@@ -213,7 +213,7 @@ type
       FMarkList: TMarkList;
       FImageIndex: Integer;
       FIndex: Integer;
-      FPos: TPoint;
+      FPosition: TBCEditorLinesPosition;
       FVisible: Boolean;
     public
       constructor Create(const AMarkList: TMarkList);
@@ -221,11 +221,11 @@ type
       property ImageIndex: Integer read FImageIndex write FImageIndex;
       property Index: Integer read FIndex write FIndex;
       property MarkList: TMarkList read FMarkList;
-      property Pos: TPoint read FPos write FPos;
+      property Position: TBCEditorLinesPosition read FPosition write FPosition;
       property Visible: Boolean read FVisible write FVisible;
     end;
 
-    TMarkList = class(TList<TMark>)
+    TMarkList = class(TObjectList<TMark>)
     private
       FLines: TBCEditorLines;
       FOnChange: TNotifyEvent;
@@ -233,10 +233,8 @@ type
       procedure Notify(const Item: TMark; Action: TCollectionNotification); override;
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     public
-      procedure Clear();
       procedure ClearLine(const ALine: Integer);
       constructor Create(const ALines: TBCEditorLines);
-      procedure Delete(AIndex: Integer);
       destructor Destroy(); override;
       function IndexOfIndex(const AIndex: Integer): Integer;
       function Remove(AValue: TMark): Integer;
@@ -582,28 +580,18 @@ begin
   FData := nil;
   FImageIndex := -1;
   FIndex := -1;
-  FPos := InvalidLinesPosition;
+  FPosition := InvalidLinesPosition;
   FVisible := True;
 end;
 
 { TBCEditorLines.TMarkList ****************************************************}
-
-procedure TBCEditorLines.TMarkList.Clear();
-var
-  LIndex: Integer;
-begin
-  for LIndex := 0 to Count - 1 do
-    Items[LIndex].Free();
-
-  inherited;
-end;
 
 procedure TBCEditorLines.TMarkList.ClearLine(const ALine: Integer);
 var
   LIndex: Integer;
 begin
   for LIndex := Count - 1 downto 0 do
-    if (Items[LIndex].Pos.Y = ALine) then
+    if (Items[LIndex].Position.Line = ALine) then
       Delete(LIndex);
 end;
 
@@ -612,13 +600,6 @@ begin
   inherited Create();
 
   FLines := ALines;
-end;
-
-procedure TBCEditorLines.TMarkList.Delete(AIndex: Integer);
-begin
-  Items[AIndex].Free();
-
-  inherited;
 end;
 
 destructor TBCEditorLines.TMarkList.Destroy();
@@ -1502,19 +1483,19 @@ begin
     try
       DoDelete(ALine);
 
-      for LIndex := FBookmarks.Count - 1 downto 0 do
-        if (FBookmarks[LIndex].Pos.Y = ALine) then
-          FBookmarks.Delete(LIndex)
-        else if (FBookmarks[LIndex].Pos.Y > ALine) then
-          FBookmarks[LIndex].Pos := Point(FBookmarks[LIndex].Pos.X, FBookmarks[LIndex].Pos.Y - 1);
-      for LIndex := FBookmarks.Count - 1 downto 0 do
-        if (FMarks[LIndex].Pos.Y = ALine) then
-          FMarks.Delete(LIndex)
-        else if (FMarks[LIndex].Pos.Y > ALine) then
-          FMarks[LIndex].Pos := Point(FMarks[LIndex].Pos.X, FMarks[LIndex].Pos.Y - 1);
-
       UndoList.Push(LUndoType, LCaretPosition, LSelArea,
         LinesArea(LBeginPosition, InvalidLinesPosition), LText);
+
+      for LIndex := FBookmarks.Count - 1 downto 0 do
+        if (FBookmarks[LIndex].Position.Line = ALine) then
+          FBookmarks.Delete(LIndex)
+        else if (FBookmarks[LIndex].Position.Line > ALine) then
+          FBookmarks.List[LIndex].Position := LinesPosition(FBookmarks[LIndex].Position.Char, FBookmarks[LIndex].Position.Line - 1);
+      for LIndex := FMarks.Count - 1 downto 0 do
+        if (FMarks[LIndex].Position.Line = ALine) then
+          FMarks.Delete(LIndex)
+        else if (FMarks[LIndex].Position.Line > ALine) then
+          FMarks[LIndex].Position := LinesPosition(FMarks[LIndex].Position.Char, FMarks[LIndex].Position.Line - 1);
     finally
       EndUpdate();
     end;
@@ -2326,11 +2307,11 @@ begin
     DoInsert(ALine, AText);
 
     for LIndex := FBookmarks.Count - 1 downto 0 do
-      if (FBookmarks[LIndex].Pos.Y > ALine) then
-        FBookmarks[LIndex].Pos := Point(FBookmarks[LIndex].Pos.X, FBookmarks[LIndex].Pos.Y + 1);
-    for LIndex := FBookmarks.Count - 1 downto 0 do
-      if (FMarks[LIndex].Pos.Y > ALine) then
-        FMarks[LIndex].Pos := Point(FMarks[LIndex].Pos.X, FMarks[LIndex].Pos.Y + 1);
+      if (FBookmarks[LIndex].Position.Line > ALine) then
+        FBookmarks[LIndex].Position := LinesPosition(FBookmarks[LIndex].Position.Char, FBookmarks[LIndex].Position.Line + 1);
+    for LIndex := FMarks.Count - 1 downto 0 do
+      if (FMarks[LIndex].Position.Line > ALine) then
+        FMarks[LIndex].Position := LinesPosition(FMarks[LIndex].Position.Char, FMarks[LIndex].Position.Line + 1);
 
     if (not (lsLoading in State)) then
     begin
@@ -2632,42 +2613,52 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
 
     procedure UpdateMarkDelete(const AMark: TMark);
     begin
-      if (AMark.Pos.Y = AArea.EndPosition.Line) then
-        if (AArea.BeginPosition.Line = AArea.EndPosition.Line) then
-          AMark.Pos :=
+      if (AMark.Position.Line = AArea.EndPosition.Line) then
+        if (AMark.Position.Line = AArea.EndPosition.Line) then
+          AMark.Position :=
+            LinesPosition(
+              AArea.BeginPosition.Char + AMark.Position.Char,
+              AArea.BeginPosition.Line)
+        else if (AArea.BeginPosition.Line = AArea.EndPosition.Line) then
+          AMark.Position :=
             Point(
-              AMark.Pos.X - (AArea.EndPosition.Char - AArea.BeginPosition.Char),
-              AMark.Pos.Y)
+              AMark.Position.Char - (AArea.EndPosition.Char - AArea.BeginPosition.Char),
+              AMark.Position.Line)
         else
-          AMark.Pos :=
+          AMark.Position :=
             Point(
-              AMark.Pos.X - AArea.EndPosition.Char,
-              AMark.Pos.Y - (AArea.EndPosition.Line - AArea.BeginPosition.Line))
+              AMark.Position.Char - AArea.EndPosition.Char,
+              AMark.Position.Line - (AArea.EndPosition.Line - AArea.BeginPosition.Line))
       else if (AArea.EndPosition.Line > AArea.BeginPosition.Line) then
-        AMark.Pos :=
+        AMark.Position :=
           Point(
-            AMark.Pos.X,
-            AMark.Pos.Y - (AArea.EndPosition.Line - AArea.BeginPosition.Line));
+            AMark.Position.Char,
+            AMark.Position.Line - (AArea.EndPosition.Line - AArea.BeginPosition.Line));
     end;
 
     procedure UpdateMarkInsert(const AMark: TMark);
     begin
-      if (AMark.Pos.Y = AArea.BeginPosition.Line) then
-        if (AArea.BeginPosition.Line = Result.Line) then
-          AMark.Pos :=
+      if (AMark.Position.Line = AArea.BeginPosition.Line) then
+        if ((AMark.Position.Line = AArea.BeginPosition.Line) and (AMark.Position.Char >= AArea.BeginPosition.Char)) then
+          AMark.Position :=
             LinesPosition(
-              AMark.Pos.X + (Result.Char - AArea.BeginPosition.Char),
-              AMark.Pos.Y)
+              AMark.Position.Char - AArea.BeginPosition.Char,
+              Result.Line)
+        else if (AArea.BeginPosition.Line = Result.Line) then
+          AMark.Position :=
+            LinesPosition(
+              AMark.Position.Char + (Result.Char - AArea.BeginPosition.Char),
+              AMark.Position.Line)
         else
           FSyncEditArea.EndPosition :=
             LinesPosition(
-              AMark.Pos.X + Result.Char,
-              AMark.Pos.Y + Result.Line - AArea.BeginPosition.Line)
+              AMark.Position.Char + Result.Char,
+              AMark.Position.Line + Result.Line - AArea.BeginPosition.Line)
       else if (Result.Line > AArea.BeginPosition.Line) then
-        AMark.Pos :=
-          Point(
-            AMark.Pos.X,
-            AMark.Pos.Y + Result.Line - AArea.BeginPosition.Line);
+        AMark.Position :=
+          LinesPosition(
+            AMark.Position.Char,
+            AMark.Position.Line + Result.Line - AArea.BeginPosition.Line);
     end;
 
   var
@@ -2687,9 +2678,11 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
       LText := TextIn[AArea];
       DoDeleteText(AArea);
       for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkDelete(FBookmarks[LIndex]);
-      for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkDelete(FMarks[LIndex]);
+        if (FBookmarks[LIndex].Position >= AArea.EndPosition) then
+          UpdateMarkDelete(FBookmarks[LIndex]);
+      for LIndex := 0 to FMarks.Count - 1 do
+        if (FMarks[LIndex].Position >= AArea.EndPosition) then
+          UpdateMarkDelete(FMarks[LIndex]);
     end;
 
     if ((AUndoType in [utBackspace, utDelete]) or (AText = '')) then
@@ -2698,9 +2691,11 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
     begin
       Result := DoInsertText(AArea.BeginPosition, AText);
       for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkInsert(FBookmarks[LIndex]);
-      for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkInsert(FMarks[LIndex]);
+        if (FBookmarks[LIndex].Position >= AArea.BeginPosition) then
+          UpdateMarkInsert(FBookmarks[LIndex]);
+      for LIndex := 0 to FMarks.Count - 1 do
+        if (FMarks[LIndex].Position >= AArea.BeginPosition) then
+          UpdateMarkInsert(FMarks[LIndex]);
     end;
 
     case (AUndoType) of

@@ -62,7 +62,8 @@ type
 
     TState = set of (esCaretInvalid, esCodeFoldingInvalid, esDoubleBufferInvalid,
       esMatchedPairInvalid, esMetricsInvalid, esMinimapInvalid, esRowsInvalid,
-      esScrollBarsInvalid, esSyncEditInvalid, esSyncEditOverlaysInvalid,
+      esScrollBarsInvalid, esSyncEditInvalid,
+      esSyncEditOverlaysInvalid,
       esCaretChanged, esFontChanged, esHighlighterChanged, esSelChanged,
       esSizeChanged, esSysFontChanged, esTextChanged,
       esDragging, esPainting, esScrolling, ecProcessingCommand,
@@ -598,6 +599,7 @@ type
     procedure InvalidateClient();
     procedure InvalidateCodeFolding();
     procedure InvalidateLineNumber(const ALine: Integer);
+    procedure InvalidateMarks();
     procedure InvalidateMatchingPair();
     procedure InvalidateMetrics();
     procedure InvalidateMinimap();
@@ -780,7 +782,7 @@ type
     procedure DragOver(ASource: TObject; X, Y: Integer; AState: TDragState; var AAccept: Boolean); overload; override;
     procedure ExpandCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
     function ExpandCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
-    function GetBookmark(const AIndex: Integer; var ALinesPosition: TBCEditorLinesPosition): Boolean;
+    function GetBookmark(const AIndex: Integer; out ALinesPosition: TBCEditorLinesPosition): Boolean;
     function GetMarks(): TBCEditorLines.TMarkList; inline;
     procedure GotoBookmark(const AIndex: Integer);
     procedure GotoNextBookmark;
@@ -925,7 +927,6 @@ type
     property Canvas;
     property CaretPos;
     property CharAt;
-    property DoubleBuffered;
     property Highlighter;
     property InsertPos;
     property Marks;
@@ -948,6 +949,7 @@ type
     property CompletionProposal;
     property Constraints;
     property Ctl3D;
+    property DoubleBuffered;
     property Enabled;
     property Font;
     property Height;
@@ -2875,7 +2877,7 @@ begin
   while LIndex < FLines.Bookmarks.Count do
   begin
     LBookmark := FLines.Bookmarks.Items[LIndex];
-    if LBookmark.Pos.Y = ALine then
+    if LBookmark.Position.Line = ALine then
     begin
       if LBookmark.Index = AIndex then
         Result := True;
@@ -2955,6 +2957,19 @@ var
 begin
   LHandled := False;
   FHookedCommandHandlers.Broadcast(True, ecTerminate, nil, LHandled);
+
+  FLines.OnBookmarksChange := nil;
+  FLines.OnCaretChange := nil;
+  FLines.OnClear := nil;
+  FLines.OnDelete := nil;
+  FLines.OnInsert := nil;
+  FLines.OnLoad := nil;
+  FLines.OnMarksChange := nil;
+  FLines.OnModifiedChange := nil;
+  FLines.OnReplacePrompt := nil;
+  FLines.OnSelChange := nil;
+  FLines.OnSyncEditChange := nil;
+  FLines.OnUpdate := nil;
 
   if (Assigned(FBuildRowsThread)) then
     FBuildRowsThread.Terminate();
@@ -5066,7 +5081,7 @@ begin
   InvalidateClient();
 end;
 
-function TCustomBCEditor.GetBookmark(const AIndex: Integer; var ALinesPosition: TBCEditorLinesPosition): Boolean;
+function TCustomBCEditor.GetBookmark(const AIndex: Integer; out ALinesPosition: TBCEditorLinesPosition): Boolean;
 var
   LIndex: Integer;
 begin
@@ -5074,7 +5089,7 @@ begin
   LIndex := FLines.Bookmarks.IndexOfIndex(AIndex);
   if (LIndex >= 0) then
   begin
-    ALinesPosition := FLines.Bookmarks[LIndex].Pos;
+    ALinesPosition := FLines.Bookmarks[LIndex].Position;
     Result := True;
   end;
 end;
@@ -5310,7 +5325,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.GotoNextBookmark;
+procedure TCustomBCEditor.GotoNextBookmark();
 var
   LIndex: Integer;
   LMark: TBCEditorLines.TMark;
@@ -5318,17 +5333,17 @@ begin
   for LIndex := 0 to FLines.Bookmarks.Count - 1 do
   begin
     LMark := FLines.Bookmarks.Items[LIndex];
-    if (LMark.Pos > FLines.CaretPosition) then
+    if (LMark.Position > FLines.CaretPosition) then
     begin
       GotoBookmark(LMark.Index);
       Exit;
     end;
   end;
-  if FLines.Bookmarks.Count > 0 then
+  if (FLines.Bookmarks.Count > 0) then
     GotoBookmark(FLines.Bookmarks.Items[0].Index);
 end;
 
-procedure TCustomBCEditor.GotoPreviousBookmark;
+procedure TCustomBCEditor.GotoPreviousBookmark();
 var
   LIndex: Integer;
   LMark: TBCEditorLines.TMark;
@@ -5336,13 +5351,13 @@ begin
   for LIndex := FLines.Bookmarks.Count - 1 downto 0 do
   begin
     LMark := FLines.Bookmarks.Items[LIndex];
-    if (LMark.Pos < FLines.CaretPosition) then
+    if (LMark.Position < FLines.CaretPosition) then
     begin
       GotoBookmark(LMark.Index);
       Exit;
     end;
   end;
-  if FLines.Bookmarks.Count > 0 then
+  if (FLines.Bookmarks.Count > 0) then
     GotoBookmark(FLines.Bookmarks.Items[FLines.Bookmarks.Count - 1].Index);
 end;
 
@@ -5647,9 +5662,9 @@ begin
   LChar := APosition.Char - 1;
   while (LChar >= 0) do
   begin
-    if (FLines.Items[APosition.Line].Text[LChar] = BCEDITOR_TAB_CHAR) then
+    if (FLines.Items[APosition.Line].Text[LChar + 1] = BCEDITOR_TAB_CHAR) then
       Exit(True)
-    else if (FLines.Items[APosition.Line].Text[LChar] = BCEDITOR_SPACE_CHAR) then
+    else if (FLines.Items[APosition.Line].Text[LChar + 1] = BCEDITOR_SPACE_CHAR) then
       Exit(False);
     Dec(LChar);
   end;
@@ -5724,6 +5739,11 @@ begin
   LRect.Right := FLineNumbersRect.Right;
   LRect.Bottom := LRect.Top + FPaintHelper.RowHeight;
   InvalidateRect(LRect);
+end;
+
+procedure TCustomBCEditor.InvalidateMarks();
+begin
+  InvalidateRect(FMarksRect);
 end;
 
 procedure TCustomBCEditor.InvalidateMatchingPair();
@@ -7073,7 +7093,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
         LRect.Top := FMarksRect.Top + (LRow - APaintHelper.TopRow) * APaintHelper.RowHeight;
         LRect.Bottom := LRect.Top + APaintHelper.RowHeight;
 
-        if (LRow <= AEndRow) then
+        if ((LRow <= AEndRow) and (LRow < FRows.Count)) then
           LLine := FRows.Items[LRow].Line
         else
           LLine := -1;
@@ -7098,14 +7118,14 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
 
                 LBookmark := nil;
                 for LIndex := FLines.Bookmarks.Count - 1 downto 0 do
-                  if (FLines.Bookmarks[LIndex].Pos.Y = LLine) then
+                  if (FLines.Bookmarks[LIndex].Position.Line = LLine) then
                     LBookmark := FLines.Bookmarks[LIndex];
                 if (Assigned(LBookmark)) then
                   APaintHelper.Graphics.DrawCachedBitmap(FBookmarkBitmaps[LBookmark.Index], LLeft, LRect.Top);
 
                 LMark := nil;
                 for LIndex := FLines.Marks.Count - 1 downto 0 do
-                  if (FLines.Marks[LIndex].Pos.Y = LLine) then
+                  if (FLines.Marks[LIndex].Position.Line = LLine) then
                     LBookmark := FLines.Marks[LIndex];
                 if (Assigned(LMark)) then
                 begin
@@ -7174,7 +7194,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
         LRect.Top := FLineNumbersRect.Top + (LRow - APaintHelper.TopRow) * APaintHelper.RowHeight;
         LRect.Bottom := LRect.Top + APaintHelper.RowHeight;
 
-        if (LRow <= AEndRow) then
+        if ((LRow <= AEndRow) and (LRow < FRows.Count)) then
           LLine := FRows.Items[LRow].Line
         else
           LLine := -1;
@@ -7275,7 +7295,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
         LRect.Top := FLineStatesRect.Top + (LRow - APaintHelper.TopRow) * APaintHelper.RowHeight;
         LRect.Bottom := LRect.Top + APaintHelper.RowHeight;
 
-        if (LRow <= AEndRow) then
+        if ((LRow <= AEndRow) and (LRow < FRows.Count)) then
           LLine := FRows.Items[LRow].Line
         else
           LLine := -1;
@@ -7344,7 +7364,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
         LRect.Top := FCodeFoldingRect.Top + (LRow - APaintHelper.TopRow) * APaintHelper.RowHeight;
         LRect.Bottom := LRect.Top + APaintHelper.RowHeight;
 
-        if (LRow <= AEndRow) then
+        if ((LRow <= AEndRow) and (LRow < FRows.Count)) then
           LLine := FRows.Items[LRow].Line
         else
           LLine := -1;
@@ -7611,7 +7631,8 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
       cjPaintOverlays:
         if (APaintOverlays
           and (esScrolling in FState)
-          and FScrollingRect.IntersectsWith(AClipRect)) then
+          and FScrollingRect.IntersectsWith(AClipRect)
+          and DoubleBuffered) then
           APaintHelper.Graphics.DrawCachedBitmap(FScrollingBitmap, FScrollingRect.Left, FScrollingRect.Top);
       cjMouseDown:
         if (esScrolling in FState) then
@@ -8120,7 +8141,7 @@ begin
       if ((AJob = cjPaint) and LRect.IntersectsWith(LClipRect)
         or (AJob <> cjPaint) and LMouseRect.Contains(ACursorPos)) then
       begin
-        if (LRow <= AEndRow) then
+        if ((LRow <= AEndRow) and (LRow < FRows.Count)) then
           LLine := FRows.Items[LRow].Line
         else
           LLine := -1;
@@ -8142,7 +8163,10 @@ begin
             and (AJob <> cjScrolling)) then
           begin
             LLeft := FTextPos.X;
-            Dec(LRect.Left, FTextPos.X);
+            if (LIsBuildMinimapThread) then
+              LRect.Left := 0
+            else
+              Dec(LRect.Left, FTextPos.X);
             if (LIsBuildMinimapThread) then
               FLines.CriticalSection.Enter();
             try
@@ -8167,6 +8191,7 @@ begin
                 end;
 
                 repeat
+
                   Result := Result or ProcessToken(AJob, ATextRect,
                     APaintHelper, LClipRect,
                     AButton, AShift, ACursorPos, LRect,
@@ -10121,9 +10146,9 @@ begin
             LNewTextPos.Y := LTextPos.Y
           else
             LNewTextPos.Y := Max(0, FRows.CaretPosition.Row - FPaintHelper.UsableRows div 2) * FPaintHelper.RowHeight;
-        if (LTextPos.Y > LNewTextPos.Y + (FPaintHelper.UsableRows - 1) * FPaintHelper.RowHeight) then
+        if (LTextPos.Y > LNewTextPos.Y + FPaintHelper.UsableRows * FPaintHelper.RowHeight) then
           if (not (esCenterCaret in FState)) then
-            LNewTextPos.Y := LTextPos.Y - (FPaintHelper.UsableRows - 1) * FPaintHelper.RowHeight
+            LNewTextPos.Y := LTextPos.Y - FPaintHelper.UsableRows * FPaintHelper.RowHeight
           else
             LNewTextPos.Y := Max(0, FRows.CaretPosition.Row - FPaintHelper.UsableRows div 2) * FPaintHelper.RowHeight;
       end;
@@ -10153,11 +10178,13 @@ begin
       FLines.Bookmarks.Delete(LIndex);
 
     LBookmark := TBCEditorLines.TMark.Create(FLines.Bookmarks);
-    LBookmark.Pos := ALinesPosition;
+    LBookmark.Position := ALinesPosition;
     LBookmark.ImageIndex := Min(AIndex, BCEDITOR_BOOKMARKS - 1);
     LBookmark.Index := AIndex;
     LBookmark.Visible := True;
     FLines.Bookmarks.Add(LBookmark);
+
+    InvalidateMarks();
   end;
 end;
 
@@ -10432,7 +10459,7 @@ begin
     LMark := TBCEditorLines.TMark.Create(FLines.Marks);
     with LMark do
     begin
-      Pos := ALinesPosition;
+      Position := ALinesPosition;
       ImageIndex := AImageIndex;
       Index := AIndex;
       Visible := True;
@@ -11085,10 +11112,7 @@ begin
   try
     case (FRowsWanted.What) of
       rwPaintText:
-        InvalidateRect(
-          Rect(
-            0, (FRowsWanted.Row - FPaintHelper.TopRow) * FPaintHelper.RowHeight,
-            FTextRect.Right, FTextRect.Bottom));
+        InvalidateText();
       rwScrollToPosition:
         begin
           if (FRowsWanted.CenterCaret) then
@@ -11099,6 +11123,7 @@ begin
             if (FRowsWanted.CenterCaret) then
               Exclude(FState, esCenterCaret);
           end;
+          InvalidateText();
         end;
       rwDown:
         DoUpOrDown(FRowsWanted.Row - FRows.CaretPosition.Row, FRowsWanted.Select);
