@@ -879,28 +879,18 @@ type
     procedure ActivateHint(const X, Y: Integer; const AHint: string);
     procedure AddHighlighterKeywords(AStringList: TStrings);
     procedure Assign(ASource: TPersistent); override;
-    procedure BeginUndoBlock(); deprecated 'Use Lines.EndUpdate()'; // 2017-07-12
     procedure BeginUpdate();
     function CharIndexToPos(const ACharIndex: Integer): TPoint; {$IFNDEF Debug} inline; {$ENDIF}
-    procedure Clear(); virtual; deprecated 'Use Lines.Clear()';
     function ClientToPos(const X, Y: Integer): TPoint; {$IFNDEF Debug} inline; {$ENDIF}
-    function ClientToText(const X, Y: Integer): TPoint; deprecated 'Use ClientToPos'; // 2017-05-13
-    function CharAtCursor(): Char; deprecated 'Use CharAt[CaretPos]'; // 2017-04-05
-    procedure CommandProcessor(ACommand: TBCEditorCommand; AChar: Char; AData: Pointer); deprecated 'Use ProcessCommand'; // 2017-08-11
     procedure CopyToClipboard();
     constructor Create(AOwner: TComponent); override;
     procedure CutToClipboard();
     destructor Destroy(); override;
-    procedure DoRedo(); deprecated 'Use Redo()'; // 2017-02-12
-    procedure DoUndo(); deprecated 'Use Undo()'; // 2017-02-12
     procedure DragDrop(ASource: TObject; X, Y: Integer); override;
-    procedure EndUndoBlock(); deprecated 'Use Lines.EndUpdate()'; // 2017-07-12
     procedure EndUpdate();
     function ExecuteAction(Action: TBasicAction): Boolean; override;
     procedure ExportToHTML(const AFileName: string; const ACharSet: string = ''; AEncoding: TEncoding = nil); overload;
     procedure ExportToHTML(AStream: TStream; const ACharSet: string = ''; AEncoding: TEncoding = nil); overload;
-    procedure LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromFile'; // 2017-03-10
-    procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromStream'; // 2017-03-10
     procedure PasteFromClipboard();
     function PostCommand(const ACommand: TBCEditorCommand;
       const AData: TBCEditorCommandData = nil): Boolean;
@@ -910,15 +900,9 @@ type
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure RegisterCommandHandler(const AProc: Pointer; const AHandlerData: Pointer); overload;
     procedure RegisterCommandHandler(const AProc: TBCEditorHookedCommandObjectProc); overload;
-    procedure SaveToFile(const AFileName: string; AEncoding: TEncoding = nil); deprecated 'Use Lines.SaveToFile'; // 2017-10-22
-    procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); deprecated 'Use Lines.SaveToStream'; // 2017-10-22
     procedure SelectAll();
-    function SelectedText(): string; deprecated 'Use SelText'; // 2017-03-16
-    function SelectionAvailable: Boolean; deprecated 'Use SelLength <> 0'; // 2017-07-16
     procedure SetFocus(); override;
     procedure Sort(const ASortOrder: TBCEditorSortOrder = soAsc; const ACaseSensitive: Boolean = False);
-    function TextBetween(const ABeginPosition, AEndPosition: TBCEditorLinesPosition): string; deprecated 'Use SelStart := PosToCharIndex(BeginPos); SelLength := SelStart + PosToCharIndex(EndPos); Result := SelText;'; // 2017-07-23
-    function TextCaretPosition(): TBCEditorLinesPosition; deprecated 'Use CaretPos'; // 2017-02-12
     procedure ToggleSelectedCase(const ACase: TBCEditorCase = cNone);
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
     function UpdateAction(Action: TBasicAction): Boolean; override;
@@ -926,7 +910,6 @@ type
       const AHandlerData: Pointer); overload;
     procedure UnregisterCommandHandler(const AProc: TBCEditorHookedCommandObjectProc); overload;
     procedure WndProc(var AMessage: TMessage); override;
-    function WordAtCursor(): string; deprecated 'Use WordAt[CaretPos]'; // 2017-03-13
   end;
 
 type
@@ -2183,11 +2166,6 @@ begin
   FLeftMargin.Assign(TCustomBCEditor(ASource).LeftMargin);
 end;
 
-procedure TCustomBCEditor.BeginUndoBlock();
-begin
-  FLines.BeginUpdate();
-end;
-
 procedure TCustomBCEditor.BeginUpdate();
 begin
   if (FUpdateCount = 0) then SetUpdateState(True);
@@ -2365,22 +2343,9 @@ begin
   FMinimap.ChangeScale(M, D);
 end;
 
-function TCustomBCEditor.CharAtCursor(): Char;
-begin
-  if (FLines.Count = 0) then
-    Result := BCEDITOR_NONE_CHAR
-  else
-    Result := FLines.Char[FLines.CaretPosition];
-end;
-
 function TCustomBCEditor.CharIndexToPos(const ACharIndex: Integer): TPoint;
 begin
   Result := FLines.PositionOf(ACharIndex);
-end;
-
-procedure TCustomBCEditor.Clear();
-begin
-  FLines.Clear();
 end;
 
 procedure TCustomBCEditor.ClearUndo();
@@ -2527,11 +2492,6 @@ begin
   Result := ClientToLines(X, Y);
 end;
 
-function TCustomBCEditor.ClientToText(const X, Y: Integer): TPoint;
-begin
-  Result := ClientToPos(X, Y);
-end;
-
 procedure TCustomBCEditor.CMSysFontChanged(var AMessage: TMessage);
 begin
   if (Assigned(FHintWindow)) then
@@ -2669,10 +2629,6 @@ end;
 procedure TCustomBCEditor.ColorsChanged(ASender: TObject);
 begin
   InvalidateClient();
-end;
-
-procedure TCustomBCEditor.CommandProcessor(ACommand: TBCEditorCommand; AChar: Char; AData: Pointer);
-begin
 end;
 
 procedure TCustomBCEditor.CopyToClipboard();
@@ -3996,11 +3952,6 @@ begin
   SetCaretPosition(AData^.Pos, AData^.Selection);
 end;
 
-procedure TCustomBCEditor.DoRedo();
-begin
-  Redo();
-end;
-
 procedure TCustomBCEditor.DoReplace(const AData: PBCEditorCommandDataReplace);
 var
   LArea: TBCEditorLinesArea;
@@ -4355,11 +4306,6 @@ begin
   FLines.SelArea := FLines.LineArea[FLines.CaretPosition.Line];
 
   FLastDoubleClickTime := 0;
-end;
-
-procedure TCustomBCEditor.DoUndo();
-begin
-  Undo();
 end;
 
 procedure TCustomBCEditor.DoUnselect();
@@ -4850,11 +4796,6 @@ procedure TCustomBCEditor.EMUndo(var AMessage: TMessage);
 begin
   AMessage.Result := LRESULT(CanUndo);
   Undo();
-end;
-
-procedure TCustomBCEditor.EndUndoBlock();
-begin
-  FLines.EndUpdate();
 end;
 
 procedure TCustomBCEditor.EndUpdate();
@@ -6335,16 +6276,6 @@ begin
     Include(FState, esTextChanged)
   else
     Change();
-end;
-
-procedure TCustomBCEditor.LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil);
-begin
-  FLines.LoadFromFile(AFileName, AEncoding);
-end;
-
-procedure TCustomBCEditor.LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil);
-begin
-  FLines.LoadFromStream(AStream, AEncoding);
 end;
 
 procedure TCustomBCEditor.MarksChanged(ASender: TObject);
@@ -9325,16 +9256,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.SaveToFile(const AFileName: string; AEncoding: TEncoding = nil);
-begin
-  FLines.SaveToFile(AFileName, AEncoding);
-end;
-
-procedure TCustomBCEditor.SaveToStream(AStream: TStream; AEncoding: TEncoding = nil);
-begin
-  FLines.SaveToStream(AStream, AEncoding);
-end;
-
 procedure TCustomBCEditor.ScanCodeFolding();
 var
   LIndex: Integer;
@@ -10220,16 +10141,6 @@ begin
   ProcessCommand(ecSelectAll);
 end;
 
-function TCustomBCEditor.SelectedText(): string;
-begin
-  Result := SelText;
-end;
-
-function TCustomBCEditor.SelectionAvailable: Boolean;
-begin
-  Result := SelLength <> 0;
-end;
-
 procedure TCustomBCEditor.SetBookmark(const AIndex: Integer; const ALinesPosition: TBCEditorLinesPosition);
 var
   LBookmark: TBCEditorLines.TMark;
@@ -11035,22 +10946,6 @@ procedure TCustomBCEditor.SyncEditChecked(const AData: Pointer);
 begin
   if (lsSyncEditAvailable in FLines.State) then
     InvalidateSyncEditButton();
-end;
-
-function TCustomBCEditor.TextBetween(const ABeginPosition, AEndPosition: TBCEditorLinesPosition): string;
-var
-  LSelArea: TBCEditorLinesArea;
-begin
-  LSelArea := FLines.SelArea;
-  SelStart := PosToCharIndex(Min(ABeginPosition, AEndPosition));
-  SelLength := SelStart + PosToCharIndex(Max(ABeginPosition, AEndPosition));
-  Result := SelText;
-  FLines.SelArea := LSelArea;
-end;
-
-function TCustomBCEditor.TextCaretPosition(): TBCEditorLinesPosition;
-begin
-  Result := FLines.CaretPosition;
 end;
 
 function TCustomBCEditor.TokenColumns(const AText: PChar;
@@ -12215,11 +12110,6 @@ begin
   end;
 
   inherited;
-end;
-
-function TCustomBCEditor.WordAtCursor(): string;
-begin
-  Result := GetWordAt(CaretPos);
 end;
 
 function TCustomBCEditor.WordBegin(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition;
