@@ -2613,7 +2613,9 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
 
     procedure UpdateMarkDelete(const AMark: TMark);
     begin
-      if (AMark.Position.Line = AArea.EndPosition.Line) then
+      if (AArea.Contains(AMark.Position)) then
+        AMark.Position := AArea.BeginPosition
+      else if (AMark.Position.Line = AArea.EndPosition.Line) then
         if (AMark.Position.Line = AArea.EndPosition.Line) then
           AMark.Position :=
             LinesPosition(

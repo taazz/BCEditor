@@ -450,8 +450,6 @@ type
     FScrollingEnabled: Boolean;
     FScrollingPoint: TPoint;
     FScrollingRect: TRect;
-    FSelectedCaseCycle: TBCEditorCase;
-    FSelectedCaseText: string;
     FSelectionOptions: TBCEditorSelectionOptions;
     FSpecialCharsNullText: string;
     FState: TState;
@@ -493,8 +491,10 @@ type
     procedure DeleteLineFromRows(const ALine: Integer);
     procedure DoBackspaceKey();
     procedure DoBlockComment;
+    procedure DoBlockIndent(const ACommand: TBCEditorCommand);
     procedure DoBOL(const ASelectionCommand: Boolean);
     procedure DoChar(const AData: PBCEditorCommandDataChar);
+    procedure DoCompletionProposal(); virtual;
     procedure DoCopyToClipboard();
     procedure DoCutToClipboard();
     procedure DoDeleteToEOL();
@@ -506,6 +506,7 @@ type
     function DoFindBackwards(const AData: PBCEditorCommandDataFind): Boolean;
     procedure DoFindFirst(const AData: PBCEditorCommandDataFind);
     function DoFindForewards(const AData: PBCEditorCommandDataFind): Boolean;
+    procedure DoGotoMatchingPair();
     procedure DoInsertText(const AText: string);
     procedure DoLeftOrRightKey(const ACommand: TBCEditorCommand);
     procedure DoLineComment();
@@ -522,6 +523,7 @@ type
     procedure DoShowGotoLine();
     procedure DoShowReplace();
     procedure DoSetBookmark(const ACommand: TBCEditorCommand);
+    procedure DoSyncEdit();
     procedure DoTabKey(const ACommand: TBCEditorCommand);
     procedure DoText(const AData: PBCEditorCommandDataText);
     procedure DoToggleSelectedCase(const ACommand: TBCEditorCommand);
@@ -556,6 +558,7 @@ type
     procedure EMSetSel(var AMessage: TMessage); message EM_SETSEL;
     procedure EMSetTabStop(var AMessage: TMessage); message EM_SETTABSTOPS;
     procedure EMUndo(var AMessage: TMessage); message EM_UNDO;
+    function ExpandCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
     procedure ExpandCodeFoldingRange(const ARange: TBCEditorCodeFoldingRanges.TRange);
     procedure FindDialogClose(Sender: TObject);
     procedure FindDialogFind(Sender: TObject);
@@ -663,6 +666,7 @@ type
     function RowsToText(ARowsPosition: TBCEditorRowsPosition;
       const AVisibleOnly: Boolean = False): TPoint;
     procedure ScanCodeFolding();
+    procedure ScanCodeFoldingRanges(); virtual;
     procedure ScrollTo(AValue: TPoint); overload; inline;
     procedure ScrollTo(ATextPos: TPoint; const AAlignToRow: Boolean); overload;
     procedure ScrollTo(AX, AY: Integer); overload; inline;
@@ -705,6 +709,7 @@ type
     procedure SetWantReturns(const AValue: Boolean);
     procedure SetWordBlock(const ALinesPosition: TBCEditorLinesPosition);
     procedure SetWordWrap(const AValue: Boolean);
+    function SplitTextIntoWords(AStringList: TStrings; const ACaseSensitive: Boolean): string;
     procedure SyncEditActivated(const AData: Pointer);
     procedure SyncEditChecked(const AData: Pointer);
     function TokenColumns(const AText: PChar; const ALength, AColumn: Integer): Integer; {$IFNDEF Debug} inline; {$ENDIF}
@@ -764,29 +769,20 @@ type
     procedure Change(); virtual;
     procedure ChangeScale(M, D: Integer); override;
     procedure ClearUndo();
-    procedure CollapseCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
-    function CollapseCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
-    function CreateLines(): BCEditor.Lines.TBCEditorLines;
+    function CreateLines(): BCEditor.Lines.TBCEditorLines; virtual;
     procedure CreateParams(var AParams: TCreateParams); override;
     procedure CreateWnd(); override;
     function DeleteBookmark(const ALine: Integer; const AIndex: Integer): Boolean; overload;
     procedure DestroyWnd(); override;
-    procedure DoBlockIndent(const ACommand: TBCEditorCommand);
-    procedure DoCompletionProposal(); virtual;
-    procedure DoGotoMatchingPair();
     function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
     function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
-    procedure DoSyncEdit();
-    procedure DoTripleClick();
     procedure DragCanceled(); override;
     procedure DragOver(ASource: TObject; X, Y: Integer; AState: TDragState; var AAccept: Boolean); overload; override;
-    procedure ExpandCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
-    function ExpandCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
     function GetBookmark(const AIndex: Integer; out ALinesPosition: TBCEditorLinesPosition): Boolean;
     function GetMarks(): TBCEditorLines.TMarkList; inline;
     procedure GotoBookmark(const AIndex: Integer);
-    procedure GotoNextBookmark;
-    procedure GotoPreviousBookmark;
+    procedure GotoNextBookmark();
+    procedure GotoPreviousBookmark();
     function IsCommentChar(const AChar: Char): Boolean;
     function IsEmptyChar(const AChar: Char): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     function IsWordBreakChar(const AChar: Char): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
@@ -802,19 +798,15 @@ type
     procedure Paint(); override;
     procedure ReadState(Reader: TReader); override;
     procedure Resize(); override;
-    procedure ScanCodeFoldingRanges(); virtual;
     procedure SetBookmark(const AIndex: Integer; const ALinesPosition: TBCEditorLinesPosition);
     procedure SetLineColor(const ALine: Integer; const AForegroundColor, ABackgroundColor: TColor);
     procedure SetMark(const AIndex: Integer; const ALinesPosition: TBCEditorLinesPosition;
       const AImageIndex: Integer);
     procedure SetParent(AParent: TWinControl); override;
-    procedure SetUndoOption(const AOption: TBCEditorUndoOption; const AEnabled: Boolean);
     procedure SetUpdateState(AUpdating: Boolean); virtual;
-    function SplitTextIntoWords(AStringList: TStrings; const ACaseSensitive: Boolean): string;
     function WordBegin(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     function WordEnd(): TBCEditorLinesPosition; overload; {$IFNDEF Debug} inline; {$ENDIF}
     function WordEnd(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
-    property AllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges read FAllCodeFoldingRanges;
     property AfterProcessCommand: TBCEditorAfterProcessCommandEvent read FAfterProcessCommand write FAfterProcessCommand;
     property BeforeProcessCommand: TBCEditorBeforeProcessCommandEvent read FBeforeProcessCommand write FBeforeProcessCommand;
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle default bsSingle;
@@ -823,6 +815,7 @@ type
     property CanUndo: Boolean read GetCanUndo;
     property CaretPos: TPoint read GetCaretPos write SetCaretPos;
     property CharAt[Pos: TPoint]: Char read GetCharAt;
+    property Color default clWindow;
     property Colors: BCEditor.Properties.TBCEditorColors read GetColors write SetColors stored IsColorsStored;
     property CompletionProposal: BCEditor.Properties.TBCEditorCompletionProposal read GetCompletionProposal write SetCompletionProposal stored IsCompletionProposalStored;
     property Cursor: TCursor read GetCursor write SetCursor;
@@ -905,7 +898,6 @@ type
     procedure SelectAll();
     procedure SetFocus(); override;
     procedure Sort(const ASortOrder: TBCEditorSortOrder = soAsc; const ACaseSensitive: Boolean = False);
-    procedure ToggleSelectedCase(const ACase: TBCEditorCase = cNone);
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
     function UpdateAction(Action: TBasicAction): Boolean; override;
     procedure UnregisterCommandHandler(const AProc: Pointer;
@@ -944,7 +936,7 @@ type
     property Anchors;
     property BeforeProcessCommand;
     property BorderStyle;
-    property Color default clWindow;
+    property Color;
     property Colors;
     property CompletionProposal;
     property Constraints;
@@ -2529,80 +2521,6 @@ begin
       Result := LRange;
 end;
 
-procedure TCustomBCEditor.CollapseCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
-var
-  LFirstLine: Integer;
-  LLastLine: Integer;
-  LLevel: Integer;
-  LLine: Integer;
-  LRange: TBCEditorCodeFoldingRanges.TRange;
-  LRangeLevel: Integer;
-begin
-  if (not FLines.SelArea.IsEmpty()) then
-  begin
-    LFirstLine := FLines.SelArea.BeginPosition.Line;
-    LLastLine := FLines.SelArea.EndPosition.Line;
-  end
-  else
-  begin
-    LFirstLine := FLines.BOFPosition.Line;
-    LLastLine := FLines.EOFPosition.Line;
-  end;
-
-  BeginUpdate();
-
-  LLevel := -1;
-  for LLine := LFirstLine to LLastLine do
-  begin
-    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
-    if (Assigned(LRange)) then
-    begin
-      if (LLevel = -1) then
-        LLevel := LRange.FoldRangeLevel;
-      LRangeLevel := LRange.FoldRangeLevel - LLevel;
-      if ((AFirstLevel <= LRangeLevel) and (LRangeLevel <= ALastLevel)
-        and not LRange.Collapsed and LRange.Collapsable) then
-        CollapseCodeFoldingRange(LRange);
-    end;
-  end;
-
-  EndUpdate();
-end;
-
-function TCustomBCEditor.CollapseCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
-var
-  LFirstLine: Integer;
-  LLastLine: Integer;
-  LLine: Integer;
-  LRange: TBCEditorCodeFoldingRanges.TRange;
-begin
-  if (AFirstLine >= 0) then
-    LFirstLine := AFirstLine
-  else
-    LFirstLine := 0;
-  if (ALastLine >= 0) then
-    LLastLine := ALastLine
-  else if (AFirstLine >= 0) then
-    LLastLine := AFirstLine
-  else
-    LLastLine := FLines.Count - 1;
-
-  BeginUpdate();
-
-  Result := 0;
-  for LLine := LFirstLine to LLastLine do
-  begin
-    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
-    if (Assigned(LRange) and not LRange.Collapsed and LRange.Collapsable) then
-    begin
-      CollapseCodeFoldingRange(LRange);
-      Inc(Result);
-    end;
-  end;
-
-  EndUpdate();
-end;
-
 procedure TCustomBCEditor.CollapseCodeFoldingRange(const ARange: TBCEditorCodeFoldingRanges.TRange);
 var
   LLine: Integer;
@@ -2719,7 +2637,6 @@ begin
   FReplaceDialog := nil;
   FRowsWanted.What := rwNothing;
   FRowsWanted.Minimap := False;
-  FSelectedCaseText := '';
   FSelectionOptions := DefaultSelectionOptions;
   FState := [esSysFontChanged, esMetricsInvalid];
   FSyncEditButtonHotBitmap := nil;
@@ -4316,13 +4233,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoTripleClick();
-begin
-  FLines.SelArea := FLines.LineArea[FLines.CaretPosition.Line];
-
-  FLastDoubleClickTime := 0;
-end;
-
 procedure TCustomBCEditor.DoUnselect();
 begin
   FLines.SelArea := LinesArea(FLines.CaretPosition, FLines.CaretPosition);
@@ -4817,46 +4727,6 @@ procedure TCustomBCEditor.EndUpdate();
 begin
   Dec(FUpdateCount);
   if (FUpdateCount = 0) then SetUpdateState(False);
-end;
-
-procedure TCustomBCEditor.ExpandCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
-var
-  LFirstLine: Integer;
-  LLastLine: Integer;
-  LLevel: Integer;
-  LLine: Integer;
-  LRange: TBCEditorCodeFoldingRanges.TRange;
-  LRangeLevel: Integer;
-begin
-  if (not FLines.SelArea.IsEmpty()) then
-  begin
-    LFirstLine := FLines.SelArea.BeginPosition.Line;
-    LLastLine := FLines.SelArea.EndPosition.Line;
-  end
-  else
-  begin
-    LFirstLine := 0;
-    LLastLine := FLines.Count - 1;
-  end;
-
-  BeginUpdate();
-
-  LLevel := -1;
-  for LLine := LFirstLine to LLastLine do
-  begin
-    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
-    if (Assigned(LRange)) then
-    begin
-      if LLevel = -1 then
-        LLevel := LRange.FoldRangeLevel;
-      LRangeLevel := LRange.FoldRangeLevel - LLevel;
-      if ((AFirstLevel <= LRangeLevel) and (LRangeLevel <= ALastLevel)
-        and LRange.Collapsed) then
-        ExpandCodeFoldingRange(LRange);
-    end;
-  end;
-
-  EndUpdate();
 end;
 
 function TCustomBCEditor.ExpandCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
@@ -10643,27 +10513,6 @@ begin
   FLines.Text := AValue;
 end;
 
-procedure TCustomBCEditor.SetUndoOption(const AOption: TBCEditorUndoOption; const AEnabled: Boolean);
-begin
-  case (AOption) of
-    uoGroupUndo:
-      if (AEnabled) then
-        FLines.Options := FLines.Options + [loUndoGrouped]
-      else
-        FLines.Options := FLines.Options - [loUndoGrouped];
-    uoUndoAfterLoad:
-      if (AEnabled) then
-        FLines.Options := FLines.Options + [loUndoAfterLoad]
-      else
-        FLines.Options := FLines.Options - [loUndoAfterLoad];
-    uoUndoAfterSave:
-      if (AEnabled) then
-        FLines.Options := FLines.Options + [loUndoAfterSave]
-      else
-        FLines.Options := FLines.Options - [loUndoAfterSave];
-  end;
-end;
-
 procedure TCustomBCEditor.SetUndoOptions(AOptions: TBCEditorUndoOptions);
 var
   LLinesOptions: TBCEditorLines.TOptions;
@@ -11007,42 +10856,6 @@ begin
       AText, ALength, AToken);
     Result := LRect.Left;
   end;
-end;
-
-procedure TCustomBCEditor.ToggleSelectedCase(const ACase: TBCEditorCase = cNone);
-var
-  LCommand: TBCEditorCommand;
-  LSelArea: TBCEditorLinesArea;
-begin
-  if AnsiUpperCase(SelText) <> AnsiUpperCase(FSelectedCaseText) then
-  begin
-    FSelectedCaseCycle := cUpper;
-    FSelectedCaseText := SelText;
-  end;
-  if ACase <> cNone then
-    FSelectedCaseCycle := ACase;
-
-  BeginUpdate();
-
-  LSelArea := LinesArea(FLines.SelBeginPosition, FLines.SelEndPosition);
-  LCommand := ecNone;
-  case FSelectedCaseCycle of
-    cUpper: { UPPERCASE }
-      LCommand := ecUpperCase;
-    cLower: { lowercase }
-      LCommand := ecLowerCase;
-    cOriginal: { Original text }
-      SelText := FSelectedCaseText;
-  end;
-  if FSelectedCaseCycle <> cOriginal then
-    ProcessCommand(LCommand);
-  FLines.SelArea := LSelArea;
-
-  EndUpdate();
-
-  Inc(FSelectedCaseCycle);
-  if FSelectedCaseCycle > cOriginal then
-    FSelectedCaseCycle := cUpper;
 end;
 
 procedure TCustomBCEditor.UMFindAllAreas(var AMessage: TMessage);
