@@ -929,6 +929,7 @@ type
     property SelText;
     property Text;
     property TextOverwrite;
+    property TopLine;
     property WordAt;
   published
     property AfterProcessCommand;
@@ -994,7 +995,6 @@ type
     property TabOrder;
     property TabStop;
     property TabWidth;
-    property TopLine;
     property Tag;
     property UndoOptions;
     property Visible;

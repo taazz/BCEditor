@@ -23,13 +23,10 @@ type
     property Value: string read FValue write FValue;
   end;
 
-  TBCEditorCompletionProposalItems = class(TList<TBCEditorCompletionProposalItem>)
-  strict private
-    FOwner: TPersistent;
+  TBCEditorCompletionProposalItems = class(TObjectList<TBCEditorCompletionProposalItem>)
   public
     function Add(): TBCEditorCompletionProposalItem; reintroduce;
     procedure Assign(ASource: TBCEditorCompletionProposalItems);
-    constructor Create(AOwner: TPersistent);
     function Insert(const AIndex: Integer): TBCEditorCompletionProposalItem; reintroduce;
   end;
 
@@ -634,13 +631,6 @@ begin
     Add().Assign(ASource[LIndex]);
 end;
 
-constructor TBCEditorCompletionProposalItems.Create(AOwner: TPersistent);
-begin
-  inherited Create();
-
-  FOwner := AOwner;
-end;
-
 function TBCEditorCompletionProposalItems.Insert(const AIndex: Integer): TBCEditorCompletionProposalItem;
 begin
   Result := TBCEditorCompletionProposalItem.Create();
@@ -730,7 +720,7 @@ begin
   FFont := TFont.Create;
   FFont.Name := 'Courier New';
   FFont.Size := 8;
-  FItems := TBCEditorCompletionProposalItems.Create(Self);
+  FItems := TBCEditorCompletionProposalItems.Create();
   FTitle := TTitle.Create;
   FVisible := True;
   FWidth := 0;

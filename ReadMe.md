@@ -13,8 +13,8 @@ A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VC
 * Word wrap
 * Code folding
 * Synchron edit
-* Completion proposal
-* Undo, redo
+* Completion proposal popup window
+* Unlimited undo and redo
 * Macro recorder
 * Fonts with variable character width
 * Windows DPI Aware
@@ -31,9 +31,8 @@ A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VC
   begin
     Highlighter.LoadFromFile('JSON.json');
     Highlighter.Colors.LoadFromFile('Default.json'); 
-    LoadFromFile(GetHighlighterFileName('JSON.json')); 
     ...
-    Lines.Text := Highlighter.Info.General.Sample; 
+    Text := Highlighter.Info.General.Sample; 
   end;
 ```
 <b>Note!</b> LoadFromStream / LoadFromResource does not support multi-highlighters (for example HTML with Scripts.json). Override TBCBaseEditor.CreateFileStream function, if you want to load multi-highlighters from a stream.
