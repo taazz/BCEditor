@@ -200,7 +200,7 @@ var
     LIndex: Integer;
     LItems: TBCEditorCompletionProposalItems;
     LMaxWidth: Integer;
-    LProposalColumn: TBCEditorCompletionProposalColumns.TColumn;
+    LProposalColumn: TBCEditorCompletionProposalColumn;
     LTempWidth: Integer;
     LVisibleColumnCount: Integer;
     LWidthSum: Integer;
@@ -254,7 +254,7 @@ var
 
   function GetTitleVisible: Boolean;
   var
-    LColumn: TBCEditorCompletionProposalColumns.TColumn;
+    LColumn: TBCEditorCompletionProposalColumn;
     LColumnIndex: Integer;
   begin
     Result := False;
@@ -336,7 +336,7 @@ end;
 
 function TBCEditorCompletionProposalPopup.GetItemHeight(): Integer;
 var
-  LColumn: TBCEditorCompletionProposalColumns.TColumn;
+  LColumn: TBCEditorCompletionProposalColumn;
   LColumnIndex: Integer;
   LHeight: Integer;
 begin
@@ -360,7 +360,7 @@ end;
 
 function TBCEditorCompletionProposalPopup.GetTitleHeight(): Integer;
 var
-  LColumn: TBCEditorCompletionProposalColumns.TColumn;
+  LColumn: TBCEditorCompletionProposalColumn;
   LColumnIndex: Integer;
   LHeight: Integer;
 begin
@@ -615,7 +615,7 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.Paint();
 var
-  LColumn: TBCEditorCompletionProposalColumns.TColumn;
+  LColumn: TBCEditorCompletionProposalColumn;
   LColumnIndex: Integer;
   LColumnWidth: Integer;
   LIndex: Integer;

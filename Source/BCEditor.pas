@@ -3292,7 +3292,6 @@ var
   LControl: TWinControl;
   LCurrentInput: string;
   LIndex: Integer;
-  LItem: TBCEditorCompletionProposalItems.TItem;
   LItems: TStrings;
   LPoint: TPoint;
 begin
@@ -3326,11 +3325,10 @@ begin
         Items.Clear;
       for LIndex := 0 to LItems.Count - 1 do
       begin
-        LItem := Items.Add;
-        LItem.Value := LItems[LIndex];
+        Items.Add().Value := LItems[LIndex];
         { Add empty items for columns }
         for LColumnIndex := 1 to FCompletionProposal.Columns.Count - 1 do
-          FCompletionProposal.Columns[LColumnIndex].Items.Add;
+          FCompletionProposal.Columns[LColumnIndex].Items.Add();
       end;
     finally
       LItems.Free;
@@ -9260,7 +9258,7 @@ var
       Result := APText^ = LCurrentCodeFoldingRegion.EscapeChar;
   end;
 
-  function IsNextSkipChar(APText: PChar; ASkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem): Boolean;
+  function IsNextSkipChar(APText: PChar; ASkipRegionItem: TBCEditorCodeFoldingSkipRegion): Boolean;
   begin
     Result := False;
     if ASkipRegionItem.SkipIfNextCharIsNot <> BCEDITOR_NONE_CHAR then
@@ -9269,7 +9267,7 @@ var
 
   function SkipRegionsClose: Boolean;
   var
-    LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
+    LSkipRegionItem: TBCEditorCodeFoldingSkipRegion;
     LTokenEndPos: PChar;
     LTokenPos: PChar;
     LTokenText: string;
@@ -9310,7 +9308,7 @@ var
   var
     LCount: Integer;
     LIndex: Integer;
-    LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
+    LSkipRegionItem: TBCEditorCodeFoldingSkipRegion;
     LTokenEndPos: PChar;
     LTokenPos: PChar;
     LTokenText: string;
@@ -10649,7 +10647,7 @@ function TCustomBCEditor.SplitTextIntoWords(AStringList: TStrings; const ACaseSe
 var
   LSkipCloseKeyChars: TBCEditorAnsiCharSet;
   LSkipOpenKeyChars: TBCEditorAnsiCharSet;
-  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegion;
 
   procedure AddKeyChars();
   var
@@ -10696,7 +10694,7 @@ var
   LLine: Integer;
   LLineEndPos: PChar;
   LLinePos: PChar;
-  LOpenTokenSkipFoldRangeList: TList;
+  LOpenTokenSkipFoldRangeList: TList<TBCEditorCodeFoldingSkipRegion>;
   LPBookmarkText: PChar;
   LStringList: TStringList;
   LTokenEndPos: PChar;
@@ -10708,7 +10706,7 @@ begin
   Result := '';
   AddKeyChars;
   AStringList.Clear;
-  LOpenTokenSkipFoldRangeList := TList.Create;
+  LOpenTokenSkipFoldRangeList := TList<TBCEditorCodeFoldingSkipRegion>.Create;
   try
     for LLine := 0 to FLines.Count - 1 do
       if (FLines.Items[LLine].Text <> '') then
@@ -10722,7 +10720,7 @@ begin
           { Skip regions - Close }
           if (LOpenTokenSkipFoldRangeList.Count > 0) and CharInSet(LLinePos^, LSkipCloseKeyChars) then
           begin
-            LTokenText := TBCEditorCodeFoldingSkipRegions.TItem(LOpenTokenSkipFoldRangeList.Last).CloseToken;
+            LTokenText := LOpenTokenSkipFoldRangeList[LOpenTokenSkipFoldRangeList.Count - 1].CloseToken;
             if (LTokenText <> '') then
             begin
               LTokenPos := @LTokenText[1];

@@ -10,8 +10,9 @@ uses
 
 type
   TBCEditorHighlighter = class;
+  TBCEditorCodeFoldingRegion = class;
 
-  TBCEditorCodeFoldingRegionItem = class(TCollectionItem)
+  TBCEditorCodeFoldingRegionItem = class
     strict private
       FBeginWithBreakChar: Boolean;
       FBreakCharFollows: Boolean;
@@ -36,7 +37,7 @@ type
       procedure LoadFromJSON(const AJSON: TJSONObject);
     public
       procedure Clear();
-      constructor Create(ACollection: TCollection); override;
+      constructor Create(ARegions: TBCEditorCodeFoldingRegion); reintroduce;
       destructor Destroy(); override;
       property BeginWithBreakChar: Boolean read FBeginWithBreakChar write FBeginWithBreakChar;
       property BreakCharFollows: Boolean read FBreakCharFollows write FBreakCharFollows default True;
@@ -62,7 +63,22 @@ type
   TBCEditorCodeFoldingAllRanges = class;
   TBCEditorCodeFoldingSkipRegions = class;
 
-  TBCEditorCodeFoldingRegion = class(TCollection)
+  TBCEditorCodeFoldingSkipRegion = class
+  strict private
+    FCloseToken: string;
+    FOpenToken: string;
+    FRegionType: TBCEditorRangeItemType;
+    FSkipEmptyChars: Boolean;
+    FSkipIfNextCharIsNot: Char;
+  public
+    property OpenToken: string read FOpenToken write FOpenToken;
+    property CloseToken: string read FCloseToken write FCloseToken;
+    property RegionType: TBCEditorRangeItemType read FRegionType write FRegionType;
+    property SkipEmptyChars: Boolean read FSkipEmptyChars write FSkipEmptyChars;
+    property SkipIfNextCharIsNot: Char read FSkipIfNextCharIsNot write FSkipIfNextCharIsNot default BCEDITOR_NONE_CHAR;
+  end;
+
+  TBCEditorCodeFoldingRegion = class(TObjectList<TBCEditorCodeFoldingRegionItem>)
   strict private
     FCloseToken: string;
     FEscapeChar: Char;
@@ -80,7 +96,7 @@ type
     function Add(const AOpenToken: string; const ACloseToken: string): TBCEditorCodeFoldingRegionItem;
     procedure Clear();
     function Contains(const AOpenToken: string; const ACloseToken: string): Boolean;
-    constructor Create(const AHighlighter: TBCEditorHighlighter; const AItemClass: TCollectionItemClass);
+    constructor Create(const AHighlighter: TBCEditorHighlighter);
     destructor Destroy; override;
     property CloseToken: string read FCloseToken write FCloseToken;
     property EscapeChar: Char read FEscapeChar write FEscapeChar default BCEDITOR_NONE_CHAR;
@@ -92,30 +108,10 @@ type
   end;
   TBCEditorCodeFoldingRegions = class(TObjectList<TBCEditorCodeFoldingRegion>);
 
-  TBCEditorCodeFoldingSkipRegions = class(TCollection)
-  type
-
-    TItem = class(TCollectionItem)
-    strict private
-      FCloseToken: string;
-      FOpenToken: string;
-      FRegionType: TBCEditorRangeItemType;
-      FSkipEmptyChars: Boolean;
-      FSkipIfNextCharIsNot: Char;
-    public
-      property OpenToken: string read FOpenToken write FOpenToken;
-      property CloseToken: string read FCloseToken write FCloseToken;
-      property RegionType: TBCEditorRangeItemType read FRegionType write FRegionType;
-      property SkipEmptyChars: Boolean read FSkipEmptyChars write FSkipEmptyChars;
-      property SkipIfNextCharIsNot: Char read FSkipIfNextCharIsNot write FSkipIfNextCharIsNot default BCEDITOR_NONE_CHAR;
-    end;
-
-  strict private
-    function GetSkipRegionItem(AIndex: Integer): TItem;
+  TBCEditorCodeFoldingSkipRegions = class(TObjectList<TBCEditorCodeFoldingSkipRegion>)
   public
-    function Add(const AOpenToken, ACloseToken: string): TItem;
-    function Contains(const AOpenToken, ACloseToken: string): Boolean;
-    property SkipRegionItems[AIndex: Integer]: TItem read GetSkipRegionItem; default;
+    function Add(const AOpenToken, ACloseToken: string): TBCEditorCodeFoldingSkipRegion; reintroduce;
+    function IndexOf(const AOpenToken, ACloseToken: string): Integer; reintroduce;
   end;
 
   TBCEditorCodeFoldingRanges = class(TPersistent)
@@ -192,17 +188,18 @@ type
 
   EBCEditorHighlighterJSON = class(Exception);
 
-  TBCEditorHighlighter = class(TObject)
+  TBCEditorHighlighter = class
   type
     TAttribute = class;
+    TRule = class;
     TToken = class;
     TRange = class;
-    TDefaultParser = class;
+    TSymbolParser = class;
     TDelimitersParser = class;
     TTokenNodeList = class;
-    TBaseParser = class;
-    TParser = class;
-    TSymbolParsers = array [AnsiChar] of TBaseParser;
+    TAbstractParser = class;
+    TDefaultParser = class;
+    TSymbolParsers = array [AnsiChar] of TAbstractParser;
 
     TMatchingPairToken = record
       OpenToken: string;
@@ -275,18 +272,27 @@ type
       property Name: string read FName;
     end;
 
-    TAbstractRule = class(TObject)
+    TRule = class
     strict private
+      FStyle: string;
       FTokenType: TBCEditorRangeType;
+    protected
+      FAttribute: TAttribute;
+      FParent: TRange;
     public
+      constructor Create;
+      destructor Destroy; override;
+      property Attribute: TAttribute read FAttribute;
+      property Parent: TRange read FParent write FParent;
+      property Style: string read FStyle;
       property TokenType: TBCEditorRangeType read FTokenType write FTokenType;
     end;
 
-    TAbstractToken = class(TObject)
+    TAbstractToken = class
     strict private
       FAttribute: TAttribute;
       FBreakType: TBCEditorBreakType;
-      FOpenRule: TAbstractRule;
+      FOpenRule: TRule;
     public
       procedure Clear;
       constructor Create; reintroduce; overload;
@@ -294,7 +300,7 @@ type
       constructor Create(const AHighlighterAttribute: TAttribute); reintroduce; overload;
       property Attribute: TAttribute read FAttribute write FAttribute;
       property BreakType: TBCEditorBreakType read FBreakType write FBreakType;
-      property OpenRule: TAbstractRule read FOpenRule write FOpenRule;
+      property OpenRule: TRule read FOpenRule write FOpenRule;
     end;
 
     TMultiToken = class(TAbstractToken)
@@ -330,7 +336,7 @@ type
       property Temporary: Boolean read FTemporary write FTemporary;
     end;
 
-    TTokenNode = class(TObject)
+    TTokenNode = class
     strict private
       FBreakType: TBCEditorBreakType;
       FChar: Char;
@@ -346,7 +352,7 @@ type
       property Token: TToken read FToken write FToken;
     end;
 
-    TTokenNodeList = class(TObject)
+    TTokenNodeList = class
     strict private
       FNodeList: TObjectList<TTokenNode>;
     public
@@ -359,20 +365,6 @@ type
       procedure SetNode(const AIndex: Integer; const AValue: TTokenNode);
       property Count: Integer read GetCount;
       property Nodes[const Aindex: Integer]: TTokenNode read GetNode write SetNode;
-    end;
-
-    TRule = class(TAbstractRule)
-    private
-      FAttribute: TAttribute;
-      FStyle: string;
-    protected
-      FParent: TRange;
-    public
-      constructor Create;
-      destructor Destroy; override;
-      property Attribute: TAttribute read FAttribute;
-      property Parent: TRange read FParent write FParent;
-      property Style: string read FStyle;
     end;
 
     TKeyList = class(TRule)
@@ -411,8 +403,8 @@ type
       FCloseParent: Boolean;
       FCloseToken: TMultiToken;
       FClosingToken: TToken;
-      FDefaultSymbols: TDefaultParser;
-      FDefaultTermSymbol: TDelimitersParser;
+      FDefaultSymbolsParser: TSymbolParser;
+      FDefaultDelimiterParser: TDelimitersParser;
       FDefaultToken: TToken;
       FDelimiters: TBCEditorAnsiCharSet;
       FHighlighter: TBCEditorHighlighter;
@@ -480,7 +472,7 @@ type
       property UseDelimitersForText: Boolean read FUseDelimitersForText write FUseDelimitersForText;
     end;
 
-    TComments = class(TObject)
+    TComments = class
     strict private
       FChars: TBCEditorAnsiCharSet;
       FBlockComments: TBCEditorArrayOfString;
@@ -496,50 +488,53 @@ type
       property LineComments: TBCEditorArrayOfString read FLineComments;
     end;
 
-    TBaseParser = class abstract
-    public
-      function GetToken(const ARange: TRange;
+    TAbstractParser = class abstract
+    protected
+      function ParseToken(const ARange: TRange;
         const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; virtual; abstract;
     end;
 
-    TParser = class(TBaseParser)
+    TDefaultParser = class(TAbstractParser)
     strict private
       FHeadNode: TTokenNode;
-      FSets: TList;
-    public
-      procedure AddSet(ASet: TSet); virtual;
-      procedure AddTokenNode(const AString: string; AToken: TToken; ABreakType: TBCEditorBreakType); virtual;
-      constructor Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType); reintroduce; overload; virtual;
-      constructor Create(ASet: TSet); reintroduce; overload; virtual;
-      destructor Destroy; override;
-      function GetToken(const ARange: TRange;
+      FSets: TList<TSet>;
+    protected
+      procedure AddSet(const ASet: TSet); virtual;
+      procedure AddTokenNode(const AString: string; const AToken: TToken;
+        const ABreakType: TBCEditorBreakType); virtual;
+      function ParseToken(const ARange: TRange;
         const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; override;
-      property HeadNode: TTokenNode read FHeadNode;
-      property Sets: TList read FSets;
+    public
+      constructor Create(const AChar: Char; const AToken: TToken;
+        const ABreakType: TBCEditorBreakType); reintroduce; overload; virtual;
+      constructor Create(const ASet: TSet); reintroduce; overload; virtual;
+      destructor Destroy(); override;
     end;
 
-    TDefaultParser = class(TBaseParser)
+    TDelimitersParser = class(TAbstractParser)
     strict private
       FToken: TToken;
+    protected
+      function ParseToken(const ARange: TRange;
+        const ALineText: PChar; const ALineLength: Integer;
+        var AChar: Integer; out AToken: TToken): Boolean; override;
     public
       constructor Create(AToken: TToken); reintroduce; virtual;
-      destructor Destroy; override;
-      function GetToken(const ARange: TRange;
-        const ALineText: PChar; const ALineLength: Integer;
-        var AChar: Integer; out AToken: TToken): Boolean; override;
+      destructor Destroy(); override;
     end;
 
-    TDelimitersParser = class(TBaseParser)
+    TSymbolParser = class(TAbstractParser)
     strict private
       FToken: TToken;
-    public
-      constructor Create(AToken: TToken); virtual;
-      destructor Destroy; override;
-      function GetToken(const ARange: TRange;
+    protected
+      function ParseToken(const ARange: TRange;
         const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; override;
+    public
+      constructor Create(AToken: TToken); reintroduce; virtual;
+      destructor Destroy(); override;
     end;
 
     PTokenFind = ^TTokenFind;
@@ -1014,9 +1009,9 @@ begin
   FSkipIfFoundAfterOpenTokenList.Clear();
 end;
 
-constructor TBCEditorCodeFoldingRegionItem.Create(ACollection: TCollection);
+constructor TBCEditorCodeFoldingRegionItem.Create(ARegions: TBCEditorCodeFoldingRegion);
 begin
-  inherited Create(ACollection);
+  inherited Create();
 
   FSkipIfFoundAfterOpenTokenList := TStringList.Create();
 
@@ -1066,15 +1061,15 @@ end;
 { TBCEditorCodeFoldingRegion **************************************************}
 
 function TBCEditorCodeFoldingRegion.Add(const AOpenToken: string; const ACloseToken: string): TBCEditorCodeFoldingRegionItem;
+var
+  Item: TBCEditorCodeFoldingRegionItem;
 begin
-  Result := TBCEditorCodeFoldingRegionItem(inherited Add);
-  with Result do
-  begin
-    OpenToken := AOpenToken;
-    OpenTokenLength := Length(AOpenToken);
-    CloseToken := ACloseToken;
-    CloseTokenLength := Length(ACloseToken);
-  end;
+  Item := TBCEditorCodeFoldingRegionItem.Create(Self);
+  Item.OpenToken := AOpenToken;
+  Item.OpenTokenLength := Length(AOpenToken);
+  Item.CloseToken := ACloseToken;
+  Item.CloseTokenLength := Length(ACloseToken);
+  Result := Items[inherited Add(Item)];
 end;
 
 procedure TBCEditorCodeFoldingRegion.Clear();
@@ -1101,14 +1096,13 @@ begin
   end;
 end;
 
-constructor TBCEditorCodeFoldingRegion.Create(const AHighlighter: TBCEditorHighlighter;
-  const AItemClass: TCollectionItemClass);
+constructor TBCEditorCodeFoldingRegion.Create(const AHighlighter: TBCEditorHighlighter);
 begin
-  inherited Create(AItemClass);
+  inherited Create();
 
   FHighlighter := AHighlighter;
 
-  FSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
+  FSkipRegions := TBCEditorCodeFoldingSkipRegions.Create();
 
   Clear();
 end;
@@ -1214,7 +1208,7 @@ var
   LRangesItem: TJSONObject;
   LRegionItem: TBCEditorCodeFoldingRegionItem;
   LSkipRegionArray: TJSONArray;
-  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegion;
   LSkipRegionType: TBCEditorRangeItemType;
   LString: string;
 begin
@@ -1251,7 +1245,7 @@ begin
               end;
             end;
             { Skip duplicates }
-            if (SkipRegions.Contains(LOpenToken, LCloseToken)) then
+            if (SkipRegions.IndexOf(LOpenToken, LCloseToken) >= 0) then
               Continue;
           end;
 
@@ -1287,33 +1281,28 @@ end;
 
 { TBCEditorCodeFoldingSkipRegions *********************************************}
 
-function TBCEditorCodeFoldingSkipRegions.Add(const AOpenToken, ACloseToken: string): TItem;
+function TBCEditorCodeFoldingSkipRegions.Add(const AOpenToken, ACloseToken: string): TBCEditorCodeFoldingSkipRegion;
+var
+  Item: TBCEditorCodeFoldingSkipRegion;
 begin
-  Result := TItem(inherited Add);
-  with Result do
-  begin
-    OpenToken := AOpenToken;
-    CloseToken := ACloseToken;
-  end;
+  Item := TBCEditorCodeFoldingSkipRegion.Create();
+  Item.OpenToken := AOpenToken;
+  Item.CloseToken := ACloseToken;
+  Result := Items[inherited Add(Item)];
 end;
 
-function TBCEditorCodeFoldingSkipRegions.Contains(const AOpenToken, ACloseToken: string): Boolean;
+function TBCEditorCodeFoldingSkipRegions.IndexOf(const AOpenToken, ACloseToken: string): Integer;
 var
   LIndex: Integer;
-  LSkipRegion: TItem;
+  LSkipRegion: TBCEditorCodeFoldingSkipRegion;
 begin
-  Result := False;
+  Result := -1;
   for LIndex := 0 to Count - 1 do
   begin
-    LSkipRegion := SkipRegionItems[LIndex];
+    LSkipRegion := Items[LIndex];
     if (LSkipRegion.OpenToken = AOpenToken) and (LSkipRegion.CloseToken = ACloseToken) then
-      Exit(True);
+      Exit(LIndex);
   end;
-end;
-
-function TBCEditorCodeFoldingSkipRegions.GetSkipRegionItem(AIndex: Integer): TItem;
-begin
-  Result := TItem(inherited Items[AIndex]);
 end;
 
 { TBCEditorCodeFoldingRanges.TRange *******************************************}
@@ -2554,13 +2543,13 @@ var
 begin
   Reset;
   FDefaultToken := TToken.Create(Attribute);
-  if Assigned(FDefaultTermSymbol) then
+  if Assigned(FDefaultDelimiterParser) then
   begin
-    FDefaultTermSymbol.Free;
-    FDefaultTermSymbol := nil;
+    FDefaultDelimiterParser.Free;
+    FDefaultDelimiterParser := nil;
   end;
-  FDefaultTermSymbol := TDelimitersParser.Create(TToken.Create(Attribute));
-  FDefaultSymbols := TDefaultParser.Create(TToken.Create(Attribute));
+  FDefaultDelimiterParser := TDelimitersParser.Create(TToken.Create(Attribute));
+  FDefaultSymbolsParser := TSymbolParser.Create(TToken.Create(Attribute));
 
   FDelimiters := FDelimiters + BCEDITOR_ABSOLUTE_DELIMITERS;
 
@@ -2620,16 +2609,16 @@ begin
       if not Assigned(SymbolParsers[LAnsiChar]) then
       begin
         if LLength = 1 then
-          FSymbolParsers[LAnsiChar] := TParser.Create(LFirstChar, LTempToken, LBreakType)
+          FSymbolParsers[LAnsiChar] := TDefaultParser.Create(LFirstChar, LTempToken, LBreakType)
         else
-          FSymbolParsers[LAnsiChar] := TParser.Create(LFirstChar, FDefaultToken, LBreakType);
+          FSymbolParsers[LAnsiChar] := TDefaultParser.Create(LFirstChar, FDefaultToken, LBreakType);
       end;
       if CharInSet(LSymbol[LLength], FDelimiters) then
         LBreakType := btAny;
       if LLength <> 1 then
       begin
-        Assert(SymbolParsers[LAnsiChar] is TParser);
-        TParser(SymbolParsers[LAnsiChar]).AddTokenNode(StringCaseFunct(Copy(LSymbol, 2, LLength - 1)), LTempToken,
+        Assert(SymbolParsers[LAnsiChar] is TDefaultParser);
+        TDefaultParser(SymbolParsers[LAnsiChar]).AddTokenNode(StringCaseFunct(Copy(LSymbol, 2, LLength - 1)), LTempToken,
           LBreakType);
       end;
     end;
@@ -2645,11 +2634,11 @@ begin
         LSet := FSets.List[LIndex2];
         if CharInSet(LAnsiChar, LSet.CharSet) then
           if not Assigned(SymbolParsers[LAnsiChar]) then
-            FSymbolParsers[LAnsiChar] := TParser.Create(LSet)
+            FSymbolParsers[LAnsiChar] := TDefaultParser.Create(LSet)
           else
           begin
-            Assert(SymbolParsers[LAnsiChar] is TParser);
-            TParser(SymbolParsers[LAnsiChar]).AddSet(LSet);
+            Assert(SymbolParsers[LAnsiChar] is TDefaultParser);
+            TDefaultParser(SymbolParsers[LAnsiChar]).AddSet(LSet);
           end;
       end;
     end;
@@ -2660,9 +2649,9 @@ begin
     if not Assigned(SymbolParsers[LAnsiChar]) then
     begin
       if CharInSet(LAnsiChar, FDelimiters) then
-        FSymbolParsers[LAnsiChar] := FDefaultTermSymbol
+        FSymbolParsers[LAnsiChar] := FDefaultDelimiterParser
       else
-        FSymbolParsers[LAnsiChar] := FDefaultSymbols;
+        FSymbolParsers[LAnsiChar] := FDefaultSymbolsParser;
     end;
   end;
 
@@ -2673,7 +2662,7 @@ procedure TBCEditorHighlighter.TRange.Reset;
 var
   LAnsiChar: AnsiChar;
   LIndex: Integer;
-  LParser: TBaseParser;
+  LParser: TAbstractParser;
 begin
   if not FPrepared then
     Exit;
@@ -2682,16 +2671,16 @@ begin
   begin
     LAnsiChar := AnsiChar(LIndex);
     LParser := SymbolParsers[LAnsiChar];
-    if Assigned(LParser) and (LParser <> FDefaultTermSymbol) and (LParser <> FDefaultSymbols) then
+    if Assigned(LParser) and (LParser <> FDefaultDelimiterParser) and (LParser <> FDefaultSymbolsParser) then
       LParser.Free;
   end;
 
   FDefaultToken.Free;
   FDefaultToken := nil;
-  FDefaultTermSymbol.Free;
-  FDefaultTermSymbol := nil;
-  FDefaultSymbols.Free;
-  FDefaultSymbols := nil;
+  FDefaultDelimiterParser.Free;
+  FDefaultDelimiterParser := nil;
+  FDefaultSymbolsParser.Free;
+  FDefaultSymbolsParser := nil;
 
   if Assigned(FRanges) then
     for LIndex := 0 to FRanges.Count - 1 do
@@ -2787,14 +2776,41 @@ begin
   inherited Destroy;
 end;
 
-{ TBCEditorHighlighter.TParser ************************************************}
+{ TBCEditorHighlighter.TDelimitersParser **************************************}
 
-procedure TBCEditorHighlighter.TParser.AddSet(ASet: TSet);
+constructor TBCEditorHighlighter.TDelimitersParser.Create(AToken: TToken);
 begin
-  Sets.Add(ASet);
+  inherited Create();
+
+  FToken := AToken;
 end;
 
-procedure TBCEditorHighlighter.TParser.AddTokenNode(const AString: string; AToken: TToken; ABreakType: TBCEditorBreakType);
+destructor TBCEditorHighlighter.TDelimitersParser.Destroy;
+begin
+  FToken.Free();
+
+  inherited;
+end;
+
+function TBCEditorHighlighter.TDelimitersParser.ParseToken(const ARange: TRange;
+  const ALineText: PChar; const ALineLength: Integer;
+  var AChar: Integer; out AToken: TToken): Boolean;
+begin
+  if (AChar < ALineLength) then
+    Inc(AChar);
+  AToken := FToken;
+  Result := True;
+end;
+
+{ TBCEditorHighlighter.TParser ************************************************}
+
+procedure TBCEditorHighlighter.TDefaultParser.AddSet(const ASet: TSet);
+begin
+  FSets.Add(ASet);
+end;
+
+procedure TBCEditorHighlighter.TDefaultParser.AddTokenNode(const AString: string;
+  const AToken: TToken; const ABreakType: TBCEditorBreakType);
 var
   LChar: Char;
   LIndex: Integer;
@@ -2802,7 +2818,7 @@ var
   LTokenNode: TTokenNode;
   LTokenNodeList: TTokenNodeList;
 begin
-  LTokenNodeList := HeadNode.NextNodes;
+  LTokenNodeList := FHeadNode.NextNodes;
   LTokenNode := nil;
   LLength := Length(AString);
   for LIndex := 1 to LLength do
@@ -2820,7 +2836,34 @@ begin
   LTokenNode.Token := AToken;
 end;
 
-function TBCEditorHighlighter.TParser.GetToken(const ARange: TRange;
+constructor TBCEditorHighlighter.TDefaultParser.Create(const AChar: Char;
+  const AToken: TToken; const ABreakType: TBCEditorBreakType);
+begin
+  inherited Create();
+
+  FHeadNode := TTokenNode.Create(AChar, AToken, ABreakType);
+  FSets := TList<TSet>.Create();
+end;
+
+constructor TBCEditorHighlighter.TDefaultParser.Create(const ASet: TSet);
+begin
+  inherited Create();
+
+  FHeadNode := nil;
+  FSets := TList<TSet>.Create();
+  AddSet(ASet);
+end;
+
+destructor TBCEditorHighlighter.TDefaultParser.Destroy();
+begin
+  if Assigned(FHeadNode) then
+    FHeadNode.Free();
+  FSets.Free();
+
+  inherited;
+end;
+
+function TBCEditorHighlighter.TDefaultParser.ParseToken(const ARange: TRange;
   const ALineText: PChar; const ALineLength: Integer;
   var AChar: Integer; out AToken: TToken): Boolean;
 var
@@ -2839,9 +2882,9 @@ begin
   Result := False;
 
   LBeginChar := AChar;
-  if Assigned(HeadNode) then
+  if Assigned(FHeadNode) then
   begin
-    LCurrentTokenNode := HeadNode;
+    LCurrentTokenNode := FHeadNode;
     LNextChar := LBeginChar;
     LStartTokenNode := nil;
     repeat
@@ -2902,14 +2945,14 @@ begin
   end;
 
   LAllowedDelimiters := ARange.Delimiters;
-  for LIndex := 0 to Sets.Count - 1 do
-    LAllowedDelimiters := LAllowedDelimiters - TSet(Sets.List[LIndex]).CharSet;
+  for LIndex := 0 to FSets.Count - 1 do
+    LAllowedDelimiters := LAllowedDelimiters - FSets[LIndex].CharSet;
 
   if (AChar < ALineLength) then
-    for LIndex := 0 to Sets.Count - 1 do
+    for LIndex := 0 to FSets.Count - 1 do
     begin
       AChar := LBeginChar;
-      LSet := TSet(Sets.List[LIndex]);
+      LSet := FSets[LIndex];
       LLinePos := @ALineText[AChar];
       LLineEndPos := @ALineText[ALineLength];
       repeat
@@ -2927,80 +2970,28 @@ begin
   AChar := LBeginChar + 1;
 end;
 
-constructor TBCEditorHighlighter.TParser.Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType);
+{ TBCEditorHighlighter.TSymbolParser ******************************************}
+
+constructor TBCEditorHighlighter.TSymbolParser.Create(AToken: TToken);
 begin
-  inherited Create;
+  inherited Create();
 
-  FHeadNode := TTokenNode.Create(AChar, AToken, ABreakType);
-  FSets := TList.Create;
-end;
-
-constructor TBCEditorHighlighter.TParser.Create(ASet: TSet);
-begin
-  inherited Create;
-
-  FSets := TList.Create;
-  AddSet(ASet);
-end;
-
-destructor TBCEditorHighlighter.TParser.Destroy;
-begin
-  if Assigned(FHeadNode) then
-  begin
-    FHeadNode.Free;
-    FHeadNode := nil;
-  end;
-  FSets.Clear;
-  FSets.Free;
-  FSets := nil;
-  inherited;
-end;
-
-{ TBCEditorHighlighter.TDefaultParser *****************************************}
-
-constructor TBCEditorHighlighter.TDefaultParser.Create(AToken: TToken);
-begin
   FToken := AToken;
 end;
 
-destructor TBCEditorHighlighter.TDefaultParser.Destroy;
+destructor TBCEditorHighlighter.TSymbolParser.Destroy;
 begin
-  FToken.Free;
-  FToken := nil;
+  FToken.Free();
+
   inherited;
 end;
 
-function TBCEditorHighlighter.TDefaultParser.GetToken(const ARange: TRange;
+function TBCEditorHighlighter.TSymbolParser.ParseToken(const ARange: TRange;
   const ALineText: PChar; const ALineLength: Integer;
   var AChar: Integer; out AToken: TToken): Boolean;
 begin
   Inc(AChar);
   Result := False;
-end;
-
-{ TBCEditorHighlighter.TDelimitersParser **************************************}
-
-constructor TBCEditorHighlighter.TDelimitersParser.Create(AToken: TToken);
-begin
-  inherited Create;
-  FToken := AToken;
-end;
-
-destructor TBCEditorHighlighter.TDelimitersParser.Destroy;
-begin
-  FToken.Free;
-  FToken := nil;
-  inherited;
-end;
-
-function TBCEditorHighlighter.TDelimitersParser.GetToken(const ARange: TRange;
-  const ALineText: PChar; const ALineLength: Integer;
-  var AChar: Integer; out AToken: TToken): Boolean;
-begin
-  if (AChar < ALineLength) then
-    Inc(AChar);
-  AToken := FToken;
-  Result := True;
 end;
 
 { TBCEditorHighlighter.TDetection *********************************************}
@@ -3135,7 +3126,7 @@ begin
 
   FComments := TComments.Create;
 
-  FCompletionProposalSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
+  FCompletionProposalSkipRegions := TBCEditorCodeFoldingSkipRegions.Create();
 
   FMainRules := TRange.Create(Self);
   FMainRules.Parent := FMainRules;
@@ -3213,7 +3204,7 @@ var
   LDelimiters: TBCEditorAnsiCharSet;
   LIndex: Integer;
   LKeywordText: string;
-  LParser: TBaseParser;
+  LParser: TAbstractParser;
 begin
   Result := AFind.FLineChar + AFind.FLength < AFind.FLineLength;
 
@@ -3262,7 +3253,7 @@ begin
 
       if (not Assigned(LParser)) then
         Inc(LChar)
-      else if (not LParser.GetToken(AFind.FRange, AFind.FLineText, AFind.FLineLength, LChar, AFind.FToken)) then
+      else if (not LParser.ParseToken(AFind.FRange, AFind.FLineText, AFind.FLineLength, LChar, AFind.FToken)) then
       begin
         AFind.FToken := AFind.FRange.DefaultToken;
 
@@ -3368,7 +3359,7 @@ begin
           LCodeFoldingRangeObject := GetJSONObject(LCodeFoldingRangesArray, LIndex);
           if (Assigned(LCodeFoldingRangeObject)) then
           begin
-            LCodeFoldingRegion := TBCEditorCodeFoldingRegion.Create(Self, TBCEditorCodeFoldingRegionItem);
+            LCodeFoldingRegion := TBCEditorCodeFoldingRegion.Create(Self);
             LCodeFoldingRegion.LoadFromJSON(LCodeFoldingRangeObject);
             LCodeFoldingRegion.LoadSkipRegionFromJSON(LCodeFoldingRangeObject);
             LCodeFoldingRegion.LoadFoldRegionFromJSON(LCodeFoldingRangeObject);
@@ -3415,7 +3406,7 @@ var
   LJSONObject: TJSONObject;
   LOpenToken: string;
   LSkipRegionArray: TJSONArray;
-  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegion;
 begin
   if (Assigned(AJSON)) then
   begin
@@ -3443,7 +3434,7 @@ begin
           end;
         end;
         { Skip duplicates }
-        if (CompletionProposalSkipRegions.Contains(LOpenToken, LCloseToken)) then
+        if (CompletionProposalSkipRegions.IndexOf(LOpenToken, LCloseToken) >= 0) then
           Continue;
       end;
 
