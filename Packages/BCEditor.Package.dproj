@@ -163,7 +163,6 @@
         <DCCReference Include="..\Source\BCEditor.MacroRecorder.pas"/>
         <DCCReference Include="..\Source\BCEditor.Print.pas"/>
         <DCCReference Include="..\Source\BCEditor.Print.Preview.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Search.pas"/>
         <DCCReference Include="..\Source\BCEditor.StyleHooks.pas"/>
         <DCCReference Include="..\Source\BCEditor.PaintHelper.pas"/>
         <DCCReference Include="..\Source\BCEditor.Types.pas"/>

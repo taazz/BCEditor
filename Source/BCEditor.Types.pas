@@ -99,7 +99,6 @@ type
   );
 
   TBCEditorSearchOption = (
-    soBeepIfStringNotFound,
     soCaseSensitive,
     soEntireScope,
     soHighlightResults,

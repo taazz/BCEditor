@@ -15,7 +15,7 @@ uses
   BCEditor.Editor.Selection, BCEditor.Editor.SpecialChars,
   BCEditor.Editor.Tabs, BCEditor.Editor.WordWrap,
   BCEditor.Editor.CodeFolding.Hint.Form, BCEditor.Highlighter,
-  BCEditor.KeyboardHandler, BCEditor.Lines, BCEditor.Search, BCEditor.PaintHelper, BCEditor.Editor.SyncEdit,
+  BCEditor.KeyboardHandler, BCEditor.Lines, BCEditor.PaintHelper, BCEditor.Editor.SyncEdit,
   BCEditor.Editor.TokenInfo, BCEditor.Utils, BCEditor.Editor.TokenInfo.PopupWindow;
 
 type
@@ -24,10 +24,12 @@ type
     TUndoOptions = set of TBCEditorUndoOption;
   strict private type
     TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
+    TBCEditorSearch = class(BCEditor.Editor.Search.TBCEditorSearch);
+
     TState = set of (esRowsChanged, esCaretMoved, esScrollBarChanged,
       esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated,
       esIgnoreNextChar, esCaretVisible, esDblClicked, esWaitForDragging,
-      esCodeFoldingInfoClicked, esInSelection, esDragging);
+      esCodeFoldingInfoClicked, esInSelection, esDragging, esSearch);
 
     TMultiCarets = class(TList<TBCEditorDisplayPosition>)
     private
@@ -72,6 +74,11 @@ type
       property Line[Row: Integer]: Integer read GetLine write PutLine;
       property MaxLength: Integer read GetMaxLength;
       property Text[Row: Integer]: string read GetText;
+    end;
+
+    TSearchResult = record
+      BeginPosition: TBCEditorTextPosition;
+      EndPosition: TBCEditorTextPosition;
     end;
 
   strict private const
@@ -210,10 +217,12 @@ type
     FScrollDeltaY: Integer;
     FScrollTimer: TTimer;
     FSearch: TBCEditorSearch;
-    FSearchEngine: TBCEditorCustomSearch;
     FSearchFindDialog: TFindDialog;
     FSearchFindFirst: Boolean;
+    FSearchPattern: string;
     FSearchReplaceDialog: TReplaceDialog;
+    FSearchResults: TList<TSearchResult>;
+    FSearchStatus: string;
     FSelectedCaseCycle: TBCEditorCase;
     FSelectedCaseText: string;
     FSelection: TBCEditorSelection;
@@ -236,11 +245,10 @@ type
     FWindowProducedMessage: Boolean;
     FWordWrap: TBCEditorWordWrap;
     FWordWrapIndicator: TBitmap;
-    procedure ActiveLineChanged(ASender: TObject);
-    procedure AfterLinesUpdate(ASender: TObject);
-    procedure AssignSearchEngine(const AEngine: TBCEditorSearchEngine);
-    procedure BeforeLinesUpdate(ASender: TObject);
-    procedure BookmarkListChange(ASender: TObject);
+    procedure ActiveLineChanged(Sender: TObject);
+    procedure AfterLinesUpdate(Sender: TObject);
+    procedure BeforeLinesUpdate(Sender: TObject);
+    procedure BookmarkListChange(Sender: TObject);
     function CalcIndentText(const IndentCount: Integer): string;
     procedure CaretChanged(ASender: TObject);
     procedure CheckIfAtMatchingKeywords;
@@ -382,7 +390,6 @@ type
     procedure RightMarginChanged(ASender: TObject);
     procedure ScrollChanged(ASender: TObject);
     procedure ScrollTimerHandler(ASender: TObject);
-    procedure SearchAll(const ASearchText: string = '');
     procedure SearchChanged(AEvent: TBCEditorSearchChanges);
     procedure SearchFindDialogClose(Sender: TObject);
     procedure SelectionChanged(ASender: TObject);
@@ -506,6 +513,7 @@ type
     procedure ExpandCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
     function ExpandCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
     procedure FillRect(const ARect: TRect);
+    function FindFirst(const APattern: string): Boolean;
     function FindNext(const AHandleNotFound: Boolean = True): Boolean;
     function FindPrevious(const AHandleNotFound: Boolean = True): Boolean;
     procedure FreeHintForm(var AForm: TBCEditorCodeFoldingHintForm);
@@ -875,7 +883,6 @@ uses
   BCEditor.Language, BCEditor.Export.HTML, Vcl.Themes, BCEditor.StyleHooks;
 
 resourcestring
-  SBCEditorSearchEngineNotAssigned = 'Search engine has not been assigned';
   SBCEditorLineIsNotVisible = 'Line is not visible';
 
 type
@@ -1187,9 +1194,9 @@ begin
   { Search }
   FSearch := TBCEditorSearch.Create;
   FSearch.OnChange := SearchChanged;
+  FSearchResults := TList<TSearchResult>.Create();
   FSearchFindDialog := nil;
   FSearchReplaceDialog := nil;
-  AssignSearchEngine(FSearch.Engine);
   FReplace := TBCEditorReplace.Create;
   FReplace.OnChange := ReplaceChanged;
   { Scroll }
@@ -1280,6 +1287,7 @@ begin
   FRightMargin.Free;
   FScroll.Free;
   FSearch.Free;
+  FSearchResults.Free();
   FReplace.Free;
   FTabs.Free;
   FSpecialChars.Free;
@@ -1295,11 +1303,6 @@ begin
     FreeMem(FMinimapShadowAlphaByteArray);
     FMinimapShadowAlphaByteArray := nil;
   end;
-  if Assigned(FSearchEngine) then
-  begin
-    FSearchEngine.Free;
-    FSearchEngine := nil;
-  end;
   if Assigned(FCodeFoldingHintForm) then
     FCodeFoldingHintForm.Release;
   FRows.Free();
@@ -1307,13 +1310,13 @@ begin
   inherited Destroy;
 end;
 
-procedure TCustomBCEditor.ActiveLineChanged(ASender: TObject);
+procedure TCustomBCEditor.ActiveLineChanged(Sender: TObject);
 begin
   if not (csLoading in ComponentState) then
   begin
-    if ASender is TBCEditorActiveLine then
+    if Sender is TBCEditorActiveLine then
       Invalidate;
-    if ASender is TBCEditorGlyph then
+    if Sender is TBCEditorGlyph then
       Invalidate;
   end;
 end;
@@ -1457,7 +1460,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.AfterLinesUpdate(ASender: TObject);
+procedure TCustomBCEditor.AfterLinesUpdate(Sender: TObject);
 begin
   EndUpdate();
 end;
@@ -1489,24 +1492,7 @@ begin
     inherited Assign(ASource);
 end;
 
-procedure TCustomBCEditor.AssignSearchEngine(const AEngine: TBCEditorSearchEngine);
-begin
-  if Assigned(FSearchEngine) then
-  begin
-    FSearchEngine.Free;
-    FSearchEngine := nil;
-  end;
-  case AEngine of
-    seNormal:
-      FSearchEngine := TBCEditorNormalSearch.Create;
-    seRegularExpression:
-      FSearchEngine := TBCEditorRegexSearch.Create;
-    seWildCard:
-      FSearchEngine := TBCEditorWildCardSearch.Create;
-  end;
-end;
-
-procedure TCustomBCEditor.BeforeLinesUpdate(ASender: TObject);
+procedure TCustomBCEditor.BeforeLinesUpdate(Sender: TObject);
 begin
   BeginUpdate();
 end;
@@ -1529,7 +1515,7 @@ begin
   Inc(FUpdateCount);
 end;
 
-procedure TCustomBCEditor.BookmarkListChange(ASender: TObject);
+procedure TCustomBCEditor.BookmarkListChange(Sender: TObject);
 begin
   Invalidate;
 end;
@@ -3877,7 +3863,7 @@ begin
   HideSelection := False;
 
   FSearchFindFirst := First;
-  FSearchFindDialog.FindText := Search.SearchText;
+  FSearchFindDialog.FindText := FSearchPattern;
   FSearchFindDialog.Execute();
 
   Result := True;
@@ -3895,13 +3881,13 @@ begin
   else
     Search.Options := Search.Options - [soWholeWordsOnly];
 
-  if (FSearchFindFirst or (TFindDialog(Sender).FindText <> Search.SearchText)) then
+  if (FSearchFindFirst or (TFindDialog(Sender).FindText <> FSearchPattern)) then
   begin
-    Search.SearchText := TFindDialog(Sender).FindText;
+    FindFirst(TFindDialog(Sender).FindText);
     FSearchFindFirst := False;
   end
   else
-    ExecuteCommand(ecSearchNext, #0, nil);
+    FindNext();
 end;
 
 function TCustomBCEditor.DoSearchMatchNotFoundWraparoundDialog: Boolean;
@@ -3945,7 +3931,7 @@ end;
 
 procedure TCustomBCEditor.DoSearchStringNotFoundDialog;
 begin
-  MessageDialog(Format(SBCEditorSearchStringNotFound, [FSearch.SearchText]), mtInformation, [mbOK]);
+  MessageDialog(Format(SBCEditorSearchStringNotFound, [FSearchPattern]), mtInformation, [mbOK]);
 end;
 
 procedure TCustomBCEditor.DoSetBookmark(const ACommand: TBCEditorCommand; AData: Pointer);
@@ -4531,11 +4517,12 @@ begin
         and LeftMargin.LineNumbers.Visible and LeftMargin.Autosize) then
         LeftMargin.AutosizeDigitCount(Lines.Count);
 
-//      if (State * [esRowsChanged, esLinesUpdated] <> []) then
-//        UpdateFoldRanges(0, Lines.Count);
-
       if (State * [esCaretMoved, esRowsChanged, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> []) then
+      begin
+        if (not (esSearch in State)) then
+          FSearchResults.Clear();
         ScanMatchingPair();
+      end;
 
       if (State * [esCaretMoved, esRowsChanged, esLinesCleared, esLinesUpdated] <> []) then
         ScrollToCaret();
@@ -4671,7 +4658,7 @@ begin
   else if (Action is TSearchFindFirst) then
     DoSearchFind(True, TSearchFindFirst(Action))
   else if (Action is TSearchFind) then
-    DoSearchFind(Search.SearchText = '', TSearchFind(Action))
+    DoSearchFind(FSearchPattern = '', TSearchFind(Action))
   else if (Action is TSearchReplace) then
     DoSearchReplace(TSearchReplace(Action))
   else if (Action is TSearchFindNext) then
@@ -4758,7 +4745,7 @@ begin
     ecSearchFindFirst:
       DoSearchFind(True, nil);
     ecSearchFind:
-      DoSearchFind(Search.SearchText = '', nil);
+      DoSearchFind(FSearchPattern = '', nil);
     ecSearchReplace:
       DoSearchReplace(nil);
     ecSearchNext:
@@ -4884,10 +4871,187 @@ var
 begin
   if (FCaret.MultiEdit.Enabled) then
   begin
-    for LIndex := 0 to FSearch.Lines.Count - 1 do
-      AddCaret(TextToDisplay(FSearch.Lines[LIndex].EndTextPosition));
+    for LIndex := 0 to FSearchResults.Count - 1 do
+      AddCaret(TextToDisplay(FSearchResults[LIndex].EndPosition));
     SetFocus();
   end;
+end;
+
+function TCustomBCEditor.FindFirst(const APattern: string): Boolean;
+
+  procedure NormalSearch(const APattern, AText: string; const AOffset: Integer);
+
+    function IsWordBreakChar(AChar: Char): Boolean;
+    begin
+      if (AChar < BCEDITOR_EXCLAMATION_MARK) or AChar.IsWhiteSpace then
+        Result := True
+      else
+      if AChar = BCEDITOR_LOW_LINE then
+        Result := False
+      else
+        Result := not AChar.IsLetterOrDigit;
+    end;
+
+  var
+    LIndex: Integer;
+    LPattern: string;
+    LPatternEndPos: PChar;
+    LPatternLength: Integer;
+    LPatternPos: PChar;
+    LPreviousStart: Integer;
+    LPreviousPosition: TBCEditorTextPosition;
+    LSearchResult: TSearchResult;
+    LText: string;
+    LTextBeginPos: PChar;
+    LTextEndPos: PChar;
+    LTextLength: Integer;
+    LTextPos: PChar;
+  begin
+    if (Length(APattern) = 0) then
+      FSearchStatus := SBCEditorPatternIsEmpty
+    else if (Length(APattern) < Length(AText)) then
+    begin
+      LPattern := APattern;
+      LPatternLength := Length(LPattern);
+      if (not FSearch.CaseSensitive) then
+        CharLowerBuff(PChar(LPattern), LPatternLength);
+
+      if (FSearch.WholeWordsOnly) then
+      begin
+        LPatternPos := @LPattern[1];
+        LPatternEndPos := @LPattern[Length(LPattern)];
+        while (LPatternPos <= LPatternEndPos) do
+          if (IsWordBreakChar(LPatternPos^)) then
+            Exit();
+      end;
+
+      LText := AText;
+      LTextLength := Length(LText);
+      if (not FSearch.CaseSensitive) then
+        CharLowerBuff(PChar(LText), LTextLength);
+
+      LTextBeginPos := @LText[1];
+      LTextEndPos := @LText[Length(LText)];
+
+      LPreviousStart := AOffset;
+      LPreviousPosition := Lines.CharIndexToPosition(LPreviousStart);
+
+      for LIndex := 0 to LTextLength - LPatternLength do
+      begin
+        LTextPos := @LTextBeginPos[LIndex];
+
+        if (not FSearch.WholeWordsOnly or not IsWordBreakChar(LTextPos^)) then
+        begin
+          LPatternPos := @LPattern[1];
+          LPatternEndPos := @LPattern[LPatternLength];
+          while ((LPatternPos <= LPatternEndPos) and (LPatternPos^ = LTextPos^)) do
+          begin
+            Inc(LPatternPos);
+            Inc(LTextPos);
+          end;
+          if ((LPatternPos > LPatternEndPos)
+            and (not FSearch.WholeWordsOnly or (LTextPos > LTextEndPos) or IsWordBreakChar(LTextPos^))) then
+          begin
+            LSearchResult.BeginPosition := Lines.CharIndexToPosition(LTextPos - LTextBeginPos - LPatternLength - LPreviousStart, LPreviousPosition);
+            LSearchResult.EndPosition := Lines.CharIndexToPosition(LPatternLength, LSearchResult.BeginPosition);
+            FSearchResults.Add(LSearchResult);
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  procedure RegExSearch(const APattern, AText: string; const AOffset: Integer);
+  var
+    LMatch: TMatch;
+    LOptions: TRegexOptions;
+    LPreviousStart: Integer;
+    LPreviousPosition: TBCEditorTextPosition;
+    LRegex: TRegEx;
+    LSearchResult: TSearchResult;
+  begin
+    try
+      LPreviousStart := AOffset;
+      LPreviousPosition := Lines.CharIndexToPosition(LPreviousStart);
+
+      LOptions := [roMultiLine];
+      {$if CompilerVersion > 26}
+      Include(FOptions, roNotEmpty);
+      {$endif}
+      if (FSearch.CaseSensitive) then
+        Exclude(LOptions, roIgnoreCase)
+      else
+        Include(LOptions, roIgnoreCase);
+      LRegex := TRegEx.Create(APattern, LOptions);
+      LMatch := LRegex.Match(AText);
+      while LMatch.Success do
+      begin
+        LSearchResult.BeginPosition := Lines.CharIndexToPosition(LMatch.Index - LPreviousStart, LPreviousPosition);
+        LSearchResult.EndPosition := Lines.CharIndexToPosition(LMatch.Length, LSearchResult.BeginPosition);
+        FSearchResults.Add(LSearchResult);
+
+        LMatch := LMatch.NextMatch();
+      end;
+    except
+      on E: Exception do
+        FSearchStatus := E.Message;
+    end;
+  end;
+
+  procedure WildcardSearch(const APattern, AText: string; const AOffset: Integer);
+  var
+    LIndex: Integer;
+    LPattern: string;
+  begin
+    for LIndex := 1 to Length(APattern) do
+      case APattern[LIndex] of
+        '*':
+          LPattern := LPattern + '.*';
+        '?':
+          LPattern := LPattern + '.?';
+        else
+          LPattern := LPattern + APattern[LIndex];
+      end;
+
+    RegExSearch(LPattern, AText, AOffset);
+  end;
+
+begin
+  FSearchResults.Clear();
+  FSearchStatus := '';
+
+  case (FSearch.Engine) of
+    seNormal:
+      if (FSearch.InSelection.Active and SelectionAvailable) then
+        NormalSearch(APattern, SelText, SelStart)
+      else
+        NormalSearch(APattern, Text, 0);
+    seRegularExpression:
+      if (FSearch.InSelection.Active and SelectionAvailable) then
+        RegExSearch(APattern, SelText, SelStart)
+      else
+        RegExSearch(APattern, Text, 0);
+    seWildCard:
+      if (FSearch.InSelection.Active and SelectionAvailable) then
+        WildcardSearch(APattern, SelText, SelStart)
+      else
+        WildcardSearch(APattern, Text, 0);
+    else raise ERangeError.Create('Engine: ' + IntToStr(Ord(FSearch.Engine)));
+  end;
+
+  FSearchPattern := APattern;
+
+  if (FSearchResults.Count > 0) then
+  begin
+    Include(FState, esSearch);
+    try
+      SetCaretAndSelection(FSearchResults[0].EndPosition, FSearchResults[0].BeginPosition, FSearchResults[0].EndPosition);
+    finally
+      Exclude(FState, esSearch);
+    end;
+  end
+
+  Result := FSearchResults.Count > 0;
 end;
 
 function TCustomBCEditor.FindHookedCommandEvent(const AHookedCommandEvent: TBCEditorHookedCommandEvent): Integer;
@@ -4906,85 +5070,126 @@ end;
 
 function TCustomBCEditor.FindNext(const AHandleNotFound: Boolean = True): Boolean;
 var
-  LItemIndex: Integer;
+  LResultItem: Integer;
+  LLeft: Integer;
+  LMiddle: Integer;
+  LRight: Integer;
+  LTextCaretPosition: TBCEditorTextPosition;
 begin
-  Result := False;
+  Result := FSearchResults.Count > 0;
 
-  LItemIndex := FSearch.GetNextSearchItemIndex(Lines.CaretPosition);
-  if LItemIndex = -1 then
-  begin
-    if not AHandleNotFound or AHandleNotFound and (FSearch.SearchText = '') then
-      Exit;
-
-    if (soBeepIfStringNotFound in FSearch.Options) and not (soWrapAround in FSearch.Options) then
-      SysUtils.Beep;
-
-    if GetSearchResultCount = 0 then
-    begin
-      if soShowStringNotFound in FSearch.Options then
-        DoSearchStringNotFoundDialog;
-    end
-    else
-    if (soWrapAround in FSearch.Options) or
-      (soShowSearchMatchNotFound in FSearch.Options) and DoSearchMatchNotFoundWraparoundDialog then
-    begin
-      Lines.CaretPosition := Lines.BOFPosition;
-      Result := FindNext;
-    end
-  end
+  if (not Result) then
+    LResultItem := -1
   else
   begin
-    if FSearch.Lines[LItemIndex].BeginTextPosition.Line >= TopRow + VisibleRows - 1 then
-      GotoLineAndCenter(FSearch.Lines[LItemIndex].EndTextPosition.Line, FSearch.Lines[LItemIndex].EndTextPosition.Char)
-    else
-      Lines.CaretPosition := FSearch.Lines[LItemIndex].EndTextPosition;
+    LTextCaretPosition := Lines.CaretPosition;
 
-    Lines.SelBeginPosition := FSearch.Lines[LItemIndex].BeginTextPosition;
-    Lines.SelEndPosition := FSearch.Lines[LItemIndex].EndTextPosition;
+    if (LTextCaretPosition < FSearchResults[0].BeginPosition) then
+      LResultItem := 0
+    else if (LTextCaretPosition <= FSearchResults[FSearchResults.Count - 1].BeginPosition) then
+    begin
+      LResultItem := -1;
+
+      LLeft := 0;
+      LRight := FLines.Count - 1;
+
+      while (LResultItem < 0) do
+      begin
+        LMiddle := (LLeft + LRight) div 2;
+        if (FSearchResults[LMiddle].BeginPosition < LTextCaretPosition) then
+          LLeft := LMiddle + 1
+        else if ((FSearchResults[LMiddle - 1].BeginPosition < LTextCaretPosition)
+          and (FSearchResults[LMiddle].BeginPosition >= LTextCaretPosition)) then
+          LResultItem := LMiddle
+        else
+          LRight := LMiddle - 1;
+      end;
+    end
+    else if ((soWrapAround in FSearch.Options)
+      or (soShowSearchMatchNotFound in FSearch.Options) and DoSearchMatchNotFoundWraparoundDialog) then
+      LResultItem := 0
+    else
+      LResultItem := -1;
+  end;
+
+  Result := LResultItem >= 0;
+  if (Result) then
+  begin
+    if (FSearchResults[LResultItem].BeginPosition.Line >= TopRow + VisibleRows - 1) then
+      GotoLineAndCenter(FSearchResults[LResultItem].EndPosition.Line, FSearchResults[LResultItem].EndPosition.Char);
+
+    Include(FState, esSearch);
+    try
+      SetCaretAndSelection(FSearchResults[LResultItem].EndPosition, FSearchResults[LResultItem].BeginPosition, FSearchResults[LResultItem].EndPosition);
+    finally
+      Exclude(FState, esSearch);
+    end;
 
     Result := True;
-  end;
+  end
+  else if (AHandleNotFound and (FSearchPattern <> '')) then
+    DoSearchStringNotFoundDialog();
 end;
 
 function TCustomBCEditor.FindPrevious(const AHandleNotFound: Boolean = True): Boolean;
 var
-  LItemIndex: Integer;
+  LResultItem: Integer;
+  LLeft: Integer;
+  LMiddle: Integer;
+  LRight: Integer;
+  LTextCaretPosition: TBCEditorTextPosition;
 begin
-  Result := False;
+  Result := FSearchResults.Count > 0;
 
-  LItemIndex := FSearch.GetPreviousSearchItemIndex(Lines.CaretPosition);
-  if LItemIndex = -1 then
-  begin
-    if not AHandleNotFound or AHandleNotFound and (FSearch.SearchText = '') then
-      Exit;
-
-    if soBeepIfStringNotFound in FSearch.Options then
-      SysUtils.Beep;
-    if GetSearchResultCount = 0 then
-    begin
-      if soShowStringNotFound in FSearch.Options then
-        DoSearchStringNotFoundDialog;
-    end
-    else
-    if (soWrapAround in FSearch.Options) or
-      (soShowSearchMatchNotFound in FSearch.Options) and DoSearchMatchNotFoundWraparoundDialog then
-    begin
-      Lines.CaretPosition := Lines.EOFPosition;
-      Result := FindPrevious;
-    end
-  end
+  if (not Result) then
+    LResultItem := -1
   else
   begin
-    if FSearch.Lines[LItemIndex].BeginTextPosition.Line < TopRow then
-      GotoLineAndCenter(FSearch.Lines[LItemIndex].BeginTextPosition.Line, FSearch.Lines[LItemIndex].BeginTextPosition.Char)
-    else
-      Lines.CaretPosition := FSearch.Lines[LItemIndex].BeginTextPosition;
+    LTextCaretPosition := Lines.CaretPosition;
 
-    Lines.SelBeginPosition := FSearch.Lines[LItemIndex].BeginTextPosition;
-    Lines.SelEndPosition := FSearch.Lines[LItemIndex].EndTextPosition;
+    if (LTextCaretPosition > FSearchResults[FSearchResults.Count - 1].BeginPosition) then
+    begin
+      LResultItem := -1;
+
+      LLeft := 0;
+      LRight := FLines.Count - 1;
+
+      while (LResultItem < 0) do
+      begin
+        LMiddle := (LLeft + LRight) div 2;
+        if (FSearchResults[LMiddle].BeginPosition < LTextCaretPosition) then
+          LLeft := LMiddle + 1
+        else if ((FSearchResults[LMiddle].BeginPosition <= LTextCaretPosition)
+          and (FSearchResults[LMiddle + 1].BeginPosition > LTextCaretPosition)) then
+          LResultItem := LMiddle
+        else
+          LRight := LMiddle - 1;
+      end;
+    end
+    else if ((soWrapAround in FSearch.Options)
+      or (soShowSearchMatchNotFound in FSearch.Options) and DoSearchMatchNotFoundWraparoundDialog) then
+      LResultItem := FSearchResults.Count - 1
+    else
+      LResultItem := -1;
+  end;
+
+  Result := LResultItem >= 0;
+  if (Result) then
+  begin
+    if (FSearchResults[LResultItem].BeginPosition.Line >= TopRow + VisibleRows - 1) then
+      GotoLineAndCenter(FSearchResults[LResultItem].EndPosition.Line, FSearchResults[LResultItem].EndPosition.Char);
+
+    Include(FState, esSearch);
+    try
+      SetCaretAndSelection(FSearchResults[LResultItem].EndPosition, FSearchResults[LResultItem].BeginPosition, FSearchResults[LResultItem].EndPosition);
+    finally
+      Exclude(FState, esSearch);
+    end;
 
     Result := True;
-  end;
+  end
+  else if (AHandleNotFound and (FSearchPattern <> '')) then
+    DoSearchStringNotFoundDialog();
 end;
 
 procedure TCustomBCEditor.FindWords(const AWord: string; AList: TList; ACaseSensitive: Boolean; AWholeWordsOnly: Boolean);
@@ -5791,7 +5996,7 @@ end;
 
 function TCustomBCEditor.GetSearchResultCount: Integer;
 begin
-  Result := FSearch.Lines.Count;
+  Result := FSearchResults.Count;
 end;
 
 function TCustomBCEditor.GetSelectionAvailable(): Boolean;
@@ -6848,8 +7053,6 @@ var
   end;
 
 begin
-  LIndex := ALine;
-
   UpdateMarks(FBookmarkList);
   UpdateMarks(FMarkList);
 
@@ -6866,9 +7069,6 @@ begin
   CodeFoldingResetCaches;
 
   DeleteLineFromRows(ALine);
-
-  if not FReplaceLock then
-    SearchAll;
 
   Modified := True;
 
@@ -6916,7 +7116,6 @@ begin
 
   InsertLineIntoRows(ALine, True);
   CodeFoldingResetCaches;
-  SearchAll;
 
   Modified := True;
 
@@ -6946,9 +7145,6 @@ begin
 
   if FCodeFolding.Visible then
     UpdateFoldRanges(ALine + 1, 1);
-
-  if not FReplaceLock then
-    SearchAll;
 
   Modified := True;
 
@@ -8897,52 +9093,48 @@ var
   LIndex: Integer;
   LLine: Integer;
 begin
-  if not Assigned(FSearch.Lines) then
-    Exit;
-  if not Assigned(FSearchEngine) then
-    Exit;
-  if (FSearchEngine.ResultCount = 0) then
-    Exit;
-
-  { Background }
-  if FSearch.Map.Colors.Background <> clNone then
-    Canvas.Brush.Color := FSearch.Map.Colors.Background
-  else
-    Canvas.Brush.Color := FBackgroundColor;
-  FillRect(AClipRect);
-  { Lines in window }
-  LHeight := ClientRect.Height / Max(Lines.Count, 1);
-  AClipRect.Top := Round((TopRow - 1) * LHeight);
-  AClipRect.Bottom := Max(Round((TopRow - 1 + VisibleRows) * LHeight), AClipRect.Top + 1);
-  Canvas.Brush.Color := FBackgroundColor;
-  FillRect(AClipRect);
-  { Draw lines }
-  if FSearch.Map.Colors.Foreground <> clNone then
-    Canvas.Pen.Color := FSearch.Map.Colors.Foreground
-  else
-    Canvas.Pen.Color := clHighlight;
-  Canvas.Pen.Width := 1;
-  Canvas.Pen.Style := psSolid;
-  for LIndex := 0 to FSearch.Lines.Count - 1 do
+  if (FSearchResults.Count > 0) then
   begin
-    LLine := Round(FSearch.Lines[LIndex].BeginTextPosition.Line * LHeight);
-    Canvas.MoveTo(AClipRect.Left, LLine);
-    Canvas.LineTo(AClipRect.Right, LLine);
-    Canvas.MoveTo(AClipRect.Left, LLine + 1);
-    Canvas.LineTo(AClipRect.Right, LLine + 1);
-  end;
-  { Draw active line }
-  if moShowActiveLine in FSearch.Map.Options then
-  begin
-    if FSearch.Map.Colors.ActiveLine <> clNone then
-      Canvas.Pen.Color := FSearch.Map.Colors.ActiveLine
+    { Background }
+    if FSearch.Map.Colors.Background <> clNone then
+      Canvas.Brush.Color := FSearch.Map.Colors.Background
     else
-      Canvas.Pen.Color := FActiveLine.Color;
-    LLine := Round(DisplayCaretPosition.Row * LHeight);
-    Canvas.MoveTo(AClipRect.Left, LLine);
-    Canvas.LineTo(AClipRect.Right, LLine);
-    Canvas.MoveTo(AClipRect.Left, LLine + 1);
-    Canvas.LineTo(AClipRect.Right, LLine + 1);
+      Canvas.Brush.Color := FBackgroundColor;
+    FillRect(AClipRect);
+    { Lines in window }
+    LHeight := ClientRect.Height / Max(Lines.Count, 1);
+    AClipRect.Top := Round((TopRow - 1) * LHeight);
+    AClipRect.Bottom := Max(Round((TopRow - 1 + VisibleRows) * LHeight), AClipRect.Top + 1);
+    Canvas.Brush.Color := FBackgroundColor;
+    FillRect(AClipRect);
+    { Draw lines }
+    if FSearch.Map.Colors.Foreground <> clNone then
+      Canvas.Pen.Color := FSearch.Map.Colors.Foreground
+    else
+      Canvas.Pen.Color := clHighlight;
+    Canvas.Pen.Width := 1;
+    Canvas.Pen.Style := psSolid;
+    for LIndex := 0 to FSearchResults.Count - 1 do
+    begin
+      LLine := Round(FSearchResults[LIndex].BeginPosition.Line * LHeight);
+      Canvas.MoveTo(AClipRect.Left, LLine);
+      Canvas.LineTo(AClipRect.Right, LLine);
+      Canvas.MoveTo(AClipRect.Left, LLine + 1);
+      Canvas.LineTo(AClipRect.Right, LLine + 1);
+    end;
+    { Draw active line }
+    if moShowActiveLine in FSearch.Map.Options then
+    begin
+      if FSearch.Map.Colors.ActiveLine <> clNone then
+        Canvas.Pen.Color := FSearch.Map.Colors.ActiveLine
+      else
+        Canvas.Pen.Color := FActiveLine.Color;
+      LLine := Round(DisplayCaretPosition.Row * LHeight);
+      Canvas.MoveTo(AClipRect.Left, LLine);
+      Canvas.LineTo(AClipRect.Right, LLine);
+      Canvas.MoveTo(AClipRect.Left, LLine + 1);
+      Canvas.LineTo(AClipRect.Right, LLine + 1);
+    end;
   end;
 end;
 
@@ -9211,29 +9403,29 @@ var
 
   procedure PaintSearchResults(const AText: string; const ATextRect: TRect);
   var
-    LBeginTextPositionChar: Integer;
+    LBeginTextPosition: TBCEditorTextPosition;
     LCharCount: Integer;
     LIsTextPositionInSelection: Boolean;
     LOldBackgroundColor: TColor;
     LOldColor: TColor;
-    LSearchItem: TBCEditorSearch.TItem;
+    LSearchItem: TSearchResult;
     LSearchRect: TRect;
     LSearchTextLength: Integer;
     LToken: string;
 
     function GetSearchTextLength: Integer;
     begin
-      if (LCurrentLine = LSearchItem.BeginTextPosition.Line) and (LSearchItem.BeginTextPosition.Line = LSearchItem.EndTextPosition.Line) then
-        Result := LSearchItem.EndTextPosition.Char - LSearchItem.BeginTextPosition.Char
+      if (LCurrentLine = LSearchItem.BeginPosition.Line) and (LSearchItem.BeginPosition.Line = LSearchItem.EndPosition.Line) then
+        Result := LSearchItem.EndPosition.Char - LSearchItem.BeginPosition.Char
       else
-      if (LCurrentLine > LSearchItem.BeginTextPosition.Line) and (LCurrentLine < LSearchItem.EndTextPosition.Line) then
+      if (LCurrentLine > LSearchItem.BeginPosition.Line) and (LCurrentLine < LSearchItem.EndPosition.Line) then
         Result := LCurrentRowTextLength
       else
-      if (LCurrentLine = LSearchItem.BeginTextPosition.Line) and (LCurrentLine < LSearchItem.EndTextPosition.Line) then
-        Result := LCurrentRowTextLength - LSearchItem.BeginTextPosition.Char + 2
+      if (LCurrentLine = LSearchItem.BeginPosition.Line) and (LCurrentLine < LSearchItem.EndPosition.Line) then
+        Result := LCurrentRowTextLength - LSearchItem.BeginPosition.Char + 2
       else
-      if (LCurrentLine > LSearchItem.BeginTextPosition.Line) and (LCurrentLine = LSearchItem.EndTextPosition.Line) then
-        Result := LSearchItem.EndTextPosition.Char
+      if (LCurrentLine > LSearchItem.BeginPosition.Line) and (LCurrentLine = LSearchItem.EndPosition.Line) then
+        Result := LSearchItem.EndPosition.Char
       else
         Result := 0;
     end;
@@ -9242,8 +9434,8 @@ var
     begin
       Result := True;
       Inc(LCurrentSearchIndex);
-      if LCurrentSearchIndex < FSearch.Lines.Count then
-        LSearchItem := FSearch.Lines[LCurrentSearchIndex]
+      if LCurrentSearchIndex < FSearchResults.Count then
+        LSearchItem := FSearchResults[LCurrentSearchIndex]
       else
       begin
         LCurrentSearchIndex := -1;
@@ -9255,21 +9447,21 @@ var
     if soHighlightResults in FSearch.Options then
       if LCurrentSearchIndex <> -1 then
       begin
-        LSearchItem := FSearch.Lines[LCurrentSearchIndex];
+        LSearchItem := FSearchResults[LCurrentSearchIndex];
 
-        while (LCurrentSearchIndex < FSearch.Lines.Count) and (LSearchItem.EndTextPosition.Line < LCurrentLine) do
+        while (LCurrentSearchIndex < FSearchResults.Count) and (LSearchItem.EndPosition.Line < LCurrentLine) do
         begin
           Inc(LCurrentSearchIndex);
-          if LCurrentSearchIndex < FSearch.Lines.Count then
-            LSearchItem := FSearch.Lines[LCurrentSearchIndex];
+          if LCurrentSearchIndex < FSearchResults.Count then
+            LSearchItem := FSearchResults[LCurrentSearchIndex];
         end;
-        if LCurrentSearchIndex = FSearch.Lines.Count then
+        if LCurrentSearchIndex = FSearchResults.Count then
         begin
           LCurrentSearchIndex := -1;
           Exit;
         end;
 
-        if LCurrentLine < LSearchItem.BeginTextPosition.Line then
+        if LCurrentLine < LSearchItem.BeginPosition.Line then
           Exit;
 
         LOldColor := FPaintHelper.Color;
@@ -9287,13 +9479,13 @@ var
 
           if FSearch.InSelection.Active then
           begin
-            LIsTextPositionInSelection := IsTextPositionInSearchBlock(LSearchItem.BeginTextPosition);
+            LIsTextPositionInSelection := IsTextPositionInSearchBlock(LSearchItem.BeginPosition);
             if LIsTextPositionInSelection then
-              LIsTextPositionInSelection := not Lines.IsPositionInSelection(LSearchItem.BeginTextPosition);
+              LIsTextPositionInSelection := not Lines.IsPositionInSelection(LSearchItem.BeginPosition);
           end
           else
-            LIsTextPositionInSelection := Lines.IsPositionInSelection(LSearchItem.BeginTextPosition) and
-              Lines.IsPositionInSelection(LSearchItem.EndTextPosition);
+            LIsTextPositionInSelection := Lines.IsPositionInSelection(LSearchItem.BeginPosition) and
+              Lines.IsPositionInSelection(LSearchItem.EndPosition);
 
           if not FSearch.InSelection.Active and LIsTextPositionInSelection or
             FSearch.InSelection.Active and not LIsTextPositionInSelection then
@@ -9306,12 +9498,12 @@ var
           LToken := AText;
           LSearchRect := ATextRect;
 
-          if LSearchItem.BeginTextPosition.Line < LCurrentLine then
-            LBeginTextPositionChar := 0
+          if LSearchItem.BeginPosition.Line < LCurrentLine then
+            LBeginTextPosition := TextPosition(0, 0)
           else
-            LBeginTextPositionChar := LSearchItem.BeginTextPosition.Char;
+            LBeginTextPosition := LSearchItem.BeginPosition;
 
-          LCharCount := LBeginTextPositionChar - LTokenHelper.CharsBefore;
+          LCharCount := LBeginTextPosition.Char - LTokenHelper.CharsBefore;
 
           if LCharCount > 0 then
           begin
@@ -9322,7 +9514,7 @@ var
           else
             LCharCount := LTokenHelper.Length - Length(AText);
 
-          LToken := Copy(LToken, 1, Min(LSearchTextLength, LBeginTextPositionChar + LSearchTextLength -
+          LToken := Copy(LToken, 1, Min(LSearchTextLength, LBeginTextPosition.Char + LSearchTextLength -
             LTokenHelper.CharsBefore - LCharCount));
           LSearchRect.Right := LSearchRect.Left + GetTokenWidth(LToken, Length(LToken), LPaintedColumn);
           if SameText(AText, LToken) then
@@ -9332,13 +9524,13 @@ var
             ExtTextOut(Canvas.Handle, LSearchRect.Left, LSearchRect.Top, ETO_OPAQUE or ETO_CLIPPED,
               @LSearchRect, PChar(LToken), Length(LToken), nil);
 
-          if LBeginTextPositionChar + LSearchTextLength > LCurrentRowTextLength then
+          if LBeginTextPosition.Char + LSearchTextLength > LCurrentRowTextLength then
             Break
           else
-          if LBeginTextPositionChar + LSearchTextLength > LTokenHelper.CharsBefore + Length(LToken) + LCharCount + 1 then
+          if LBeginTextPosition.Char + LSearchTextLength > LTokenHelper.CharsBefore + Length(LToken) + LCharCount + 1 then
             Break
           else
-          if LBeginTextPositionChar + LSearchTextLength - 1 <= LCurrentRowTextLength then
+          if LBeginTextPosition.Char + LSearchTextLength - 1 <= LCurrentRowTextLength then
           begin
             if not NextItem then
               Break;
@@ -10258,18 +10450,18 @@ var
 begin
   LCurrentSearchIndex := -1;
 
-  if Assigned(FSearch.Lines) and (FSearch.Lines.Count > 0) then
+  if (FSearchResults.Count > 0) then
   begin
     LCurrentSearchIndex := 0;
-    while LCurrentSearchIndex < FSearch.Lines.Count do
+    while LCurrentSearchIndex < FSearchResults.Count do
     begin
-      LTextPosition := FSearch.Lines[LCurrentSearchIndex].EndTextPosition;
+      LTextPosition := FSearchResults[LCurrentSearchIndex].EndPosition;
       if LTextPosition.Line + 1 >= TopRow then
         Break
       else
         Inc(LCurrentSearchIndex);
     end;
-    if LCurrentSearchIndex = FSearch.Lines.Count then
+    if LCurrentSearchIndex = FSearchResults.Count then
       LCurrentSearchIndex := -1;
   end;
 
@@ -10409,7 +10601,7 @@ begin
     rcEngineUpdate:
       begin
         Lines.CaretPosition := Lines.BOFPosition;
-        AssignSearchEngine(FReplace.Engine);
+        FSearch.Engine := FReplace.Engine;
       end;
   end;
 end;
@@ -10460,9 +10652,6 @@ var
   LFound: Boolean;
   LItemIndex: Integer;
 begin
-  if not Assigned(FSearchEngine) then
-    raise EBCEditorBaseException.Create(SBCEditorSearchEngineNotAssigned);
-
   Result := 0;
   if Length(ASearchText) = 0 then
     Exit;
@@ -10474,8 +10663,8 @@ begin
   ClearCodeFolding;
   FReplaceLock := True;
 
-  SearchAll(ASearchText);
-  Result := FSearch.Lines.Count - 1;
+  FindFirst(ASearchText);
+  Result := FSearchResults.Count - 1;
 
   Lines.BeginUpdate();
   try
@@ -10522,12 +10711,12 @@ begin
         LockPainting;
 
         if LIsPrompt then
-          SearchAll(ASearchText);
+          FindFirst(ASearchText);
 
-        for LItemIndex := FSearch.Lines.Count - 1 downto 0 do
+        for LItemIndex := FSearchResults.Count - 1 downto 0 do
         begin
-          Lines.SelBeginPosition := FSearch.Lines[LItemIndex].BeginTextPosition;
-          Lines.SelEndPosition := FSearch.Lines[LItemIndex].EndTextPosition;
+          Lines.SelBeginPosition := FSearchResults[LItemIndex].BeginPosition;
+          Lines.SelEndPosition := FSearchResults[LItemIndex].EndPosition;
 
           ReplaceSelectedText;
         end;
@@ -10542,7 +10731,7 @@ begin
         Exit;
     end;
   finally
-    FSearch.Lines.Clear;
+    FSearchResults.Clear;
     Lines.EndUpdate();
     FReplaceLock := False;
     InitCodeFolding;
@@ -11576,169 +11765,15 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.SearchAll(const ASearchText: string = '');
-var
-  LBeginTextPosition: TBCEditorTextPosition;
-  LLine: Integer;
-  LEndTextPosition: TBCEditorTextPosition;
-  LSelectedOnly: Boolean;
-
-  function IsLineInSearch: Boolean;
-  begin
-    Result := not FSearch.InSelection.Active
-      or
-      LSelectedOnly and Lines.IsPositionInSelection(Lines.SelBeginPosition) and Lines.IsPositionInSelection(Lines.SelEndPosition)
-      or
-      FSearch.InSelection.Active and
-      (FSearch.InSelection.SelectionBeginPosition.Line <= LLine) and
-      (FSearch.InSelection.SelectionEndPosition.Line >= LLine)
-  end;
-
-  function CanAddResult: Boolean;
-  begin
-    Result := not FSearch.InSelection.Active
-      or
-      LSelectedOnly and Lines.IsPositionInSelection(Lines.SelBeginPosition) and Lines.IsPositionInSelection(Lines.SelEndPosition)
-      or
-      FSearch.InSelection.Active and
-      ((FSearch.InSelection.SelectionBeginPosition.Line < LLine) and (FSearch.InSelection.SelectionEndPosition.Line > LLine) or
-      IsTextPositionInSearchBlock(LBeginTextPosition) and IsTextPositionInSearchBlock(LEndTextPosition));
-  end;
-
-var
-  LCurrentLineLength: Integer;
-  LLength: Integer;
-  LLineBreakLength: Integer;
-  LPreviousIndex: Integer;
-  LPreviousPosition: TBCEditorTextPosition;
-  LResultIndex: Integer;
-  LSearchAllCount: Integer;
-  LSearchItem: TBCEditorSearch.TItem;
-  LSearchLength: Integer;
-  LSearchResult: Integer;
-  LSearchText: string;
-  LTempLine: Integer;
-  LTextPosition: Integer;
-begin
-  FSearch.Lines.Clear;
-
-  if not FSearch.Enabled then
-    Exit;
-
-  if ASearchText = '' then
-    LSearchText := FSearch.SearchText
-  else
-    LSearchText := ASearchText;
-
-  if LSearchText = '' then
-    Exit;
-
-  LSelectedOnly := False;
-  FSearchEngine.Pattern := LSearchText;
-  if ASearchText <> '' then
-  begin
-    FSearchEngine.CaseSensitive := roCaseSensitive in FReplace.Options;
-    FSearchEngine.WholeWordsOnly := roWholeWordsOnly in FReplace.Options;
-    LSelectedOnly := roSelectedOnly in FReplace.Options;
-  end
-  else
-  begin
-    FSearchEngine.CaseSensitive := soCaseSensitive in FSearch.Options;
-    FSearchEngine.WholeWordsOnly := soWholeWordsOnly in FSearch.Options;
-  end;
-
-  LPreviousIndex := 0;
-  LPreviousPosition := Lines.BOFPosition;
-  for LSearchResult := 0 to FSearchEngine.SearchAll(Lines) - 1 do
-  begin
-    LBeginTextPosition := Lines.CharIndexToPosition(FSearchEngine.Results[LSearchResult] - LPreviousIndex, LPreviousPosition);
-    LEndTextPosition := TextPosition(LBeginTextPosition.Char + FSearchEngine.Lengths[LSearchResult], LBeginTextPosition.Line);
-
-    LPreviousIndex := FSearchEngine.Results[LSearchResult];
-    LPreviousPosition := LBeginTextPosition;
-  end;
-
-  LResultIndex := 0;
-  LSearchAllCount := FSearchEngine.SearchAll(Lines);
-  LLineBreakLength := Length(Lines.LineBreak);
-  if LSearchAllCount > 0 then
-  begin
-    LLine := 0;
-    LCurrentLineLength := Length(Lines[LLine]) + LLineBreakLength;
-    LTextPosition := 0;
-    while (LLine < Lines.Count) and (LResultIndex < LSearchAllCount) do
-    begin
-      if IsLineInSearch then
-      begin
-        while (LLine < Lines.Count) and (LResultIndex < LSearchAllCount) and
-          (FSearchEngine.Results[LResultIndex] <= LTextPosition + LCurrentLineLength) do
-        begin
-          LSearchLength := FSearchEngine.Lengths[LResultIndex];
-
-          LBeginTextPosition := Lines.CharIndexToPosition(FSearchEngine.Results[LResultIndex]);
-
-          LBeginTextPosition.Char := FSearchEngine.Results[LResultIndex] - LTextPosition;
-          LBeginTextPosition.Line := LLine;
-          LEndTextPosition.Char := LBeginTextPosition.Char + LSearchLength;
-          LEndTextPosition.Line := LLine;
-
-          LLength := LCurrentLineLength;
-          LTempLine := LLine;
-          while LEndTextPosition.Char + 1 > LLength do
-          begin
-            Dec(LEndTextPosition.Char, LLength);
-            Inc(LTempLine);
-            LLength := Length(Lines[LTempLine]) + LLineBreakLength;
-            LEndTextPosition.Line := LTempLine;
-          end;
-
-          if CanAddResult then
-          begin
-            LSearchItem.BeginTextPosition := LBeginTextPosition;
-            LSearchItem.EndTextPosition := LEndTextPosition;
-            FSearch.Lines.Add(LSearchItem);
-          end;
-
-          Inc(LResultIndex);
-        end;
-      end;
-      Inc(LLine);
-      Inc(LTextPosition, LCurrentLineLength);
-      if (LLine < Lines.Count) then
-        LCurrentLineLength := Length(Lines[LLine]) + LLineBreakLength;
-    end;
-  end;
-end;
-
 procedure TCustomBCEditor.SearchChanged(AEvent: TBCEditorSearchChanges);
 begin
-  case AEvent of
-    scEngineUpdate:
-      begin
-        Lines.CaretPosition := Lines.BOFPosition;
-        AssignSearchEngine(FSearch.Engine);
-      end;
-    scSearch:
-      if FSearch.Enabled then
-      begin
-        SearchAll;
-        if soEntireScope in FSearch.Options then
-          Lines.CaretPosition := Lines.BOFPosition;
-        if SelectionAvailable then
-          Lines.CaretPosition := Lines.SelBeginPosition;
-        FindNext;
-      end;
-    scInSelectionActive:
-      begin
-        if FSearch.InSelection.Active then
-        begin
-          FSearch.InSelection.SelectionBeginPosition := Lines.SelBeginPosition;
-          FSearch.InSelection.SelectionEndPosition := Lines.SelEndPosition;
-          Lines.SelBeginPosition := Lines.CaretPosition;
-        end;
-        SearchAll;
-      end;
-  end;
+  if (FSearchResults.Count > 0) then
+    case (AEvent) of
+      scSearch,
+      scEngineUpdate,
+      scInSelectionActive:
+        FindFirst(FSearchPattern);
+    end;
   FLeftMarginWidth := GetLeftMarginWidth;
   Invalidate;
 end;
@@ -11750,7 +11785,7 @@ end;
 
 function TCustomBCEditor.SearchStatus: string;
 begin
-  Result := FSearchEngine.Status;
+  Result := FSearchStatus;
 end;
 
 procedure TCustomBCEditor.SelectAll;

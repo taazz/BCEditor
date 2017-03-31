@@ -3,18 +3,14 @@ unit BCEditor.Editor.Search;
 interface {********************************************************************}
 
 uses
-  Classes, Generics.Collections,
+  Classes, Generics.Collections, RegularExpressions,
   Controls, Graphics,
-  BCEditor.Types, BCEditor.Consts;
+  BCEditor.Types, BCEditor.Consts, BCEditor.Lines;
 
 type
   TBCEditorSearch = class(TPersistent)
-  type
+  public type
     TChangeEvent = procedure(Event: TBCEditorSearchChanges) of object;
-    TItem = record
-      BeginTextPosition: TBCEditorTextPosition;
-      EndTextPosition: TBCEditorTextPosition;
-    end;
     TOptions = set of TBCEditorSearchOption;
 
     THighlighter = class(TPersistent)
@@ -95,7 +91,7 @@ type
       procedure SetAlign(const AValue: TBCEditorSearchMapAlign);
       procedure SetColors(const AValue: TColors);
       procedure SetOnChange(AValue: TChangeEvent);
-      procedure SetOptions(const AValue: TBCEditorSearch.TMap.TOptions);
+      procedure SetOptions(const AValue: TMap.TOptions);
       procedure SetVisible(AValue: Boolean);
       procedure SetWidth(AValue: Integer);
     public
@@ -134,50 +130,51 @@ type
     end;
 
   strict private const
-    DefaultOptions = [soHighlightResults, soSearchOnTyping, soBeepIfStringNotFound, soShowSearchMatchNotFound];
+    DefaultOptions = [soHighlightResults, soSearchOnTyping, soShowSearchMatchNotFound];
   strict private
+    FCaseSensitive: Boolean;
     FEnabled: Boolean;
-    FEngine: TBCEditorSearchEngine;
+    FEngineType: TBCEditorSearchEngine;
     FHighlighter: THighlighter;
     FInSelection: TInSelection;
-    FLines: TList<TItem>;
     FMap: TMap;
     FOnChange: TChangeEvent;
     FOptions: TOptions;
-    FSearchText: string;
     FVisible: Boolean;
+    FWholeWordsOnly: Boolean;
     procedure DoChange;
+    procedure SetCaseSensitive(const AValue: Boolean);
     procedure SetEnabled(const AValue: Boolean);
-    procedure SetEngine(const AValue: TBCEditorSearchEngine);
+    procedure SetEngineType(const AValue: TBCEditorSearchEngine);
     procedure SetHighlighter(const AValue: THighlighter);
     procedure SetInSelection(const AValue: TInSelection);
     procedure SetMap(const AValue: TMap);
     procedure SetOnChange(const AValue: TChangeEvent);
-    procedure SetSearchText(const AValue: string);
+    procedure SetWholeWordsOnly(const AValue: Boolean);
+  protected
+    property OnChange: TChangeEvent read FOnChange write SetOnChange;
   public
-    constructor Create;
-    destructor Destroy; override;
+    constructor Create();
+    destructor Destroy(); override;
     procedure Assign(ASource: TPersistent); override;
-    function GetNextSearchItemIndex(const ATextPosition: TBCEditorTextPosition): Integer;
-    function GetPreviousSearchItemIndex(const ATextPosition: TBCEditorTextPosition): Integer;
-    procedure SetOption(const AOption: TBCEditorSearchOption; const AEnabled: Boolean);
     property Visible: Boolean read FVisible write FVisible;
   published
+    property CaseSensitive: Boolean read FCaseSensitive write SetCaseSensitive default False;
     property Enabled: Boolean read FEnabled write SetEnabled default True;
-    property Engine: TBCEditorSearchEngine read FEngine write SetEngine default seNormal;
+    property Engine: TBCEditorSearchEngine read FEngineType write SetEngineType default seNormal;
     property Highlighter: THighlighter read FHighlighter write SetHighlighter;
     property InSelection: TInSelection read FInSelection write SetInSelection;
-    property Lines: TList<TItem> read FLines write FLines;
     property Map: TMap read FMap write SetMap;
     property Options: TOptions read FOptions write FOptions default DefaultOptions;
-    property SearchText: string read FSearchText write SetSearchText;
-    property OnChange: TChangeEvent read FOnChange write SetOnChange;
+    property WholeWordsOnly: Boolean read FWholeWordsOnly write SetWholeWordsOnly default False;
   end;
 
 implementation {***************************************************************}
 
 uses
-  Math;
+  Windows,
+  Math, SysUtils, Character,
+  BCEditor.Language;
 
 { TBCEditorSearch.THighlighter.TColors ****************************************}
 
@@ -408,7 +405,7 @@ begin
   FColors.OnChange := FOnChange;
 end;
 
-procedure TBCEditorSearch.TMap.SetOptions(const AValue: TBCEditorSearch.TMap.TOptions);
+procedure TBCEditorSearch.TMap.SetOptions(const AValue: TMap.TOptions);
 begin
   if FOptions <> AValue then
   begin
@@ -476,26 +473,26 @@ end;
 
 { TBCEditorSearch *************************************************************}
 
-constructor TBCEditorSearch.Create;
+constructor TBCEditorSearch.Create();
 begin
   inherited;
 
-  FSearchText := '';
-  FEngine := seNormal;
-  FMap := TBCEditorSearch.TMap.Create;
-  FLines := TList<TItem>.Create;
+  FCaseSensitive := False;
+  FEnabled := True;
+  FEngineType := seNormal;
   FHighlighter := THighlighter.Create;
   FInSelection := TInSelection.Create;
+  FMap := TBCEditorSearch.TMap.Create;
   FOptions := DefaultOptions;
-  FEnabled := True;
+  FWholeWordsOnly := False;
 end;
 
-destructor TBCEditorSearch.Destroy;
+destructor TBCEditorSearch.Destroy();
 begin
-  FMap.Free;
-  FHighlighter.Free;
-  FInSelection.Free;
-  FLines.Free;
+  FHighlighter.Free();
+  FInSelection.Free();
+  FMap.Free();
+
   inherited;
 end;
 
@@ -504,86 +501,32 @@ begin
   if Assigned(ASource) and (ASource is TBCEditorSearch) then
   with ASource as TBCEditorSearch do
   begin
+    Self.FCaseSensitive := FCaseSensitive;
     Self.FEnabled := FEnabled;
-    Self.FSearchText := FSearchText;
-    Self.FEngine := FEngine;
-    Self.FOptions := FOptions;
-    Self.FMap.Assign(FMap);
+    Self.FEngineType := FEngineType;
     Self.FHighlighter.Assign(FHighlighter);
     Self.FInSelection.Assign(FInSelection);
+    Self.FMap.Assign(FMap);
+    Self.FOptions := FOptions;
+    Self.FWholeWordsOnly := FWholeWordsOnly;
     Self.DoChange;
   end
   else
     inherited Assign(ASource);
 end;
 
-procedure TBCEditorSearch.DoChange;
+procedure TBCEditorSearch.DoChange();
 begin
-  if Assigned(FOnChange) then
+  if (Assigned(FOnChange)) then
     FOnChange(scRefresh);
 end;
 
-function TBCEditorSearch.GetNextSearchItemIndex(const ATextPosition: TBCEditorTextPosition): Integer;
-var
-  LMiddle: Integer;
-  LLeft: Integer;
-  LRight: Integer;
+procedure TBCEditorSearch.SetCaseSensitive(const AValue: Boolean);
 begin
-  if (FLines.Count = 0) then
-    Result := -1
-  else if ((Lines[0].BeginTextPosition >= ATextPosition)
-    or (Lines[Lines.Count - 1].BeginTextPosition < ATextPosition)) then
-    Result := 0
-  else
+  if (AValue <> FCaseSensitive) then
   begin
-    Result := -1;
-
-    LLeft := 0;
-    LRight := FLines.Count - 1;
-
-    while (Result < 0) do
-    begin
-      LMiddle := (LLeft + LRight) div 2;
-      if (Lines[LMiddle].BeginTextPosition < ATextPosition) then
-        LLeft := LMiddle + 1
-      else if ((Lines[LMiddle - 1].BeginTextPosition < ATextPosition)
-        and (Lines[LMiddle].BeginTextPosition >= ATextPosition)) then
-        Result := LMiddle
-      else
-        LRight := LMiddle - 1;
-    end;
-  end;
-end;
-
-function TBCEditorSearch.GetPreviousSearchItemIndex(const ATextPosition: TBCEditorTextPosition): Integer;
-var
-  LMiddle: Integer;
-  LLeft: Integer;
-  LRight: Integer;
-begin
-  if (FLines.Count = 0) then
-    Result := -1
-  else if ((Lines[FLines.Count - 1].BeginTextPosition <= ATextPosition)
-    or (Lines[0].BeginTextPosition > ATextPosition)) then
-    Result := FLines.Count - 1
-  else
-  begin
-    Result := -1;
-
-    LLeft := 0;
-    LRight := FLines.Count - 1;
-
-    while (Result < 0) do
-    begin
-      LMiddle := (LLeft + LRight) div 2;
-      if (Lines[LMiddle].BeginTextPosition < ATextPosition) then
-        LLeft := LMiddle + 1
-      else if ((Lines[LMiddle].BeginTextPosition <= ATextPosition)
-        and (Lines[LMiddle + 1].BeginTextPosition > ATextPosition)) then
-        Result := LMiddle
-      else
-        LRight := LMiddle - 1;
-    end;
+    FCaseSensitive := AValue;
+    DoChange();
   end;
 end;
 
@@ -592,18 +535,16 @@ begin
   if FEnabled <> AValue then
   begin
     FEnabled := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(scSearch);
+    DoChange();
   end;
 end;
 
-procedure TBCEditorSearch.SetEngine(const AValue: TBCEditorSearchEngine);
+procedure TBCEditorSearch.SetEngineType(const AValue: TBCEditorSearchEngine);
 begin
-  if FEngine <> AValue then
+  if (FEngineType <> AValue) then
   begin
-    FEngine := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(scEngineUpdate);
+    FEngineType := AValue;
+    DoChange();
   end;
 end;
 
@@ -630,19 +571,13 @@ begin
   FInSelection.OnChange := FOnChange;
 end;
 
-procedure TBCEditorSearch.SetOption(const AOption: TBCEditorSearchOption; const AEnabled: Boolean);
+procedure TBCEditorSearch.SetWholeWordsOnly(const AValue: Boolean);
 begin
-  if AEnabled then
-    Include(FOptions, AOption)
-  else
-    Exclude(FOptions, AOption);
-end;
-
-procedure TBCEditorSearch.SetSearchText(const AValue: string);
-begin
-  FSearchText := AValue;
-  if Assigned(FOnChange) then
-    FOnChange(scSearch);
+  if (AValue <> FWholeWordsOnly) then
+  begin
+    FWholeWordsOnly := AValue;
+    DoChange();
+  end;
 end;
 
 end.

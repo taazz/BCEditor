@@ -227,9 +227,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Register.pas">
             <BuildOrder>95</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Search.pas">
-            <BuildOrder>85</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.StyleHooks.pas">
             <BuildOrder>88</BuildOrder>
         </DelphiCompile>
