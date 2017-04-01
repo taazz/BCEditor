@@ -429,7 +429,7 @@ begin
 
   LText := TextBetween[ABeginPosition, AEndPosition];
 
-  UndoList.BeginUpdate();
+  BeginUpdate();
   try
     DoDeleteText(ABeginPosition, AEndPosition);
 
@@ -437,7 +437,7 @@ begin
       LSelBeginPosition, LSelEndPosition, SelMode,
       ABeginPosition, AEndPosition, LText);
   finally
-    UndoList.EndUpdate();
+    EndUpdate();
   end;
 
   CaretPosition := ABeginPosition;
@@ -577,7 +577,7 @@ var
   LText: string;
 begin
   BeginUpdate();
-  UndoList.BeginUpdate();
+  BeginUpdate();
 
   try
     LBeginPosition := BOLPosition[ABeginLine];
@@ -597,7 +597,7 @@ begin
       InvalidTextPosition, InvalidTextPosition, smNormal,
       LBeginPosition, LEndPosition);
   finally
-    UndoList.EndUpdate();
+    EndUpdate();
     EndUpdate();
     RedoList.Clear();
   end;
@@ -636,7 +636,7 @@ begin
     LUndoType := utDelete;
   end;
 
-  UndoList.BeginUpdate();
+  BeginUpdate();
   try
     DoDelete(ALine);
 
@@ -644,7 +644,7 @@ begin
       LSelBeginPosition, LSelEndPosition, SelMode,
       LBeginPosition, InvalidTextPosition, LText);
   finally
-    UndoList.EndUpdate();
+    EndUpdate();
   end;
 end;
 
@@ -690,14 +690,14 @@ begin
   end
   else
   begin
-    UndoList.BeginUpdate();
+    BeginUpdate();
 
     try
       for LLine := LBeginPosition.Line to LEndPosition.Line do
         if (LeftStr(Lines[LLine].Text, LIndentTextLength) = AIndentText) then
           DeleteText(BOLPosition[LLine], TextPosition(Length(AIndentText), LLine));
     finally
-      UndoList.EndUpdate();
+      EndUpdate();
     end;
   end;
 
@@ -727,7 +727,7 @@ var
   LSpaces: string;
   LText: string;
 begin
-  UndoList.BeginUpdate();
+  BeginUpdate();
   try
     if (ABeginPosition = AEndPosition) then
       // Do nothing
@@ -801,7 +801,7 @@ begin
     if (SelMode = smNormal) then
       CaretPosition := ABeginPosition;
   finally
-    UndoList.EndUpdate();
+    EndUpdate();
   end;
 
   RedoList.Clear();
@@ -1865,7 +1865,7 @@ begin
     InsertText(ABeginPosition, AText)
   else
   begin
-    UndoList.BeginUpdate();
+    BeginUpdate();
     try
       LCaretPosition := CaretPosition;
       LSelBeginPosition := SelBeginPosition;
@@ -1882,7 +1882,7 @@ begin
 
       CaretPosition := Result;
     finally
-      UndoList.EndUpdate();
+      EndUpdate();
     end;
   end;
 end;

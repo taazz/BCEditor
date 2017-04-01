@@ -391,7 +391,7 @@ type
     function PreviousWordPosition(const ATextPosition: TBCEditorTextPosition): TBCEditorTextPosition; overload;
     procedure RemoveDuplicateMultiCarets;
     procedure ReplaceChanged(AEvent: TBCEditorReplaceChanges);
-    function RescanHighlighterRangesFrom(const AIndex: Integer): Integer;
+    function RescanHighlighterRangesFrom(const ALine: Integer): Integer;
     procedure RightMarginChanged(ASender: TObject);
     procedure ScrollChanged(ASender: TObject);
     procedure ScrollTimerHandler(ASender: TObject);
@@ -7282,6 +7282,8 @@ begin
   FRows.Clear();
   FMultiCaretPosition.Row := -1;
 
+  RescanHighlighterRangesFrom(0);
+
   Modified := True;
 
   if (UpdateCount > 0) then
@@ -10869,19 +10871,18 @@ begin
   Invalidate;
 end;
 
-function TCustomBCEditor.RescanHighlighterRangesFrom(const AIndex: Integer): Integer;
+function TCustomBCEditor.RescanHighlighterRangesFrom(const ALine: Integer): Integer;
 var
   LCurrentRange: TBCEditorHighlighter.TRange;
 begin
-  Assert(AIndex < Lines.Count);
+  Assert(ALine < Lines.Count);
 
-  Result := AIndex;
-
-  if Result = 0 then
+  if (ALine = 0) then
     FHighlighter.ResetCurrentRange
   else
-    FHighlighter.SetCurrentRange(Lines.Ranges[Result - 1]);
+    FHighlighter.SetCurrentRange(Lines.Ranges[ALine - 1]);
 
+  Result := ALine;
   repeat
     FHighlighter.SetCurrentLine(Lines[Result]);
     FHighlighter.NextToEndOfLine;
