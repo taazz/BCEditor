@@ -2629,7 +2629,7 @@ begin
     and ((FCurrentLineIndex > Length(FCurrentLine)) or not CharInset(FCurrentLine[1 + FCurrentLineIndex - 1], BCEDITOR_ABSOLUTE_DELIMITERS))) then
     FBeginningOfLine := False;
 
-  if (FCurrentLineIndex > Length(FCurrentLine)) then
+  if (FCurrentLineIndex >= Length(FCurrentLine)) then
     FPreviousEndOfLine := True;
 end;
 

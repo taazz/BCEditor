@@ -81,7 +81,6 @@ type
 
   const
     BOFPosition: TBCEditorTextPosition = (Char: 0; Line: 0);
-    InvalidPosition: TBCEditorTextPosition = (Char: -1; Line: -1);
   strict private const
     DefaultOptions = [loUndoGrouped];
   strict private
@@ -179,6 +178,7 @@ type
     procedure Redo(); inline;
     function ReplaceText(ABeginPosition, AEndPosition: TBCEditorTextPosition;
       const AText: string): TBCEditorTextPosition;
+    function Search(const APattern: string; const AForwards, ARegExpr: Boolean; var APosition: TBCEditorTextPosition): Boolean;
     procedure SetTabWidth(const AValue: Integer);
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
@@ -513,8 +513,6 @@ begin
 
     Result.Char := LLength;
   end;
-
-  Assert(Result <= EOFPosition, 'ACharIndex: ' + IntToStr(ACharIndex) + ', RelPos: ' + ARelativePosition.ToString() + ', Result: ' + Result.ToString());
 end;
 
 procedure TBCEditorLines.Clear();
@@ -591,12 +589,12 @@ begin
     LText := TextBetween[LBeginPosition, LEndPosition];
     UndoList.Push(utDelete, CaretPosition,
       SelBeginPosition, SelEndPosition, SelMode,
-      LBeginPosition, InvalidPosition, LText);
+      LBeginPosition, InvalidTextPosition, LText);
 
     QuickSort(ABeginLine, AEndLine, ACompare);
 
-    UndoList.Push(utInsert, InvalidPosition,
-      InvalidPosition, InvalidPosition, smNormal,
+    UndoList.Push(utInsert, InvalidTextPosition,
+      InvalidTextPosition, InvalidTextPosition, smNormal,
       LBeginPosition, LEndPosition);
   finally
     UndoList.EndUpdate();
@@ -644,7 +642,7 @@ begin
 
     UndoList.Push(LUndoType, LCaretPosition,
       LSelBeginPosition, LSelEndPosition, SelMode,
-      LBeginPosition, InvalidPosition, LText);
+      LBeginPosition, InvalidTextPosition, LText);
   finally
     UndoList.EndUpdate();
   end;
@@ -758,7 +756,7 @@ begin
 
       UndoList.Push(utDelete, LCaretPosition,
         LSelBeginPosition, LSelEndPosition, SelMode,
-        ABeginPosition, InvalidPosition, LText);
+        ABeginPosition, InvalidTextPosition, LText);
     end
     else
     begin
@@ -768,7 +766,7 @@ begin
 
       UndoList.Push(utSelection, LCaretPosition,
         LSelBeginPosition, LSelEndPosition, SelMode,
-        InvalidPosition, InvalidPosition);
+        InvalidTextPosition, InvalidTextPosition);
 
       for LLine := ABeginPosition.Line to AEndPosition.Line do
       begin
@@ -782,9 +780,9 @@ begin
 
         DoDeleteText(LBeginText, LEndText);
 
-        UndoList.Push(utDelete, InvalidPosition,
-          InvalidPosition, InvalidPosition, SelMode,
-          LBeginText, InvalidPosition, LText);
+        UndoList.Push(utDelete, InvalidTextPosition,
+          InvalidTextPosition, InvalidTextPosition, SelMode,
+          LBeginText, InvalidTextPosition, LText);
 
         LLineLength := Length(Lines[LLine].Text);
         if (LLineLength > ABeginPosition.Char) then
@@ -793,8 +791,8 @@ begin
 
           DoInsertText(LEndText, LSpaces);
 
-          UndoList.Push(utInsert, InvalidPosition,
-            InvalidPosition, InvalidPosition, SelMode,
+          UndoList.Push(utInsert, InvalidTextPosition,
+            InvalidTextPosition, InvalidTextPosition, SelMode,
             TextPosition(ABeginPosition.Char, LLine), TextPosition(AEndPosition.Char, LLine));
         end;
       end;
@@ -1243,7 +1241,7 @@ begin
             InternalClear(False);
             LDestinationList.Push(LUndoItem.UndoType, LCaretPosition,
               LSelBeginPosition, LSelEndPosition, LSelMode,
-              BOFPosition, InvalidPosition, LText, LUndoItem.BlockNumber);
+              BOFPosition, InvalidTextPosition, LText, LUndoItem.BlockNumber);
           end
           else
           begin
@@ -1652,14 +1650,14 @@ begin
 
         UndoList.Push(utDelete, LCaretPosition,
           LSelBeginPosition, LSelEndPosition, SelMode,
-          LInsertBeginPosition, InvalidPosition, LDeleteText);
+          LInsertBeginPosition, InvalidTextPosition, LDeleteText);
 
         if (LPos > LLineBeginPos) then
         begin
           LInsertEndPosition := InsertText(LInsertBeginPosition, LInsertText);
 
-          UndoList.Push(utInsert, InvalidPosition,
-            InvalidPosition, InvalidPosition, SelMode,
+          UndoList.Push(utInsert, InvalidTextPosition,
+            InvalidTextPosition, InvalidTextPosition, SelMode,
             LInsertBeginPosition, LInsertEndPosition);
         end;
       end
@@ -1673,14 +1671,14 @@ begin
 
         UndoList.Push(utDelete, LCaretPosition,
           LSelBeginPosition, LSelEndPosition, SelMode,
-          LInsertBeginPosition, InvalidPosition, LDeleteText);
+          LInsertBeginPosition, InvalidTextPosition, LDeleteText);
 
         if (LPos > LLineBeginPos) then
         begin
           LInsertEndPosition := InsertText(LInsertBeginPosition, LeftStr(LInsertText, AEndPosition.Char - ABeginPosition.Char));
 
           UndoList.Push(utInsert, LCaretPosition,
-            InvalidPosition, InvalidPosition, SelMode,
+            InvalidTextPosition, InvalidTextPosition, SelMode,
             LInsertBeginPosition, LInsertEndPosition);
         end;
       end;
@@ -1900,6 +1898,13 @@ begin
   end;
 end;
 
+function TBCEditorLines.Search(const APattern: string;
+  const AForwards, ARegExpr: Boolean; var APosition: TBCEditorTextPosition): Boolean;
+begin
+  // Not used until now...
+  Result := False;
+end;
+
 procedure TBCEditorLines.SetCaretPosition(const AValue: TBCEditorTextPosition);
 begin
   Assert(BOFPosition <= AValue);
@@ -2022,7 +2027,7 @@ begin
   if (loUndoAfterLoad in Options) then
   begin
     UndoList.Push(utInsert, BOFPosition,
-      InvalidPosition, InvalidPosition, SelMode,
+      InvalidTextPosition, InvalidTextPosition, SelMode,
       BOFPosition, LEndPosition);
 
     RedoList.Clear();
@@ -2061,7 +2066,7 @@ begin
             or (SelEndPosition <> FOldSelBeginPosition)) then
           UndoList.Push(utSelection, FOldCaretPosition,
             FOldSelBeginPosition, FOldSelEndPosition, SelMode,
-            InvalidPosition, InvalidPosition);
+            InvalidTextPosition, InvalidTextPosition);
         RedoList.Clear();
       end;
     end;

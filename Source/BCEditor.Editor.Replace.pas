@@ -10,25 +10,30 @@ type
   TBCEditorReplace = class(TPersistent)
   type
     TChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
-    TEvent = procedure(ASender: TObject; const ASearch, AReplace: string; ALine, AColumn: Integer;
-      ADeleteLine: Boolean; var AAction: TBCEditorReplaceAction) of object;
+    TEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorTextPosition;
+      var AAction: TBCEditorReplaceAction) of object;
     TOptions = set of TBCEditorReplaceOption;
 
+  strict private const
+    DefaultOptions = [roPrompt];
   strict private
-    FAction: TBCEditorReplaceActionOption;
     FEngine: TBCEditorSearchEngine;
     FOnChange: TChangeEvent;
     FOptions: TOptions;
+    FPattern: string;
+    FReplaceText: string;
     procedure SetEngine(const AValue: TBCEditorSearchEngine);
+  protected
+    property OnChange: TChangeEvent read FOnChange write FOnChange;
   public
     constructor Create;
     procedure Assign(ASource: TPersistent); override;
     procedure SetOption(const AOption: TBCEditorReplaceOption; const AEnabled: Boolean);
+    property Pattern: string read FPattern write FPattern;
+    property ReplaceText: string read FReplaceText write FReplaceText;
   published
-    property Action: TBCEditorReplaceActionOption read FAction write FAction default eraReplace;
     property Engine: TBCEditorSearchEngine read FEngine write SetEngine default seNormal;
-    property OnChange: TChangeEvent read FOnChange write FOnChange;
-    property Options: TOptions read FOptions write FOptions default [roPrompt];
+    property Options: TOptions read FOptions write FOptions default DefaultOptions;
   end;
 
 implementation
@@ -37,9 +42,8 @@ constructor TBCEditorReplace.Create;
 begin
   inherited;
 
-  FAction := eraReplace;
   FEngine := seNormal;
-  FOptions := [roPrompt];
+  FOptions := DefaultOptions;
 end;
 
 procedure TBCEditorReplace.Assign(ASource: TPersistent);
@@ -49,7 +53,6 @@ begin
   begin
     Self.FEngine := Engine;
     Self.FOptions := Options;
-    Self.FAction := Action;
   end
   else
     inherited Assign(ASource);

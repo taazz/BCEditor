@@ -87,11 +87,9 @@ type
     soTripleClickRowSelect
   );
 
-  TBCEditorSearchChanges = (
-    scRefresh,
-    scSearch,
-    scEngineUpdate,
-    scInSelectionActive
+  TBCEditorSearchEvent = (
+    seInvalidate,
+    seChange
   );
 
   TBCEditorReplaceChanges = (
@@ -99,12 +97,11 @@ type
   );
 
   TBCEditorSearchOption = (
+    soBackwards,
     soCaseSensitive,
     soEntireScope,
     soHighlightResults,
     soSearchOnTyping,
-    soShowStringNotFound,
-    soShowSearchMatchNotFound,
     soWholeWordsOnly,
     soWrapAround
   );
@@ -121,11 +118,6 @@ type
     roReplaceAll,
     roSelectedOnly,
     roWholeWordsOnly
-  );
-
-  TBCEditorReplaceActionOption = (
-    eraReplace,
-    eraDeleteLine
   );
 
   TBCEditorSearchEngine = (
@@ -346,6 +338,9 @@ function Max(const A, B: TBCEditorTextPosition): TBCEditorTextPosition; overload
 function Min(const A, B: TBCEditorTextPosition): TBCEditorTextPosition; overload; inline;
 function TextPosition(const AChar, ALine: Integer): TBCEditorTextPosition; overload; inline;
 function TextPosition(const APos: TPoint): TBCEditorTextPosition; overload; inline;
+
+const
+  InvalidTextPosition: TBCEditorTextPosition = (Char: -1; Line: -1);
 
 implementation {***************************************************************}
 

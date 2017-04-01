@@ -26,14 +26,12 @@ type
   strict private const
     DefaultOptions = [soPastEndOfLine, soShowVerticalScrollHint, soWheelClickMove];
   strict private
-    FBars: System.UITypes.TScrollStyle;
     FHint: TBCEditorScroll.THint;
     FIndicator: TBCEditorGlyph;
     FMaxWidth: Integer;
     FOnChange: TNotifyEvent;
     FOptions: TOptions;
     procedure DoChange;
-    procedure SetBars(const AValue: System.UITypes.TScrollStyle);
     procedure SetHint(const AValue: TBCEditorScroll.THint);
     procedure SetIndicator(const AValue: TBCEditorGlyph);
     procedure SetOnChange(AValue: TNotifyEvent);
@@ -44,7 +42,6 @@ type
     procedure Assign(ASource: TPersistent); override;
     procedure SetOption(const AOption: TBCEditorScrollOption; const AEnabled: Boolean);
   published
-    property Bars: System.UITypes.TScrollStyle read FBars write SetBars default System.UITypes.TScrollStyle.ssBoth;
     property Hint: TBCEditorScroll.THint read FHint write SetHint;
     property Indicator: TBCEditorGlyph read FIndicator write SetIndicator;
     property Options: TOptions read FOptions write SetOptions default DefaultOptions;
@@ -83,7 +80,6 @@ begin
 
   FOptions := DefaultOptions;
   FMaxWidth := 1024;
-  FBars := System.UITypes.TScrollStyle.ssBoth;
   FHint := TBCEditorScroll.THint.Create;
   FIndicator := TBCEditorGlyph.Create(HInstance, BCEDITOR_MOUSE_MOVE_SCROLL, clFuchsia);
 end;
@@ -101,7 +97,6 @@ begin
   if ASource is TBCEditorScroll then
   with ASource as TBCEditorScroll do
   begin
-    Self.FBars := FBars;
     Self.FHint.Assign(FHint);
     Self.FIndicator.Assign(FIndicator);
     Self.FOptions := FOptions;
@@ -116,15 +111,6 @@ procedure TBCEditorScroll.DoChange;
 begin
   if Assigned(FOnChange) then
     FOnChange(Self);
-end;
-
-procedure TBCEditorScroll.SetBars(const AValue: System.UITypes.TScrollStyle);
-begin
-  if FBars <> AValue then
-  begin
-    FBars := AValue;
-    DoChange;
-  end;
 end;
 
 procedure TBCEditorScroll.SetHint(const AValue: THint);
