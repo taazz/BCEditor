@@ -82,7 +82,7 @@ type
     property CharHeight: Integer read FCharHeight write FCharHeight;
     property Clicked: Boolean read FClicked write FClicked;
     property Dragging: Boolean read FDragging write FDragging;
-    property TopRow: Integer read FTopRow write FTopRow default 1;
+    property TopRow: Integer read FTopRow write FTopRow default 0;
     property VisibleRows: Integer read FVisibleRows write FVisibleRows;
   published
     property Align: TBCEditorMinimapAlign read FAlign write SetAlign default maRight;
@@ -226,7 +226,7 @@ begin
 
   FClicked := False;
 
-  FTopRow := 1;
+  FTopRow := 0;
 
   FIndicator := TBCEditorMinimap.TIndicator.Create;
   FColors := TBCEditorMinimap.TColors.Create;

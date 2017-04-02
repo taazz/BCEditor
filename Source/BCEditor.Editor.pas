@@ -560,6 +560,7 @@ type
     procedure PaintCodeFoldingLine(AClipRect: TRect; ALine: Integer);
     procedure PaintGuides(const AFirstRow, ALastRow: Integer; const AMinimap: Boolean);
     procedure PaintLeftMargin(const AClipRect: TRect; const AFirstRow, ALastTextRow, ALastRow: Integer);
+    procedure PaintMinimap(AClipRect: TRect);
     procedure PaintMinimapIndicator(AClipRect: TRect);
     procedure PaintMinimapShadow(ACanvas: TCanvas; AClipRect: TRect);
     procedure PaintMouseMoveScrollPoint;
@@ -4742,10 +4743,10 @@ var
 begin
   LTemp := Rows.Count - FMinimap.VisibleRows;
   LTemp2 := Max(Y div FMinimap.CharHeight - FMinimapClickOffsetY, 0);
-  FMinimap.TopRow := Max(1, Trunc((LTemp / Max(FMinimap.VisibleRows - VisibleRows, 1)) * LTemp2));
+  FMinimap.TopRow := Max(0, Trunc((LTemp / Max(FMinimap.VisibleRows - VisibleRows, 1)) * LTemp2));
   if (LTemp > 0) and (FMinimap.TopRow > LTemp) then
     FMinimap.TopRow := LTemp;
-  LTopRow := Max(1, FMinimap.TopRow + LTemp2);
+  LTopRow := Max(0, FMinimap.TopRow + LTemp2);
   if TopRow <> LTopRow then
   begin
     TopRow := LTopRow;
@@ -8190,8 +8191,6 @@ begin
       { Minimap }
       if FMinimap.Visible then
       begin
-        LDrawRect := LClipRect;
-
         if FMinimap.Align = maRight then
         begin
           LDrawRect.Left := ClientRect.Width - FMinimap.GetWidth - FSearch.Map.GetWidth - 2;
@@ -8209,36 +8208,7 @@ begin
             Inc(LDrawRect.Right, FSearch.Map.GetWidth);
           end;
         end;
-
-        FPaintHelper.SetBaseFont(FMinimap.Font);
-
-        if not FMinimap.Dragging and (LDrawRect.Height = FMinimapBufferBitmap.Height) and (FLastTopLine = TopRow) and
-          (FLastLineNumberCount = Rows.Count) and
-          (not SelectionAvailable or (Lines.SelBeginPosition.Line >= TopRow) and (Lines.SelEndPosition.Line <= TopRow + VisibleRows)) then
-        begin
-          LFirstRow := TopRow;
-          LLastTextRow := TopRow + VisibleRows;
-          BitBlt(Canvas.Handle, LDrawRect.Left, LDrawRect.Top, LDrawRect.Width, LDrawRect.Height,
-            FMinimapBufferBitmap.Canvas.Handle, 0, 0, SRCCOPY);
-          LDrawRect.Top := (TopRow - FMinimap.TopRow) * FMinimap.CharHeight;
-        end
-        else
-        begin
-          LFirstRow := Max(FMinimap.TopRow, 1);
-          LLastTextRow := Min(Rows.Count, LFirstRow + LClipRect.Height div Max(FMinimap.CharHeight - 1, 1));
-        end;
-
-        PaintTextLines(LDrawRect, LFirstRow, LLastTextRow, True);
-        if FCodeFolding.Visible and (moShowIndentGuides in FMinimap.Options) then
-          PaintGuides(LFirstRow, LLastTextRow, True);
-        if ioUseBlending in FMinimap.Indicator.Options then
-          PaintMinimapIndicator(LDrawRect);
-
-        FMinimapBufferBitmap.Width := LDrawRect.Width;
-        FMinimapBufferBitmap.Height := LDrawRect.Height;
-        BitBlt(FMinimapBufferBitmap.Canvas.Handle, 0, 0, LDrawRect.Width, LDrawRect.Height, Canvas.Handle, LDrawRect.Left,
-          LDrawRect.Top, SRCCOPY);
-        FPaintHelper.SetBaseFont(Font);
+        PaintMinimap(LDrawRect);
       end;
 
       { Search map }
@@ -9099,6 +9069,47 @@ begin
   PaintSyncEditIndicator;
   PaintLineState;
   PaintBookmarkPanelLine;
+end;
+
+procedure TCustomBCEditor.PaintMinimap(AClipRect: TRect);
+var
+  LClipRect: TRect;
+  LDrawRect: TRect;
+  LFirstRow: Integer;
+  LLastTextRow: Integer;
+begin
+  LDrawRect := AClipRect;
+
+  FPaintHelper.SetBaseFont(FMinimap.Font);
+
+  if not FMinimap.Dragging and (LDrawRect.Height = FMinimapBufferBitmap.Height) and (FLastTopLine = TopRow) and
+    (FLastLineNumberCount = Rows.Count) and
+    (not SelectionAvailable or (Lines.SelBeginPosition.Line >= TopRow) and (Lines.SelEndPosition.Line <= TopRow + VisibleRows)) then
+  begin
+    LFirstRow := TopRow;
+    LLastTextRow := Min(Rows.Count - 1, TopRow + VisibleRows);
+    BitBlt(Canvas.Handle, LDrawRect.Left, LDrawRect.Top, LDrawRect.Width, LDrawRect.Height,
+      FMinimapBufferBitmap.Canvas.Handle, 0, 0, SRCCOPY);
+    LDrawRect.Top := (TopRow - FMinimap.TopRow) * FMinimap.CharHeight;
+  end
+  else
+  begin
+    LFirstRow := FMinimap.TopRow;
+    LLastTextRow := Min(Rows.Count - 1, LFirstRow + LClipRect.Height div Max(0, FMinimap.CharHeight - 1));
+  end;
+
+  PaintTextLines(LDrawRect, LFirstRow, LLastTextRow, True);
+  if FCodeFolding.Visible and (moShowIndentGuides in FMinimap.Options) then
+    PaintGuides(LFirstRow, LLastTextRow, True);
+  if ioUseBlending in FMinimap.Indicator.Options then
+    PaintMinimapIndicator(LDrawRect);
+
+  FMinimapBufferBitmap.Width := LDrawRect.Width;
+  FMinimapBufferBitmap.Height := LDrawRect.Height;
+  BitBlt(FMinimapBufferBitmap.Canvas.Handle, 0, 0, LDrawRect.Width, LDrawRect.Height,
+    Canvas.Handle, LDrawRect.Left, LDrawRect.Top, SRCCOPY);
+
+  FPaintHelper.SetBaseFont(Font);
 end;
 
 procedure TCustomBCEditor.PaintMinimapIndicator(AClipRect: TRect);
@@ -10347,8 +10358,6 @@ var
     LFirstColumn: Integer;
     LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
     LFromLineText: string;
-    LKeyword: string;
-    LLine: Integer;
     LNextTokenText: string;
     LOpenTokenEndLen: Integer;
     LOpenTokenEndPos: Integer;
@@ -12297,8 +12306,8 @@ begin
     FTopRow := LValue;
 
     if (FMinimap.Visible and not FMinimap.Dragging) then
-      FMinimap.TopRow := Max(TopRow - Abs(Trunc((FMinimap.VisibleRows - VisibleRows) *
-        (TopRow / Max(Rows.Count - VisibleRows, 1)))), 1);
+      FMinimap.TopRow := Max(0, TopRow - Abs(Trunc((FMinimap.VisibleRows - VisibleRows) *
+        (TopRow / Max(Rows.Count - VisibleRows, 1)))));
 
     if Assigned(OnScroll) then
       OnScroll(Self, sbVertical);
@@ -12449,7 +12458,7 @@ begin
           FPaintHelper.SetBaseFont(FMinimap.Font);
           FMinimap.CharHeight := FPaintHelper.CharHeight - 1;
           FMinimap.VisibleRows := ClientHeight div FMinimap.CharHeight;
-          FMinimap.TopRow := Max(TopRow - Abs(Trunc((FMinimap.VisibleRows - VisibleRows) * (TopRow / Max(Rows.Count - VisibleRows, 1)))), 1);
+          FMinimap.TopRow := Max(0, TopRow - Abs(Trunc((FMinimap.VisibleRows - VisibleRows) * (TopRow / Max(Rows.Count - VisibleRows, 1)))));
           FPaintHelper.SetBaseFont(Font);
         end;
 
