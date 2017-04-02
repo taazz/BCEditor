@@ -1785,13 +1785,11 @@ begin
 
           while (LTextWidth < LXInEditor) do
           begin
-            while (LTokenPos + 1 <= LTokenEndPos)
-              and (((LTokenPos + 1)^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
-                or (LTokenPos^ <> BCEDITOR_NONE_CHAR)
-                  and (LTokenPos^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
-                  and not IsCombiningDiacriticalMark(LTokenPos^)) do
+            repeat
               Inc(LTokenPos);
-
+            until ((LTokenPos > LTokenEndPos)
+              or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
+                and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
             LCharLength := LTokenPos - LTokenBeginPos + 1;
             LChar := LeftStr(LTokenText, LCharLength);
             Inc(LTextWidth, GetTokenWidth(LChar, LCharLength, LCharsBefore));
@@ -2757,15 +2755,12 @@ begin
             Inc(LChar);
           Inc(LResultChar);
         end;
-        while ((LLinePos <= LLineEndPos)
-          and ((LLinePos^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
-            or ((LLinePos - 1)^ <> BCEDITOR_NONE_CHAR)
-              and ((LLinePos - 1)^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
-              and not IsCombiningDiacriticalMark((LLinePos - 1)^))) do
-        begin
+        repeat
           Inc(LResultChar);
           Inc(LLinePos);
-        end;
+        until ((LLinePos > LLineEndPos)
+          or (Char((LLinePos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LLinePos - 1)^)
+            and not (Char(LLinePos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
         Result.Char := LResultChar;
       end;
     end;
@@ -6082,6 +6077,9 @@ var
 begin
   if (FRows.Count = 0) then
   begin
+    if (WordWrap.Enabled and (WordWrap.Width = wwwPage)) then
+      HandleNeeded();
+
     BeginUpdate();
     try
       for LLine := 0 to Lines.Count - 1 do
@@ -6495,12 +6493,10 @@ var
   LLine: Integer;
   LLineText: string;
   LMaxWidth: Integer;
-  LNextTokenText: string;
   LRow: Integer;
   LTokenBeginPos: PChar;
   LTokenEndPos: PChar;
   LTokenPos: PChar;
-  LTokenTextLength: Integer;
   LTokenText: string;
   LTokenWidth: Integer;
   LWidth: Integer;
@@ -6516,89 +6512,85 @@ begin
   begin
     LRow := ARow;
     LFlags := [rfFirstRowOfLine];
-    LMaxWidth := WordWrapWidth;
+    LMaxWidth := WordWrapWidth();
     if ALine = 0 then
       FHighlighter.ResetCurrentRange
     else
       FHighlighter.SetCurrentRange(Lines.Ranges[ALine - 1]);
     LLineText := Lines[ALine];
     FHighlighter.SetCurrentLine(LLineText);
+
     LWidth := 0;
     LLength := 0;
     LCharsBefore := 0;
     LIndex := 0;
-    while not FHighlighter.GetEndOfLine do
+    while (not FHighlighter.GetEndOfLine()) do
     begin
-      if LNextTokenText = '' then
-        FHighlighter.GetToken(LTokenText)
-      else
-        LTokenText := LNextTokenText;
-      LNextTokenText := '';
-      LTokenTextLength := Length(LTokenText);
-      LHighlighterAttribute := FHighlighter.GetTokenAttribute;
-      if Assigned(LHighlighterAttribute) then
+      FHighlighter.GetToken(LTokenText);
+      LHighlighterAttribute := FHighlighter.GetTokenAttribute();
+      if (Assigned(LHighlighterAttribute)) then
         FPaintHelper.SetStyle(LHighlighterAttribute.FontStyles);
-      LTokenWidth := GetTokenWidth(LTokenText, LTokenTextLength, LCharsBefore);
 
-      if LTokenWidth > LMaxWidth then
-      begin
-        LTokenWidth := 0;
-        LTokenBeginPos := @LTokenText[1];
-        LTokenPos := LTokenBeginPos;
-        LTokenEndPos := @LTokenText[Length(LTokenText)];
-        LFirstPartOfToken := '';
-        while ((LTokenPos <= LTokenEndPos) and (LWidth + LTokenWidth <= LMaxWidth)) do
+      repeat
+        LTokenWidth := GetTokenWidth(LTokenText, Length(LTokenText), LCharsBefore);
+
+        if (LWidth + LTokenWidth <= LMaxWidth) then
         begin
-          while (LTokenPos + 1 <= LTokenEndPos)
-            and (((LTokenPos + 1)^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
-              or (LTokenPos^ <> BCEDITOR_NONE_CHAR)
-                and (LTokenPos^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
-                and not IsCombiningDiacriticalMark(LTokenPos^)) do
+          { no line break }
+          Inc(LLength, Length(LTokenText));
+          Inc(LWidth, LTokenWidth);
+          Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
+          LTokenText := '';
+        end
+        else if (LLength > 0) then
+        begin
+          { line break before token }
+          FRows.Insert(LRow, LFlags, ALine, LIndex, LLength);
+          Exclude(LFlags, rfFirstRowOfLine);
+          Inc(LIndex, LLength);
+          Inc(LRow);
+
+          LLength := 0;
+          LWidth := 0;
+          LCharsBefore := 0;
+          LTokenText := '';
+        end
+        else
+        begin
+          { line break inside token }
+
+          LTokenBeginPos := @LTokenText[1];
+          LTokenPos := @LTokenText[1 + VisibleColumns - 1];
+          LTokenEndPos := @LTokenText[Length(LTokenText)];
+
+          repeat
             Inc(LTokenPos);
-          LChar := LeftStr(LTokenText, LTokenPos - LTokenBeginPos + 1);
-          LTokenWidth := GetTokenWidth(LFirstPartOfToken + LChar, Length(LFirstPartOfToken + LChar), LCharsBefore);
-          if LWidth + LTokenWidth < LMaxWidth then
-            LFirstPartOfToken := LFirstPartOfToken + LChar;
+          until ((LTokenPos > LTokenEndPos)
+            or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
+              and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+
+          LLength := LTokenPos - LTokenBeginPos;
+          FRows.Insert(LRow, LFlags, ALine, LIndex, LLength);
+          Exclude(LFlags, rfFirstRowOfLine);
+          Inc(LIndex, LLength);
+          Inc(LRow);
+          Delete(LTokenText, 1, LLength);
+
+          LLength := 0;
+          LWidth := 0;
+          LCharsBefore := 0;
         end;
-        if (LLength = 0) and (LFirstPartOfToken = '') then
-          LFirstPartOfToken := LTokenPos^;
-        Inc(LLength, Length(LFirstPartOfToken));
-        FRows.Insert(LRow, LFlags, ALine, LIndex, LLength);
-        Exclude(LFlags, rfFirstRowOfLine);
-        Inc(LRow);
-        Inc(LIndex, LLength);
+      until (LTokenText = '');
 
-        Inc(LCharsBefore, GetTokenCharCount(LFirstPartOfToken, LCharsBefore));
-        LLength := 0;
-        LWidth := 0;
-        LNextTokenText := Copy(LTokenText, Length(LFirstPartOfToken) + 1, Length(LTokenText));
-
-        if LNextTokenText = '' then
-          FHighlighter.Next;
-        Continue;
-      end
-      else
-      if LWidth + LTokenWidth > LMaxWidth then
-      begin
-        FRows.Insert(LRow, LFlags, ALine, LIndex, LLength);
-        Exclude(LFlags, rfFirstRowOfLine);
-        Inc(LRow);
-        Inc(LIndex, LLength);
-        LLength := 0;
-        LWidth := 0;
-        Continue;
-      end;
-
-      Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
-      Inc(LLength, Length(LTokenText));
-      Inc(LWidth, LTokenWidth);
-      FHighlighter.Next;
+      FHighlighter.Next();
     end;
-    if (LLength > 0) or (LLineText = '') then
+
+    if ((LLength > 0) or (LLineText = '')) then
     begin
       FRows.Insert(LRow, LFlags + [rfLastRowOfLine], ALine, LIndex, LLength);
       Inc(LRow);
     end;
+
     Result := LRow - ARow;
   end;
 
@@ -7865,21 +7857,12 @@ begin
       begin
         LLinePos := @LLineText[1 + LNewCaretPosition.Char];
         LLineEndPos := @LLineText[Length(LLineText)];
-        while ((LLinePos <= LLineEndPos)
-          and ((LLinePos^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
-            or ((LLinePos - 1)^ <> BCEDITOR_NONE_CHAR)
-              and ((LLinePos - 1)^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
-              and not IsCombiningDiacriticalMark((LLinePos - 1)^))) do
-          if (Cols > 0) then
-          begin
-            Inc(LLinePos);
-            Inc(LNewCaretPosition.Char);
-          end
-          else
-          begin
-            Dec(LLinePos);
-            Dec(LNewCaretPosition.Char);
-          end;
+        repeat
+          Inc(LLinePos);
+          Inc(LNewCaretPosition.Char);
+        until ((LLinePos > LLineEndPos)
+          or (Char((LLinePos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LLinePos - 1)^)
+            and not (Char(LLinePos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
       end;
 
       MoveCaretAndSelection(Lines.SelBeginPosition, LNewCaretPosition, SelectionCommand);
@@ -13779,14 +13762,18 @@ end;
 
 function TCustomBCEditor.WordWrapWidth: Integer;
 begin
-  case FWordWrap.Width of
+  Assert(CharWidth > 0);
+
+  case (FWordWrap.Width) of
     wwwPage:
-      Result := VisibleColumns * CharWidth;
+      begin
+        Assert(VisibleColumns > 0);
+        Result := VisibleColumns * CharWidth;
+      end;
     wwwRightMargin:
       Result := FRightMargin.Position * CharWidth;
-  else
-    Result := 0;
-  end
+    else raise ERangeError.Create('Width: ' + IntToStr(Ord(FWordWrap.Width)));
+  end;
 end;
 
 end.
