@@ -309,11 +309,13 @@ type
     procedure DoSearchFindExecute(Sender: TObject);
     function DoSearchNext(APosition: TBCEditorTextPosition;
       out ASearchResult: TSearchResult; const WrapAround: Boolean = False): Boolean;
+    function DoSearchNormal(var APosition: TBCEditorTextPosition): Boolean;
     function DoSearchPrevious(APosition: TBCEditorTextPosition;
       out ASearchResult: TSearchResult; const WrapAround: Boolean = False): Boolean;
     function DoSearchReplace(const Action: TSearchReplace): Boolean;
     procedure DoSearchReplaceExecute(Sender: TObject);
     procedure DoSearchReplaceFind(Sender: TObject);
+    function DoSearchRegEx(var APosition: TBCEditorTextPosition): Boolean;
     procedure DoSetBookmark(const ACommand: TBCEditorCommand; AData: Pointer);
     procedure DoShiftTabKey;
     procedure DoSyncEdit;
@@ -544,7 +546,6 @@ type
     function IsCommentChar(const AChar: Char): Boolean;
     function IsEmptyChar(const AChar: Char): Boolean; inline;
     function IsWordBreakChar(const AChar: Char): Boolean; inline;
-    function IsWordChar(const AChar: Char): Boolean; inline;
     procedure KeyDown(var AKey: Word; AShift: TShiftState); override;
     procedure KeyPressW(var AKey: Char);
     procedure KeyUp(var AKey: Word; AShift: TShiftState); override;
@@ -2160,7 +2161,7 @@ begin
             if LCollapsedCount <> 0 then
             begin
               Inc(LNewSelectionEndPosition.Line, LCollapsedCount);
-              LNewSelectionEndPosition.Char := Length(Lines[LNewSelectionEndPosition.Line]);
+              LNewSelectionEndPosition.Char := Lines.Length[LNewSelectionEndPosition.Line];
             end;
             Lines.BeginUpdate();
             try
@@ -2482,7 +2483,7 @@ begin
   if (SelectionAvailable) then
     SelText := ''
   else if ((Lines.CaretPosition.Line < Lines.Count)
-    and (Lines.CaretPosition.Char < Length(Lines[Lines.CaretPosition.Line]))) then
+    and (Lines.CaretPosition.Char < Lines.Length[Lines.CaretPosition.Line])) then
     Lines.DeleteText(Lines.CaretPosition, TextPosition(Lines.CaretPosition.Char + 1, Lines.CaretPosition.Line))
   else if (Lines.CaretPosition.Line < Lines.Count - 1) then
     Lines.DeleteText(Lines.CaretPosition, Lines.BOLPosition[Lines.CaretPosition.Line + 1]);
@@ -2497,7 +2498,7 @@ begin
   else
     LNewCaretPosition := Lines.BOLPosition[Lines.CaretPosition.Line];
   if (LNewCaretPosition <> Lines.CaretPosition) then
-    Lines.DeleteText(LNewCaretPosition, TextPosition(Min(Lines.CaretPosition.Char, Length(Lines[Lines.CaretPosition.Line])), Lines.CaretPosition.Line));
+    Lines.DeleteText(LNewCaretPosition, TextPosition(Min(Lines.CaretPosition.Char, Lines.Length[Lines.CaretPosition.Line]), Lines.CaretPosition.Line));
 end;
 
 procedure TCustomBCEditor.DeleteLine();
@@ -2649,8 +2650,8 @@ begin
   begin
     case (ACommand) of
       ecDeleteWord:
-        if ((Lines.CaretPosition.Char < Length(Lines[Lines.CaretPosition.Line]))
-          and IsWordChar(Lines[Lines.CaretPosition.Line][1 + Lines.CaretPosition.Char])) then
+        if ((Lines.CaretPosition.Char < Lines.Length[Lines.CaretPosition.Line])
+          and not IsWordBreakChar(Lines[Lines.CaretPosition.Line][1 + Lines.CaretPosition.Char])) then
           LEndPosition := WordEnd(Lines.CaretPosition)
         else
           LEndPosition := NextWordPosition(Lines.CaretPosition);
@@ -2816,7 +2817,7 @@ begin
       if (LLineText <> '') then
       begin
         LLinePos := @LLineText[1];
-        LLineEndPos := @LLineText[Length(Lines[Result.Line])];
+        LLineEndPos := @LLineText[Lines.Length[Result.Line]];
         LChar := 0;
         LResultChar := 0;
         while LChar < Result.Char do
@@ -2886,9 +2887,9 @@ begin
       end;
 
       if ((Lines.CaretPosition.Line < Lines.Count)
-        and (Lines.CaretPosition.Char > Length(Lines[Lines.CaretPosition.Line]))) then
+        and (Lines.CaretPosition.Char > Lines.Length[Lines.CaretPosition.Line])) then
       begin
-        if (Length(Lines[Lines.CaretPosition.Line]) > 0) then
+        if (Lines.Length[Lines.CaretPosition.Line] > 0) then
           Lines.CaretPosition := Lines.EOLPosition[Lines.CaretPosition.Line]
         else
         begin
@@ -2918,7 +2919,7 @@ begin
       begin
         LSpaceCount1 := LeftSpaceCount(Lines[Lines.CaretPosition.Line]);
         LSpaceCount2 := 0;
-        if ((Lines.CaretPosition.Char < Length(Lines[Lines.CaretPosition.Line]) - 1)
+        if ((Lines.CaretPosition.Char < Lines.Length[Lines.CaretPosition.Line] - 1)
           and (Lines[Lines.CaretPosition.Line][1 + Lines.CaretPosition.Char] = BCEDITOR_SPACE_CHAR)
             or (LSpaceCount1 <> Lines.CaretPosition.Char)) then
         begin
@@ -2988,7 +2989,7 @@ begin
         if (Assigned(LFoldRange) and LFoldRange.Collapsed) then
         begin
           LNewCaretPosition.Line := LFoldRange.FirstLine;
-          Inc(LNewCaretPosition.Char, Length(Lines[LNewCaretPosition.Line]) + 1);
+          Inc(LNewCaretPosition.Char, Lines.Length[LNewCaretPosition.Line] + 1);
         end;
 
         Lines.DeleteText(LNewCaretPosition, Lines.CaretPosition);
@@ -3162,7 +3163,7 @@ begin
     begin
       LTextBeginPosition.Char := 0;
       if (LTextEndPosition.Char > 0) then
-        LTextEndPosition.Char := Length(Lines[LTextEndPosition.Line]);
+        LTextEndPosition.Char := Lines.Length[LTextEndPosition.Line];
       SetCaretAndSelection(LTextEndPosition, LTextBeginPosition, LTextEndPosition);
     end;
   finally
@@ -3301,7 +3302,7 @@ begin
     Char := 0;
     Line := Lines.Count - 1;
     if Line > 0 then
-      Char := Length(Lines[Line]);
+      Char := Lines.Length[Line];
   end;
   MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ACommand = ecSelectionEditorBottom);
 end;
@@ -3354,7 +3355,7 @@ begin
       SelText := AText
     else if ((FTextEntryMode = temOverwrite)
       and (Lines.CaretPosition.Line < Lines.Count)
-      and (Lines.CaretPosition.Char < Length(Lines[Lines.CaretPosition.Line]))) then
+      and (Lines.CaretPosition.Char < Lines.Length[Lines.CaretPosition.Line])) then
     begin
       Lines.ReplaceText(Lines.CaretPosition, TextPosition(Lines.CaretPosition.Char + 1, Lines.CaretPosition.Line), AText);
       if (FSyncEdit.Active) then
@@ -3941,164 +3942,61 @@ begin
 end;
 
 function TCustomBCEditor.DoSearch(ABeginPosition, AEndPosition: TBCEditorTextPosition): Boolean;
-
-  procedure NormalSearch(const APattern: string; const ABeginPosition, AEndPosition: TBCEditorTextPosition);
-
-    function IsWordBreakChar(AChar: Char): Boolean;
-    begin
-      if (AChar < BCEDITOR_EXCLAMATION_MARK) or AChar.IsWhiteSpace then
-        Result := True
-      else
-      if AChar = BCEDITOR_LOW_LINE then
-        Result := False
-      else
-        Result := not AChar.IsLetterOrDigit;
-    end;
-
-  var
-    LIndex: Integer;
-    LPattern: string;
-    LPatternEndPos: PChar;
-    LPatternLength: Integer;
-    LPatternPos: PChar;
-    LPreviousStart: Integer;
-    LPreviousPosition: TBCEditorTextPosition;
-    LSearchResult: TSearchResult;
-    LText: string;
-    LTextBeginPos: PChar;
-    LTextEndPos: PChar;
-    LTextLength: Integer;
-    LTextPos: PChar;
+var
+  LPosition: TBCEditorTextPosition;
+  LSearchResult: TSearchResult;
+begin
+  if (Length(Search.Pattern) = 0) then
   begin
-    if (Length(APattern) = 0) then
-      FSearchStatus := SBCEditorPatternIsEmpty
+    FSearchStatus := SBCEditorPatternIsEmpty;
+    Result := False;
+  end
+  else
+  begin
+    FSearchStatus := '';
+    FSearchResults.Clear();
+
+    if (soBackwards in Search.Options) then
+      LPosition := AEndPosition
+    else
+      LPosition := ABeginPosition;
+
+    if ((soBackwards in Search.Options) and (LPosition = Lines.BOFPosition)) then
+      Result := False
     else
     begin
-      LPattern := APattern;
-      LPatternLength := Length(LPattern);
-      if (not FSearch.CaseSensitive) then
-        CharLowerBuff(PChar(LPattern), LPatternLength);
+      repeat
+        if (soBackwards in Search.Options) then
+          if (LPosition.Char > 0) then
+            Dec(LPosition.Char)
+          else
+            LPosition := Lines.EOLPosition[LPosition.Line - 1];
 
-      if (FSearch.WholeWordsOnly) then
-      begin
-        LPatternPos := @LPattern[1];
-        LPatternEndPos := @LPattern[Length(LPattern)];
-        while (LPatternPos <= LPatternEndPos) do
-          if (IsWordBreakChar(LPatternPos^)) then
-            Exit();
-      end;
-
-      LText := Lines.TextBetween[ABeginPosition, AEndPosition];
-      LTextLength := Length(LText);
-
-      if (LPatternLength < LTextLength) then
-      begin
-        if (not FSearch.CaseSensitive) then
-          CharLowerBuff(PChar(LText), LTextLength);
-
-        LTextBeginPos := @LText[1];
-        LTextEndPos := @LText[Length(LText)];
-
-        LPreviousStart := Lines.PositionToCharIndex(ABeginPosition);
-        LPreviousPosition := ABeginPosition;
-
-        for LIndex := 0 to LTextLength - LPatternLength do
-        begin
-          LTextPos := @LTextBeginPos[LIndex];
-
-          if (not FSearch.WholeWordsOnly or not IsWordBreakChar(LTextPos^)) then
-          begin
-            LPatternPos := @LPattern[1];
-            LPatternEndPos := @LPattern[LPatternLength];
-            while ((LPatternPos <= LPatternEndPos) and (LPatternPos^ = LTextPos^)) do
-            begin
-              Inc(LPatternPos);
-              Inc(LTextPos);
-            end;
-            if ((LPatternPos > LPatternEndPos)
-              and (not FSearch.WholeWordsOnly or (LTextPos > LTextEndPos) or IsWordBreakChar(LTextPos^))) then
-            begin
-              LSearchResult.BeginPosition := Lines.CharIndexToPosition(LTextPos - LTextBeginPos - LPatternLength - LPreviousStart, LPreviousPosition);
-              LSearchResult.EndPosition := Lines.CharIndexToPosition(LPatternLength, LSearchResult.BeginPosition);
-              FSearchResults.Add(LSearchResult);
-            end;
-          end;
-        end;
-      end;
-    end;
-  end;
-
-  procedure RegExSearch(const APattern: string; const ABeginPosition, AEndPosition: TBCEditorTextPosition);
-  var
-    LMatch: TMatch;
-    LOptions: TRegexOptions;
-    LPreviousStart: Integer;
-    LPreviousPosition: TBCEditorTextPosition;
-    LRegex: TRegEx;
-    LSearchResult: TSearchResult;
-  begin
-    try
-      LOptions := [roMultiLine];
-      {$if CompilerVersion > 26}
-      Include(LOptions, roNotEmpty);
-      {$endif}
-      if (FSearch.CaseSensitive) then
-        Exclude(LOptions, roIgnoreCase)
-      else
-        Include(LOptions, roIgnoreCase);
-      LRegex := TRegEx.Create(APattern, LOptions);
-      LMatch := LRegex.Match(Lines.TextBetween[ABeginPosition, AEndPosition]);
-
-      LPreviousStart := Lines.PositionToCharIndex(ABeginPosition);
-      LPreviousPosition := ABeginPosition;
-
-      while LMatch.Success do
-      begin
-        LSearchResult.BeginPosition := Lines.CharIndexToPosition(LMatch.Index - LPreviousStart, LPreviousPosition);
-        LSearchResult.EndPosition := Lines.CharIndexToPosition(LMatch.Length, LSearchResult.BeginPosition);
-        FSearchResults.Add(LSearchResult);
-
-        LMatch := LMatch.NextMatch();
-      end;
-    except
-      on E: Exception do
-        FSearchStatus := E.Message;
-    end;
-  end;
-
-  procedure WildcardSearch(const APattern: string; const ABeginPosition, AEndPosition: TBCEditorTextPosition);
-  var
-    LIndex: Integer;
-    LPattern: string;
-  begin
-    for LIndex := 1 to Length(APattern) do
-      case APattern[LIndex] of
-        '*':
-          LPattern := LPattern + '.*';
-        '?':
-          LPattern := LPattern + '.?';
+        if (Search.Engine <> seNormal) then
+          Result := DoSearchNormal(LPosition)
         else
-          LPattern := LPattern + APattern[LIndex];
-      end;
+          Result := DoSearchRegEx(LPosition);
 
-    RegExSearch(LPattern, ABeginPosition, AEndPosition);
+        if (Result) then
+        begin
+          LSearchResult.BeginPosition := LPosition;
+          LSearchResult.EndPosition := Lines.CharIndexToPosition(Length(Search.Pattern), LSearchResult.BeginPosition);
+          if (soBackwards in Search.Options) then
+            FSearchResults.Insert(0, LSearchResult)
+          else
+            FSearchResults.Add(LSearchResult);
+        end;
+
+        if (Result and not (soBackwards in Search.Options)) then
+          if (LPosition.Char < Lines.Length[LPosition.Line]) then
+            Inc(LPosition.Char)
+          else
+            LPosition := Lines.BOLPosition[LPosition.Line];
+      until (not Result or (ABeginPosition >= AEndPosition));
+
+      Result := FSearchResults.Count > 0;
+    end;
   end;
-
-begin
-  FSearchResults.Clear();
-  FSearchStatus := '';
-
-  case (Search.Engine) of
-    seNormal:
-      NormalSearch(Search.Pattern, ABeginPosition, AEndPosition);
-    seRegularExpression:
-      RegExSearch(Search.Pattern, ABeginPosition, AEndPosition);
-    seWildCard:
-      WildcardSearch(Search.Pattern, ABeginPosition, AEndPosition);
-    else raise ERangeError.Create('Engine: ' + IntToStr(Ord(FSearch.Engine)));
-  end;
-
-  Result := FSearchResults.Count > 0;
 end;
 
 function TCustomBCEditor.DoSearchFind(const First: Boolean; const Action: TSearchFind): Boolean;
@@ -4201,6 +4099,90 @@ begin
   end;
 end;
 
+function TCustomBCEditor.DoSearchNormal(var APosition: TBCEditorTextPosition): Boolean;
+var
+  LLineLength: Integer;
+  LLinePos: PChar;
+  LLineText: string;
+  LPatternText: string;
+  LPatternEndPos: PChar;
+  LPatternLength: Integer;
+  LPatternPos: PChar;
+begin
+  Assert((0 <= APosition.Line) and (APosition.Line < Lines.Count));
+  Assert((0 <= APosition.Char) and (APosition.Char <= Lines.Length[APosition.Line]));
+
+  Result := True;
+
+  LPatternText := Search.Pattern;
+  LPatternLength := Length(LPatternText);
+  if (Result and not FSearch.CaseSensitive) then
+    CharLowerBuff(PChar(LPatternText), LPatternLength);
+
+  if (FSearch.WholeWordsOnly) then
+  begin
+    LPatternPos := @LPatternText[1];
+    LPatternEndPos := @LPatternText[LPatternLength];
+    while (LPatternPos <= LPatternEndPos) do
+      Result := Result and not IsWordBreakChar(LPatternPos^);
+  end;
+
+  if (Result) then
+  begin
+    Result := False;
+
+    while (not Result
+      and ((soBackwards in Search.Options) and (APosition > Lines.BOFPosition)
+        or not (soBackwards in Search.Options) and (APosition <= Lines.EOFPosition))) do
+    begin
+      if (soBackwards in Search.Options) then
+        if (APosition.Char > 0) then
+          Dec(APosition.Char)
+        else
+          APosition := Lines.EOLPosition[APosition.Line - 1];
+
+      LLineText := Lines[APosition.Line];
+      LLineLength := Length(LLineText);
+
+      if (LLineLength > 0) then
+      begin
+        if (not FSearch.CaseSensitive) then
+          CharLowerBuff(PChar(LLineText), Length(LLineText));
+
+        while (not Result
+          and ((soBackwards in Search.Options) and (APosition.Char >= 0)
+            or not (soBackwards in Search.Options) and (APosition.Char + LPatternLength <= LLineLength))) do
+        begin
+          LLinePos := @LLineText[1 + APosition.Char];
+
+          if (not FSearch.WholeWordsOnly or not IsWordBreakChar(LLinePos^)) then
+          begin
+            LPatternPos := @LPatternText[1];
+            LPatternEndPos := @LPatternText[LPatternLength];
+            while ((LPatternPos <= LPatternEndPos)
+              and (LPatternPos^ = LLinePos^)) do
+            begin
+              Inc(LPatternPos);
+              Inc(LLinePos);
+            end;
+            Result := LPatternPos > LPatternEndPos;
+          end;
+
+          if (not Result) then
+            if (soBackwards in Search.Options) then
+              Dec(APosition.Char)
+            else
+              Inc(APosition.Char);
+        end;
+      end;
+
+      if (not Result
+        and not (soBackwards in Search.Options)) then
+        APosition := Lines.BOLPosition[APosition.Line + 1];
+    end;
+  end;
+end;
+
 function TCustomBCEditor.DoSearchPrevious(APosition: TBCEditorTextPosition;
   out ASearchResult: TSearchResult; const WrapAround: Boolean = False): Boolean;
 var
@@ -4233,7 +4215,7 @@ begin
         else
           LRight := LMiddle - 1;
       end;
-    end 
+    end
     else if (WrapAround or DoSearchMatchNotFoundWrapAroundDialog) then
       LIndex := FSearchResults.Count - 1
     else
@@ -4243,6 +4225,68 @@ begin
     if (Result) then
       ASearchResult := FSearchResults[LIndex];
   end;
+end;
+
+function TCustomBCEditor.DoSearchRegEx(var APosition: TBCEditorTextPosition): Boolean;
+var
+  LMatch: TMatch;
+  LOptions: TRegexOptions;
+  LRegEx: TRegEx;
+begin
+  LOptions := [roSingleLine];
+  {$if CompilerVersion > 26}
+  Include(LOptions, roNotEmpty);
+  {$endif}
+  if (FSearch.CaseSensitive) then
+    Exclude(LOptions, roIgnoreCase)
+  else
+    Include(LOptions, roIgnoreCase);
+  LRegEx := TRegEx.Create(Search.Pattern, LOptions);
+
+  Result := False;
+  if (soBackwards in Search.Options) then
+    while (not Result and (APosition.Line >= 0)) do
+    begin
+      try
+        // In Delphi XE4 is a bug for TRegEx.Match - see note below
+        LMatch := LRegEx.Match(Copy(Lines[APosition.Line], 1, APosition.Char))
+      except
+        on E: Exception do
+          FSearchStatus := E.Message;
+      end;
+
+      Result := (FSearchStatus = '') and LMatch.Success;
+      while (Result and LMatch.Success) do
+      begin
+        APosition.Char := LMatch.Index - 1;
+        LMatch := LMatch.NextMatch();
+      end;
+
+      if (not Result) then
+        if (APosition.Line = 0) then
+          APosition := TextPosition(0, -1)
+        else
+          APosition := Lines.EOLPosition[APosition.Line - 1];
+    end
+  else
+    while (not Result and (APosition.Line < Lines.Count)) do
+    begin
+      try
+        // In Delphi XE4 is a bug for TRegEx.Match(Input, StartPos, Length):
+        // StartPos based on 1, but the search is started from 0.
+        // The bug is located in UnicodeIndexToUTF8, line 6 (while)
+        LMatch := LRegEx.Match(Copy(Lines[APosition.Line], 1 + APosition.Char, MaxInt));
+      except
+        on E: Exception do
+          FSearchStatus := E.Message;
+      end;
+
+      Result := (FSearchStatus = '') and LMatch.Success;
+      if (Result) then
+        APosition.Char := LMatch.Index - 1
+      else
+        APosition := Lines.BOLPosition[APosition.Line + 1];
+    end;
 end;
 
 function TCustomBCEditor.DoSearchReplace(const Action: TSearchReplace): Boolean;
@@ -4691,12 +4735,12 @@ begin
     if (LNewCaretPosition.Line >= Lines.Count) then
       LNewCaretPosition := Lines.EOLPosition[Lines.Count - 1];
     if ((LNewCaretPosition.Char = 0)
-      or (LNewCaretPosition.Char >= Length(Lines[LNewCaretPosition.Line]))
-      or not IsWordChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char - 1])) then
+      or (LNewCaretPosition.Char >= Lines.Length[LNewCaretPosition.Line])
+      or IsWordBreakChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char - 1])) then
       LNewCaretPosition := PreviousWordPosition(LNewCaretPosition);
     if ((LNewCaretPosition.Char > 0)
-      and ((LNewCaretPosition = Lines.CaretPosition) or (LNewCaretPosition.Char < Length(Lines[LNewCaretPosition.Line])))
-      and IsWordChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char - 1])) then
+      and ((LNewCaretPosition = Lines.CaretPosition) or (LNewCaretPosition.Char < Lines.Length[LNewCaretPosition.Line]))
+      and not IsWordBreakChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char - 1])) then
       LNewCaretPosition := WordStart(LNewCaretPosition);
     MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ACommand = ecSelectionWordLeft);
   end
@@ -4711,11 +4755,11 @@ begin
   LNewCaretPosition := Lines.CaretPosition;
   if (LNewCaretPosition.Line < Lines.Count) then
   begin
-    if ((LNewCaretPosition.Char < Length(Lines[LNewCaretPosition.Line]))
-      and IsWordChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char])) then
+    if ((LNewCaretPosition.Char < Lines.Length[LNewCaretPosition.Line])
+      and not IsWordBreakChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char])) then
       LNewCaretPosition := WordEnd();
-    if ((LNewCaretPosition.Char >= Length(Lines[LNewCaretPosition.Line]))
-      or not IsWordChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char])) then
+    if ((LNewCaretPosition.Char >= Lines.Length[LNewCaretPosition.Line])
+      or IsWordBreakChar(Lines[LNewCaretPosition.Line][1 + LNewCaretPosition.Char])) then
       LNewCaretPosition := NextWordPosition(LNewCaretPosition);
     MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ACommand = ecSelectionWordRight);
   end;
@@ -5735,7 +5779,7 @@ begin
   if (Lines[ALine] <> '') then
   begin
     LLinePos := @Lines[ALine][1];
-    LLineEndPos := @Lines[ALine][Length(Lines[ALine])];
+    LLineEndPos := @Lines[ALine][Lines.Length[ALine]];
     while ((LLinePos <= LLineEndPos) and CharInSet(LLinePos^, [BCEDITOR_NONE_CHAR, BCEDITOR_TAB_CHAR, BCEDITOR_SPACE_CHAR])) do
     begin
       if (LLinePos^ <> BCEDITOR_TAB_CHAR) then
@@ -6240,7 +6284,7 @@ begin
     Exit;
   ATextPosition := TextPosition(ClientToText(LCursorPoint.X, LCursorPoint.Y));
 
-  if (ATextPosition.Line = Lines.Count - 1) and (ATextPosition.Char >= Length(Lines[Lines.Count - 1])) then
+  if (ATextPosition.Line = Lines.Count - 1) and (ATextPosition.Char >= Lines.Length[Lines.Count - 1]) then
     Exit;
 
   Result := True;
@@ -6518,8 +6562,8 @@ begin
 
   if (not WordWrap.Enabled) then
   begin
-    LRowWidth := CalcTextWidth(Lines[ALine], Length(Lines[ALine]), 0);
-    FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0, Length(Lines[ALine]), LRowWidth);
+    LRowWidth := CalcTextWidth(Lines[ALine], Lines.Length[ALine], 0);
+    FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0, Lines.Length[ALine], LRowWidth);
     Result := 1;
   end
   else
@@ -6932,14 +6976,10 @@ end;
 
 function TCustomBCEditor.IsWordBreakChar(const AChar: Char): Boolean;
 begin
-  Result := CharInSet(AChar, [BCEDITOR_NONE_CHAR .. BCEDITOR_SPACE_CHAR]
+  Result := CharInSet(AChar,
+    [BCEDITOR_NONE_CHAR .. BCEDITOR_SPACE_CHAR]
     + BCEDITOR_WORD_BREAK_CHARACTERS
     + BCEDITOR_EXTRA_WORD_BREAK_CHARACTERS);
-end;
-
-function TCustomBCEditor.IsWordChar(const AChar: Char): Boolean;
-begin
-  Result := not IsWordBreakChar(AChar);
 end;
 
 function TCustomBCEditor.IsWordSelected(): Boolean;
@@ -6949,7 +6989,7 @@ var
   LLinePos: PChar;
 begin
   if ((Lines.SelBeginPosition.Line <> Lines.SelEndPosition.Line)
-    or (Length(Lines[Lines.SelBeginPosition.Line]) = 0)) then
+    or (Lines.Length[Lines.SelBeginPosition.Line] = 0)) then
     Result := False
   else
   begin
@@ -8010,7 +8050,7 @@ begin
   else if (Result.Line < Lines.Count - 1) then
   begin
     Result := Lines.BOLPosition[Result.Line + 1];
-    while ((Result.Char + 1 < Length(Lines[Result.Line])) and IsWordBreakChar(Lines[Result.Line][Result.Char + 1])) do
+    while ((Result.Char + 1 < Lines.Length[Result.Line])) and IsWordBreakChar(Lines[Result.Line][Result.Char + 1]) do
       Inc(Result.Char);
   end
   else
@@ -8332,7 +8372,7 @@ begin
 
       LTextPosition := DisplayToText(ADisplayCaretPosition);
       if ((LTextPosition.Line < Lines.Count)
-        and (LTextPosition.Char < Length(Lines[LTextPosition.Line]))) then
+        and (LTextPosition.Char < Lines.Length[LTextPosition.Line])) then
       begin
         LTempBitmap.Canvas.Font.Name := Font.Name;
         LTempBitmap.Canvas.Font.Color := LForegroundColor;
@@ -10245,7 +10285,7 @@ var
       LEndPosition := TextPosition(Max(Lines.SelBeginPosition.Char, Lines.SelEndPosition.Char), Lines.SelBeginPosition.Line);
       if (LBeginPosition.Line < Lines.Count) then
       begin
-        LEndPosition.Char := Min(LEndPosition.Char, Length(Lines[LEndPosition.Line]));
+        LEndPosition.Char := Min(LEndPosition.Char, Lines.Length[LEndPosition.Line]);
         ASelectedText := Lines.TextBetween[LBeginPosition, LEndPosition]
       end
       else
@@ -11875,16 +11915,14 @@ procedure TCustomBCEditor.ScrollToCaret(ACenterVertical: Boolean = False; AScrol
 var
   LClient: TPoint;
   LDisplayCaretPosition: TBCEditorDisplayPosition;
-  LLeftMarginWidth: Integer;
 begin
   LDisplayCaretPosition := DisplayCaretPosition;
 
-  LClient := DisplayToClient(DisplayCaretPosition);
-  LLeftMarginWidth := GetLeftMarginWidth;
-  if (LClient.X < LLeftMarginWidth) then
-    HorzTextPos := HorzTextPos + LClient.X - LLeftMarginWidth
-  else
-    HorzTextPos := HorzTextPos + LClient.X - LLeftMarginWidth - TextWidth;
+  LClient := DisplayToClient(LDisplayCaretPosition);
+  if (LClient.X - LeftMarginWidth < HorzTextPos) then
+    HorzTextPos := HorzTextPos + LClient.X - LeftMarginWidth
+  else if ((LClient.X - LeftMarginWidth >= HorzTextPos + TextWidth) or AScrollAlways) then
+    HorzTextPos := HorzTextPos + LClient.X - LeftMarginWidth - TextWidth + 1;
 
   if (not ACenterVertical) then
   begin
@@ -13092,7 +13130,7 @@ begin
     else if Action is TEditDelete then
       TEditDelete(Action).Enabled := not ReadOnly and SelectionAvailable
     else if Action is TEditSelectAll then
-      TEditSelectAll(Action).Enabled := (Lines.Count > 1) or (Lines[0] <> '')
+      TEditSelectAll(Action).Enabled := (Lines.Count > 0)
     else if Action is TEditUndo then
       TEditUndo(Action).Enabled := not ReadOnly and Lines.CanUndo
     else if Action is TSearchFindNext then
@@ -13100,9 +13138,9 @@ begin
       TSearchFindNext(Action).Enabled := Search.Pattern <> ''
     else if Action is TSearchReplace then
       // must be before TSearchFind, since TSearchReplace is TSearchFind too
-      TSearchReplace(Action).Enabled := (Lines.Count > 1) or (Lines[0] <> '')
+      TSearchReplace(Action).Enabled := (Lines.Count > 0)
     else if Action is TSearchFind then
-      TSearchFind(Action).Enabled := (Lines.Count > 1) or (Lines[0] <> '')
+      TSearchFind(Action).Enabled := (Lines.Count > 0)
     else
       Result := inherited;
 end;
@@ -13827,12 +13865,12 @@ function TCustomBCEditor.WordEnd(const ATextPosition: TBCEditorTextPosition): TB
 begin
   if (Lines[ATextPosition.Line] = '') then
     Result := Lines.EOLPosition[ATextPosition.Line]
-  else if (ATextPosition.Char < Length(Lines[ATextPosition.Line])) then
+  else if (ATextPosition.Char < Lines.Length[ATextPosition.Line]) then
   begin
     Result := ATextPosition;
-    while ((Result.Char < Length(Lines[ATextPosition.Line])) and IsWordChar(Lines[ATextPosition.Line][1 + Result.Char])) do
+    while ((Result.Char < Lines.Length[ATextPosition.Line])) and not IsWordBreakChar(Lines[ATextPosition.Line][1 + Result.Char]) do
       Inc(Result.Char);
-    while ((Result.Char < Length(Lines[ATextPosition.Line])) and IsEmptyChar(Lines[ATextPosition.Line][1 + Result.Char])) do
+    while ((Result.Char < Lines.Length[ATextPosition.Line])) and IsEmptyChar(Lines[ATextPosition.Line][1 + Result.Char]) do
       Inc(Result.Char);
   end
   else
@@ -13849,7 +13887,7 @@ begin
   else if (ATextPosition.Char > 0) then
   begin
     Result := ATextPosition;
-    while ((Result.Char > 0) and IsWordChar(LLineText[1 + Result.Char - 1])) do
+    while (not IsWordBreakChar(LLineText[1 + Result.Char - 1])) do
       Dec(Result.Char);
   end
   else

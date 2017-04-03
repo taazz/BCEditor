@@ -1,6 +1,6 @@
 unit BCEditor.Consts;
 
-interface
+interface {********************************************************************}
 
 uses
   Graphics;
@@ -78,6 +78,6 @@ const
   scWest = 6;
   scNorthWest = 7;
 
-implementation
+implementation {***************************************************************}
 
 end.
