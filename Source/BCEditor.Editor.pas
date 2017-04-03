@@ -449,7 +449,7 @@ type
     procedure UpdateFoldRanges(const ACurrentLine: Integer; const ALineCount: Integer); overload;
     procedure UpdateFoldRanges(AFoldRanges: TBCEditorCodeFolding.TRanges; const ALineCount: Integer); overload;
     procedure UpdateRows(const ALine: Integer);
-    procedure UpdateScrollBars();
+    procedure UpdateScrollBars(const AUpdateRows: Boolean = True);
     procedure UpdateWordWrap(const AValue: Boolean);
     procedure WMCaptureChanged(var AMessage: TMessage); message WM_CAPTURECHANGED;
     procedure WMChar(var AMessage: TWMChar); message WM_CHAR;
@@ -6159,7 +6159,7 @@ begin
       Exclude(FState, esRowsUpdating);
 
       if (UpdateCount = 0) then
-        UpdateScrollBars();
+        UpdateScrollBars(False);
     end;
   end;
 
@@ -13288,20 +13288,25 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.UpdateScrollBars();
+procedure TCustomBCEditor.UpdateScrollBars(const AUpdateRows: Boolean = True);
 var
   LDisplayCaretPosition: TBCEditorDisplayPosition;
   LHorzScrollInfo: TScrollInfo;
   LVertScrollInfo: TScrollInfo;
 begin
-  if (HandleAllocated and (FUpdateCount = 0) and not (esRowsUpdating in State)) then
+  if (HandleAllocated
+    and (FUpdateCount = 0)
+    and not (esRowsUpdating in State)) then
   begin
+    if (AUpdateRows) then
+      Rows; // Make sure, Rows is updated
+
     LDisplayCaretPosition := DisplayCaretPosition;
 
     LVertScrollInfo.cbSize := SizeOf(ScrollInfo);
     LVertScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
     LVertScrollInfo.nMin := 0;
-    LVertScrollInfo.nMax := Max(LDisplayCaretPosition.Row, Rows.Count - 1);
+    LVertScrollInfo.nMax := Max(LDisplayCaretPosition.Row, FRows.Count - 1);
     LVertScrollInfo.nPage := VisibleRows;
     LVertScrollInfo.nPos := TopRow;
     LVertScrollInfo.nTrackPos := 0;
@@ -13310,10 +13315,13 @@ begin
     LHorzScrollInfo.cbSize := SizeOf(ScrollInfo);
     LHorzScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
     LHorzScrollInfo.nMin := 0;
-    LHorzScrollInfo.nMax := Rows.MaxWidth - 1;
-    if ((LDisplayCaretPosition.Row >= Rows.Count)
-      or (LDisplayCaretPosition.Column > Rows[LDisplayCaretPosition.Row].Length)) then
-      LHorzScrollInfo.nMax := Max(DisplayToClient(LDisplayCaretPosition).X - LeftMarginWidth, LHorzScrollInfo.nMax);
+    LHorzScrollInfo.nMax := FRows.MaxWidth - 1;
+    if ((LDisplayCaretPosition.Row >= FRows.Count)
+      or (LDisplayCaretPosition.Column > FRows[LDisplayCaretPosition.Row].Length)) then
+      if (AUpdateRows or (LDisplayCaretPosition.Row < FRows.Count)) then
+      LHorzScrollInfo.nMax := Max(DisplayToClient(LDisplayCaretPosition).X - LeftMarginWidth, LHorzScrollInfo.nMax)
+    else
+      LHorzScrollInfo.nMax := LeftMarginWidth + LDisplayCaretPosition.Column * CharWidth;
     LHorzScrollInfo.nPage := TextWidth;
     LHorzScrollInfo.nPos := HorzTextPos;
     LHorzScrollInfo.nTrackPos := 0;
