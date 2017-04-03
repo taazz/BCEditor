@@ -23,7 +23,7 @@ A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VC
 
 <h3>Demo</h3>
 
-  * <a href="https://www.dropbox.com/s/h3yenr9re4hllci/BCEditor_Demo.zip?dl=1">BCEditor Demo</a>
+  * <a href="http://www.mysqlfront.de/bonecode/BCEditor_Demo.zip">BCEditor Demo</a>
 
 <h3>Screenshot</h3>
 

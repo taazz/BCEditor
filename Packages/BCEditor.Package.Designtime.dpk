@@ -1,6 +1,6 @@
 package BCEditor.Package.Designtime;
 
-{$R 'BCEditor.Package.dcr'}
+{$R 'BCEditor.Package.Designtime.dcr'}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
@@ -38,6 +38,6 @@ requires
   BCEditor.Package.Runtime;
 
 contains
-  BCEditor.Package in 'BCEditor.Package.pas';
+  BCEditor.Package.Designtime in 'BCEditor.Package.Designtime.pas';
 
 end.

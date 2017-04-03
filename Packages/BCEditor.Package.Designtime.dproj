@@ -89,14 +89,14 @@
         <DelphiCompile Include="$(MainSource)">
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
-        <DCCReference Include="BCEditor.Package.dcr"/>
+        <DCCReference Include="BCEditor.Package.Designtime.dcr"/>
         <DCCReference Include="designide.dcp"/>
         <DCCReference Include="rtl.dcp"/>
         <DCCReference Include="vcl.dcp"/>
         <DCCReference Include="dbrtl.dcp"/>
         <DCCReference Include="vcldb.dcp"/>
         <DCCReference Include="BCEditor.Package.Runtime.dcp"/>
-        <DCCReference Include="BCEditor.Package.pas"/>
+        <DCCReference Include="BCEditor.Package.Designtime.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

@@ -92,13 +92,13 @@
         <TASM_Debugging>None</TASM_Debugging>
     </PropertyGroup>
     <ItemGroup>
-        <ResFiles Include="BCEditor.Package.dcr">
+        <ResFiles Include="BCEditor.Package.Designtime.dcr">
             <BuildOrder>3</BuildOrder>
         </ResFiles>
         <CppCompile Include="BCEditor.Package.Designtime.cpp">
             <BuildOrder>0</BuildOrder>
         </CppCompile>
-        <DelphiCompile Include="BCEditor.Package.pas">
+        <DelphiCompile Include="BCEditor.Package.Designtime.pas">
             <BuildOrder>2</BuildOrder>
         </DelphiCompile>
         <PackageImport Include="designide.bpi">

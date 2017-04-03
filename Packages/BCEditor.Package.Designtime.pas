@@ -1,4 +1,4 @@
-unit BCEditor.Package;
+unit BCEditor.Package.Designtime;
 
 interface {********************************************************************}
 
