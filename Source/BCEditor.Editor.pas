@@ -60,8 +60,11 @@ type
       FEditor: TCustomBCEditor;
       FMaxLength: Integer;
       FMaxLengthRow: Integer;
+      FMaxWidth: Integer;
+      FMaxWidthRow: Integer;
       function GetLine(ARow: Integer): Integer; inline;
       function GetMaxLength(): Integer;
+      function GetMaxWidth(): Integer;
       function GetText(ARow: Integer): string; inline;
       procedure PutLine(ARow: Integer; AValue: Integer); inline;
     strict protected
@@ -77,6 +80,7 @@ type
         const AIndex, ALength, AWidth: Integer);
       property Line[Row: Integer]: Integer read GetLine write PutLine;
       property MaxLength: Integer read GetMaxLength;
+      property MaxWidth: Integer read GetMaxWidth;
       property Text[Row: Integer]: string read GetText;
     end;
 
@@ -139,7 +143,6 @@ type
     FLastShiftState: TShiftState;
     FLastSortOrder: TBCEditorSortOrder;
     FLastTopLine: Integer;
-    FLeftColumnn: Integer;
     FLeftMargin: TBCEditorLeftMargin;
     FLeftMarginCharWidth: Integer;
     FLeftMarginWidth: Integer;
@@ -233,6 +236,7 @@ type
     FSyncEdit: TBCEditorSyncEdit;
     FTabs: TBCEditorTabs;
     FTextEntryMode: TBCEditorTextEntryMode;
+    FTextWidth: Integer;
     FTokenInfo: TBCEditorTokenInfo;
     FTokenInfoPopupWindow: TBCEditorTokenInfoPopupWindow;
     FTokenInfoTimer: TTimer;
@@ -240,7 +244,6 @@ type
     FTopRow: Integer;
     FUpdateCount: Integer;
     FURIOpener: Boolean;
-    FVisibleColumns: Integer;
     FVisibleRows: Integer;
     FWantReturns: Boolean;
     FWheelScrollLines: UINT;
@@ -341,6 +344,7 @@ type
       var AToken: string; var ATokenType: TBCEditorRangeType; var AColumn: Integer;
       var AHighlighterAttribute: TBCEditorHighlighter.TAttribute): Boolean;
     function GetHookedCommandHandlersCount: Integer;
+    function GetHorzTextPos(): Integer;
     function GetLeadingExpandedLength(const AStr: string; const ABorder: Integer = 0): Integer;
     function GetLeftMarginWidth: Integer;
     function GetLineIndentLevel(const ALine: Integer): Integer;
@@ -408,8 +412,8 @@ type
     procedure SetDefaultKeyCommands;
     procedure SetDisplayCaretPosition(const ADisplayCaretPosition: TBCEditorDisplayPosition);
     procedure SetForegroundColor(const AValue: TColor);
+    procedure SetHorzTextPos(AValue: Integer);
     procedure SetKeyCommands(const AValue: TBCEditorKeyCommands);
-    procedure SetLeftColumnn(const AValue: Integer);
     procedure SetLeftMargin(const AValue: TBCEditorLeftMargin);
     procedure SetModified(const AValue: Boolean);
     procedure SetMouseMoveScrollCursors(const AIndex: Integer; const AValue: HCursor);
@@ -608,7 +612,8 @@ type
     property AlwaysShowCaret: Boolean read FAlwaysShowCaret write SetAlwaysShowCaret;
     property HideScrollBars: Boolean read FHideScrollBars write SetHideScrollBars default True;
     property HideSelection: Boolean read FHideSelection write SetHideSelection default True;
-    property LeftColumn: Integer read FLeftColumnn write SetLeftColumnn;
+    property HorzTextPos: Integer read GetHorzTextPos write SetHorzTextPos;
+    property LeftMarginWidth: Integer read FLeftMarginWidth;
     property OnAfterBookmarkPlaced: TNotifyEvent read FOnAfterBookmarkPlaced write FOnAfterBookmarkPlaced;
     property OnAfterDeleteBookmark: TNotifyEvent read FOnAfterDeleteBookmark write FOnAfterDeleteBookmark;
     property OnAfterDeleteMark: TNotifyEvent read FOnAfterDeleteMark write FOnAfterDeleteMark;
@@ -643,6 +648,7 @@ type
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
     property Options: TBCEditorOptions read FOptions write SetOptions default DefaultOptions;
     property Rows: TRows read GetRows;
+    property TextWidth: Integer read FTextWidth;
     property TopRow: Integer read FTopRow write SetTopRow;
     property UndoOptions: TUndoOptions read GetUndoOptions write SetUndoOptions default DefaultUndoOptions;
     property VisibleRows: Integer read FVisibleRows;
@@ -769,7 +775,6 @@ type
     property TextEntryMode: TBCEditorTextEntryMode read FTextEntryMode write SetTextEntryMode default temInsert;
     property TokenInfo: TBCEditorTokenInfo read FTokenInfo write SetTokenInfo;
     property URIOpener: Boolean read FURIOpener write FURIOpener;
-    property VisibleColumns: Integer read FVisibleColumns;
     property WantReturns: Boolean read FWantReturns write SetWantReturns default True;
     property WordAt[ATextPos: TPoint]: string read GetWordAt;
     property UpdateCount: Integer read FUpdateCount;
@@ -1038,6 +1043,11 @@ begin
     FMaxLength := -1;
     FMaxLengthRow := -1;
   end;
+  if (FMaxWidthRow = ARow) then
+  begin
+    FMaxWidth := -1;
+    FMaxWidthRow := -1;
+  end;
 end;
 
 function TCustomBCEditor.TRows.GetLine(ARow: Integer): Integer;
@@ -1058,6 +1068,21 @@ begin
       end;
 
   Result := FMaxLength;
+end;
+
+function TCustomBCEditor.TRows.GetMaxWidth(): Integer;
+var
+  LRow: Integer;
+begin
+  if ((FMaxWidth < 0) and (Count > 0)) then
+    for LRow := 0 to Count - 1 do
+      if (Items[LRow].Width > FMaxWidth) then
+      begin
+        FMaxWidthRow := LRow;
+        FMaxWidth := Items[LRow].Width;
+      end;
+
+  Result := FMaxWidth;
 end;
 
 function TCustomBCEditor.TRows.GetText(ARow: Integer): string;
@@ -1083,11 +1108,19 @@ begin
 
   if ((FMaxLength >= 0) and (ALength > FMaxLength)) then
   begin
-    FMaxLengthRow := ALength;
-    FMaxLength := ARow;
+    FMaxLength := ALength;
+    FMaxLengthRow := ARow;
   end
   else if (FMaxLengthRow >= ARow) then
     Inc(FMaxLengthRow);
+
+  if ((FMaxWidth >= 0) and (AWidth > FMaxWidth)) then
+  begin
+    FMaxWidth := AWidth;
+    FMaxWidthRow := ARow;
+  end
+  else if (FMaxWidthRow >= ARow) then
+    Inc(FMaxWidthRow);
 end;
 
 procedure TCustomBCEditor.TRows.PutLine(ARow: Integer; AValue: Integer);
@@ -1186,7 +1219,6 @@ begin
   FKeyCommands := TBCEditorKeyCommands.Create(Self);
   SetDefaultKeyCommands;
   FWantReturns := True;
-  FLeftColumnn := 0;
   FTopRow := 0;
   FOptions := DefaultOptions;
   { Completion proposal }
@@ -1694,7 +1726,7 @@ begin
   ClearMatchingPair;
   ClearBookmarks;
   FMarkList.Clear;
-  LeftColumn := 0;
+  HorzTextPos := 0;
   TopRow := 0;
   Invalidate;
   UpdateScrollBars;
@@ -1753,12 +1785,12 @@ var
   LTokenWidth: Integer;
   LXInEditor: Integer;
 begin
-  if (X < FLeftMarginWidth) then
+  if (X < LeftMarginWidth) then
     Result := DisplayPosition(0, ARow)
   else if (Rows.Count = 0) then
-    Result := DisplayPosition((X - FLeftMarginWidth) div CharWidth, ARow)
+    Result := DisplayPosition((X - LeftMarginWidth) div CharWidth, ARow)
   else if (ARow >= Rows.Count) then
-    Result := DisplayPosition((X - FLeftMarginWidth) div CharWidth, Rows[Rows.Count - 1].Line + ARow - Rows.Count + 1)
+    Result := DisplayPosition((X - LeftMarginWidth) div CharWidth, Rows[Rows.Count - 1].Line + ARow - Rows.Count + 1)
   else
   begin
     Result := DisplayPosition(0, ARow);
@@ -1782,7 +1814,7 @@ begin
     LPreviousFontStyles := [];
     LTextWidth := 0;
     LCharsBefore := 0;
-    LXInEditor := X + LeftColumn * CharWidth - FLeftMarginWidth + 4;
+    LXInEditor := X + HorzTextPos - LeftMarginWidth + 4;
     LLength := 0;
 
     LHighlighterAttribute := FHighlighter.GetTokenAttribute;
@@ -1861,7 +1893,7 @@ begin
 
       FHighlighter.Next;
     end;
-    Inc(Result.Column, (X - FLeftMarginWidth - LTextWidth) div CharWidth + LeftColumn);
+    Inc(Result.Column, (X - LeftMarginWidth - LTextWidth + HorzTextPos) div CharWidth);
   end;
 end;
 
@@ -2241,8 +2273,8 @@ begin
       Exit;
     end;
 
-    LScrollBoundsLeft := FLeftMarginWidth;
-    LScrollBoundsRight := LScrollBoundsLeft + VisibleColumns * CharWidth + 4;
+    LScrollBoundsLeft := LeftMarginWidth;
+    LScrollBoundsRight := LScrollBoundsLeft + TextWidth + 4;
 
     LScrollBounds := Bounds(LScrollBoundsLeft, 0, LScrollBoundsRight, VisibleRows * LineHeight);
 
@@ -2655,9 +2687,9 @@ var
   LTokenLength: Integer;
 begin
   if (Rows.Count = 0) then
-    Result := Point(FLeftMarginWidth + ADisplayPosition.Column * CharWidth, (ADisplayPosition.Row - TopRow) * LineHeight)
+    Result := Point(LeftMarginWidth + ADisplayPosition.Column * CharWidth, (ADisplayPosition.Row - TopRow) * LineHeight)
   else if (ADisplayPosition.Row >= Rows.Count) then
-    Result := Point(FLeftMarginWidth + ADisplayPosition.Column * CharWidth, (Lines.Count - Rows[Rows.Count - 1].Line - 1 + ADisplayPosition.Row - TopRow) * LineHeight)
+    Result := Point(LeftMarginWidth + ADisplayPosition.Column * CharWidth, (Lines.Count - Rows[Rows.Count - 1].Line - 1 + ADisplayPosition.Row - TopRow) * LineHeight)
   else
   begin
     Result := Point(0, (ADisplayPosition.Row - TopRow) * LineHeight);
@@ -2733,7 +2765,7 @@ begin
     if LLength <= ADisplayPosition.Column then
       Inc(Result.X, (ADisplayPosition.Column - LLength) * CharWidth);
 
-    Inc(Result.X, FLeftMarginWidth - LeftColumn * CharWidth);
+    Inc(Result.X, LeftMarginWidth - HorzTextPos);
   end;
 end;
 
@@ -3396,7 +3428,7 @@ begin
       LeftMargin.OnChange := LeftMarginChanged;
       if HandleAllocated then
       begin
-        FVisibleColumns := Max(1, (ClientWidth - FLeftMarginWidth) div CharWidth);
+        FTextWidth := ClientWidth - LeftMarginWidth;
         if WordWrap.Enabled then
         begin
           FRows.Clear();
@@ -3406,7 +3438,7 @@ begin
         Invalidate;
       end;
     end;
-    FLeftMarginWidth := GetLeftMarginWidth;
+    FLeftMarginWidth := GetLeftMarginWidth();
   end;
 end;
 
@@ -3580,9 +3612,9 @@ begin
     if Assigned(LFoldRange) and LFoldRange.Collapsed then
     begin
       LCollapseMarkRect := LFoldRange.CollapseMarkRect;
-      OffsetRect(LCollapseMarkRect, -FLeftMarginWidth, 0);
+      OffsetRect(LCollapseMarkRect, -LeftMarginWidth, 0);
 
-      if LCollapseMarkRect.Right > FLeftMarginWidth then
+      if LCollapseMarkRect.Right > LeftMarginWidth then
         if PtInRect(LCollapseMarkRect, AClient) then
         begin
           FreeHintForm(FCodeFoldingHintForm);
@@ -3668,7 +3700,7 @@ begin
           DoToggleMark
       end;
 
-      LCodeFoldingRegion := (X >= FLeftMarginWidth - FCodeFolding.GetWidth) and (X <= FLeftMarginWidth);
+      LCodeFoldingRegion := (X >= LeftMarginWidth - FCodeFolding.GetWidth) and (X <= LeftMarginWidth);
 
       if (FCodeFolding.Visible and LCodeFoldingRegion) then
       begin
@@ -4805,6 +4837,7 @@ end;
 
 procedure TCustomBCEditor.DragOver(ASource: TObject; X, Y: Integer; AState: TDragState; var AAccept: Boolean);
 var
+  LColumn: Integer;
   LDisplayPosition: TBCEditorDisplayPosition;
   LOldTextCaretPosition: TBCEditorTextPosition;
 begin
@@ -4822,8 +4855,9 @@ begin
       begin
         LOldTextCaretPosition := Lines.CaretPosition;
         LDisplayPosition := ClientToDisplay(X, Y);
+        LColumn := HorzTextPos div CharWidth;
         LDisplayPosition.Row := MinMax(LDisplayPosition.Row, TopRow, TopRow + VisibleRows - 1);
-        LDisplayPosition.Column := MinMax(LDisplayPosition.Column, LeftColumn, LeftColumn + GetVisibleChars(LDisplayPosition.Row) - 1);
+        LDisplayPosition.Column := MinMax(LDisplayPosition.Column, LColumn, LColumn + GetVisibleChars(LDisplayPosition.Row) - 1);
         Lines.CaretPosition := DisplayToText(LDisplayPosition);
         ComputeScroll(Point(X, Y));
         if (LOldTextCaretPosition <> Lines.CaretPosition) then
@@ -5103,12 +5137,12 @@ begin
       DoScroll(ACommand);
     ecScrollLeft:
       begin
-        LeftColumn := LeftColumn - 1;
+        HorzTextPos := HorzTextPos - 1;
         Update;
       end;
     ecScrollRight:
       begin
-        LeftColumn := LeftColumn + 1;
+        HorzTextPos := HorzTextPos + 1;
         Update;
       end;
     ecInsertMode:
@@ -5642,6 +5676,18 @@ begin
     Result := FHookedCommandHandlers.Count
   else
     Result := 0;
+end;
+
+function TCustomBCEditor.GetHorzTextPos(): Integer;
+var
+  LScrollInfo: TScrollInfo;
+begin
+  LScrollInfo.cbSize := SizeOf(LScrollInfo);
+  LScrollInfo.fMask := SIF_POS;
+  if (not GetScrollInfo(Handle, SB_HORZ, LScrollInfo)) then
+    Result := 0
+  else
+    Result := LScrollInfo.nPos;
 end;
 
 function TCustomBCEditor.GetLeadingExpandedLength(const AStr: string; const ABorder: Integer = 0): Integer;
@@ -7317,7 +7363,7 @@ begin
   else
     FreeMinimapBitmaps;
 
-  FLeftMarginWidth := GetLeftMarginWidth;
+  FLeftMarginWidth := GetLeftMarginWidth();
   SizeOrFontChanged(True);
 
   Invalidate;
@@ -7417,11 +7463,10 @@ begin
   inherited;
 
   if (rmoMouseMove in FRightMargin.Options) and FRightMargin.Visible then
-    if (AButton = mbLeft) and (Abs(FRightMargin.Position * CharWidth + FLeftMarginWidth - X -
-      LeftColumn * CharWidth) < 3) then
+    if (AButton = mbLeft) and (Abs(FRightMargin.Position * CharWidth + LeftMarginWidth - X - HorzTextPos) < 3) then
     begin
       FRightMargin.Moving := True;
-      FRightMarginMovePosition := FRightMargin.Position * CharWidth + FLeftMarginWidth;
+      FRightMarginMovePosition := FRightMargin.Position * CharWidth + LeftMarginWidth;
       Exit;
     end;
 
@@ -7437,7 +7482,7 @@ begin
 
   FKeyboardHandler.ExecuteMouseDown(Self, AButton, AShift, X, Y);
 
-  if (AButton = mbLeft) and (ssDouble in AShift) and (X > FLeftMarginWidth) then
+  if (AButton = mbLeft) and (ssDouble in AShift) and (X > LeftMarginWidth) then
   begin
     FLastDblClick := GetTickCount;
     FLastRow := LSelectedRow;
@@ -7455,7 +7500,7 @@ begin
     FLastDblClick := 0;
   end;
 
-  if ((X + 4 > FLeftMarginWidth) and ((AButton = mbLeft) or (AButton = mbRight))) then
+  if ((X + 4 > LeftMarginWidth) and ((AButton = mbLeft) or (AButton = mbRight))) then
   begin
     LTextCaretPosition := TextPosition(ClientToText(X, Y));
     if (AButton = mbLeft) then
@@ -7465,7 +7510,7 @@ begin
       MouseCapture := True;
 
       Exclude(FState, esWaitForDragging);
-      if LSelectionAvailable and (eoDragDropEditing in FOptions) and (X > FLeftMarginWidth) and
+      if LSelectionAvailable and (eoDragDropEditing in FOptions) and (X > LeftMarginWidth) and
         (Lines.SelMode = smNormal) and Lines.IsPositionInSelection(LTextCaretPosition) then
         Include(FState, esWaitForDragging);
     end
@@ -7523,7 +7568,7 @@ begin
       end;
     end;
 
-  if X + 4 < FLeftMarginWidth then
+  if X + 4 < LeftMarginWidth then
     DoOnLeftMarginClick(AButton, AShift, X, Y);
 end;
 
@@ -7599,19 +7644,18 @@ begin
 
   if (rmoMouseMove in FRightMargin.Options) and FRightMargin.Visible then
   begin
-    FRightMargin.MouseOver := Abs(FRightMargin.Position * CharWidth + FLeftMarginWidth - X -
-      LeftColumn * CharWidth) < 3;
+    FRightMargin.MouseOver := Abs(FRightMargin.Position * CharWidth + LeftMarginWidth - X - HorzTextPos) < 3;
 
     if FRightMargin.Moving then
     begin
-      if X > FLeftMarginWidth then
+      if X > LeftMarginWidth then
         FRightMarginMovePosition := X;
       if rmoShowMovingHint in FRightMargin.Options then
       begin
         LHintWindow := GetRightMarginHint;
 
         LPositionText := Format(SBCEditorRightMarginPosition,
-          [(FRightMarginMovePosition - FLeftMarginWidth + LeftColumn * CharWidth) div CharWidth]);
+          [(FRightMarginMovePosition - LeftMarginWidth + HorzTextPos) div CharWidth]);
 
         LRect := LHintWindow.CalcHintRect(200, LPositionText, nil);
         LPoint := ClientToScreen(Point(ClientWidth - LRect.Right - 4, 4));
@@ -7639,9 +7683,9 @@ begin
       begin
         LPoint := Point(X, Y);
         LRect := LFoldRange.CollapseMarkRect;
-        OffsetRect(LRect, -FLeftMarginWidth, 0);
+        OffsetRect(LRect, -LeftMarginWidth, 0);
 
-        if LRect.Right > FLeftMarginWidth then
+        if LRect.Right > LeftMarginWidth then
         begin
           FCodeFolding.MouseOverHint := False;
           if PtInRect(LRect, LPoint) then
@@ -7666,7 +7710,7 @@ begin
               if LLine = FCodeFolding.Hint.RowCount then
                 FCodeFoldingHintForm.ItemList.Add('...');
 
-              LPoint.X := FLeftMarginWidth;
+              LPoint.X := LeftMarginWidth;
               LPoint.Y := LRect.Bottom + 2;
               LPoint := ClientToScreen(LPoint);
 
@@ -7728,9 +7772,9 @@ begin
   if FScrollDeltaX <> 0 then
   begin
     if GetKeyState(VK_SHIFT) < 0 then
-      TopRow := LeftColumn + FScrollDeltaX * VisibleColumns
+      HorzTextPos := HorzTextPos + TextWidth
     else
-      TopRow := LeftColumn + FScrollDeltaX;
+      HorzTextPos := HorzTextPos + FScrollDeltaX;
   end;
   if FScrollDeltaY <> 0 then
   begin
@@ -7765,7 +7809,7 @@ begin
   if FCodeFolding.Visible then
     CheckIfAtMatchingKeywords;
 
-  if FMouseOverURI and (AButton = mbLeft) and (X > FLeftMarginWidth) then
+  if FMouseOverURI and (AButton = mbLeft) and (X > LeftMarginWidth) then
   begin
     GetCursorPos(LCursorPoint);
     LCursorPoint := ScreenToClient(LCursorPoint);
@@ -7781,7 +7825,7 @@ begin
       FRightMargin.Moving := False;
       if rmoShowMovingHint in FRightMargin.Options then
         ShowWindow(GetRightMarginHint.Handle, SW_HIDE);
-      FRightMargin.Position := (FRightMarginMovePosition - FLeftMarginWidth + LeftColumn * CharWidth)
+      FRightMargin.Position := (FRightMarginMovePosition - LeftMarginWidth + HorzTextPos)
         div CharWidth;
       if Assigned(FOnRightMarginMouseUp) then
         FOnRightMarginMouseUp(Self);
@@ -8110,7 +8154,7 @@ begin
 
       { Text lines }
       LDrawRect.Top := 0;
-      LDrawRect.Left := FLeftMarginWidth - LeftColumn * CharWidth;
+      LDrawRect.Left := LeftMarginWidth - HorzTextPos;
       LDrawRect.Right := ClientRect.Width;
       LDrawRect.Bottom := LClipRect.Height;
 
@@ -8407,7 +8451,7 @@ begin
     LCollapseMarkRect.Top := FCodeFolding.Hint.Indicator.Padding.Top + ALineRect.Top;
     LCollapseMarkRect.Bottom := ALineRect.Bottom - FCodeFolding.Hint.Indicator.Padding.Bottom;
 
-    if LCollapseMarkRect.Right > FLeftMarginWidth then
+    if LCollapseMarkRect.Right > LeftMarginWidth then
     begin
       if FCodeFolding.Hint.Indicator.Glyph.Visible then
         FCodeFolding.Hint.Indicator.Glyph.Draw(Canvas, LCollapseMarkRect.Left, ALineRect.Top, ALineRect.Height)
@@ -8458,7 +8502,7 @@ begin
         end;
       end;
     end;
-    Inc(LCollapseMarkRect.Left, FLeftMarginWidth);
+    Inc(LCollapseMarkRect.Left, LeftMarginWidth);
     LCollapseMarkRect.Right := LCollapseMarkRect.Left + FCodeFolding.Hint.Indicator.Width;
     AFoldRange.CollapseMarkRect := LCollapseMarkRect;
   end;
@@ -8664,12 +8708,12 @@ begin
             if not LCodeFoldingRange.RegionItem.ShowGuideLine then
               Continue;
 
-            X := FLeftMarginWidth + GetLineIndentLevel(LCodeFoldingRange.LastLine) * CharWidth;
+            X := LeftMarginWidth + GetLineIndentLevel(LCodeFoldingRange.LastLine) * CharWidth;
 
             if not AMinimap then
-              Dec(X, LeftColumn * CharWidth);
+              Dec(X, HorzTextPos);
 
-            if (X - FLeftMarginWidth > 0) and not AMinimap or AMinimap and (X > 0) and (LCurrentLine >= 0) then
+            if (X - LeftMarginWidth > 0) and not AMinimap or AMinimap and (X > 0) and (LCurrentLine >= 0) then
             begin
               if (LDeepestLevel = LCodeFoldingRange.IndentLevel) and (LCurrentLine >= LCodeFoldingRange.FirstLine) and
                 (LCurrentLine <= LCodeFoldingRange.LastLine) and (cfoHighlightIndentGuides in FCodeFolding.Options) then
@@ -9165,8 +9209,7 @@ var
 begin
   if FRightMargin.Visible then
   begin
-    LRightMarginPosition := FLeftMarginWidth + FRightMargin.Position * CharWidth -
-      LeftColumn * CharWidth;
+    LRightMarginPosition := LeftMarginWidth + FRightMargin.Position * CharWidth - HorzTextPos;
     if (LRightMarginPosition >= AClipRect.Left) and (LRightMarginPosition <= AClipRect.Right) then
     begin
       Canvas.Pen.Color := FRightMargin.Colors.Edge;
@@ -9762,7 +9805,7 @@ var
   begin
     LLastColumn := LTokenHelper.CharsBefore + Length(LTokenHelper.Text) + 1;
 
-    if not AMinimap and (LTokenRect.Right > FLeftMarginWidth) or AMinimap and
+    if not AMinimap and (LTokenRect.Right > LeftMarginWidth) or AMinimap and
       ((LTokenRect.Left < ClientRect.Width) or (LTokenRect.Left < FMinimap.Width)) then
     begin
       LTokenLength := ATokenLength;
@@ -10355,7 +10398,7 @@ var
       LRowRect.Bottom := (AFirstRow - FMinimap.TopRow + 1) * FMinimap.CharHeight
     else
       LRowRect.Bottom := LineHeight;
-    LFirstColumn := LeftColumn;
+    LFirstColumn := HorzTextPos div CharWidth;
 
     LWordAtSelection := GetWordAtSelection(LSelectedText);
 
@@ -11802,9 +11845,9 @@ begin
   LDisplayPosition := ClientToDisplay(LCursorPoint.X, LCursorPoint.Y);
   if FScrollDeltaX <> 0 then
     if GetKeyState(VK_SHIFT) < 0 then
-      LeftColumn := LeftColumn + FScrollDeltaX * VisibleColumns
+      HorzTextPos := HorzTextPos + Sign(FScrollDeltaX) * TextWidth
     else
-      LeftColumn := LeftColumn + FScrollDeltaX;
+      HorzTextPos := HorzTextPos + FScrollDeltaX;
   if FScrollDeltaY <> 0 then
   begin
     if GetKeyState(VK_SHIFT) < 0 then
@@ -11830,14 +11873,18 @@ end;
 
 procedure TCustomBCEditor.ScrollToCaret(ACenterVertical: Boolean = False; AScrollAlways: Boolean = False);
 var
+  LClient: TPoint;
   LDisplayCaretPosition: TBCEditorDisplayPosition;
+  LLeftMarginWidth: Integer;
 begin
   LDisplayCaretPosition := DisplayCaretPosition;
 
-  if (LDisplayCaretPosition.Column < LeftColumn) then
-    LeftColumn := LDisplayCaretPosition.Column
-  else if (LDisplayCaretPosition.Column > LeftColumn + VisibleColumns) then
-    LeftColumn := LDisplayCaretPosition.Column - VisibleColumns;
+  LClient := DisplayToClient(DisplayCaretPosition);
+  LLeftMarginWidth := GetLeftMarginWidth;
+  if (LClient.X < LLeftMarginWidth) then
+    HorzTextPos := HorzTextPos + LClient.X - LLeftMarginWidth
+  else
+    HorzTextPos := HorzTextPos + LClient.X - LLeftMarginWidth - TextWidth;
 
   if (not ACenterVertical) then
   begin
@@ -11862,7 +11909,7 @@ begin
       seChange:
         FindFirst();
     end;
-  FLeftMarginWidth := GetLeftMarginWidth;
+  FLeftMarginWidth := GetLeftMarginWidth();
   Invalidate;
 end;
 
@@ -12034,27 +12081,20 @@ begin
     FKeyCommands.Assign(AValue);
 end;
 
-procedure TCustomBCEditor.SetLeftColumnn(const AValue: Integer);
-var
-  LValue: Integer;
-begin
-  LValue := Max(0, Min(AValue, Rows.MaxLength - VisibleColumns));
-
-  if (LValue <> FLeftColumnn) then
-  begin
-    FLeftColumnn := LValue;
-
-    if Assigned(OnScroll) then
-      OnScroll(Self, sbVertical);
-
-    UpdateScrollBars;
-    Invalidate();
-  end;
-end;
-
 procedure TCustomBCEditor.SetLeftMargin(const AValue: TBCEditorLeftMargin);
 begin
   LeftMargin.Assign(AValue);
+end;
+
+procedure TCustomBCEditor.SetHorzTextPos(AValue: Integer);
+var
+  LScrollInfo: TScrollInfo;
+begin
+  LScrollInfo.cbSize := SizeOf(LScrollInfo);
+  LScrollInfo.fMask := SIF_POS;
+  LScrollInfo.nPos := AValue;
+  SetScrollInfo(Handle, SB_HORZ, LScrollInfo, TRUE);
+  Invalidate();
 end;
 
 procedure TCustomBCEditor.SetLineColor(const ALine: Integer; const AForegroundColor, ABackgroundColor: TColor);
@@ -12465,7 +12505,7 @@ end;
 
 procedure TCustomBCEditor.SizeOrFontChanged(const AFontChanged: Boolean);
 var
-  LVisibleColumns: Integer;
+  LTextWidth: Integer;
   LVisibleRows: Integer;
   LWidthChanged: Boolean;
 begin
@@ -12482,15 +12522,15 @@ begin
         ResetCaret;
       end;
 
-      LVisibleColumns := Max(1, (ClientWidth - FLeftMarginWidth) div CharWidth);
+      LTextWidth := ClientWidth - LeftMarginWidth;
       LVisibleRows := Max(1, ClientHeight div LineHeight);
-      LWidthChanged := LVisibleRows <> FVisibleColumns;
+      LWidthChanged := LTextWidth <> FTextWidth;
 
       FillChar(FItalicOffsetCache, SizeOf(FItalicOffsetCache), 0);
 
       if (LWidthChanged or (LVisibleRows <> VisibleRows)) then
       begin
-        FVisibleColumns := LVisibleColumns;
+        FTextWidth := LTextWidth;
         FVisibleRows := LVisibleRows;
 
         if FMinimap.Visible then
@@ -12855,7 +12895,7 @@ begin
         end;
       end;
 
-      while ((Result.Row < Rows.Count) and (Result.Column > Rows[Result.Row].Length)) do
+      while ((Result.Row < Rows.Count) and (Result.Column >= Rows[Result.Row].Length)) do
       begin
         LIsWrapped := True;
         Dec(Result.Column, Rows[Result.Row].Length);
@@ -13270,9 +13310,12 @@ begin
     LHorzScrollInfo.cbSize := SizeOf(ScrollInfo);
     LHorzScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
     LHorzScrollInfo.nMin := 0;
-    LHorzScrollInfo.nMax := Max(LDisplayCaretPosition.Column, Rows.MaxLength - 1);
-    LHorzScrollInfo.nPage := VisibleColumns;
-    LHorzScrollInfo.nPos := LeftColumn;
+    LHorzScrollInfo.nMax := Rows.MaxWidth - 1;
+    if ((LDisplayCaretPosition.Row >= Rows.Count)
+      or (LDisplayCaretPosition.Column > Rows[LDisplayCaretPosition.Row].Length)) then
+      LHorzScrollInfo.nMax := Max(DisplayToClient(LDisplayCaretPosition).X - LeftMarginWidth, LHorzScrollInfo.nMax);
+    LHorzScrollInfo.nPage := TextWidth;
+    LHorzScrollInfo.nPos := HorzTextPos;
     LHorzScrollInfo.nTrackPos := 0;
     SetScrollInfo(Handle, SB_HORZ, LHorzScrollInfo, TRUE);
 
@@ -13293,7 +13336,7 @@ begin
     LOldTopRow := TopRow;
     if AValue then
     begin
-      LeftColumn := 0;
+      HorzTextPos := 0;
       if FWordWrap.Width = wwwRightMargin then
         FRightMargin.Visible := True;
     end;
@@ -13405,21 +13448,21 @@ begin
 
   case AMessage.ScrollCode of
     SB_LEFT:
-      LeftColumn := 0;
+      HorzTextPos := 0;
     SB_RIGHT:
-      LeftColumn := Rows.MaxLength - VisibleColumns;
-    SB_LINERIGHT:
-      LeftColumn := LeftColumn + 1;
+      HorzTextPos := Max(0, Rows.MaxWidth - TextWidth);
     SB_LINELEFT:
-      LeftColumn := LeftColumn - 1;
-    SB_PAGERIGHT:
-      LeftColumn := LeftColumn + VisibleColumns;
+      HorzTextPos := HorzTextPos - CharWidth;
+    SB_LINERIGHT:
+      HorzTextPos := HorzTextPos + CharWidth;
     SB_PAGELEFT:
-      LeftColumn := LeftColumn + VisibleColumns;
+      HorzTextPos := HorzTextPos - TextWidth;
+    SB_PAGERIGHT:
+      HorzTextPos := HorzTextPos + TextWidth;
     SB_THUMBPOSITION, SB_THUMBTRACK:
       begin
         FIsScrolling := True;
-        LeftColumn := AMessage.Pos;
+        HorzTextPos := AMessage.Pos;
       end;
     SB_ENDSCROLL:
       FIsScrolling := False;
@@ -13497,10 +13540,10 @@ begin
     if IsNeg then
     begin
       if FHWheelAccumulator <> 0 then FHWheelAccumulator := -FHWheelAccumulator;
-      LeftColumn := LeftColumn - 16;
+      HorzTextPos := HorzTextPos - CharWidth;
     end
     else
-      LeftColumn := LeftColumn + 16;
+      HorzTextPos := HorzTextPos + CharWidth;
   end;
 end;
 
@@ -13815,14 +13858,9 @@ end;
 
 function TCustomBCEditor.WordWrapWidth: Integer;
 begin
-  Assert(CharWidth > 0);
-
   case (FWordWrap.Width) of
     wwwPage:
-      begin
-        Assert(VisibleColumns > 0);
-        Result := VisibleColumns * CharWidth;
-      end;
+      Result := TextWidth;
     wwwRightMargin:
       Result := FRightMargin.Position * CharWidth;
     else raise ERangeError.Create('Width: ' + IntToStr(Ord(FWordWrap.Width)));
