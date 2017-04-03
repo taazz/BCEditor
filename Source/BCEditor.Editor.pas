@@ -30,7 +30,8 @@ type
     TState = set of (esRowsChanged, esCaretMoved,
       esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated,
       esIgnoreNextChar, esCaretVisible, esDblClicked, esWaitForDragging,
-      esCodeFoldingInfoClicked, esInSelection, esDragging, esFind, esReplace);
+      esCodeFoldingInfoClicked, esInSelection, esDragging, esFind, esReplace,
+      esRowsUpdating);
 
     TMultiCarets = class(TList<TBCEditorDisplayPosition>)
     private
@@ -51,6 +52,7 @@ type
       Index: Integer;
       Length: Integer;
       Line: Integer;
+      Width: Integer;
     end;
 
     TRows = class(TList<TRow>)
@@ -66,12 +68,13 @@ type
       property Editor: TCustomBCEditor read FEditor;
     public
       procedure Add(const AFlags: TRow.TFlags; const ALine: Integer;
-        const AIndex, ALength: Integer); inline;
+        const AIndex, ALength, AWidth: Integer); inline;
       procedure Clear();
       constructor Create(const AEditor: TCustomBCEditor);
       procedure Delete(ARow: Integer);
       procedure Insert(ARow: Integer;
-        const AFlags: TRow.TFlags; const ALine: Integer; const AIndex, ALength: Integer);
+        const AFlags: TRow.TFlags; const ALine: Integer;
+        const AIndex, ALength, AWidth: Integer);
       property Line[Row: Integer]: Integer read GetLine write PutLine;
       property MaxLength: Integer read GetMaxLength;
       property Text[Row: Integer]: string read GetText;
@@ -249,6 +252,8 @@ type
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarkListChange(Sender: TObject);
     function CalcIndentText(const IndentCount: Integer): string;
+    function CalcTextColumns(const AToken: string; const AColumnIndex: Integer): Integer;
+    function CalcTextWidth(const AToken: string; const ALength: Integer; const AColumnIndex: Integer): Integer;
     procedure CaretChanged(ASender: TObject);
     procedure CheckIfAtMatchingKeywords;
     procedure ClearCodeFolding;
@@ -354,8 +359,6 @@ type
     function GetSelText(): string;
     function GetText: string;
     function GetTextBetween(ATextBeginPosition, ATextEndPosition: TBCEditorTextPosition): string;
-    function GetTokenCharCount(const AToken: string; const ACharsBefore: Integer): Integer;
-    function GetTokenWidth(const AToken: string; const ALength: Integer; const ACharsBefore: Integer): Integer;
     function GetUndoOptions(): TUndoOptions;
     function GetVisibleChars(const ARow: Integer; const ALineText: string = ''): Integer;
     function GetWordAt(ATextPos: TPoint): string; inline;
@@ -590,6 +593,7 @@ type
     procedure SetOption(const AOption: TBCEditorOption; const AEnabled: Boolean);
     procedure SetReadOnly(const AValue: Boolean); virtual;
     procedure SetUndoOption(const AOption: TBCEditorUndoOption; const AEnabled: Boolean);
+    procedure SetUpdateState(AUpdating: Boolean); virtual;
     procedure SetWantReturns(const AValue: Boolean);
     procedure ShowCaret;
     procedure ScrollToCaret(ACenterVertical: Boolean = False; AScrollAlways: Boolean = False);
@@ -1002,9 +1006,9 @@ end;
 { TBCCustomEditor.TRows *******************************************************}
 
 procedure TCustomBCEditor.TRows.Add(const AFlags: TRow.TFlags;
-  const ALine: Integer; const AIndex, ALength: Integer);
+  const ALine: Integer; const AIndex, ALength, AWidth: Integer);
 begin
-  Insert(Count, AFlags, ALine, AIndex, ALength);
+  Insert(Count, AFlags, ALine, AIndex, ALength, AWidth);
 end;
 
 procedure TCustomBCEditor.TRows.Clear();
@@ -1064,7 +1068,7 @@ begin
 end;
 
 procedure TCustomBCEditor.TRows.Insert(ARow: Integer; const AFlags: TRow.TFlags;
-  const ALine: Integer; const AIndex, ALength: Integer);
+  const ALine: Integer; const AIndex, ALength, AWidth: Integer);
 var
   LItem: TRow;
 begin
@@ -1515,14 +1519,7 @@ end;
 
 procedure TCustomBCEditor.BeginUpdate();
 begin
-  if (FUpdateCount = 0) then
-  begin
-    FState := FState - [esCaretMoved, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated, esRowsChanged];
-
-    if (HandleAllocated and Visible) then
-      SendMessage(Handle, WM_SETREDRAW, WPARAM(FALSE), 0);
-  end;
-
+  if (FUpdateCount = 0) then SetUpdateState(True);
   Inc(FUpdateCount);
 end;
 
@@ -1541,6 +1538,55 @@ begin
   begin
     Result := StringOfChar(BCEDITOR_TAB_CHAR, IndentCount div FTabs.Width);
     Result := Result + StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount mod FTabs.Width);
+  end;
+end;
+
+function TCustomBCEditor.CalcTextColumns(const AToken: string; const AColumnIndex: Integer): Integer;
+var
+  LPToken: PChar;
+begin
+  LPToken := PChar(AToken);
+  if LPToken^ = BCEDITOR_TAB_CHAR then
+  begin
+    if toColumns in FTabs.Options then
+      Result := FTabs.Width - AColumnIndex mod FTabs.Width
+    else
+      Result := FTabs.Width;
+  end
+  else
+    Result := Length(AToken);
+end;
+
+function TCustomBCEditor.CalcTextWidth(const AToken: string; const ALength: Integer; const AColumnIndex: Integer): Integer;
+var
+  LPToken: PChar;
+  LSize: TSize;
+begin
+  Result := 0;
+
+  if (AToken = '') or (ALength = 0) then
+    Exit;
+
+  LPToken := PChar(AToken);
+
+  if LPToken^ = BCEDITOR_NONE_CHAR then
+    Exit(FPaintHelper.FontStock.CharWidth * ALength)
+  else
+  if LPToken^ = BCEDITOR_SPACE_CHAR then
+    Exit(FPaintHelper.FontStock.CharWidth * ALength)
+  else
+  if LPToken^ = BCEDITOR_TAB_CHAR then
+  begin
+    if toColumns in FTabs.Options then
+      Result := FTabs.Width - AColumnIndex mod FTabs.Width
+    else
+      Result := FTabs.Width;
+    Result := Result * FPaintHelper.FontStock.CharWidth + (ALength - 1) * FPaintHelper.FontStock.CharWidth * FTabs.Width;
+  end
+  else
+  begin
+    GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, AToken, ALength, LSize);
+    Result := LSize.cx;
   end;
 end;
 
@@ -1709,6 +1755,8 @@ var
 begin
   if (X < FLeftMarginWidth) then
     Result := DisplayPosition(0, ARow)
+  else if (Rows.Count = 0) then
+    Result := DisplayPosition((X - FLeftMarginWidth) div CharWidth, ARow)
   else if (ARow >= Rows.Count) then
     Result := DisplayPosition((X - FLeftMarginWidth) div CharWidth, Rows[Rows.Count - 1].Line + ARow - Rows.Count + 1)
   else
@@ -1770,13 +1818,13 @@ begin
             Inc(LRow);
             LLength := 0;
             LTextWidth := 0;
-            Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
+            Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
             Continue;
           end;
 
       if LRow = ARow then
       begin
-        LTokenWidth := GetTokenWidth(LTokenText, LTokenLength, LCharsBefore);
+        LTokenWidth := CalcTextWidth(LTokenText, LTokenLength, LCharsBefore);
         if ((LXInEditor > 0) and (LTextWidth + LTokenWidth > LXInEditor)) then
         begin
           LTokenBeginPos := @LTokenText[1];
@@ -1785,14 +1833,16 @@ begin
 
           while (LTextWidth < LXInEditor) do
           begin
-            repeat
+            while (LTokenPos + 1 <= LTokenEndPos)
+              and (((LTokenPos + 1)^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
+                or (LTokenPos^ <> BCEDITOR_NONE_CHAR)
+                  and (LTokenPos^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
+                  and not IsCombiningDiacriticalMark(LTokenPos^)) do
               Inc(LTokenPos);
-            until ((LTokenPos > LTokenEndPos)
-              or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
-                and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+
             LCharLength := LTokenPos - LTokenBeginPos + 1;
             LChar := LeftStr(LTokenText, LCharLength);
-            Inc(LTextWidth, GetTokenWidth(LChar, LCharLength, LCharsBefore));
+            Inc(LTextWidth, CalcTextWidth(LChar, LCharLength, LCharsBefore));
             Inc(LCharsBefore, LCharLength);
             if LTextWidth <= LXInEditor then
               Inc(Result.Column, LCharLength);
@@ -1807,7 +1857,7 @@ begin
       end;
 
       Inc(LLength, LTokenLength);
-      Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
+      Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
 
       FHighlighter.Next;
     end;
@@ -2415,7 +2465,7 @@ begin
   else
     LNewCaretPosition := Lines.BOLPosition[Lines.CaretPosition.Line];
   if (LNewCaretPosition <> Lines.CaretPosition) then
-    Lines.DeleteText(LNewCaretPosition, TextPosition(Max(Lines.CaretPosition.Char, Length(Lines[Lines.CaretPosition.Line])), Lines.CaretPosition.Line));
+    Lines.DeleteText(LNewCaretPosition, TextPosition(Min(Lines.CaretPosition.Char, Length(Lines[Lines.CaretPosition.Line])), Lines.CaretPosition.Line));
 end;
 
 procedure TCustomBCEditor.DeleteLine();
@@ -2604,11 +2654,10 @@ var
   LTokenText: string;
   LTokenLength: Integer;
 begin
-  if (ADisplayPosition.Row >= Rows.Count) then
-  begin
-    Rows;
+  if (Rows.Count = 0) then
+    Result := Point(FLeftMarginWidth + ADisplayPosition.Column * CharWidth, (ADisplayPosition.Row - TopRow) * LineHeight)
+  else if (ADisplayPosition.Row >= Rows.Count) then
     Result := Point(FLeftMarginWidth + ADisplayPosition.Column * CharWidth, (Lines.Count - Rows[Rows.Count - 1].Line - 1 + ADisplayPosition.Row - TopRow) * LineHeight)
-  end
   else
   begin
     Result := Point(0, (ADisplayPosition.Row - TopRow) * LineHeight);
@@ -2659,7 +2708,7 @@ begin
 
             Inc(LRow);
             LLength := 0;
-            Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
+            Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
             Continue;
           end;
 
@@ -2667,16 +2716,16 @@ begin
       begin
         if LLength + LTokenLength > ADisplayPosition.Column then
         begin
-          Inc(Result.X, GetTokenWidth(LTokenText, ADisplayPosition.Column - LLength, LCharsBefore));
+          Inc(Result.X, CalcTextWidth(LTokenText, ADisplayPosition.Column - LLength, LCharsBefore));
           Inc(LLength, LTokenLength);
           Break;
         end;
 
-        Inc(Result.X, GetTokenWidth(LTokenText, Length(LTokenText), LCharsBefore));
+        Inc(Result.X, CalcTextWidth(LTokenText, Length(LTokenText), LCharsBefore));
       end;
 
       Inc(LLength, LTokenLength);
-      Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
+      Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
 
       FHighlighter.Next;
     end;
@@ -2697,7 +2746,9 @@ var
   LResultChar: Integer;
   LRow: Integer;
 begin
-  if (ADisplayPosition.Row >= Rows.Count) then
+  if (Rows.Count = 0) then
+    Result := TextPosition(ADisplayPosition.Column, ADisplayPosition.Row)
+  else if (ADisplayPosition.Row >= Rows.Count) then
     Result := TextPosition(ADisplayPosition.Column, Rows[Rows.Count - 1].Line + ADisplayPosition.Row - Rows.Count + 1)
   else
   begin
@@ -2755,12 +2806,15 @@ begin
             Inc(LChar);
           Inc(LResultChar);
         end;
-        repeat
+        while ((LLinePos <= LLineEndPos)
+          and ((LLinePos^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
+            or ((LLinePos - 1)^ <> BCEDITOR_NONE_CHAR)
+              and ((LLinePos - 1)^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
+              and not IsCombiningDiacriticalMark((LLinePos - 1)^))) do
+        begin
           Inc(LResultChar);
           Inc(LLinePos);
-        until ((LLinePos > LLineEndPos)
-          or (Char((LLinePos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LLinePos - 1)^)
-            and not (Char(LLinePos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+        end;
         Result.Char := LResultChar;
       end;
     end;
@@ -3954,7 +4008,7 @@ function TCustomBCEditor.DoSearch(ABeginPosition, AEndPosition: TBCEditorTextPos
     try
       LOptions := [roMultiLine];
       {$if CompilerVersion > 26}
-      Include(FOptions, roNotEmpty);
+      Include(LOptions, roNotEmpty);
       {$endif}
       if (FSearch.CaseSensitive) then
         Exclude(LOptions, roIgnoreCase)
@@ -4805,54 +4859,8 @@ end;
 
 procedure TCustomBCEditor.EndUpdate();
 begin
-  if (UpdateCount > 0) then
-  begin
-    Dec(FUpdateCount);
-
-    if (UpdateCount = 0) then
-    begin
-      Assert(Lines.UndoList.UpdateCount = 0);
-
-      if ((State * [esLinesCleared, esLinesDeleted, esLinesInserted] <> [])
-        and LeftMargin.LineNumbers.Visible and LeftMargin.Autosize) then
-        LeftMargin.AutosizeDigitCount(Lines.Count);
-
-      if (State * [esLinesCleared] <> []) then
-        InitCodeFolding();
-
-      if (State * [esCaretMoved, esRowsChanged, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> []) then
-      begin
-        if (State * [esFind, esReplace] = []) then
-          FSearchResults.Clear();
-        ScanMatchingPair();
-      end;
-
-      if (State * [esCaretMoved, esRowsChanged, esLinesCleared, esLinesUpdated] <> []) then
-        ScrollToCaret();
-
-      if (HandleAllocated) then
-      begin
-        if (State * [esCaretMoved] <> []) then
-          UpdateCaret();
-        if ((State * [esRowsChanged, esLinesCleared, esLinesUpdated] <> [])
-          or (State * [esCaretMoved] <> []) and ((Lines.CaretPosition.Line >= Lines.Count) or (Lines.CaretPosition.Char > Rows.MaxLength))) then
-          UpdateScrollBars();
-        if (Visible) then
-        begin
-          SendMessage(Handle, WM_SETREDRAW, WPARAM(TRUE), 0);
-          Invalidate();
-        end;
-      end;
-
-      if (Assigned(OnChange)
-        and (State * [esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> [])
-        and not (csReading in ComponentState)
-        and (not (lsLoading in Lines.State) or (loUndoAfterLoad in Lines.Options))) then
-        OnChange(Self);
-
-      FState := FState - [esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated];
-    end;
-  end;
+  Dec(FUpdateCount);
+  if (FUpdateCount = 0) then SetUpdateState(False);
 end;
 
 procedure TCustomBCEditor.ExpandCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
@@ -4913,20 +4921,21 @@ begin
   else
     LLastLine := Lines.Count - 1;
 
-  BeginUpdate();
-
-  Result := 0;
-  for LLine := LFirstLine to LLastLine do
-  begin
-    LRange := FCodeFoldingRangeFromLine[LLine];
-    if (Assigned(LRange) and LRange.Collapsed) then
+  Include(FState, esRowsUpdating);
+  try
+    Result := 0;
+    for LLine := LFirstLine to LLastLine do
     begin
-      ExpandCodeFoldingRange(LRange);
-      Inc(Result);
+      LRange := FCodeFoldingRangeFromLine[LLine];
+      if (Assigned(LRange) and LRange.Collapsed) then
+      begin
+        ExpandCodeFoldingRange(LRange);
+        Inc(Result);
+      end;
     end;
+  finally
+    Exclude(FState, esRowsUpdating);
   end;
-
-  EndUpdate();
 end;
 
 procedure TCustomBCEditor.ExpandCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
@@ -6077,11 +6086,11 @@ var
 begin
   if (FRows.Count = 0) then
   begin
-    if (WordWrap.Enabled and (WordWrap.Width = wwwPage)) then
-      HandleNeeded();
-
-    BeginUpdate();
+    Include(FState, esRowsUpdating);
     try
+      if (WordWrap.Enabled and (WordWrap.Width = wwwPage)) then
+        HandleNeeded();
+
       for LLine := 0 to Lines.Count - 1 do
         Lines.FirstRow[LLine] := RowToInsert;
 
@@ -6101,7 +6110,10 @@ begin
           Inc(LRow, InsertLineIntoRows(LLine, LRow));
         end;
     finally
-      EndUpdate();
+      Exclude(FState, esRowsUpdating);
+
+      if (UpdateCount = 0) then
+        UpdateScrollBars();
     end;
   end;
 
@@ -6186,55 +6198,6 @@ begin
     Exit;
 
   Result := True;
-end;
-
-function TCustomBCEditor.GetTokenCharCount(const AToken: string; const ACharsBefore: Integer): Integer;
-var
-  LPToken: PChar;
-begin
-  LPToken := PChar(AToken);
-  if LPToken^ = BCEDITOR_TAB_CHAR then
-  begin
-    if toColumns in FTabs.Options then
-      Result := FTabs.Width - ACharsBefore mod FTabs.Width
-    else
-      Result := FTabs.Width;
-  end
-  else
-    Result := Length(AToken);
-end;
-
-function TCustomBCEditor.GetTokenWidth(const AToken: string; const ALength: Integer; const ACharsBefore: Integer): Integer;
-var
-  LPToken: PChar;
-  LSize: TSize;
-begin
-  Result := 0;
-
-  if (AToken = '') or (ALength = 0) then
-    Exit;
-
-  LPToken := PChar(AToken);
-
-  if LPToken^ = BCEDITOR_NONE_CHAR then
-    Exit(FPaintHelper.FontStock.CharWidth * ALength)
-  else
-  if LPToken^ = BCEDITOR_SPACE_CHAR then
-    Exit(FPaintHelper.FontStock.CharWidth * ALength)
-  else
-  if LPToken^ = BCEDITOR_TAB_CHAR then
-  begin
-    if toColumns in FTabs.Options then
-      Result := FTabs.Width - ACharsBefore mod FTabs.Width
-    else
-      Result := FTabs.Width;
-    Result := Result * FPaintHelper.FontStock.CharWidth + (ALength - 1) * FPaintHelper.FontStock.CharWidth * FTabs.Width;
-  end
-  else
-  begin
-    GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, AToken, ALength, LSize);
-    Result := LSize.cx;
-  end;
 end;
 
 function TCustomBCEditor.GetUndoOptions(): TUndoOptions;
@@ -6484,35 +6447,40 @@ end;
 function TCustomBCEditor.InsertLineIntoRows(const ALine: Integer; const ARow: Integer): Integer;
 var
   LChar: string;
-  LCharsBefore: Integer;
+  LColumnIndex: Integer;
   LFirstPartOfToken: string;
   LFlags: TRow.TFlags;
   LHighlighterAttribute: TBCEditorHighlighter.TAttribute;
-  LIndex: Integer;
-  LLength: Integer;
   LLine: Integer;
+  LLineIndex: Integer;
   LLineText: string;
-  LMaxWidth: Integer;
+  LMaxRowWidth: Integer;
   LRow: Integer;
+  LRowLength: Integer;
+  LRowWidth: Integer;
   LTokenBeginPos: PChar;
   LTokenEndPos: PChar;
+  LTokenLength: Integer;
   LTokenPos: PChar;
+  LTokenPrevPos: PChar;
+  LTokenRowBeginPos: PChar;
+  LTokenRowWidth: Integer;
   LTokenText: string;
   LTokenWidth: Integer;
-  LWidth: Integer;
 begin
   ClearMatchingPair();
 
   if (not WordWrap.Enabled) then
   begin
-    FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0, Length(Lines[ALine]));
+    LRowWidth := CalcTextWidth(Lines[ALine], Length(Lines[ALine]), 0);
+    FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0, Length(Lines[ALine]), LRowWidth);
     Result := 1;
   end
   else
   begin
     LRow := ARow;
     LFlags := [rfFirstRowOfLine];
-    LMaxWidth := WordWrapWidth();
+    LMaxRowWidth := WordWrapWidth();
     if ALine = 0 then
       FHighlighter.ResetCurrentRange
     else
@@ -6520,10 +6488,10 @@ begin
     LLineText := Lines[ALine];
     FHighlighter.SetCurrentLine(LLineText);
 
-    LWidth := 0;
-    LLength := 0;
-    LCharsBefore := 0;
-    LIndex := 0;
+    LRowWidth := 0;
+    LRowLength := 0;
+    LColumnIndex := 0;
+    LLineIndex := 0;
     while (not FHighlighter.GetEndOfLine()) do
     begin
       FHighlighter.GetToken(LTokenText);
@@ -6531,63 +6499,82 @@ begin
       if (Assigned(LHighlighterAttribute)) then
         FPaintHelper.SetStyle(LHighlighterAttribute.FontStyles);
 
-      repeat
-        LTokenWidth := GetTokenWidth(LTokenText, Length(LTokenText), LCharsBefore);
+      LTokenWidth := CalcTextWidth(LTokenText, Length(LTokenText), LColumnIndex);
 
-        if (LWidth + LTokenWidth <= LMaxWidth) then
-        begin
-          { no line break }
-          Inc(LLength, Length(LTokenText));
-          Inc(LWidth, LTokenWidth);
-          Inc(LCharsBefore, GetTokenCharCount(LTokenText, LCharsBefore));
-          LTokenText := '';
-        end
-        else if (LLength > 0) then
-        begin
-          { line break before token }
-          FRows.Insert(LRow, LFlags, ALine, LIndex, LLength);
-          Exclude(LFlags, rfFirstRowOfLine);
-          Inc(LIndex, LLength);
-          Inc(LRow);
+      if (LRowWidth + LTokenWidth <= LMaxRowWidth) then
+      begin
+        { no row break in token }
+        Inc(LRowLength, Length(LTokenText));
+        Inc(LRowWidth, LTokenWidth);
+        Inc(LColumnIndex, CalcTextColumns(LTokenText, LColumnIndex));
+      end
+      else if (LRowLength > 0) then
+      begin
+        { row break before token }
+        FRows.Insert(LRow, LFlags, ALine, LLineIndex, LRowLength, LRowWidth);
+        Exclude(LFlags, rfFirstRowOfLine);
+        Inc(LLineIndex, LRowLength);
+        Inc(LRow);
 
-          LLength := 0;
-          LWidth := 0;
-          LCharsBefore := 0;
-          LTokenText := '';
-        end
-        else
-        begin
-          { line break inside token }
+        LRowLength := Length(LTokenText);
+        LRowWidth := LTokenWidth;
+        LColumnIndex := CalcTextColumns(LTokenText, LColumnIndex);
+      end
+      else
+      begin
+        { row break inside token }
 
-          LTokenBeginPos := @LTokenText[1];
-          LTokenPos := @LTokenText[1 + VisibleColumns - 1];
-          LTokenEndPos := @LTokenText[Length(LTokenText)];
+        LTokenBeginPos := @LTokenText[1];
+        LTokenPos := LTokenBeginPos;
+        LTokenEndPos := @LTokenText[Length(LTokenText)];
+
+        repeat
+          LTokenRowBeginPos := LTokenPos;
+
+          Inc(LTokenPos);
 
           repeat
-            Inc(LTokenPos);
-          until ((LTokenPos > LTokenEndPos)
-            or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
-              and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+            LTokenPrevPos := LTokenPos;
 
-          LLength := LTokenPos - LTokenBeginPos;
-          FRows.Insert(LRow, LFlags, ALine, LIndex, LLength);
-          Exclude(LFlags, rfFirstRowOfLine);
-          Inc(LIndex, LLength);
-          Inc(LRow);
-          Delete(LTokenText, 1, LLength);
+            LTokenRowWidth := CalcTextWidth(LTokenText, LTokenPos - LTokenRowBeginPos, LColumnIndex);
 
-          LLength := 0;
-          LWidth := 0;
-          LCharsBefore := 0;
-        end;
-      until (LTokenText = '');
+            if (LTokenRowWidth < LMaxRowWidth) then
+              repeat
+                Inc(LTokenPos);
+              until ((LTokenPos > LTokenEndPos)
+                or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
+                  and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+          until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth >= LMaxRowWidth));
+
+          if (LTokenRowWidth >= LMaxRowWidth) then
+          begin
+            LTokenPos := LTokenPrevPos;
+
+            LRowLength := LTokenPos - LTokenRowBeginPos;
+            FRows.Insert(LRow, LFlags, ALine, LLineIndex, LRowLength, LTokenRowWidth);
+            Exclude(LFlags, rfFirstRowOfLine);
+            Inc(LLineIndex, LRowLength);
+            Inc(LRow);
+
+            LRowLength := 0;
+            LRowWidth := 0;
+            LColumnIndex := 0;
+          end
+          else
+          begin
+            LRowLength := LTokenPos - LTokenRowBeginPos;
+            LRowWidth := LTokenRowWidth;
+            LColumnIndex := CalcTextColumns(Copy(LTokenText,1 + LTokenRowBeginPos - LTokenBeginPos, LRowLength), LColumnIndex);
+          end;
+        until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth < LMaxRowWidth));
+      end;
 
       FHighlighter.Next();
     end;
 
-    if ((LLength > 0) or (LLineText = '')) then
+    if ((LRowLength > 0) or (LLineText = '')) then
     begin
-      FRows.Insert(LRow, LFlags + [rfLastRowOfLine], ALine, LIndex, LLength);
+      FRows.Insert(LRow, LFlags + [rfLastRowOfLine], ALine, LLineIndex, LRowLength, LRowWidth);
       Inc(LRow);
     end;
 
@@ -7275,8 +7262,6 @@ begin
   FRows.Clear();
   FMultiCaretPosition.Row := -1;
 
-  RescanHighlighterRangesFrom(0);
-
   Modified := True;
 
   if (UpdateCount > 0) then
@@ -7857,12 +7842,15 @@ begin
       begin
         LLinePos := @LLineText[1 + LNewCaretPosition.Char];
         LLineEndPos := @LLineText[Length(LLineText)];
-        repeat
-          Inc(LLinePos);
-          Inc(LNewCaretPosition.Char);
-        until ((LLinePos > LLineEndPos)
-          or (Char((LLinePos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LLinePos - 1)^)
-            and not (Char(LLinePos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+        while ((LLinePos <= LLineEndPos)
+          and ((LLinePos^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
+            or ((LLinePos - 1)^ <> BCEDITOR_NONE_CHAR)
+              and ((LLinePos - 1)^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
+              and not IsCombiningDiacriticalMark((LLinePos - 1)^))) do
+        begin
+          Dec(LLinePos);
+          Dec(LNewCaretPosition.Char);
+        end;
       end;
 
       MoveCaretAndSelection(Lines.SelBeginPosition, LNewCaretPosition, SelectionCommand);
@@ -8108,7 +8096,7 @@ begin
 
   LFirstRow := TopRow + LClipRect.Top div LineHeight;
   LTemp := (LClipRect.Bottom + LineHeight - 1) div LineHeight;
-  LLastTextRow := MinMax(TopRow + LTemp - 1, 0, Rows.Count - 1);
+  LLastTextRow := MinMax(TopRow + LTemp - 1, -1, Rows.Count - 1);
   LLastRow := TopRow + LTemp;
 
   HideCaret;
@@ -8131,7 +8119,7 @@ begin
       PaintRightMargin(LDrawRect);
 
       if (FCodeFolding.Visible and (cfoShowIndentGuides in CodeFolding.Options)) then
-        PaintGuides(TopRow, Min(TopRow + VisibleRows, Rows.Count), False);
+        PaintGuides(TopRow, Min(TopRow + VisibleRows, Rows.Count) - 1, False);
 
       if FSyncEdit.Enabled and FSyncEdit.Active then
         PaintSyncItems;
@@ -8616,17 +8604,29 @@ var
     end;
   end;
 
+var
+  LDisplayCaretPosition: TBCEditorDisplayPosition;
 begin
   if (ALastRow < Rows.Count) then
   begin
     LOldColor := Canvas.Pen.Color;
 
     Y := 0;
-    LCurrentLine := Rows[DisplayCaretPosition.Row].Line;
+    LDisplayCaretPosition := DisplayCaretPosition;
+    if (LDisplayCaretPosition.Row < Rows.Count) then
+      LCurrentLine := Rows[DisplayCaretPosition.Row].Line
+    else
+      LCurrentLine := -1;
     LCodeFoldingRange := nil;
     LDeepestLevel := GetDeepestLevel;
-    LFirstLine := Rows[AFirstRow].Line;
-    LEndLine := Rows[ALastRow].Line;
+    if (AFirstRow < Rows.Count) then
+      LFirstLine := Rows[AFirstRow].Line
+    else
+      LFirstLine := -1;
+    if (ALastRow < Rows.Count - 1) then
+      LEndLine := Rows[ALastRow].Line
+    else
+      LEndLine := -1;
 
     SetLength(LCodeFoldingRanges, FAllCodeFoldingRanges.AllCount);
     LRangeIndex := 0;
@@ -8669,7 +8669,7 @@ begin
             if not AMinimap then
               Dec(X, LeftColumn * CharWidth);
 
-            if (X - FLeftMarginWidth > 0) and not AMinimap or AMinimap and (X > 0) then
+            if (X - FLeftMarginWidth > 0) and not AMinimap or AMinimap and (X > 0) and (LCurrentLine >= 0) then
             begin
               if (LDeepestLevel = LCodeFoldingRange.IndentLevel) and (LCurrentLine >= LCodeFoldingRange.FirstLine) and
                 (LCurrentLine <= LCodeFoldingRange.LastLine) and (cfoHighlightIndentGuides in FCodeFolding.Options) then
@@ -8792,7 +8792,7 @@ var
             end
           end;
 
-          if ((rfFirstRowOfLine in Rows[LRow].Flags)
+          if (((Rows.Count = 0) or (rfFirstRowOfLine in Rows[LRow].Flags))
             and ((LLine = 0)
               or (LLine = Lines.CaretPosition.Line)
               or ((LLine + 1) mod 10 = 0)
@@ -9617,7 +9617,7 @@ var
           if LCharCount > 0 then
           begin
             LToken := Copy(AText, 1, LCharCount);
-            Inc(LSearchRect.Left, GetTokenWidth(LToken, LCharCount, LPaintedColumn));
+            Inc(LSearchRect.Left, CalcTextWidth(LToken, LCharCount, LPaintedColumn));
             LToken := Copy(AText, LCharCount + 1, Length(AText));
           end
           else
@@ -9625,7 +9625,7 @@ var
 
           LToken := Copy(LToken, 1, Min(LSearchTextLength, LBeginTextPosition.Char + LSearchTextLength -
             LTokenHelper.CharsBefore - LCharCount));
-          LSearchRect.Right := LSearchRect.Left + GetTokenWidth(LToken, Length(LToken), LPaintedColumn);
+          LSearchRect.Right := LSearchRect.Left + CalcTextWidth(LToken, Length(LToken), LPaintedColumn);
           if SameText(AText, LToken) then
             Inc(LSearchRect.Right, FItalicOffset);
 
@@ -9971,13 +9971,13 @@ var
       begin
         SetDrawingColors(False);
         LTokenLength := LSelectionStartColumn - LFirstColumn;
-        LTokenRect.Right := LTokenRect.Left + GetTokenWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
+        LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
         PaintToken(LText, LTokenLength);
         Delete(LText, 1, LTokenLength);
       end;
       { Selected part of the token }
       LTokenLength := Min(LSelectionEndColumn, LLastColumn) - LFirstColumn - LTokenLength;
-      LTokenRect.Right := LTokenRect.Left + GetTokenWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
+      LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
       LSelectedRect := LTokenRect;
       LSelectedTokenLength := LTokenLength;
       LSelectedText := LText;
@@ -9986,7 +9986,7 @@ var
       begin
         Delete(LText, 1, LTokenLength);
         SetDrawingColors(False);
-        LTokenRect.Right := LTokenRect.Left + GetTokenWidth(LText, Length(LText), LTokenHelper.ExpandedCharsBefore);
+        LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, Length(LText), LTokenHelper.ExpandedCharsBefore);
         PaintToken(LText, Length(LText));
       end;
     end
@@ -9995,7 +9995,7 @@ var
     begin
       SetDrawingColors(LSelected);
       LTokenLength := Length(LText);
-      LTokenRect.Right := LTokenRect.Left + GetTokenWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
+      LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
       PaintToken(LText, LTokenLength)
     end;
 
@@ -11843,14 +11843,14 @@ begin
   begin
     if (LDisplayCaretPosition.Row < TopRow) then
       TopRow := LDisplayCaretPosition.Row
-    else if ((LDisplayCaretPosition.Row > TopRow + VisibleRows) or AScrollAlways) then
+    else if ((LDisplayCaretPosition.Row >= TopRow + VisibleRows) or AScrollAlways) then
       TopRow := LDisplayCaretPosition.Row - VisibleRows + 1;
   end
   else
   begin
     if (LDisplayCaretPosition.Row < TopRow) then
       TopRow := Max(0, LDisplayCaretPosition.Row - VisibleRows div 2)
-    else if ((LDisplayCaretPosition.Row > TopRow + VisibleRows) or AScrollAlways) then
+    else if ((LDisplayCaretPosition.Row >= TopRow + VisibleRows div 2) or AScrollAlways) then
       TopRow := LDisplayCaretPosition.Row - VisibleRows div 2 + 1;
   end;
 end;
@@ -12282,7 +12282,10 @@ procedure TCustomBCEditor.SetTopRow(const AValue: Integer);
 var
   LValue: Integer;
 begin
-  LValue := Max(0, Min(AValue, Rows.Count - VisibleRows));
+  LValue := AValue;
+  if (not (soPastEndOfLine in FScroll.Options)) then
+    LValue := Min(AValue, Rows.Count - VisibleRows + 1);
+  LValue := Max(0, LValue);
 
   if (LValue <> FTopRow) then
   begin
@@ -12334,6 +12337,60 @@ begin
   if (uoUndoAfterSave in AOptions) then
     LLinesOptions := LLinesOptions + [loUndoAfterSave];
   Lines.Options := LLinesOptions;
+end;
+
+procedure TCustomBCEditor.SetUpdateState(AUpdating: Boolean);
+begin
+  if (AUpdating) then
+  begin
+    if (HandleAllocated and Visible) then
+      SendMessage(Handle, WM_SETREDRAW, WPARAM(FALSE), 0);
+  end
+  else
+  begin
+    {$IFDEF Debug}
+    Assert(Lines.UndoList.UpdateCount = 0);
+    {$ENDIF}
+
+    if ((State * [esLinesCleared, esLinesDeleted, esLinesInserted] <> [])
+      and LeftMargin.LineNumbers.Visible and LeftMargin.Autosize) then
+      LeftMargin.AutosizeDigitCount(Lines.Count);
+
+    if (State * [esLinesCleared] <> []) then
+      InitCodeFolding();
+
+    if (State * [esCaretMoved, esRowsChanged, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> []) then
+    begin
+      if (State * [esFind, esReplace] = []) then
+        FSearchResults.Clear();
+      ScanMatchingPair();
+    end;
+
+    if (State * [esCaretMoved, esRowsChanged, esLinesCleared, esLinesUpdated] <> []) then
+      ScrollToCaret();
+
+    if (HandleAllocated) then
+    begin
+      if (State * [esCaretMoved] <> []) then
+        UpdateCaret();
+      if ((State * [esRowsChanged, esLinesCleared, esLinesUpdated] <> [])
+        or (State * [esCaretMoved] <> []) and ((Lines.CaretPosition.Line >= Lines.Count) or (Lines.CaretPosition.Char > Rows.MaxLength))) then
+        UpdateScrollBars();
+      if (Visible) then
+      begin
+        SendMessage(Handle, WM_SETREDRAW, WPARAM(TRUE), 0);
+        Invalidate();
+      end;
+    end;
+
+    if (Assigned(OnChange)
+      and (State * [esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> [])
+      and not (csReading in ComponentState)
+      and (not (lsLoading in Lines.State) or (loUndoAfterLoad in Lines.Options))) then
+      OnChange(Self);
+
+    FState := FState - [esCaretMoved, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated];
+  end;
 end;
 
 procedure TCustomBCEditor.SetWantReturns(const AValue: Boolean);
@@ -12766,10 +12823,12 @@ var
   LLineText: string;
   LLinePos: PChar;
 begin
-  if (ATextPosition.Line >= Lines.Count) then
+  if (Lines.Count = 0) then
+    Result := DisplayPosition(ATextPosition.Char, ATextPosition.Line)
+  else if (ATextPosition.Line >= Lines.Count) then
     Result := DisplayPosition(ATextPosition.Char, Rows.Count + ATextPosition.Line - Rows[Rows.Count - 1].Line - 1)
-  else if ((Rows.Count > 0) and (Lines.FirstRow[ATextPosition.Line] < 0)) then
-    // Rows.Count > 0 is not needed - but GetRows must be called to initialize Lines.FirstRow
+  else if ((Rows.Count >= 0) and (Lines.FirstRow[ATextPosition.Line] < 0)) then
+    // Rows.Count >= 0 is not needed - but GetRows must be called to initialize Lines.FirstRow
     raise ERangeError.Create(SBCEditorLineIsNotVisible + #13#10
       + 'Lines.Count: ' + IntToStr(Lines.Count))
   else
@@ -12796,15 +12855,10 @@ begin
         end;
       end;
 
-      while ((Result.Row < Rows.Count - 1)
-        and (Rows[Result.Row + 1].Line = ATextPosition.Line)
-        and (Result.Column >= Rows[Result.Row].Length)) do
+      while ((Result.Row < Rows.Count) and (Result.Column > Rows[Result.Row].Length)) do
       begin
         LIsWrapped := True;
-        if (Rows[Result.Row].Length = 0) then
-          Result.Column := 0
-        else
-          Dec(Result.Column, Rows[Result.Row].Length);
+        Dec(Result.Column, Rows[Result.Row].Length);
         Inc(Result.Row);
       end;
     end;
@@ -13200,7 +13254,7 @@ var
   LHorzScrollInfo: TScrollInfo;
   LVertScrollInfo: TScrollInfo;
 begin
-  if (HandleAllocated and (FUpdateCount = 0) and (FRows.Count > 0)) then
+  if (HandleAllocated and (FUpdateCount = 0) and not (esRowsUpdating in State)) then
   begin
     LDisplayCaretPosition := DisplayCaretPosition;
 
@@ -13215,7 +13269,6 @@ begin
 
     LHorzScrollInfo.cbSize := SizeOf(ScrollInfo);
     LHorzScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
-    LHorzScrollInfo.nMin := 0;
     LHorzScrollInfo.nMin := 0;
     LHorzScrollInfo.nMax := Max(LDisplayCaretPosition.Column, Rows.MaxLength - 1);
     LHorzScrollInfo.nPage := VisibleColumns;
