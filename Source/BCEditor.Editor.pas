@@ -254,9 +254,6 @@ type
     procedure AfterLinesUpdate(Sender: TObject);
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarkListChange(Sender: TObject);
-    function CalcIndentText(const IndentCount: Integer): string;
-    function CalcTextColumns(const AToken: string; const AColumnIndex: Integer): Integer;
-    function CalcTextWidth(const AToken: string; const ALength: Integer; const AColumnIndex: Integer): Integer;
     procedure CaretChanged(ASender: TObject);
     procedure CheckIfAtMatchingKeywords;
     procedure ClearCodeFolding;
@@ -273,7 +270,10 @@ type
     function CodeFoldingTreeLineForLine(const ALine: Integer): Boolean;
     procedure CollapseCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
     procedure CompletionProposalTimerHandler(EndLine: TObject);
+    function ComputeIndentText(const IndentCount: Integer): string;
     procedure ComputeScroll(const APoint: TPoint);
+    function ComputeTextColumns(const AToken: string; const AColumnIndex: Integer): Integer;
+    function ComputeTextWidth(const AText: string; const ALength: Integer; const AColumnIndex: Integer): Integer;
     procedure CreateShadowBitmap(const AClipRect: TRect; ABitmap: Graphics.TBitmap;
       const AShadowAlphaArray: TBCEditorArrayOfSingle; const AShadowAlphaByteArray: PByteArray);
     procedure DeflateMinimapAndSearchMapRect(var ARect: TRect);
@@ -1561,68 +1561,6 @@ begin
   Invalidate;
 end;
 
-function TCustomBCEditor.CalcIndentText(const IndentCount: Integer): string;
-begin
-  if (not (eoAutoIndent in FOptions)) then
-    Result := ''
-  else if (toTabsToSpaces in FTabs.Options) then
-    Result := StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount)
-  else
-  begin
-    Result := StringOfChar(BCEDITOR_TAB_CHAR, IndentCount div FTabs.Width);
-    Result := Result + StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount mod FTabs.Width);
-  end;
-end;
-
-function TCustomBCEditor.CalcTextColumns(const AToken: string; const AColumnIndex: Integer): Integer;
-var
-  LPToken: PChar;
-begin
-  LPToken := PChar(AToken);
-  if LPToken^ = BCEDITOR_TAB_CHAR then
-  begin
-    if toColumns in FTabs.Options then
-      Result := FTabs.Width - AColumnIndex mod FTabs.Width
-    else
-      Result := FTabs.Width;
-  end
-  else
-    Result := Length(AToken);
-end;
-
-function TCustomBCEditor.CalcTextWidth(const AToken: string; const ALength: Integer; const AColumnIndex: Integer): Integer;
-var
-  LPToken: PChar;
-  LSize: TSize;
-begin
-  Result := 0;
-
-  if (AToken = '') or (ALength = 0) then
-    Exit;
-
-  LPToken := PChar(AToken);
-
-  if LPToken^ = BCEDITOR_NONE_CHAR then
-    Exit(FPaintHelper.FontStock.CharWidth * ALength)
-  else
-  if LPToken^ = BCEDITOR_SPACE_CHAR then
-    Exit(FPaintHelper.FontStock.CharWidth * ALength)
-  else
-  if LPToken^ = BCEDITOR_TAB_CHAR then
-  begin
-    if toColumns in FTabs.Options then
-      Result := FTabs.Width - AColumnIndex mod FTabs.Width
-    else
-      Result := FTabs.Width;
-    Result := Result * FPaintHelper.FontStock.CharWidth + (ALength - 1) * FPaintHelper.FontStock.CharWidth * FTabs.Width;
-  end
-  else
-  begin
-    GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, AToken, ALength, LSize);
-    Result := LSize.cx;
-  end;
-end;
-
 procedure TCustomBCEditor.CaretChanged(ASender: TObject);
 begin
   if FCaret.MultiEdit.Enabled then
@@ -1851,13 +1789,13 @@ begin
             Inc(LRow);
             LLength := 0;
             LTextWidth := 0;
-            Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
+            Inc(LCharsBefore, ComputeTextColumns(LTokenText, LCharsBefore));
             Continue;
           end;
 
       if LRow = ARow then
       begin
-        LTokenWidth := CalcTextWidth(LTokenText, LTokenLength, LCharsBefore);
+        LTokenWidth := ComputeTextWidth(LTokenText, LTokenLength, LCharsBefore);
         if ((LXInEditor > 0) and (LTextWidth + LTokenWidth > LXInEditor)) then
         begin
           LTokenBeginPos := @LTokenText[1];
@@ -1875,7 +1813,7 @@ begin
 
             LCharLength := LTokenPos - LTokenBeginPos + 1;
             LChar := LeftStr(LTokenText, LCharLength);
-            Inc(LTextWidth, CalcTextWidth(LChar, LCharLength, LCharsBefore));
+            Inc(LTextWidth, ComputeTextWidth(LChar, LCharLength, LCharsBefore));
             Inc(LCharsBefore, LCharLength);
             if LTextWidth <= LXInEditor then
               Inc(Result.Column, LCharLength);
@@ -1890,7 +1828,7 @@ begin
       end;
 
       Inc(LLength, LTokenLength);
-      Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
+      Inc(LCharsBefore, ComputeTextColumns(LTokenText, LCharsBefore));
 
       FHighlighter.Next;
     end;
@@ -2229,6 +2167,19 @@ begin
   DoCompletionProposal;
 end;
 
+function TCustomBCEditor.ComputeIndentText(const IndentCount: Integer): string;
+begin
+  if (not (eoAutoIndent in FOptions)) then
+    Result := ''
+  else if (toTabsToSpaces in FTabs.Options) then
+    Result := StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount)
+  else
+  begin
+    Result := StringOfChar(BCEDITOR_TAB_CHAR, IndentCount div FTabs.Width);
+    Result := Result + StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount mod FTabs.Width);
+  end;
+end;
+
 procedure TCustomBCEditor.ComputeScroll(const APoint: TPoint);
 var
   LCursorIndex: Integer;
@@ -2302,6 +2253,51 @@ begin
 
     FScrollTimer.Enabled := (FScrollDeltaX <> 0) or (FScrollDeltaY <> 0);
   end;
+end;
+
+function TCustomBCEditor.ComputeTextColumns(const AToken: string; const AColumnIndex: Integer): Integer;
+var
+  LPToken: PChar;
+begin
+  LPToken := PChar(AToken);
+  if LPToken^ = BCEDITOR_TAB_CHAR then
+  begin
+    if toColumns in FTabs.Options then
+      Result := FTabs.Width - AColumnIndex mod FTabs.Width
+    else
+      Result := FTabs.Width;
+  end
+  else
+    Result := Length(AToken);
+end;
+
+function TCustomBCEditor.ComputeTextWidth(const AText: string; const ALength: Integer; const AColumnIndex: Integer): Integer;
+var
+  LSize: TSize;
+begin
+  if ((AText = '') or (ALength = 0)) then
+    Result := 0
+  else
+    case (AText[1]) of
+      BCEDITOR_NONE_CHAR:
+        Result := ALength * FPaintHelper.FontStock.CharWidth;
+      BCEDITOR_SPACE_CHAR:
+        Result := ALength * FPaintHelper.FontStock.CharWidth;
+      BCEDITOR_TAB_CHAR:
+        begin
+          if (toColumns in FTabs.Options) then
+            Result := FTabs.Width - AColumnIndex mod FTabs.Width
+          else
+            Result := FTabs.Width;
+          Result := Result * FPaintHelper.FontStock.CharWidth + (ALength - 1) * FPaintHelper.FontStock.CharWidth * FTabs.Width;
+        end
+      else
+        begin
+          if (not GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, PChar(AText), ALength, LSize)) then
+            RaiseLastOSError();
+          Result := LSize.cx;
+        end;
+    end;
 end;
 
 procedure TCustomBCEditor.CopyToClipboard();
@@ -2741,7 +2737,7 @@ begin
 
             Inc(LRow);
             LLength := 0;
-            Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
+            Inc(LCharsBefore, ComputeTextColumns(LTokenText, LCharsBefore));
             Continue;
           end;
 
@@ -2749,16 +2745,16 @@ begin
       begin
         if LLength + LTokenLength > ADisplayPosition.Column then
         begin
-          Inc(Result.X, CalcTextWidth(LTokenText, ADisplayPosition.Column - LLength, LCharsBefore));
+          Inc(Result.X, ComputeTextWidth(LTokenText, ADisplayPosition.Column - LLength, LCharsBefore));
           Inc(LLength, LTokenLength);
           Break;
         end;
 
-        Inc(Result.X, CalcTextWidth(LTokenText, Length(LTokenText), LCharsBefore));
+        Inc(Result.X, ComputeTextWidth(LTokenText, Length(LTokenText), LCharsBefore));
       end;
 
       Inc(LLength, LTokenLength);
-      Inc(LCharsBefore, CalcTextColumns(LTokenText, LCharsBefore));
+      Inc(LCharsBefore, ComputeTextColumns(LTokenText, LCharsBefore));
 
       FHighlighter.Next;
     end;
@@ -3093,7 +3089,7 @@ begin
         end;
 
         if ((LLinesDeleted = 2) and (LEndPosition >= LBeginPosition)) then
-          Lines.DeleteIndent(LBeginPosition, TextPosition(LBeginPosition.Char, LEndPosition.Line), CalcIndentText(Tabs.Width), Lines.SelMode);
+          Lines.DeleteIndent(LBeginPosition, TextPosition(LBeginPosition.Char, LEndPosition.Line), ComputeIndentText(Tabs.Width), Lines.SelMode);
       end;
 
       Inc(LCommentIndex, 2);
@@ -3102,7 +3098,7 @@ begin
       begin
         Lines.SelMode := smNormal;
 
-        LIndentText := CalcIndentText(LeftSpaceCount(Lines[LBeginPosition.Line]));
+        LIndentText := ComputeIndentText(LeftSpaceCount(Lines[LBeginPosition.Line]));
 
         Lines.InsertText(LBeginPosition, LIndentText + FHighlighter.Comments.BlockComments[LCommentIndex] + Lines.LineBreak);
         Inc(LEndPosition.Line);
@@ -3111,7 +3107,7 @@ begin
           LEndPosition := Lines.EOLPosition[LEndPosition.Line - 1];
         Lines.InsertText(LEndPosition, Lines.LineBreak + LIndentText + FHighlighter.Comments.BlockComments[LCommentIndex + 1]);
 
-        Lines.InsertIndent(Lines.BOLPosition[LBeginPosition.Line + 1], TextPosition(LBeginPosition.Char, LEndPosition.Line + 1), CalcIndentText(Tabs.Width), Lines.SelMode);
+        Lines.InsertIndent(Lines.BOLPosition[LBeginPosition.Line + 1], TextPosition(LBeginPosition.Char, LEndPosition.Line + 1), ComputeIndentText(Tabs.Width), Lines.SelMode);
         Inc(LEndPosition.Line);
       end;
 
@@ -3145,7 +3141,7 @@ begin
     else
       LTextEndPosition := Lines.EOLPosition[LTextEndPosition.Line];
 
-  LIndentText := CalcIndentText(FTabs.Width);
+  LIndentText := ComputeIndentText(FTabs.Width);
 
   Lines.BeginUpdate();
   try
@@ -3467,7 +3463,7 @@ begin
       LInsertText := Lines.LineBreak;
       if (eoAutoIndent in FOptions) then
       begin
-        LIndentText := CalcIndentText(LeftSpaceCount(LLineText, True));
+        LIndentText := ComputeIndentText(LeftSpaceCount(LLineText, True));
         if (LIndentText <> '') then
           LInsertText := LInsertText + LIndentText;
       end;
@@ -3478,7 +3474,7 @@ begin
       LNewCaretPosition := Lines.InsertText(Lines.CaretPosition, Lines.LineBreak);
       if ((Lines.CaretPosition.Char > 0) and (eoAutoIndent in FOptions)) then
       begin
-        LIndentText := CalcIndentText(LeftSpaceCount(LLineText, True));
+        LIndentText := ComputeIndentText(LeftSpaceCount(LLineText, True));
         if (LIndentText <> '') then
           LNewCaretPosition := Lines.InsertText(Lines.BOLPosition[Lines.CaretPosition.Line + 1], LIndentText);
       end;
@@ -6562,7 +6558,7 @@ begin
 
   if (not WordWrap.Enabled) then
   begin
-    LRowWidth := CalcTextWidth(Lines[ALine], Lines.Length[ALine], 0);
+    LRowWidth := ComputeTextWidth(Lines[ALine], Lines.Length[ALine], 0);
     FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0, Lines.Length[ALine], LRowWidth);
     Result := 1;
   end
@@ -6589,14 +6585,14 @@ begin
       if (Assigned(LHighlighterAttribute)) then
         FPaintHelper.SetStyle(LHighlighterAttribute.FontStyles);
 
-      LTokenWidth := CalcTextWidth(LTokenText, Length(LTokenText), LColumnIndex);
+      LTokenWidth := ComputeTextWidth(LTokenText, Length(LTokenText), LColumnIndex);
 
       if (LRowWidth + LTokenWidth <= LMaxRowWidth) then
       begin
         { no row break in token }
         Inc(LRowLength, Length(LTokenText));
         Inc(LRowWidth, LTokenWidth);
-        Inc(LColumnIndex, CalcTextColumns(LTokenText, LColumnIndex));
+        Inc(LColumnIndex, ComputeTextColumns(LTokenText, LColumnIndex));
       end
       else if (LRowLength > 0) then
       begin
@@ -6608,7 +6604,7 @@ begin
 
         LRowLength := Length(LTokenText);
         LRowWidth := LTokenWidth;
-        LColumnIndex := CalcTextColumns(LTokenText, LColumnIndex);
+        LColumnIndex := ComputeTextColumns(LTokenText, LColumnIndex);
       end
       else
       begin
@@ -6626,7 +6622,7 @@ begin
           repeat
             LTokenPrevPos := LTokenPos;
 
-            LTokenRowWidth := CalcTextWidth(LTokenText, LTokenPos - LTokenRowBeginPos, LColumnIndex);
+            LTokenRowWidth := ComputeTextWidth(LTokenText, LTokenPos - LTokenRowBeginPos, LColumnIndex);
 
             if (LTokenRowWidth < LMaxRowWidth) then
               repeat
@@ -6654,7 +6650,7 @@ begin
           begin
             LRowLength := LTokenPos - LTokenRowBeginPos;
             LRowWidth := LTokenRowWidth;
-            LColumnIndex := CalcTextColumns(Copy(LTokenText,1 + LTokenRowBeginPos - LTokenBeginPos, LRowLength), LColumnIndex);
+            LColumnIndex := ComputeTextColumns(Copy(LTokenText,1 + LTokenRowBeginPos - LTokenBeginPos, LRowLength), LColumnIndex);
           end;
         until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth < LMaxRowWidth));
       end;
@@ -9700,7 +9696,7 @@ var
           if LCharCount > 0 then
           begin
             LToken := Copy(AText, 1, LCharCount);
-            Inc(LSearchRect.Left, CalcTextWidth(LToken, LCharCount, LPaintedColumn));
+            Inc(LSearchRect.Left, ComputeTextWidth(LToken, LCharCount, LPaintedColumn));
             LToken := Copy(AText, LCharCount + 1, Length(AText));
           end
           else
@@ -9708,7 +9704,7 @@ var
 
           LToken := Copy(LToken, 1, Min(LSearchTextLength, LBeginTextPosition.Char + LSearchTextLength -
             LTokenHelper.CharsBefore - LCharCount));
-          LSearchRect.Right := LSearchRect.Left + CalcTextWidth(LToken, Length(LToken), LPaintedColumn);
+          LSearchRect.Right := LSearchRect.Left + ComputeTextWidth(LToken, Length(LToken), LPaintedColumn);
           if SameText(AText, LToken) then
             Inc(LSearchRect.Right, FItalicOffset);
 
@@ -10054,13 +10050,13 @@ var
       begin
         SetDrawingColors(False);
         LTokenLength := LSelectionStartColumn - LFirstColumn;
-        LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
+        LTokenRect.Right := LTokenRect.Left + ComputeTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
         PaintToken(LText, LTokenLength);
         Delete(LText, 1, LTokenLength);
       end;
       { Selected part of the token }
       LTokenLength := Min(LSelectionEndColumn, LLastColumn) - LFirstColumn - LTokenLength;
-      LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
+      LTokenRect.Right := LTokenRect.Left + ComputeTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
       LSelectedRect := LTokenRect;
       LSelectedTokenLength := LTokenLength;
       LSelectedText := LText;
@@ -10069,7 +10065,7 @@ var
       begin
         Delete(LText, 1, LTokenLength);
         SetDrawingColors(False);
-        LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, Length(LText), LTokenHelper.ExpandedCharsBefore);
+        LTokenRect.Right := LTokenRect.Left + ComputeTextWidth(LText, Length(LText), LTokenHelper.ExpandedCharsBefore);
         PaintToken(LText, Length(LText));
       end;
     end
@@ -10078,7 +10074,7 @@ var
     begin
       SetDrawingColors(LSelected);
       LTokenLength := Length(LText);
-      LTokenRect.Right := LTokenRect.Left + CalcTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
+      LTokenRect.Right := LTokenRect.Left + ComputeTextWidth(LText, LTokenLength, LTokenHelper.ExpandedCharsBefore);
       PaintToken(LText, LTokenLength)
     end;
 
@@ -11919,10 +11915,10 @@ begin
   LDisplayCaretPosition := DisplayCaretPosition;
 
   LClient := DisplayToClient(LDisplayCaretPosition);
-  if (LClient.X - LeftMarginWidth < HorzTextPos) then
-    HorzTextPos := HorzTextPos + LClient.X - LeftMarginWidth
-  else if ((LClient.X - LeftMarginWidth >= HorzTextPos + TextWidth) or AScrollAlways) then
-    HorzTextPos := HorzTextPos + LClient.X - LeftMarginWidth - TextWidth + 1;
+  if (LClient.X - LeftMarginWidth < 0) then
+    HorzTextPos := LClient.X - LeftMarginWidth + HorzTextPos
+  else if ((LClient.X - LeftMarginWidth + CharWidth > TextWidth) or AScrollAlways) then
+    HorzTextPos := LClient.X - LeftMarginWidth + HorzTextPos - TextWidth + 1 + CharWidth;
 
   if (not ACenterVertical) then
   begin

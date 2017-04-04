@@ -24,7 +24,7 @@ package BCEditor.Package.Runtime;
 {$IMAGEBASE $400000}
 {$DEFINE DEBUG}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'BCEditor components'}
+{$DESCRIPTION 'BCEditor Components'}
 {$IMPLICITBUILD ON}
 
 requires

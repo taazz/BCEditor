@@ -64,7 +64,7 @@
         <DCC_K>false</DCC_K>
         <VerInfo_Locale>1031</VerInfo_Locale>
         <GenDll>true</GenDll>
-        <DCC_Description>BCEditor components</DCC_Description>
+        <DCC_Description>BCEditor Components</DCC_Description>
         <GenPackage>true</GenPackage>
         <DCC_F>false</DCC_F>
         <SanitizedProjectName>BCEditor.Package.Runtime</SanitizedProjectName>
