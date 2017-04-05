@@ -17,7 +17,6 @@ type
       loUndoGrouped, loUndoAfterLoad, loUndoAfterSave);
     TOptions = set of TOption;
 
-    PLine = ^TLine;
     TLine = packed record
     type
       TState = (lsLoaded, lsModified, lsSaved);
@@ -157,18 +156,15 @@ type
     function GetBOLPosition(ALine: Integer): TBCEditorTextPosition; inline;
     function GetCanRedo(): Boolean;
     function GetCanUndo(): Boolean;
-    function GetCharacter(APosition: TBCEditorTextPosition): Char; {$MESSAGE 'Nils'}
+    function GetChar(APosition: TBCEditorTextPosition): Char;
     function GetEOFPosition(): TBCEditorTextPosition;
     function GetEOLPosition(ALine: Integer): TBCEditorTextPosition; inline;
     function GetExpandedString(ALine: Integer): string;
     function GetExpandedStringLength(ALine: Integer): Integer;
-    function GetLine(ALine: Integer): PLine; inline;
     function GetMaxLength(): Integer; inline;
-    function GetRange(ALine: Integer): Pointer;
     function GetTextBetween(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string; overload;
     function GetTextBetweenColumn(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string; overload;
     procedure InternalClear(const AClearUndo: Boolean); overload;
-    procedure PutRange(ALine: Integer; ARange: Pointer); inline;
     procedure SetCaretPosition(const AValue: TBCEditorTextPosition);
     procedure SetModified(const AValue: Boolean);
     procedure SetSelBeginPosition(const AValue: TBCEditorTextPosition);
@@ -203,6 +199,10 @@ type
     procedure Redo(); inline;
     function ReplaceText(ABeginPosition, AEndPosition: TBCEditorTextPosition;
       const AText: string): TBCEditorTextPosition;
+    procedure SetBackground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
+    procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetRange(const ALine: Integer; const AValue: Pointer); inline;
     procedure SetTabWidth(const AValue: Integer);
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
@@ -214,13 +214,12 @@ type
     property CanUndo: Boolean read GetCanUndo;
     property CaretPosition: TBCEditorTextPosition read FCaretPosition write SetCaretPosition;
     property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive default False;
-    property Char[Position: TBCEditorTextPosition]: Char read GetCharacter;
+    property Char[Position: TBCEditorTextPosition]: Char read GetChar;
     property Editor: TCustomControl read FEditor write FEditor;
     property EOFPosition: TBCEditorTextPosition read GetEOFPosition;
     property EOLPosition[ALine: Integer]: TBCEditorTextPosition read GetEOLPosition;
     property ExpandedStringLengths[ALine: Integer]: Integer read GetExpandedStringLength;
     property ExpandedStrings[Line: Integer]: string read GetExpandedString;
-    property Line[Line: Integer]: PLine read GetLine;
     property Lines: TLines read FLines;
     property MaxLength: Integer read GetMaxLength;
     property Modified: Boolean read FModified write SetModified;
@@ -233,7 +232,6 @@ type
     property OnSelChange: TNotifyEvent read FOnSelChange write FOnSelChange;
     property OnUpdated: TChangeEvent read FOnUpdated write FOnUpdated;
     property Options: TOptions read FOptions write FOptions;
-    property Ranges[Line: Integer]: Pointer read GetRange write PutRange;
     property ReadOnly: Boolean read FReadOnly write FReadOnly;
     property RedoList: TUndoList read FRedoList;
     property SelBeginPosition: TBCEditorTextPosition read FSelBeginPosition write SetSelBeginPosition;
@@ -1590,12 +1588,12 @@ begin
   Result := UndoList.Count > 0;
 end;
 
-function TBCEditorLines.GetCharacter(APosition: TBCEditorTextPosition): Char;
+function TBCEditorLines.GetChar(APosition: TBCEditorTextPosition): Char;
 begin
   Assert((0 <= APosition.Line) and (APosition.Line < Lines.Count));
   Assert((0 <= APosition.Char) and (APosition.Char < Length(Lines.List[APosition.Line].Text)));
 
-  Result := Line[APosition.Line].Text[1 + APosition.Char];
+  Result := Lines[APosition.Line].Text[1 + APosition.Char];
 end;
 
 function TBCEditorLines.GetCount(): Integer;
@@ -1637,13 +1635,6 @@ begin
   Result := Lines[ALine].ExpandedLength;
 end;
 
-function TBCEditorLines.GetLine(ALine: Integer): PLine;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Result := @Lines.List[ALine];
-end;
-
 function TBCEditorLines.GetMaxLength(): Integer;
 var
   LMaxLength: Integer;
@@ -1668,13 +1659,6 @@ begin
     Result := 0
   else
     Result := Lines[FMaxLengthLine].ExpandedLength;
-end;
-
-function TBCEditorLines.GetRange(ALine: Integer): Pointer;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Result := Lines[ALine].Range;
 end;
 
 function TBCEditorLines.GetTextBetween(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string;
@@ -2070,13 +2054,6 @@ begin
   ReplaceText(BOLPosition[ALine], EOLPosition[ALine], AText);
 end;
 
-procedure TBCEditorLines.PutRange(ALine: Integer; ARange: Pointer);
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Lines.List[ALine].Range := ARange;
-end;
-
 procedure TBCEditorLines.QuickSort(ALeft, ARight: Integer; ACompare: TCompare);
 var
   LLeft: Integer;
@@ -2161,6 +2138,13 @@ begin
   end;
 end;
 
+procedure TBCEditorLines.SetBackground(const ALine: Integer; const AValue: TColor);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Lines.List[ALine].Background := AValue;
+end;
+
 procedure TBCEditorLines.SetCaretPosition(const AValue: TBCEditorTextPosition);
 begin
   Assert(BOFPosition <= AValue);
@@ -2178,6 +2162,27 @@ begin
   end
   else
     SelBeginPosition := AValue;
+end;
+
+procedure TBCEditorLines.SetFirstRow(const ALine: Integer; const AValue: Integer);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Lines.List[ALine].FirstRow := AValue;
+end;
+
+procedure TBCEditorLines.SetForeground(const ALine: Integer; const AValue: TColor);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Lines.List[ALine].Foreground := AValue;
+end;
+
+procedure TBCEditorLines.SetRange(const ALine: Integer; const AValue: Pointer);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Lines.List[ALine].Range := AValue;
 end;
 
 procedure TBCEditorLines.SetModified(const AValue: Boolean);
