@@ -17,6 +17,7 @@ type
       loUndoGrouped, loUndoAfterLoad, loUndoAfterSave);
     TOptions = set of TOption;
 
+    PLine = ^TLine;
     TLine = packed record
     type
       TState = (lsLoaded, lsModified, lsSaved);
@@ -140,7 +141,7 @@ type
     FState: TState;
     FTabWidth: Integer;
     FUndoList: TUndoList;
-    function CalcExpandString(ALine: Integer): string;
+    function ComputeExpandString(ALine: Integer): string;
     procedure DoDelete(ALine: Integer);
     procedure DoDeleteIndent(ABeginPosition, AEndPosition: TBCEditorTextPosition;
       const AIndentText: string; const ASelMode: TBCEditorSelectionMode);
@@ -153,27 +154,21 @@ type
     procedure DoPut(ALine: Integer; const AText: string);
     procedure ExchangeItems(ALine1, ALine2: Integer);
     procedure ExecuteUndoRedo(const List: TUndoList);
-    function GetBackground(ALine: Integer): TColor; inline;
     function GetBOLPosition(ALine: Integer): TBCEditorTextPosition; inline;
     function GetCanRedo(): Boolean;
     function GetCanUndo(): Boolean;
+    function GetCharacter(APosition: TBCEditorTextPosition): Char; {$MESSAGE 'Nils'}
     function GetEOFPosition(): TBCEditorTextPosition;
     function GetEOLPosition(ALine: Integer): TBCEditorTextPosition; inline;
     function GetExpandedString(ALine: Integer): string;
     function GetExpandedStringLength(ALine: Integer): Integer;
-    function GetFirstRow(ALine: Integer): Integer; inline;
-    function GetForeground(ALine: Integer): TColor; inline;
-    function GetLength(ALine: Integer): Integer; inline;
-    function GetLineState(ALine: Integer): TLine.TState; inline;
+    function GetLine(ALine: Integer): PLine; inline;
     function GetMaxLength(): Integer; inline;
     function GetRange(ALine: Integer): Pointer;
     function GetTextBetween(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string; overload;
     function GetTextBetweenColumn(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string; overload;
     procedure InternalClear(const AClearUndo: Boolean); overload;
-    procedure PutBackground(ALine: Integer; AValue: TColor); inline;
-    procedure PutForeground(ALine: Integer; AValue: TColor); inline;
     procedure PutRange(ALine: Integer; ARange: Pointer); inline;
-    procedure PutFirstRow(ALine: Integer; const ARow: Integer); inline;
     procedure SetCaretPosition(const AValue: TBCEditorTextPosition);
     procedure SetModified(const AValue: Boolean);
     procedure SetSelBeginPosition(const AValue: TBCEditorTextPosition);
@@ -214,22 +209,19 @@ type
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
     procedure Undo(); inline;
     procedure UndoGroupBreak();
-    property Background[Line: Integer]: TColor read GetBackground write PutBackground;
     property BOLPosition[Line: Integer]: TBCEditorTextPosition read GetBOLPosition;
     property CanRedo: Boolean read GetCanRedo;
     property CanUndo: Boolean read GetCanUndo;
     property CaretPosition: TBCEditorTextPosition read FCaretPosition write SetCaretPosition;
     property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive default False;
+    property Char[Position: TBCEditorTextPosition]: Char read GetCharacter;
     property Editor: TCustomControl read FEditor write FEditor;
     property EOFPosition: TBCEditorTextPosition read GetEOFPosition;
     property EOLPosition[ALine: Integer]: TBCEditorTextPosition read GetEOLPosition;
     property ExpandedStringLengths[ALine: Integer]: Integer read GetExpandedStringLength;
     property ExpandedStrings[Line: Integer]: string read GetExpandedString;
-    property FirstRow[Line: Integer]: Integer read GetFirstRow write PutFirstRow;
-    property Foreground[Line: Integer]: TColor read GetForeground write PutForeground;
-    property Length[Line: Integer]: Integer read GetLength;
+    property Line[Line: Integer]: PLine read GetLine;
     property Lines: TLines read FLines;
-    property LineState[Line: Integer]: TLine.TState read GetLineState;
     property MaxLength: Integer read GetMaxLength;
     property Modified: Boolean read FModified write SetModified;
     property OnAfterUpdate: TNotifyEvent read FOnAfterUpdate write FOnAfterUpdate;
@@ -343,7 +335,7 @@ function TBCEditorLines.TSearch.Find(var APosition: TBCEditorTextPosition;
   out AFoundLength: Integer): Boolean;
 begin
   Assert((0 <= APosition.Line) and (APosition.Line < Lines.Count));
-  Assert((0 <= APosition.Char) and (APosition.Char <= Lines.Length[APosition.Line]));
+  Assert((0 <= APosition.Char) and (APosition.Char <= Length(Lines[APosition.Line])));
 
   if (FRegExpr) then
     Result := FindRegEx(APosition, AFoundLength)
@@ -694,7 +686,7 @@ begin
   CaretPosition := ABeginPosition;
 end;
 
-function TBCEditorLines.CalcExpandString(ALine: Integer): string;
+function TBCEditorLines.ComputeExpandString(ALine: Integer): string;
 var
   LHasTabs: Boolean;
 begin
@@ -775,11 +767,10 @@ begin
       Inc(Result.Line);
     end;
 
-    if (LLength > System.Length(Lines[Result.Line].Text)) then
-      if (Result.Line < Count) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex])
-      else
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
+    if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
+      raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
+    else if (LLength > System.Length(Lines[Result.Line].Text)) then
+      raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
     Result.Char := LLength;
   end;
@@ -1291,7 +1282,7 @@ var
   LEOL: Boolean;
   LLine: Integer;
   LLineBeginPos: PChar;
-  LLineBreak: array [0..2] of Char;
+  LLineBreak: array [0..2] of System.Char;
   LLineEnd: string;
   LPos: PChar;
 begin
@@ -1584,13 +1575,6 @@ begin
   Result := Lines[ALine].Text;
 end;
 
-function TBCEditorLines.GetBackground(ALine: Integer): TColor;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Result := Lines[ALine].Background;
-end;
-
 function TBCEditorLines.GetBOLPosition(ALine: Integer): TBCEditorTextPosition;
 begin
   Result := TextPosition(0, ALine);
@@ -1604,6 +1588,14 @@ end;
 function TBCEditorLines.GetCanUndo(): Boolean;
 begin
   Result := UndoList.Count > 0;
+end;
+
+function TBCEditorLines.GetCharacter(APosition: TBCEditorTextPosition): Char;
+begin
+  Assert((0 <= APosition.Line) and (APosition.Line < Lines.Count));
+  Assert((0 <= APosition.Char) and (APosition.Char < Length(Lines.List[APosition.Line].Text)));
+
+  Result := Line[APosition.Line].Text[1 + APosition.Char];
 end;
 
 function TBCEditorLines.GetCount(): Integer;
@@ -1633,7 +1625,7 @@ begin
   if (sfHasNoTabs in Lines[ALine].Flags) then
     Result := Lines[ALine].Text
   else
-    Result := CalcExpandString(ALine);
+    Result := ComputeExpandString(ALine);
 end;
 
 function TBCEditorLines.GetExpandedStringLength(ALine: Integer): Integer;
@@ -1645,25 +1637,11 @@ begin
   Result := Lines[ALine].ExpandedLength;
 end;
 
-function TBCEditorLines.GetForeground(ALine: Integer): TColor;
+function TBCEditorLines.GetLine(ALine: Integer): PLine;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  Result := Lines[ALine].Foreground;
-end;
-
-function TBCEditorLines.GetLength(ALine: Integer): Integer;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Result := System.Length(Lines[ALine].Text);
-end;
-
-function TBCEditorLines.GetLineState(ALine: Integer): TLine.TState;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Result := Lines[ALine].State;
+  Result := @Lines.List[ALine];
 end;
 
 function TBCEditorLines.GetMaxLength(): Integer;
@@ -1677,7 +1655,7 @@ begin
     for LLine := 0 to Count - 1 do
     begin
       if (Lines[LLine].ExpandedLength < 0) then
-        CalcExpandString(LLine);
+        ComputeExpandString(LLine);
       if (Lines[LLine].ExpandedLength > LMaxLength) then
       begin
         LMaxLength := Lines[LLine].ExpandedLength;
@@ -1690,13 +1668,6 @@ begin
     Result := 0
   else
     Result := Lines[FMaxLengthLine].ExpandedLength;
-end;
-
-function TBCEditorLines.GetFirstRow(ALine: Integer): Integer;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Result := Lines[ALine].FirstRow;
 end;
 
 function TBCEditorLines.GetRange(ALine: Integer): Pointer;
@@ -2097,27 +2068,6 @@ begin
   Assert((0 <= ALine) and (ALine < Count));
 
   ReplaceText(BOLPosition[ALine], EOLPosition[ALine], AText);
-end;
-
-procedure TBCEditorLines.PutFirstRow(ALine: Integer; const ARow: Integer);
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Lines.List[ALine].FirstRow := ARow;
-end;
-
-procedure TBCEditorLines.PutBackground(ALine: Integer; AValue: TColor);
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Lines.List[ALine].Background := AValue;
-end;
-
-procedure TBCEditorLines.PutForeground(ALine: Integer; AValue: TColor);
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Lines.List[ALine].Foreground := AValue;
 end;
 
 procedure TBCEditorLines.PutRange(ALine: Integer; ARange: Pointer);

@@ -284,7 +284,7 @@ begin
 
   LTextCaretPosition := TextPosition(TCustomBCEditor(Editor).CaretPos);
 
-  LLineText := TCustomBCEditor(Editor).Lines[LTextCaretPosition.Line];
+  LLineText := TCustomBCEditor(Editor).Lines[LTextCaretPosition.Line].Text;
   LChar := LTextCaretPosition.Char;
   if LChar < Length(LLineText) then
   begin
@@ -374,11 +374,11 @@ begin
         SelectionBeginPosition := TextPosition(FCompletionStartChar, LTextPosition.Line);
         if AEndToken = BCEDITOR_NONE_CHAR then
         begin
-          LLine := Lines[LTextPosition.Line];
+          LLine := Lines[LTextPosition.Line].Text;
           if (LTextPosition.Char < Length(LLine)) and IsWordBreakChar(LLine[1 + LTextPosition.Char]) then
             SelectionEndPosition := LTextPosition
           else
-            SelectionEndPosition := TextPosition(WordEnd.Char, LTextPosition.Line)
+            SelectionEndPosition := TextPosition(WordEnd().Char, LTextPosition.Line)
         end
         else
           SelectionEndPosition := LTextPosition;
@@ -445,8 +445,8 @@ begin
       with TCustomBCEditor(Editor) do
       begin
         LTextCaretPosition := TextPosition(CaretPos);
-        if LTextCaretPosition.Char < Length(Lines[LTextCaretPosition.Line]) then
-          LChar := Lines[LTextCaretPosition.Line][1 + LTextCaretPosition.Char]
+        if LTextCaretPosition.Char < Length(Lines[LTextCaretPosition.Line].Text) then
+          LChar := Lines[LTextCaretPosition.Line].Text[1 + LTextCaretPosition.Char]
         else
           LChar := BCEDITOR_SPACE_CHAR;
 
