@@ -163,6 +163,7 @@ type
     FMinimapShadowAlphaByteArray: PByteArray;
     FMinimapShadowBitmap: Graphics.TBitmap;
     FMinimapShadowBlendFunction: TBlendFunction;
+    FMouseDownTextPosition: TBCEditorTextPosition;
     FMouseDownX: Integer;
     FMouseDownY: Integer;
     FMouseMoveScrollCursors: array [0 .. 7] of HCursor;
@@ -7313,6 +7314,7 @@ begin
   begin
     FMouseDownX := X;
     FMouseDownY := Y;
+    FMouseDownTextPosition := ClientToText(X, Y);
 
     if FMinimap.Visible then
       FMinimapBufferBitmap.Height := 0;
@@ -7678,7 +7680,7 @@ begin
     if FScrollDeltaY <> 0 then
       LDisplayPosition.Row := DisplayCaretPosition.Row;
     if not (esCodeFoldingInfoClicked in FState) then { No selection when info clicked }
-      MoveCaretAndSelection(Lines.SelBeginPosition, DisplayToText(LDisplayPosition), True);
+      MoveCaretAndSelection(FMouseDownTextPosition, DisplayToText(LDisplayPosition), True);
     FLastSortOrder := soDesc;
     Include(FState, esInSelection);
     Exclude(FState, esCodeFoldingInfoClicked);
