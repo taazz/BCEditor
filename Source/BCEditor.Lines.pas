@@ -17,6 +17,9 @@ type
       loUndoGrouped, loUndoAfterLoad, loUndoAfterSave);
     TOptions = set of TOption;
 
+    TState = set of (lsLoading, lsSaving, lsDontTrim, lsUndo, lsRedo,
+      lsCaretMoved, lsSelChanged, lsTextChanged, lsInsert);
+
     TLine = packed record
     type
       TState = (lsLoaded, lsModified, lsSaved);
@@ -27,7 +30,7 @@ type
       FirstRow: Integer;
       Foreground: TColor;
       Range: Pointer;
-      State: TState;
+      State: TLine.TState;
       Text: string;
     end;
     TLines = TList<TLine>;
@@ -60,9 +63,6 @@ type
       procedure Replace();
       property ErrorMessage: string read FErrorMessage;
     end;
-
-    TState = set of (lsLoading, lsSaving, lsDontTrim, lsUndo, lsRedo, lsCaretMoved,
-      lsSelChanged, lsTextChanged, lsInsert);
 
     TUndoItem = packed record
     type
@@ -766,7 +766,7 @@ begin
     end;
 
     if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
-      raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
+      raise ERangeError.CreateFmt(SCharIndexOutOfBounds + '(%d, %d, %d / %d)', [ACharIndex, Length(Text), Result.Char, Result.Line, Count])
     else if (LLength > System.Length(Lines[Result.Line].Text)) then
       raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 

@@ -3957,7 +3957,20 @@ begin
         LActionReplace := raReplace;
 
       repeat
-        LSuccess := LSearch.Find(LSearchPosition, LFindLength);
+        LSuccess := False; // Debug 2017-04-06
+
+        try
+          LSuccess := LSearch.Find(LSearchPosition, LFindLength);
+        except
+          // Debug 2017-04-06
+          on E: Exception do
+            E.RaiseOuterException(EAssertionFailed.Create(
+              'Backwards: ' + BoolToStr(roBackwards in FReplace.Options, True) + #13#10
+              + 'BeginPosition: ' + Replace.BeginPosition.ToString() + #13#10
+              + 'EndPosition: ' + Replace.EndPosition.ToString() + #13#10
+              + 'LSearchPosition: ' + LSearchPosition.ToString() + #13#10
+              + 'Lines.Count: ' + IntToStr(Lines.Count)));
+        end;
         if (not LSuccess) then
           LActionReplace := raCancel;
 
@@ -6435,9 +6448,7 @@ end;
 
 function TCustomBCEditor.InsertLineIntoRows(const ALine: Integer; const ARow: Integer): Integer;
 var
-  LChar: string;
   LColumnIndex: Integer;
-  LFirstPartOfToken: string;
   LFlags: TRow.TFlags;
   LHighlighterAttribute: TBCEditorHighlighter.TAttribute;
   LLine: Integer;
@@ -6448,7 +6459,6 @@ var
   LRowWidth: Integer;
   LTokenBeginPos: PChar;
   LTokenEndPos: PChar;
-  LTokenLength: Integer;
   LTokenPos: PChar;
   LTokenPrevPos: PChar;
   LTokenRowBeginPos: PChar;
