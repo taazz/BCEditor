@@ -2310,7 +2310,10 @@ begin
       else
         begin
           if (not GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, PChar(AText), ALength, LSize)) then
-            RaiseLastOSError();
+            // Debug 2017-04-06
+            raise EAssertionFailed.Create('Handle: ' + IntToStr(FPaintHelper.StockBitmap.Canvas.Handle) + #13#10
+              + 'Length(AText): ' + IntToStr(Length(AText)) + #13#10
+              + 'ALength: ' + IntToStr(ALength));
           Result := LSize.cx;
         end;
     end;
@@ -7314,7 +7317,7 @@ begin
   begin
     FMouseDownX := X;
     FMouseDownY := Y;
-    FMouseDownTextPosition := ClientToText(X, Y);
+    FMouseDownTextPosition := TextPosition(ClientToText(X, Y));
 
     if FMinimap.Visible then
       FMinimapBufferBitmap.Height := 0;
