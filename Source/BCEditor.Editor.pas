@@ -3041,29 +3041,8 @@ begin
     LBeginPosition := Min(Lines.SelBeginPosition, Lines.SelEndPosition);
     LEndPosition := Max(Lines.SelBeginPosition, Lines.SelEndPosition);
 
-    LText := Trim(Lines.TextBetween[LBeginPosition, LEndPosition]);
-
-    LCommentIndex := -2;
-    LIndex := 0;
-    while (LIndex + 1 < LCommentLength) do
-      if ((Length(LText) >= Length(FHighlighter.Comments.BlockComments[LIndex]) + Length(FHighlighter.Comments.BlockComments[LIndex + 1]))
-        and (LeftStr(LText, Length(FHighlighter.Comments.BlockComments[LIndex])) = FHighlighter.Comments.BlockComments[LIndex])
-        and (RightStr(LText, Length(FHighlighter.Comments.BlockComments[LIndex + 1])) = FHighlighter.Comments.BlockComments[LIndex + 1])) then
-      begin
-        LCommentIndex := LIndex;
-        break;
-      end
-      else
-        Inc(LIndex, 2);
-
-    if (LCommentIndex < 0) then
+    if (LEndPosition <> Lines.BOFPosition) then
     begin
-      LBeginPosition.Char := 0;
-      if (LEndPosition.Line < Lines.Count - 1) then
-        LEndPosition := Lines.BOLPosition[LEndPosition.Line]
-      else
-        LEndPosition := Lines.EOLPosition[LEndPosition.Line];
-
       LText := Trim(Lines.TextBetween[LBeginPosition, LEndPosition]);
 
       LCommentIndex := -2;
@@ -3078,68 +3057,92 @@ begin
         end
         else
           Inc(LIndex, 2);
-    end;
 
-
-    Lines.BeginUpdate();
-    try
-      if (LCommentIndex >= 0) then
+      if (LCommentIndex < 0) then
       begin
-        LText := Lines.TextBetween[LBeginPosition, LEndPosition];
+        LBeginPosition.Char := 0;
+        if (LEndPosition.Line < Lines.Count - 1) then
+          LEndPosition := Lines.BOLPosition[LEndPosition.Line]
+        else
+          LEndPosition := Lines.EOLPosition[LEndPosition.Line];
 
-        LBeginPosition := Lines.CharIndexToPosition(LeftTrimLength(LText), LBeginPosition);
-        LEndPosition := Lines.CharIndexToPosition(Length(Trim(LText)) - Length(FHighlighter.Comments.BlockComments[LIndex + 1]), LBeginPosition);
+        LText := Trim(Lines.TextBetween[LBeginPosition, LEndPosition]);
 
-        LLinesDeleted := 0;
-        Lines.DeleteText(LBeginPosition, TextPosition(LBeginPosition.Char + Length(FHighlighter.Comments.BlockComments[LIndex]), LBeginPosition.Line));
-        if (Trim(Lines.Lines[LBeginPosition.Line].Text) = '') then
-        begin
-          Lines.Delete(LBeginPosition.Line);
-          Dec(LEndPosition.Line);
-          LBeginPosition.Char := 0;
-          Inc(LLinesDeleted);
-        end;
-
-        Lines.DeleteText(LEndPosition, TextPosition(LEndPosition.Char + Length(FHighlighter.Comments.BlockComments[LIndex]), LEndPosition.Line));
-        if (Trim(Lines.Lines[LEndPosition.Line].Text) = '') then
-        begin
-          Lines.Delete(LEndPosition.Line);
-          Dec(LEndPosition.Line);
-          Inc(LLinesDeleted);
-        end;
-
-        if ((LLinesDeleted = 2) and (LEndPosition >= LBeginPosition)) then
-          Lines.DeleteIndent(LBeginPosition, TextPosition(LBeginPosition.Char, LEndPosition.Line), ComputeIndentText(Tabs.Width), Lines.SelMode);
+        LCommentIndex := -2;
+        LIndex := 0;
+        while (LIndex + 1 < LCommentLength) do
+          if ((Length(LText) >= Length(FHighlighter.Comments.BlockComments[LIndex]) + Length(FHighlighter.Comments.BlockComments[LIndex + 1]))
+            and (LeftStr(LText, Length(FHighlighter.Comments.BlockComments[LIndex])) = FHighlighter.Comments.BlockComments[LIndex])
+            and (RightStr(LText, Length(FHighlighter.Comments.BlockComments[LIndex + 1])) = FHighlighter.Comments.BlockComments[LIndex + 1])) then
+          begin
+            LCommentIndex := LIndex;
+            break;
+          end
+          else
+            Inc(LIndex, 2);
       end;
 
-      Inc(LCommentIndex, 2);
 
-      if (LCommentIndex < LCommentLength) then
-      begin
-        Lines.SelMode := smNormal;
+      Lines.BeginUpdate();
+      try
+        if (LCommentIndex >= 0) then
+        begin
+          LText := Lines.TextBetween[LBeginPosition, LEndPosition];
 
-        LIndentText := ComputeIndentText(LeftSpaceCount(Lines.Lines[LBeginPosition.Line].Text));
+          LBeginPosition := Lines.CharIndexToPosition(LeftTrimLength(LText), LBeginPosition);
+          LEndPosition := Lines.CharIndexToPosition(Length(Trim(LText)) - Length(FHighlighter.Comments.BlockComments[LIndex + 1]), LBeginPosition);
 
-        Lines.InsertText(LBeginPosition, LIndentText + FHighlighter.Comments.BlockComments[LCommentIndex] + Lines.LineBreak);
-        Inc(LEndPosition.Line);
+          LLinesDeleted := 0;
+          Lines.DeleteText(LBeginPosition, TextPosition(LBeginPosition.Char + Length(FHighlighter.Comments.BlockComments[LIndex]), LBeginPosition.Line));
+          if (Trim(Lines.Lines[LBeginPosition.Line].Text) = '') then
+          begin
+            Lines.Delete(LBeginPosition.Line);
+            Dec(LEndPosition.Line);
+            LBeginPosition.Char := 0;
+            Inc(LLinesDeleted);
+          end;
 
-        if ((LEndPosition.Char = 0) and (LEndPosition.Line > LBeginPosition.Line)) then
-          LEndPosition := Lines.EOLPosition[LEndPosition.Line - 1];
-        Lines.InsertText(LEndPosition, Lines.LineBreak + LIndentText + FHighlighter.Comments.BlockComments[LCommentIndex + 1]);
+          Lines.DeleteText(LEndPosition, TextPosition(LEndPosition.Char + Length(FHighlighter.Comments.BlockComments[LIndex]), LEndPosition.Line));
+          if (Trim(Lines.Lines[LEndPosition.Line].Text) = '') then
+          begin
+            Lines.Delete(LEndPosition.Line);
+            Dec(LEndPosition.Line);
+            Inc(LLinesDeleted);
+          end;
 
-        Lines.InsertIndent(Lines.BOLPosition[LBeginPosition.Line + 1], TextPosition(LBeginPosition.Char, LEndPosition.Line + 1), ComputeIndentText(Tabs.Width), Lines.SelMode);
-        Inc(LEndPosition.Line);
+          if ((LLinesDeleted = 2) and (LEndPosition >= LBeginPosition)) then
+            Lines.DeleteIndent(LBeginPosition, TextPosition(LBeginPosition.Char, LEndPosition.Line), ComputeIndentText(Tabs.Width), Lines.SelMode);
+        end;
+
+        Inc(LCommentIndex, 2);
+
+        if (LCommentIndex < LCommentLength) then
+        begin
+          Lines.SelMode := smNormal;
+
+          LIndentText := ComputeIndentText(LeftSpaceCount(Lines.Lines[LBeginPosition.Line].Text));
+
+          Lines.InsertText(LBeginPosition, LIndentText + FHighlighter.Comments.BlockComments[LCommentIndex] + Lines.LineBreak);
+          Inc(LEndPosition.Line);
+
+          if ((LEndPosition.Char = 0) and (LEndPosition.Line > LBeginPosition.Line)) then
+            LEndPosition := Lines.EOLPosition[LEndPosition.Line - 1];
+          Lines.InsertText(LEndPosition, Lines.LineBreak + LIndentText + FHighlighter.Comments.BlockComments[LCommentIndex + 1]);
+
+          Lines.InsertIndent(Lines.BOLPosition[LBeginPosition.Line + 1], TextPosition(LBeginPosition.Char, LEndPosition.Line + 1), ComputeIndentText(Tabs.Width), Lines.SelMode);
+          Inc(LEndPosition.Line);
+        end;
+
+        if (LEndPosition.Line < Lines.Count - 1) then
+        begin
+          LEndPosition := Lines.BOLPosition[LEndPosition.Line + 1];
+          SetCaretAndSelection(LEndPosition, LBeginPosition, LEndPosition);
+        end
+        else
+          Lines.CaretPosition := Lines.BOFPosition;
+      finally
+        Lines.EndUpdate();
       end;
-
-      if (LEndPosition.Line < Lines.Count - 1) then
-      begin
-        LEndPosition := Lines.BOLPosition[LEndPosition.Line + 1];
-        SetCaretAndSelection(LEndPosition, LBeginPosition, LEndPosition);
-      end
-      else
-        Lines.CaretPosition := Lines.BOFPosition;
-    finally
-      Lines.EndUpdate();
     end;
   end;
 end;
@@ -3150,40 +3153,43 @@ var
   LTextBeginPosition: TBCEditorTextPosition;
   LTextEndPosition: TBCEditorTextPosition;
 begin
-  if (SelectionAvailable and (Lines.SelMode = smColumn)) then
-    LTextBeginPosition := Min(Lines.SelBeginPosition, Lines.SelEndPosition)
-  else
-    LTextBeginPosition := Lines.BOLPosition[Min(Lines.SelBeginPosition, Lines.SelEndPosition).Line];
-  LTextEndPosition := TextPosition(LTextBeginPosition.Char, Max(Lines.SelBeginPosition, Lines.SelEndPosition).Line);
-  if (LTextEndPosition = LTextBeginPosition) then
-    if (LTextEndPosition.Line < Lines.Count -1) then
-      LTextEndPosition := Lines.BOLPosition[LTextEndPosition.Line + 1]
+  if (Lines.Count > 0) then
+  begin
+    if (SelectionAvailable and (Lines.SelMode = smColumn)) then
+      LTextBeginPosition := Min(Lines.SelBeginPosition, Lines.SelEndPosition)
     else
-      LTextEndPosition := Lines.EOLPosition[LTextEndPosition.Line];
+      LTextBeginPosition := Lines.BOLPosition[Min(Lines.SelBeginPosition, Lines.SelEndPosition).Line];
+    LTextEndPosition := TextPosition(LTextBeginPosition.Char, Max(Lines.SelBeginPosition, Lines.SelEndPosition).Line);
+    if (LTextEndPosition = LTextBeginPosition) then
+      if (LTextEndPosition.Line < Lines.Count - 1) then
+        LTextEndPosition := Lines.BOLPosition[LTextEndPosition.Line + 1]
+      else
+        LTextEndPosition := Lines.EOLPosition[LTextEndPosition.Line];
 
-  LIndentText := ComputeIndentText(FTabs.Width);
+    LIndentText := ComputeIndentText(FTabs.Width);
 
-  Lines.BeginUpdate();
-  try
-    case (ACommand) of
-      ecBlockIndent:
-        Lines.InsertIndent(LTextBeginPosition, LTextEndPosition,
-          LIndentText, Lines.SelMode);
-      ecBlockUnindent:
-        Lines.DeleteIndent(LTextBeginPosition, LTextEndPosition,
-          LIndentText, Lines.SelMode);
-      else raise ERangeError.Create('ACommand: ' + IntToStr(Ord(ACommand)));
+    Lines.BeginUpdate();
+    try
+      case (ACommand) of
+        ecBlockIndent:
+          Lines.InsertIndent(LTextBeginPosition, LTextEndPosition,
+            LIndentText, Lines.SelMode);
+        ecBlockUnindent:
+          Lines.DeleteIndent(LTextBeginPosition, LTextEndPosition,
+            LIndentText, Lines.SelMode);
+        else raise ERangeError.Create('ACommand: ' + IntToStr(Ord(ACommand)));
+      end;
+
+      if (not SelectionAvailable) then
+      begin
+        LTextBeginPosition.Char := 0;
+        if (LTextEndPosition.Char > 0) then
+          LTextEndPosition.Char := Length(Lines.Lines[LTextEndPosition.Line].Text);
+        SetCaretAndSelection(LTextEndPosition, LTextBeginPosition, LTextEndPosition);
+      end;
+    finally
+      Lines.EndUpdate();
     end;
-
-    if (not SelectionAvailable) then
-    begin
-      LTextBeginPosition.Char := 0;
-      if (LTextEndPosition.Char > 0) then
-        LTextEndPosition.Char := Length(Lines.Lines[LTextEndPosition.Line].Text);
-      SetCaretAndSelection(LTextEndPosition, LTextBeginPosition, LTextEndPosition);
-    end;
-  finally
-    Lines.EndUpdate();
   end;
 end;
 
@@ -4685,7 +4691,9 @@ procedure TCustomBCEditor.DoWordLeft(const ACommand: TBCEditorCommand);
 var
   LNewCaretPosition: TBCEditorTextPosition;
 begin
-  if (Lines.CaretPosition.Line < Lines.Count) then
+  if ((Lines.CaretPosition.Line = 0) and (Lines.Count = 0)) then
+    Lines.CaretPosition := Lines.BOFPosition
+  else if (Lines.CaretPosition.Line < Lines.Count) then
   begin
     LNewCaretPosition := Lines.CaretPosition;
     if (LNewCaretPosition.Line >= Lines.Count) then
@@ -4700,8 +4708,10 @@ begin
       LNewCaretPosition := WordBegin(LNewCaretPosition);
     MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ACommand = ecSelectionWordLeft);
   end
+  else if (Lines.CaretPosition.Line = Lines.Count) then
+    Lines.CaretPosition := Lines.EOLPosition[Lines.CaretPosition.Line - 1]
   else
-    Lines.CaretPosition := Lines.EOLPosition[Lines.Count - 1];
+    Lines.CaretPosition := Lines.BOLPosition[Lines.CaretPosition.Line - 1];
 end;
 
 procedure TCustomBCEditor.DoWordRight(const ACommand: TBCEditorCommand);
@@ -4715,6 +4725,7 @@ begin
       and not IsWordBreakChar(Lines.Char[LNewCaretPosition])) then
     begin
       LNewCaretPosition := WordEnd();
+      Inc(LNewCaretPosition.Char);
       while ((LNewCaretPosition.Char < Length(Lines.Lines[LNewCaretPosition.Line].Text))) and IsEmptyChar(Lines.Char[LNewCaretPosition]) do
         Inc(LNewCaretPosition.Char);
     end;
@@ -13645,7 +13656,7 @@ end;
 function TCustomBCEditor.WordBegin(const ATextPosition: TBCEditorTextPosition): TBCEditorTextPosition;
 begin
   Result := ATextPosition;
-  while ((Result.Char - 1 > 0) and not IsWordBreakChar(Lines.Lines[Result.Line].Text[1 + Result.Char - 1])) do
+  while ((Result.Char - 1 >= 0) and not IsWordBreakChar(Lines.Lines[Result.Line].Text[1 + Result.Char - 1])) do
     Dec(Result.Char);
 end;
 

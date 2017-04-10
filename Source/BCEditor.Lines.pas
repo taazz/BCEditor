@@ -721,59 +721,66 @@ var
 begin
   Assert((BOFPosition <= ARelativePosition) and (ARelativePosition <= EOFPosition));
 
-  LLength := ACharIndex;
-
-  Result := ARelativePosition;
-
-  if ((0 <= Result.Char + LLength) and (Result.Char + LLength <= System.Length(Lines[Result.Line].Text))) then
-    Inc(Result.Char, LLength)
-  else if (LLength < 0) then
+  if (Count = 0) then
   begin
-    LLineBreakLength := System.Length(LineBreak);
-
-    Inc(LLength, Result.Char);
-    Dec(Result.Line);
-
-    if (LLength > System.Length(Lines[Result.Line].Text)) then
-      raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
-
-    while ((Result.Line >= 0) and (LLength < System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do
-    begin
-      Inc(LLength, System.Length(Lines[Result.Line].Text) + LLineBreakLength);
-      Dec(Result.Line);
-    end;
-
-    if ((Result.Line < 0)
-      or (- LLength > System.Length(Lines[Result.Line].Text))) then
+    if (ACharIndex <> 0) then
       raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
-
-    Result.Char := LLength + System.Length(Lines[Result.Line].Text);
+    Result := BOFPosition;
   end
   else
   begin
-    LLineBreakLength := System.Length(LineBreak);
+    LLength := ACharIndex;
 
-    Dec(LLength, (System.Length(Lines[Result.Line].Text) - Result.Char) + LLineBreakLength);
-    Inc(Result.Line);
+    Result := ARelativePosition;
 
-    if (LLength < 0) then
-      raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
-
-    while ((Result.Line < Count) and (LLength >= System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do
+    if ((0 <= Result.Char + LLength) and (Result.Char + LLength <= System.Length(Lines[Result.Line].Text))) then
+      Inc(Result.Char, LLength)
+    else if (LLength < 0) then
     begin
-      Dec(LLength, System.Length(Lines[Result.Line].Text) + LLineBreakLength);
+      LLineBreakLength := System.Length(LineBreak);
+
+      Inc(LLength, Result.Char);
+      Dec(Result.Line);
+
+      if (LLength > System.Length(Lines[Result.Line].Text)) then
+        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+
+      while ((Result.Line >= 0) and (LLength < System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do
+      begin
+        Inc(LLength, System.Length(Lines[Result.Line].Text) + LLineBreakLength);
+        Dec(Result.Line);
+      end;
+
+      if ((Result.Line < 0)
+        or (- LLength > System.Length(Lines[Result.Line].Text))) then
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
+
+      Result.Char := LLength + System.Length(Lines[Result.Line].Text);
+    end
+    else
+    begin
+      LLineBreakLength := System.Length(LineBreak);
+
+      Dec(LLength, (System.Length(Lines[Result.Line].Text) - Result.Char) + LLineBreakLength);
       Inc(Result.Line);
+
+      if (LLength < 0) then
+        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+
+      while ((Result.Line < Count) and (LLength >= System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do
+      begin
+        Dec(LLength, System.Length(Lines[Result.Line].Text) + LLineBreakLength);
+        Inc(Result.Line);
+      end;
+
+      if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds + '(%d, %d, %d / %d)', [ACharIndex, Length(Text), Result.Char, Result.Line, Count])
+      else if (LLength > System.Length(Lines[Result.Line].Text)) then
+        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+
+      Result.Char := LLength;
     end;
-
-    if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
-      raise ERangeError.CreateFmt(SCharIndexOutOfBounds + '(%d, %d, %d / %d)', [ACharIndex, Length(Text), Result.Char, Result.Line, Count])
-    else if (LLength > System.Length(Lines[Result.Line].Text)) then
-      raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
-
-    Result.Char := LLength;
   end;
-
-  Assert((BOFPosition <= Result) and (Result <= EOFPosition));
 end;
 
 procedure TBCEditorLines.Clear();
@@ -879,19 +886,19 @@ begin
   if (Count = 1) then
   begin
     LBeginPosition := BOLPosition[ALine];
-    LText := Get(ALine);
+    LText := Lines[ALine].Text;
     LUndoType := utClear;
   end
   else if (ALine < Count - 1) then
   begin
     LBeginPosition := BOLPosition[ALine];
-    LText := Get(ALine) + LineBreak;
+    LText := Lines[ALine].Text + LineBreak;
     LUndoType := utDelete;
   end
   else
   begin
     LBeginPosition := EOLPosition[ALine - 1];
-    LText := LineBreak + Get(ALine);
+    LText := LineBreak + Lines[ALine].Text;
     LUndoType := utDelete;
   end;
 
@@ -1076,8 +1083,6 @@ begin
 end;
 
 procedure TBCEditorLines.DoDelete(ALine: Integer);
-var
-  LClear: Boolean;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
@@ -1087,23 +1092,10 @@ begin
     else if (FMaxLengthLine > ALine) then
       Dec(FMaxLengthLine);
 
-  LClear := Count = 1;
-  if (LClear) then
-  begin
-    Lines.List[0].Background := clNone;
-    Lines.List[0].ExpandedLength := -1;
-    Lines.List[0].FirstRow := -1;
-    Lines.List[0].Foreground := clNone;
-    Lines.List[0].Flags := [sfHasTabs, sfHasNoTabs];
-    Lines.List[0].Range := nil;
-    Lines.List[0].State := lsLoaded;
-    Lines.List[0].Text := '';
-  end
-  else
-    Lines.Delete(ALine);
+  Lines.Delete(ALine);
 
   if (SelMode = smNormal) then
-    if (LClear) then
+    if (Count = 0) then
       CaretPosition := BOFPosition
     else if (ALine < Count) then
       CaretPosition := BOLPosition[ALine]
@@ -1120,7 +1112,7 @@ begin
   if (UpdateCount > 0) then
     Include(FState, lsTextChanged);
 
-  if (LClear and Assigned(OnCleared)) then
+  if ((Count = 0) and Assigned(OnCleared)) then
     OnCleared(Self)
   else if (Assigned(OnDeleted)) then
     OnDeleted(Self, ALine);
