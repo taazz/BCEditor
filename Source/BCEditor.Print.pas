@@ -1977,8 +1977,8 @@ begin
     LLeft := FMargins.PixelLeft;
     while not FHighlighter.GetEndOfLine do
     begin
-      FHighlighter.GetToken(LToken);
-      LTokenPosition := FHighlighter.GetTokenPosition;
+      FHighlighter.GetTokenText(LToken);
+      LTokenPosition := FHighlighter.GetTokenIndex;
       LHighlighterAttribute := FHighlighter.GetTokenAttribute;
 
       FCanvas.Font.Color := FFontColor;

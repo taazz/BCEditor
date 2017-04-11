@@ -3,7 +3,7 @@ unit BCEditor.Highlighter;
 interface {********************************************************************}
 
 uses
-  Classes, SysUtils,
+  Classes, SysUtils, Generics.Collections,
   Controls, Graphics,
   JsonDataObjects,
   BCEditor.Consts, BCEditor.Editor.CodeFolding, BCEditor.Types;
@@ -21,14 +21,13 @@ type
     TAbstractParserArray = array [AnsiChar] of TBaseParser;
 
     TMatchingPairMatch = record
-      OpenToken: string;
-      CloseToken: string;
-      OpenTokenPos: TBCEditorTextPosition;
-      CloseTokenPos: TBCEditorTextPosition;
-      TokenAttribute: TAttribute;
+      Attribute: TAttribute;
+      OpenText: string;
+      CloseText: string;
+      OpenPosition: TBCEditorTextPosition;
+      ClosePosition: TBCEditorTextPosition;
     end;
 
-    PMatchingPairToken = ^TMatchingPairToken;
     TMatchingPairToken = record
       OpenToken: string;
       CloseToken: string;
@@ -423,7 +422,7 @@ type
     FLoading: Boolean;
     FMainRules: TRange;
     FMatchingPairHighlight: Boolean;
-    FMatchingPairs: TList;
+    FMatchingPairs: TList<TMatchingPairToken>;
     FMultiHighlighter: Boolean;
     FName: string;
     FPreviousEndOfLine: Boolean;
@@ -453,13 +452,13 @@ type
     function GetCurrentRangeAttribute: TAttribute;
     function GetEndOfLine: Boolean;
     function GetTokenAttribute: TAttribute;
+    function GetTokenIndex: Integer;
     function GetTokenKind: TBCEditorRangeType;
     function GetTokenLength: Integer;
-    function GetTokenPosition: Integer;
     procedure AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
     procedure AddKeywords(var AStringList: TStringList);
     procedure Clear;
-    procedure GetToken(var AResult: string);
+    procedure GetTokenText(var AResult: string);
     procedure LoadFromFile(const AFileName: string);
     procedure LoadFromResource(const ResName: string; const ResType: PChar);
     procedure LoadFromStream(AStream: TStream);
@@ -481,7 +480,7 @@ type
     property FoldOpenKeyChars: TBCEditorCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
     property MainRules: TRange read FMainRules;
     property MatchingPairHighlight: Boolean read FMatchingPairHighlight write FMatchingPairHighlight default True;
-    property MatchingPairs: TList read FMatchingPairs write FMatchingPairs;
+    property MatchingPairs: TList<TMatchingPairToken> read FMatchingPairs;
     property MultiHighlighter: Boolean read FMultiHighlighter write FMultiHighlighter;
     property Name: string read FName write FName;
     property Sample: string read FSample write FSample;
@@ -1997,9 +1996,6 @@ begin
         LeftMargin.Colors.BookmarkPanelBackground := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, LeftMargin.Colors.BookmarkPanelBackground);
         LeftMargin.Colors.LineStateModified := StringToColorDef(LColorsObject['LeftMarginLineStateModified'].Value, LeftMargin.Colors.LineStateModified);
         LeftMargin.Colors.LineStateNormal := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, LeftMargin.Colors.LineStateNormal);
-        Minimap.Colors.Background := StringToColorDef(LColorsObject['MinimapBackground'].Value, Minimap.Colors.Background);
-        Minimap.Colors.Bookmark := StringToColorDef(LColorsObject['MinimapBookmark'].Value, Minimap.Colors.Bookmark);
-        Minimap.Colors.VisibleRows := StringToColorDef(LColorsObject['MinimapVisibleLines'].Value, Minimap.Colors.VisibleRows);
         MatchingPair.Colors.Matched := StringToColorDef(LColorsObject['MatchingPairMatched'].Value, MatchingPair.Colors.Matched);
         MatchingPair.Colors.Underline := StringToColorDef(LColorsObject['MatchingPairUnderline'].Value, MatchingPair.Colors.Underline);
         MatchingPair.Colors.Unmatched := StringToColorDef(LColorsObject['MatchingPairUnmatched'].Value, MatchingPair.Colors.Unmatched);
@@ -2025,7 +2021,6 @@ begin
       begin
         LeftMargin.Font.Name := StrToStrDef(LFontsObject['LineNumbers'].Value, LeftMargin.Font.Name);
         Font.Name := StrToStrDef(LFontsObject['Text'].Value, Font.Name);
-        Minimap.Font.Name := StrToStrDef(LFontsObject['Minimap'].Value, Minimap.Font.Name);
         CodeFolding.Hint.Font.Name := StrToStrDef(LFontsObject['CodeFoldingHint'].Value, CodeFolding.Hint.Font.Name);
         if cpoUseHighlighterColumnFont in CompletionProposal.Options then
           for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
@@ -2036,7 +2031,6 @@ begin
       begin
         LeftMargin.Font.Size := StrToIntDef(LFontSizesObject['LineNumbers'].Value, LeftMargin.Font.Size);
         Font.Size := StrToIntDef(LFontSizesObject['Text'].Value, Font.Size);
-        Minimap.Font.Size := StrToIntDef(LFontSizesObject['Minimap'].Value, Minimap.Font.Size);
         CodeFolding.Hint.Font.Size := StrToIntDef(LFontSizesObject['CodeFoldingHint'].Value, CodeFolding.Hint.Font.Size);
         if cpoUseHighlighterColumnFont in CompletionProposal.Options then
           for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
@@ -2226,7 +2220,7 @@ var
   LIndex: Integer;
   LJsonDataValue: PJsonDataValue;
   LJSONObject: TJsonObject;
-  LTokenMatch: PMatchingPairToken;
+  LTokenMatch: TMatchingPairToken;
 begin
   if not Assigned(AMatchingPairObject) then
     Exit;
@@ -2256,7 +2250,6 @@ begin
       end;
     end;
 
-    New(LTokenMatch);
     LTokenMatch.OpenToken := LJsonDataValue.ObjectValue['OpenToken'].Value;
     LTokenMatch.CloseToken := LJsonDataValue.ObjectValue['CloseToken'].Value;
     FHighlighter.MatchingPairs.Add(LTokenMatch)
@@ -2467,7 +2460,7 @@ begin
   FCurrentRange := MainRules;
 
   FColors := TColors.Create(Self);
-  FMatchingPairs := TList.Create;
+  FMatchingPairs := TList<TMatchingPairToken>.Create();
   FMatchingPairHighlight := True;
 
   FTemporaryCurrentTokens := TList.Create;
@@ -2477,23 +2470,17 @@ begin
   FLoading := False;
 end;
 
-destructor TBCEditorHighlighter.Destroy;
+destructor TBCEditorHighlighter.Destroy();
 begin
-  Clear;
+  Clear();
 
-  FComments.Free;
-  FComments := nil;
-  FMainRules.Free;
-  FMainRules := nil;
-  FAttributes.Free;
-  FAttributes := nil;
-  FCompletionProposalSkipRegions.Free;
-  FCompletionProposalSkipRegions := nil;
-  FMatchingPairs.Free;
-  FMatchingPairs := nil;
-  FColors.Free;
-  FColors := nil;
-  FTemporaryCurrentTokens.Free;
+  FComments.Free();
+  FMainRules.Free();
+  FAttributes.Free();
+  FCompletionProposalSkipRegions.Free();
+  FMatchingPairs.Free();
+  FColors.Free();
+  FTemporaryCurrentTokens.Free();
 
   inherited;
 end;
@@ -2658,11 +2645,6 @@ begin
     Result := nil;
 end;
 
-function TBCEditorHighlighter.GetTokenPosition: Integer;
-begin
-  Result := FTokenPosition;
-end;
-
 procedure TBCEditorHighlighter.ResetCurrentRange;
 begin
   FCurrentRange := MainRules;
@@ -2694,14 +2676,14 @@ begin
       AStringList.Add(FMainRules.KeyList[LIndex].KeyList[LIndex2]);
 end;
 
-procedure TBCEditorHighlighter.GetToken(var AResult: string);
+procedure TBCEditorHighlighter.GetTokenText(var AResult: string);
 begin
   AResult := Copy(FCurrentLine, 1 + FTokenPosition, FCurrentLineIndex - FTokenPosition);
 end;
 
-procedure TBCEditorHighlighter.Reset;
+function TBCEditorHighlighter.GetTokenIndex: Integer;
 begin
-  MainRules.Reset;
+  Result := FTokenPosition;
 end;
 
 function TBCEditorHighlighter.GetTokenKind: TBCEditorRangeType;
@@ -2717,7 +2699,7 @@ begin
   else
   { keyword token type }
   begin
-    GetToken(LToken);
+    GetTokenText(LToken);
     for LIndex := 0 to FCurrentRange.KeyListCount - 1 do
     begin
       LCurrentRangeKeyList := FCurrentRange.KeyList[LIndex];
@@ -2740,8 +2722,6 @@ begin
   FMainRules.Clear;
   FComments.Clear;
   FCompletionProposalSkipRegions.Clear;
-  for LIndex := FMatchingPairs.Count - 1 downto 0 do
-    Dispose(PMatchingPairToken(FMatchingPairs.Items[LIndex]));
   FMatchingPairs.Clear;
   FSample := '';
   for LIndex := 0 to FCodeFoldingRangeCount - 1 do
@@ -2836,15 +2816,17 @@ begin
 end;
 
 procedure TBCEditorHighlighter.LoadFromStream(AStream: TStream);
+var
+  ImportJSON: TImportJSON;
 begin
   Clear;
   FLoading := True;
-  with TImportJSON.Create(Self) do
-    try
-      ImportFromStream(AStream);
-    finally
-      Free;
-    end;
+  ImportJSON := TImportJSON.Create(Self);
+  try
+    ImportJSON.ImportFromStream(AStream);
+  finally
+    ImportJSON.Free();
+  end;
   UpdateColors;
   FLoading := False;
 end;
@@ -2859,6 +2841,11 @@ end;
 procedure TBCEditorHighlighter.AddAttribute(AHighlighterAttribute: TAttribute);
 begin
   FAttributes.AddObject(AHighlighterAttribute.Name, AHighlighterAttribute);
+end;
+
+procedure TBCEditorHighlighter.Reset;
+begin
+  MainRules.Reset;
 end;
 
 procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);

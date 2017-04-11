@@ -39,9 +39,6 @@
         "MatchingPairMatched": "clAqua",
         "MatchingPairUnderline": "clGray",
         "MatchingPairUnmatched": "clYellow",
-        "MinimapBackground": "clNone",
-        "MinimapBookmark": "clGreen",
-        "MinimapVisibleLines": "$00F0FFFF",
         "RightMargin": "clSilver",
         "RightMovingEdge": "clSilver",
         "SearchHighlighterBackground": "clBlack",
@@ -62,14 +59,12 @@
       "Fonts": {
         "LineNumbers": "Courier New",
         "Text": "Courier New",
-        "Minimap": "Courier New",
         "CodeFoldingHint": "Courier New",
         "CompletionProposal": "Courier New"
       },
       "FontSizes": {
         "LineNumbers": "8",
         "Text": "9",
-        "Minimap": "1",
         "CodeFoldingHint": "8",
         "CompletionProposal": "8"
       }

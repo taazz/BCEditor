@@ -1300,6 +1300,7 @@ begin
   begin
     LLineBreak[0] := #0; LLineBreak[1] := #0; LLineBreak[2] := #0;
 
+
     BeginUpdate();
     try
       LLine := APosition.Line;

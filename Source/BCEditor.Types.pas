@@ -25,7 +25,7 @@ type
   TBCEditorMarkPanelPaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const AFirstLine: Integer; const ALastLine: Integer) of object;
   TBCEditorMarkPanelLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
 
-  TBCEditorLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer; const AIsMinimapLine: Boolean) of object;
+  TBCEditorLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
 
   TBCEditorCustomLineColorsEvent = procedure(ASender: TObject; const ALine: Integer; var AUseColors: Boolean;
     var AForeground: TColor; var ABackground: TColor) of object;
@@ -173,11 +173,6 @@ type
     function ToString(): string; inline;
   end;
 
-  TBCEditorMatchingPairTokenMatch = record
-    Position: TBCEditorTextPosition;
-    Token: string;
-  end;
-
   TBCEditorBreakType = (
     btUnspecified,
     btAny,
@@ -206,14 +201,6 @@ type
     ttWebLink
   );
 
-
-  TBCEditorMatchingTokenResult = (
-    trCloseAndOpenTokenFound,
-    trCloseTokenFound,
-    trNotFound,
-    trOpenTokenFound,
-    trOpenAndCloseTokenFound
-  );
 
   TBCEditorKeyPressWEvent = procedure(ASender: TObject; var AKey: Char) of object;
 

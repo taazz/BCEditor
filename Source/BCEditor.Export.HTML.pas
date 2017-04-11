@@ -157,7 +157,7 @@ begin
     while not FHighlighter.GetEndOfLine do
     begin
       LHighlighterAttribute := FHighlighter.GetTokenAttribute;
-      FHighlighter.GetToken(LToken);
+      FHighlighter.GetTokenText(LToken);
       if LToken = BCEDITOR_SPACE_CHAR then
         LTextLine := LTextLine + '&nbsp;'
       else
