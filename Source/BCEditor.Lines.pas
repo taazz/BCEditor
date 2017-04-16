@@ -774,7 +774,13 @@ begin
       end;
 
       if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds + '(%d, %d, %d / %d)', [ACharIndex, Length(Text), Result.Char, Result.Line, Count])
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds + #13#10
+          + 'ACharIndex: ' + IntToStr(ACharIndex) + #13#10
+          + 'ARelativePosition: ' + IntToStr(PositionToCharIndex(ARelativePosition)) + #13#10
+          + 'Length: ' + IntToStr(Length(Text)) + #13#10
+          + 'Count: ' + IntToStr(Count) + #13#10
+          + 'Result: ' + Result.ToString + #13#10,
+          [ACharIndex + PositionToCharIndex(ARelativePosition)])
       else if (LLength > System.Length(Lines[Result.Line].Text)) then
         raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
