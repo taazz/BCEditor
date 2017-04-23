@@ -742,7 +742,9 @@ begin
       Inc(LLength, Result.Char);
       Dec(Result.Line);
 
-      if (LLength > System.Length(Lines[Result.Line].Text)) then
+      if (Result.Line < Count) then
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
+      else if (LLength > System.Length(Lines[Result.Line].Text)) then
         raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
       while ((Result.Line >= 0) and (LLength < System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do

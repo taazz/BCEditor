@@ -425,9 +425,9 @@ type
     procedure SetSelectionBeginPosition(const AValue: TBCEditorTextPosition);
     procedure SetSelectionEndPosition(const AValue: TBCEditorTextPosition);
     procedure SetSelectionMode(const AValue: TBCEditorSelectionMode);
-    procedure SetSelLength(const AValue: Integer);
-    procedure SetSelStart(const AValue: Integer);
-    procedure SetSelText(const AValue: string);
+    procedure SetSelLength(const AValue: Integer); inline;
+    procedure SetSelStart(const AValue: Integer); inline;
+    procedure SetSelText(const AValue: string); inline;
     procedure SetSpecialChars(const AValue: TBCEditorSpecialChars);
     procedure SetSyncEdit(const AValue: TBCEditorSyncEdit);
     procedure SetTabs(const AValue: TBCEditorTabs);
@@ -5689,9 +5689,9 @@ var
 var
   LTokenText: string;
 begin
-  if (not Assigned(FHighlighter)) then
-    Result := trNotFound
-  else
+  Result := trNotFound;
+
+  if (Assigned(FHighlighter)) then
   begin
     LTextCaretPosition := ATextCaretPosition;
 
@@ -9367,8 +9367,8 @@ var
               FItalicOffsetCache[AnsiChar(LLastChar)] := FItalicOffset;
           end;
 
-          if LLastColumn = LCurrentRowTextLength + 1 then
-            Inc(LTokenRect.Right, FItalicOffset);
+//          if LLastColumn = LCurrentRowTextLength + 1 then
+//            Inc(LTokenRect.Right, FItalicOffset);
 
           if LAddWrappedCount then
             Inc(LTokenRect.Right, FItalicOffset);
@@ -11800,7 +11800,7 @@ begin
         Dec(LBeginPosition.Char);
 
     LEndPosition := LBeginPosition;
-    while ((LEndPosition.Char + 1 < LLineTextLength)
+    while ((LEndPosition.Char < LLineTextLength)
       and not IsWordBreakChar(Lines.Lines[ATextPosition.Line].Text[1 + LEndPosition.Char])) do
       Inc(LEndPosition.Char);
     if ((soExpandRealNumbers in FSelection.Options) and Lines.Lines[ATextPosition.Line].Text[1 + LBeginPosition.Char + 1].IsNumber) then
@@ -11888,7 +11888,6 @@ begin
       end;
     finally
       EndUpdate();
-      UpdateScrollBars();
       Invalidate();
     end;
   end;
