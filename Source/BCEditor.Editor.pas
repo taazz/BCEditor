@@ -2275,12 +2275,12 @@ begin
           LSize.cx := 0;
           LSize.cy := 0;
           if (not GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, PChar(AText), ALength, LSize)) then
-            // Debug 2017-04-06
-            raise EAssertionFailed.Create('Handle: ' + IntToStr(FPaintHelper.StockBitmap.Canvas.Handle) + #13#10
-              + 'Length(AText): ' + IntToStr(Length(AText)) + #13#10
-              + 'ALength: ' + IntToStr(ALength) + #13#10
-              + 'GetLastError(): ' + IntToStr(GetLastError()));
-          Result := LSize.cx;
+            // Sometimes GetTextExtentPoint32 fails. But why?
+            // Obsolete Canvas.Handle?
+            // Lack of GDI resources?
+            Result := 0
+          else
+            Result := LSize.cx;
         end;
     end;
 end;
@@ -12186,6 +12186,7 @@ var
   LIsWrapped: Boolean;
   LLineEndPos: PChar;
   LLinePos: PChar;
+  LRowsCount: Integer; // Debug 2017-04-24
 begin
   if (Lines.Count = 0) then
     Result := DisplayPosition(ATextPosition.Char, ATextPosition.Line)
@@ -12193,9 +12194,15 @@ begin
     Result := DisplayPosition(ATextPosition.Char, Rows.Count + ATextPosition.Line - Rows[Rows.Count - 1].Line - 1)
   else if ((Rows.Count >= 0) and (Lines.Lines[ATextPosition.Line].FirstRow < 0)) then
     // Rows.Count >= 0 is not needed - but GetRows must be called to initialize Lines.FirstRow
+  begin
+    LRowsCount := Rows.Count;
+    FRows.Clear();
     raise ERangeError.Create(SBCEditorLineIsNotVisible + #13#10
       + 'Lines.Count: ' + IntToStr(Lines.Count) + #13#10
-      + 'Rows.Count: ' + IntToStr(Rows.Count))
+      + 'Rows.Count: ' + IntToStr(Rows.Count) + #13#10
+      + 'LRowCount: ' + IntToStr(LRowsCount) + #13#10
+      + 'WordWrap: ' + BoolToStr(WordWrap.Enabled, True))
+  end
   else
   begin
     Result := DisplayPosition(ATextPosition.Char, Lines.Lines[ATextPosition.Line].FirstRow);

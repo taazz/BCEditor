@@ -160,9 +160,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.MatchingPair.pas">
             <BuildOrder>15</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Minimap.pas">
-            <BuildOrder>16</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.pas">
             <BuildOrder>17</BuildOrder>
         </DelphiCompile>

@@ -268,7 +268,7 @@ var
   LEndPos: PChar;
   LPos: PChar;
 begin
-  LPos := PChar(AText); LEndPos := PChar(@AText[System.Length(AText)]);
+  LPos := PChar(AText); LEndPos := PChar(@AText[Length(AText)]);
   while (LPos <= LEndPos) do
     if (CharInSet(LPos^, [BCEDITOR_LINEFEED, BCEDITOR_CARRIAGE_RETURN])) then
       Exit(True)
@@ -304,10 +304,10 @@ begin
   if (not FRegExpr) then
   begin
     if (not FCaseSensitive) then
-      CharLowerBuff(PChar(FPattern), System.Length(FPattern));
+      CharLowerBuff(PChar(FPattern), Length(FPattern));
 
     if (FWholeWords) then
-      for LIndex := 1 to System.Length(FPattern) do
+      for LIndex := 1 to Length(FPattern) do
         if (Lines.IsWordBreakChar(FPattern[LIndex])) then
         begin
           FErrorMessage := SBCEditorPatternContainsWordBreakChar;
@@ -339,11 +339,6 @@ begin
     Result := FindRegEx(APosition, AFoundLength)
   else
     Result := FindNormal(APosition, AFoundLength);
-
-  if (FBackwards) then
-    Result := Result and (APosition >= FBeginPosition)
-  else
-    Result := Result and (APosition < Lines.CharIndexToPosition(- AFoundLength, FEndPosition));
 end;
 
 function TBCEditorLines.TSearch.FindNormal(var APosition: TBCEditorTextPosition;
@@ -356,7 +351,7 @@ var
   LPatternLength: Integer;
   LPatternPos: PChar;
 begin
-  LPatternLength := System.Length(FPattern);
+  LPatternLength := Length(FPattern);
 
   if (LPatternLength = 0) then
     Result := False
@@ -376,13 +371,16 @@ begin
         else
           FFoundPosition := Lines.EOLPosition[FFoundPosition.Line - 1];
 
-      LLineText := Lines.Lines[FFoundPosition.Line].Text;
-      LLineLength := System.Length(LLineText);
+      LLineLength := Length(Lines.Lines[FFoundPosition.Line].Text);
 
       if (LLineLength > 0) then
       begin
+        // Make sure, the text will be copied - not only the pointer of the string,
+        // since we modifiy it with CharLowerBuff maybe
+        LLineText := Copy(Lines.Lines[FFoundPosition.Line].Text, 1, LLineLength);
+
         if (not FCaseSensitive) then
-          CharLowerBuff(PChar(LLineText), System.Length(LLineText));
+          CharLowerBuff(PChar(LLineText), Length(LLineText));
 
         while (not Result
           and (FBackwards and (FFoundPosition.Char >= 0)
@@ -704,7 +702,7 @@ begin
       Exclude(Lines.List[ALine].Flags, sfHasTabs);
       Include(Lines.List[ALine].Flags, sfHasNoTabs);
     end;
-    Lines.List[ALine].ExpandedLength := System.Length(Result);
+    Lines.List[ALine].ExpandedLength := Length(Result);
   end;
 end;
 
@@ -733,45 +731,45 @@ begin
 
     Result := ARelativePosition;
 
-    if ((0 <= Result.Char + LLength) and (Result.Char + LLength <= System.Length(Lines[Result.Line].Text))) then
+    if ((0 <= Result.Char + LLength) and (Result.Char + LLength <= Length(Lines[Result.Line].Text))) then
       Inc(Result.Char, LLength)
     else if (LLength < 0) then
     begin
-      LLineBreakLength := System.Length(LineBreak);
+      LLineBreakLength := Length(LineBreak);
 
-      Inc(LLength, Result.Char);
+      Inc(LLength, Result.Char + LLineBreakLength);
       Dec(Result.Line);
 
-      if (Result.Line < Count) then
+      if (Result.Line < 0) then
         raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
-      else if (LLength > System.Length(Lines[Result.Line].Text)) then
+      else if (LLength > 0) then
         raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
-      while ((Result.Line >= 0) and (LLength < System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do
+      while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do
       begin
-        Inc(LLength, System.Length(Lines[Result.Line].Text) + LLineBreakLength);
+        Inc(LLength, Length(Lines[Result.Line].Text) + LLineBreakLength);
         Dec(Result.Line);
       end;
 
       if ((Result.Line < 0)
-        or (- LLength > System.Length(Lines[Result.Line].Text))) then
+        or (- LLength > Length(Lines[Result.Line].Text))) then
         raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
 
-      Result.Char := LLength + System.Length(Lines[Result.Line].Text);
+      Result.Char := LLength + Length(Lines[Result.Line].Text);
     end
     else
     begin
-      LLineBreakLength := System.Length(LineBreak);
+      LLineBreakLength := Length(LineBreak);
 
-      Dec(LLength, (System.Length(Lines[Result.Line].Text) - Result.Char) + LLineBreakLength);
+      Dec(LLength, (Length(Lines[Result.Line].Text) - Result.Char) + LLineBreakLength);
       Inc(Result.Line);
 
       if (LLength < 0) then
         raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
-      while ((Result.Line < Count) and (LLength >= System.Length(Lines[Result.Line].Text) + LLineBreakLength)) do
+      while ((Result.Line < Count) and (LLength >= Length(Lines[Result.Line].Text) + LLineBreakLength)) do
       begin
-        Dec(LLength, System.Length(Lines[Result.Line].Text) + LLineBreakLength);
+        Dec(LLength, Length(Lines[Result.Line].Text) + LLineBreakLength);
         Inc(Result.Line);
       end;
 
@@ -783,7 +781,7 @@ begin
           + 'Count: ' + IntToStr(Count) + #13#10
           + 'Result: ' + Result.ToString + #13#10,
           [ACharIndex + PositionToCharIndex(ARelativePosition)])
-      else if (LLength > System.Length(Lines[Result.Line].Text)) then
+      else if (LLength > Length(Lines[Result.Line].Text)) then
         raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
       Result.Char := LLength;
@@ -858,7 +856,7 @@ begin
     if (AEndLine < Count - 1) then
       LEndPosition := BOLPosition[ABeginLine + 1]
     else
-      LEndPosition := TextPosition(System.Length(Lines[AEndLine].Text), AEndLine);
+      LEndPosition := TextPosition(Length(Lines[AEndLine].Text), AEndLine);
 
     LText := TextBetween[LBeginPosition, LEndPosition];
     UndoList.Push(utDelete, CaretPosition,
@@ -939,7 +937,7 @@ begin
 
   Assert((BOFPosition <= LBeginPosition) and (LBeginPosition <= LEndPosition) and (LEndPosition <= EOFPosition));
 
-  LIndentTextLength := System.Length(AIndentText);
+  LIndentTextLength := Length(AIndentText);
   LIndentFound := LBeginPosition.Line <> LEndPosition.Line;
   for LLine := LBeginPosition.Line to LEndPosition.Line do
     if (Copy(Lines[LLine].Text, 1 + LBeginPosition.Char, LIndentTextLength) <> AIndentText) then
@@ -969,21 +967,21 @@ begin
     try
       for LLine := LBeginPosition.Line to LEndPosition.Line do
         if (LeftStr(Lines[LLine].Text, LIndentTextLength) = AIndentText) then
-          DeleteText(BOLPosition[LLine], TextPosition(System.Length(AIndentText), LLine));
+          DeleteText(BOLPosition[LLine], TextPosition(Length(AIndentText), LLine));
     finally
       EndUpdate();
     end;
   end;
 
   if ((ABeginPosition <= CaretPosition) and (CaretPosition <= AEndPosition)
-    and (CaretPosition.Char > System.Length(Lines[CaretPosition.Line].Text))) then
-    FCaretPosition.Char := System.Length(Lines[CaretPosition.Line].Text);
+    and (CaretPosition.Char > Length(Lines[CaretPosition.Line].Text))) then
+    FCaretPosition.Char := Length(Lines[CaretPosition.Line].Text);
   if ((ABeginPosition <= FSelBeginPosition) and (FSelBeginPosition <= AEndPosition)
-    and (CaretPosition.Char > System.Length(Lines[FSelBeginPosition.Line].Text))) then
-    FSelBeginPosition.Char := System.Length(Lines[SelBeginPosition.Line].Text);
+    and (CaretPosition.Char > Length(Lines[FSelBeginPosition.Line].Text))) then
+    FSelBeginPosition.Char := Length(Lines[SelBeginPosition.Line].Text);
   if ((ABeginPosition <= FSelEndPosition) and (FSelEndPosition <= AEndPosition)
-    and (FSelEndPosition.Char > System.Length(Lines[FSelEndPosition.Line].Text))) then
-    FSelEndPosition.Char := System.Length(Lines[SelEndPosition.Line].Text);
+    and (FSelEndPosition.Char > Length(Lines[FSelEndPosition.Line].Text))) then
+    FSelEndPosition.Char := Length(Lines[SelEndPosition.Line].Text);
 end;
 
 procedure TBCEditorLines.DeleteText(ABeginPosition, AEndPosition: TBCEditorTextPosition;
@@ -1011,7 +1009,7 @@ begin
       LSelBeginPosition := SelBeginPosition;
       LSelEndPosition := SelEndPosition;
 
-      if (ABeginPosition.Char > System.Length(Lines[ABeginPosition.Line].Text)) then
+      if (ABeginPosition.Char > Length(Lines[ABeginPosition.Line].Text)) then
       begin
         LInsertBeginPosition := EOLPosition[ABeginPosition.Line];
 
@@ -1045,7 +1043,7 @@ begin
       for LLine := ABeginPosition.Line to AEndPosition.Line do
       begin
         LBeginText := TextPosition(ABeginPosition.Char, LLine);
-        if (AEndPosition.Char < System.Length(Lines[LLine].Text)) then
+        if (AEndPosition.Char < Length(Lines[LLine].Text)) then
           LEndText := EOLPosition[LLine]
         else
           LEndText := TextPosition(AEndPosition.Char, LLine);
@@ -1058,7 +1056,7 @@ begin
           InvalidTextPosition, InvalidTextPosition, SelMode,
           LBeginText, InvalidTextPosition, LText);
 
-        LLineLength := System.Length(Lines[LLine].Text);
+        LLineLength := Length(Lines[LLine].Text);
         if (LLineLength > ABeginPosition.Char) then
         begin
           LSpaces := StringOfChar(BCEDITOR_SPACE_CHAR, ABeginPosition.Char - LLineLength);
@@ -1152,13 +1150,13 @@ begin
       for LLine := LTextBeginPosition.Line to LTextEndPosition.Line do
         if (ASelMode = smNormal) then
         begin
-          if (LeftStr(Lines[LLine].Text, System.Length(AIndentText)) = AIndentText) then
-            DoPut(LLine, Copy(Lines[LLine].Text, 1 + System.Length(AIndentText), MaxInt));
+          if (LeftStr(Lines[LLine].Text, Length(AIndentText)) = AIndentText) then
+            DoPut(LLine, Copy(Lines[LLine].Text, 1 + Length(AIndentText), MaxInt));
         end
-        else if (Copy(Lines[LLine].Text, ABeginPosition.Char, System.Length(AIndentText)) = AIndentText) then
+        else if (Copy(Lines[LLine].Text, ABeginPosition.Char, Length(AIndentText)) = AIndentText) then
           DoPut(LLine,
             LeftStr(Lines[LLine].Text, ABeginPosition.Char)
-              + Copy(Lines[LLine].Text, 1 + ABeginPosition.Char + System.Length(AIndentText), MaxInt));
+              + Copy(Lines[LLine].Text, 1 + ABeginPosition.Char + Length(AIndentText), MaxInt));
     finally
       EndUpdate();
     end;
@@ -1214,7 +1212,7 @@ begin
       for LLine := ABeginPosition.Line to LEndLine do
         if (ASelMode = smNormal) then
           DoPut(LLine, AIndentText + Lines[LLine].Text)
-        else if (System.Length(Lines[LLine].Text) > ABeginPosition.Char) then
+        else if (Length(Lines[LLine].Text) > ABeginPosition.Char) then
           DoPut(LLine, Copy(Lines[LLine].Text, 1, ABeginPosition.Char)
             + AIndentText
             + Copy(Lines[LLine].Text, 1 + ABeginPosition.Char, MaxInt));
@@ -1285,7 +1283,7 @@ var
   LPos: PChar;
 begin
   Assert(BOFPosition <= APosition);
-  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= System.Length(Lines[APosition.Line].Text)));
+  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Lines[APosition.Line].Text)));
 
   if (AText = '') then
     Result := APosition
@@ -1301,7 +1299,7 @@ begin
       DoPut(APosition.Line, LeftStr(Lines[APosition.Line].Text, APosition.Char)
         + AText
         + Copy(Lines[APosition.Line].Text, 1 + APosition.Char, MaxInt));
-      Result := TextPosition(APosition.Char + System.Length(AText), APosition.Line);
+      Result := TextPosition(APosition.Char + Length(AText), APosition.Line);
     end;
   end
   else
@@ -1314,7 +1312,7 @@ begin
       LLine := APosition.Line;
 
       LPos := @AText[1];
-      LEndPos := @AText[System.Length(AText)];
+      LEndPos := @AText[Length(AText)];
 
       LLineBeginPos := LPos;
       while ((LPos <= LEndPos) and not CharInSet(LPos^, [BCEDITOR_LINEFEED, BCEDITOR_CARRIAGE_RETURN])) do
@@ -1340,7 +1338,7 @@ begin
           LLineEnd := Copy(Lines[LLine].Text, 1 + APosition.Char, MaxInt);
           if (LLineBeginPos < LPos) then
             DoPut(LLine, LeftStr(Lines[LLine].Text, APosition.Char) + LeftStr(AText, LPos - LLineBeginPos))
-          else if (System.Length(Lines[LLine].Text) > APosition.Char) then
+          else if (Length(Lines[LLine].Text) > APosition.Char) then
             DoPut(LLine, LeftStr(Lines[LLine].Text, APosition.Char));
         end;
         Inc(LLine);
@@ -1614,7 +1612,7 @@ function TBCEditorLines.GetEOLPosition(ALine: Integer): TBCEditorTextPosition;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  Result := TextPosition(System.Length(Lines[ALine].Text), ALine)
+  Result := TextPosition(Length(Lines[ALine].Text), ALine)
 end;
 
 function TBCEditorLines.GetExpandedString(ALine: Integer): string;
@@ -1632,7 +1630,7 @@ begin
   Assert((0 <= ALine) and (ALine < Count));
 
   if (Lines[ALine].ExpandedLength >= 0) then
-    Lines.List[ALine].ExpandedLength := System.Length(ExpandedStrings[ALine]);
+    Lines.List[ALine].ExpandedLength := Length(ExpandedStrings[ALine]);
   Result := Lines[ALine].ExpandedLength;
 end;
 
@@ -1678,8 +1676,8 @@ begin
   end
   else
   begin
-    Assert(ABeginPosition.Char <= System.Length(Lines[ABeginPosition.Line].Text));
-    Assert(AEndPosition.Char <= System.Length(Lines[AEndPosition.Line].Text));
+    Assert(ABeginPosition.Char <= Length(Lines[ABeginPosition.Line].Text));
+    Assert(AEndPosition.Char <= Length(Lines[AEndPosition.Line].Text));
 
     LEndLine := AEndPosition.Line;
     if ((loTrimTrailingLines in Options) and (lsSaving in State)) then
@@ -1695,7 +1693,7 @@ begin
       if (LEndLine = AEndPosition.Line) then
         LEndChar := AEndPosition.Char
       else
-        LEndChar := System.Length(Lines[LEndLine].Text);
+        LEndChar := Length(Lines[LEndLine].Text);
       if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
         while ((LEndChar > 0) and (Lines[LEndLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
           Dec(LEndChar);
@@ -1705,7 +1703,7 @@ begin
     begin
       StringBuilder := TStringBuilder.Create();
 
-      LEndChar := System.Length(Lines[ABeginPosition.Line].Text);
+      LEndChar := Length(Lines[ABeginPosition.Line].Text);
       if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
         while ((LEndChar > ABeginPosition.Char) and (Lines[ABeginPosition.Line].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
           Dec(LEndChar);
@@ -1713,7 +1711,7 @@ begin
       for LLine := ABeginPosition.Line + 1 to LEndLine - 1 do
       begin
         StringBuilder.Append(LineBreak);
-        LEndChar := System.Length(Lines[LLine].Text);
+        LEndChar := Length(Lines[LLine].Text);
         if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
           while ((LEndChar > 0) and (Lines[LLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
             Dec(LEndChar);
@@ -1722,12 +1720,12 @@ begin
       if (LEndLine = AEndPosition.Line) then
         LEndChar := AEndPosition.Char
       else
-        LEndChar := System.Length(Lines[LEndLine].Text);
-      if ((loTrimTrailingSpaces in Options) and (lsSaving in State) and (LEndChar = System.Length(Lines[LEndLine].Text))) then
+        LEndChar := Length(Lines[LEndLine].Text);
+      if ((loTrimTrailingSpaces in Options) and (lsSaving in State) and (LEndChar = Length(Lines[LEndLine].Text))) then
         while ((LEndChar > 0) and (Lines[LEndLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
           Dec(LEndChar);
       if ((LEndChar > 0)
-        or not (loTrimTrailingSpaces in Options) or not (lsSaving in State) or (LEndChar <> System.Length(Lines[LEndLine].Text))) then
+        or not (loTrimTrailingSpaces in Options) or not (lsSaving in State) or (LEndChar <> Length(Lines[LEndLine].Text))) then
       begin
         StringBuilder.Append(LineBreak);
         StringBuilder.Append(Lines[LEndLine].Text, 0, LEndChar);
@@ -1748,7 +1746,7 @@ var
   LLine: Integer;
 begin
   Assert(ABeginPosition <= LEndPosition);
-  Assert(ABeginPosition.Char <= System.Length(Lines[ABeginPosition.Line].Text));
+  Assert(ABeginPosition.Char <= Length(Lines[ABeginPosition.Line].Text));
 
   LBeginPosition := Min(ABeginPosition, LEndPosition);
   LEndPosition := Max(ABeginPosition, LEndPosition);
@@ -1763,10 +1761,10 @@ begin
 
     for LLine := LBeginPosition.Line to LEndPosition.Line do
     begin
-      if (System.Length(Lines[LBeginPosition.Line].Text) < LBeginPosition.Char) then
+      if (Length(Lines[LBeginPosition.Line].Text) < LBeginPosition.Char) then
         // Do nothing
-      else if (System.Length(Lines[LBeginPosition.Line].Text) < LEndPosition.Char) then
-        StringBuilder.Append(Copy(Lines[LBeginPosition.Line].Text, LBeginPosition.Char, System.Length(Lines[LBeginPosition.Line].Text) - LBeginPosition.Char))
+      else if (Length(Lines[LBeginPosition.Line].Text) < LEndPosition.Char) then
+        StringBuilder.Append(Copy(Lines[LBeginPosition.Line].Text, LBeginPosition.Char, Length(Lines[LBeginPosition.Line].Text) - LBeginPosition.Char))
       else
         StringBuilder.Append(Copy(Lines[LBeginPosition.Line].Text, LBeginPosition.Char, LEndPosition.Char - LBeginPosition.Char + 1));
       if (LLine < LEndPosition.Line) then
@@ -1785,14 +1783,14 @@ var
   LLineBreakLength: Integer;
 begin
   Result := 0;
-  LLineBreakLength := System.Length(LineBreak);
+  LLineBreakLength := Length(LineBreak);
   for LLine := 0 to Count - 2 do
   begin
-    Inc(Result, System.Length(Lines[LLine].Text));
+    Inc(Result, Length(Lines[LLine].Text));
     Inc(Result, LLineBreakLength);
   end;
   if (Count > 0) then
-    Inc(Result, System.Length(Lines[Count - 1].Text))
+    Inc(Result, Length(Lines[Count - 1].Text))
 end;
 
 function TBCEditorLines.GetTextStr: string;
@@ -1821,7 +1819,7 @@ begin
   begin
     UndoList.Push(utInsert, LCaretPosition,
       LSelBeginPosition, LSelEndPosition, SelMode,
-      BOLPosition[ALine], TextPosition(System.Length(AText), ALine));
+      BOLPosition[ALine], TextPosition(Length(AText), ALine));
 
     RedoList.Clear();
   end;
@@ -1879,7 +1877,7 @@ begin
 
   try
     LPos := PChar(AText);
-    LEndPos := @LPos[System.Length(AText)];
+    LEndPos := @LPos[Length(AText)];
     LLine := ABeginPosition.Line;
 
     while ((LPos <= LEndPos) or (LLine <= AEndPosition.Line)) do
@@ -1888,7 +1886,7 @@ begin
       while ((LPos <= LEndPos) and not CharInSet(LPos^, [BCEDITOR_LINEFEED, BCEDITOR_CARRIAGE_RETURN])) do
         Inc(LPos);
 
-      LLineLength := System.Length(Lines[LLine].Text);
+      LLineLength := Length(Lines[LLine].Text);
       SetString(LInsertText, LLineBeginPos, LPos - LLineBeginPos);
       if (LLineLength < ABeginPosition.Char) then
       begin
@@ -1980,7 +1978,7 @@ begin
       LCaretPosition := CaretPosition;
       LSelBeginPosition := SelBeginPosition;
       LSelEndPosition := SelEndPosition;
-      if ((APosition.Line < Count) and (APosition.Char <= System.Length(Lines[APosition.Line].Text))) then
+      if ((APosition.Line < Count) and (APosition.Char <= Length(Lines[APosition.Line].Text))) then
       begin
         LPosition := APosition;
         Result := DoInsertText(LPosition, AText);
@@ -2219,7 +2217,7 @@ begin
     FSelBeginPosition := AValue;
     if (SelMode = smNormal) then
       if (FSelBeginPosition.Line < Count) then
-        FSelBeginPosition.Char := Min(FSelBeginPosition.Char, System.Length(Lines[FSelBeginPosition.Line].Text))
+        FSelBeginPosition.Char := Min(FSelBeginPosition.Char, Length(Lines[FSelBeginPosition.Line].Text))
       else
         FSelBeginPosition := EOFPosition;
 
@@ -2243,7 +2241,7 @@ begin
     FSelEndPosition := AValue;
     if (SelMode = smNormal) then
       if (FSelEndPosition.Line < Count) then
-        FSelEndPosition.Char := Min(FSelEndPosition.Char, System.Length(Lines[FSelEndPosition.Line].Text))
+        FSelEndPosition.Char := Min(FSelEndPosition.Char, Length(Lines[FSelEndPosition.Line].Text))
       else
         FSelEndPosition := EOFPosition;
 
@@ -2356,11 +2354,11 @@ var
   LLine: Integer;
   LLineBreakLength: Integer;
 begin
-  LLineBreakLength := System.Length(LineBreak);
+  LLineBreakLength := Length(LineBreak);
   Result := 0;
   for LLine := 0 to APosition.Line - 1 do
   begin
-    Inc(Result, System.Length(Lines[LLine].Text));
+    Inc(Result, Length(Lines[LLine].Text));
     Inc(Result, LLineBreakLength);
   end;
   Inc(Result, APosition.Char);

@@ -48,7 +48,6 @@ contains
   BCEditor.Editor.LeftMargin in '..\Source\BCEditor.Editor.LeftMargin.pas',
   BCEditor.Editor.Marks in '..\Source\BCEditor.Editor.Marks.pas',
   BCEditor.Editor.MatchingPair in '..\Source\BCEditor.Editor.MatchingPair.pas',
-  BCEditor.Editor.Minimap in '..\Source\BCEditor.Editor.Minimap.pas',
   BCEditor.Editor.PopupWindow in '..\Source\BCEditor.Editor.PopupWindow.pas',
   BCEditor.Editor.Replace in '..\Source\BCEditor.Editor.Replace.pas',
   BCEditor.Editor.RightMargin in '..\Source\BCEditor.Editor.RightMargin.pas',
