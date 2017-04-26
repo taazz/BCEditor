@@ -10,8 +10,6 @@ uses
 type
   TBCEditorRightMargin = class(TPersistent)
   type
-    TOptions = set of TBCEditorRightMarginOption;
-
     TColors = class(TPersistent)
     strict private
       FEdge: TColor;
@@ -35,7 +33,7 @@ type
     FMouseOver: Boolean;
     FMoving: Boolean;
     FOnChange: TNotifyEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorRightMarginOptions;
     FPosition: Integer;
     FVisible: Boolean;
     procedure DoChange;
@@ -53,7 +51,7 @@ type
   published
     property Colors: TBCEditorRightMargin.TColors read FColors write SetColors;
     property Cursor: TCursor read FCursor write FCursor default crHSplit;
-    property Options: TOptions read FOptions write FOptions default [rmoMouseMove, rmoShowMovingHint];
+    property Options: TBCEditorRightMarginOptions read FOptions write FOptions default [rmoMouseMove, rmoShowMovingHint];
     property Position: Integer read FPosition write SetPosition default 80;
     property Visible: Boolean read FVisible write SetVisible default True;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;

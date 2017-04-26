@@ -24,8 +24,8 @@ type
     FItems: TStrings;
     FMargin: Integer;
     FOnCanceled: TNotifyEvent;
-    FOnSelected: TBCEditorCompletionProposal.TSelectedEvent;
-    FOnValidate: TBCEditorCompletionProposal.TValidateEvent;
+    FOnSelected: TSelectedEvent;
+    FOnValidate: TValidateEvent;
     FSelectedLine: Integer;
     FSendToEditor: Boolean;
     FTitleHeight: Integer;
@@ -33,7 +33,7 @@ type
     FTopLine: Integer;
     FValueSet: Boolean;
     function GetItemHeight: Integer;
-    function GetItems: TBCEditorCompletionProposal.TItems;
+    function GetItems: TCompletionItems;
     function GetTitleHeight: Integer;
     function GetVisibleLines: Integer;
     procedure HandleDblClick(ASender: TObject);
@@ -58,10 +58,10 @@ type
     procedure MouseWheel(AShift: TShiftState; AWheelDelta: Integer; AMousePos: TPoint);
     procedure WndProc(var Msg: TMessage); override;
     property CurrentString: string read FCurrentString write SetCurrentString;
-    property Items: TBCEditorCompletionProposal.TItems read GetItems;
+    property Items: TCompletionItems read GetItems;
     property TopLine: Integer read FTopLine write SetTopLine;
     property OnCanceled: TNotifyEvent read FOnCanceled write FOnCanceled;
-    property OnSelected: TBCEditorCompletionProposal.TSelectedEvent read FOnSelected write FOnSelected;
+    property OnSelected: TSelectedEvent read FOnSelected write FOnSelected;
   end;
 
 implementation {***************************************************************}
@@ -169,7 +169,7 @@ var
     LAutoWidthCount: Integer;
     LColumnIndex: Integer;
     LIndex: Integer;
-    LItems: TBCEditorCompletionProposal.TItems;
+    LItems: TCompletionItems;
     LMaxWidth: Integer;
     LProposalColumn: TBCEditorCompletionProposal.TColumns.TColumn;
     LTempWidth: Integer;
@@ -319,7 +319,7 @@ begin
   end;
 end;
 
-function TBCEditorCompletionProposalPopupWindow.GetItems: TBCEditorCompletionProposal.TItems;
+function TBCEditorCompletionProposalPopupWindow.GetItems: TCompletionItems;
 begin
   Result := nil;
   if FCompletionProposal.CompletionColumnIndex <  FCompletionProposal.Columns.Count then

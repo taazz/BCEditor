@@ -10,9 +10,6 @@ uses
 type
   TBCEditorCaret = class(TPersistent)
   type
-    TChangedEvent = procedure(ASender: TObject; X, Y: Integer) of object;
-    TOptions = set of TBCEditorCaretOption;
-
     TStyles = class(TPersistent)
     strict private
       FInsert: TBCEditorCaretStyle;
@@ -81,9 +78,6 @@ type
 
     TMultiEdit = class(TPersistent)
     type
-      TOptions = set of TBCEditorCaretMultiEditOption;
-
-
       TColors = class(TPersistent)
       strict private
         FBackground: TColor;
@@ -102,12 +96,12 @@ type
       FColors: TBCEditorCaret.TMultiEdit.TColors;
       FEnabled: Boolean;
       FOnChange: TNotifyEvent;
-      FOptions: TBCEditorCaret.TMultiEdit.TOptions;
+      FOptions: TBCEditorCaretMultiEditOptions;
       FStyle: TBCEditorCaretStyle;
       procedure DoChange;
       procedure SetColors(AValue: TBCEditorCaret.TMultiEdit.TColors);
       procedure SetEnabled(AValue: Boolean);
-      procedure SetOptions(const AValue: TBCEditorCaret.TMultiEdit.TOptions);
+      procedure SetOptions(const AValue: TBCEditorCaretMultiEditOptions);
       procedure SetStyle(const AValue: TBCEditorCaretStyle);
     public
       constructor Create;
@@ -116,7 +110,7 @@ type
     published
       property Colors: TBCEditorCaret.TMultiEdit.TColors read FColors write SetColors;
       property Enabled: Boolean read FEnabled write SetEnabled default True;
-      property Options: TBCEditorCaret.TMultiEdit.TOptions read FOptions write SetOptions default DefaultOptions;
+      property Options: TBCEditorCaretMultiEditOptions read FOptions write SetOptions default DefaultOptions;
       property Style: TBCEditorCaretStyle read FStyle write SetStyle default csVerticalLine;
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     end;
@@ -128,14 +122,14 @@ type
     FNonBlinking: TBCEditorCaret.TNonBlinking;
     FOffsets: TBCEditorCaret.TOffsets;
     FOnChange: TNotifyEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorCaretOptions;
     FStyles: TStyles;
     procedure DoChange(ASender: TObject);
     procedure SetMultiEdit(AValue: TBCEditorCaret.TMultiEdit);
     procedure SetNonBlinking(AValue: TBCEditorCaret.TNonBlinking);
     procedure SetOffsets(AValue: TBCEditorCaret.TOffsets);
     procedure SetOnChange(AValue: TNotifyEvent);
-    procedure SetOptions(const AValue: TOptions);
+    procedure SetOptions(const AValue: TBCEditorCaretOptions);
     procedure SetStyles(const AValue: TBCEditorCaret.TStyles);
   public
     constructor Create;
@@ -146,7 +140,7 @@ type
     property MultiEdit: TBCEditorCaret.TMultiEdit read FMultiEdit write SetMultiEdit;
     property NonBlinking: TBCEditorCaret.TNonBlinking read FNonBlinking write SetNonBlinking;
     property Offsets: TBCEditorCaret.TOffsets read FOffsets write SetOffsets;
-    property Options: TOptions read FOptions write SetOptions default DefaultOptions;
+    property Options: TBCEditorCaretOptions read FOptions write SetOptions default DefaultOptions;
     property Styles: TBCEditorCaret.TStyles read FStyles write SetStyles;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   end;
@@ -395,7 +389,7 @@ begin
   end;
 end;
 
-procedure TBCEditorCaret.TMultiEdit.SetOptions(const AValue: TBCEditorCaret.TMultiEdit.TOptions);
+procedure TBCEditorCaret.TMultiEdit.SetOptions(const AValue: TBCEditorCaretMultiEditOptions);
 begin
   if FOptions <> AValue then
   begin
@@ -490,7 +484,7 @@ begin
     Exclude(FOptions, AOption);
 end;
 
-procedure TBCEditorCaret.SetOptions(const AValue: TOptions);
+procedure TBCEditorCaret.SetOptions(const AValue: TBCEditorCaretOptions);
 begin
   if FOptions <> AValue then
   begin

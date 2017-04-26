@@ -10,8 +10,6 @@ uses
 type
   TBCEditorMatchingPair = class(TPersistent)
   type
-    TOptions = set of TBCEditorMatchingPairOption;
-
     TColors = class(TPersistent)
     strict private
       FMatched: TColor;
@@ -31,7 +29,7 @@ type
   strict private
     FColors: TColors;
     FEnabled: Boolean;
-    FOptions: TOptions;
+    FOptions: TBCEditorMatchingPairOptions;
     procedure SetColors(const AValue: TColors);
   public
     constructor Create;
@@ -41,7 +39,7 @@ type
   published
     property Colors: TColors read FColors write SetColors;
     property Enabled: Boolean read FEnabled write FEnabled default True;
-    property Options: TOptions read FOptions write FOptions default DefaultOptions;
+    property Options: TBCEditorMatchingPairOptions read FOptions write FOptions default DefaultOptions;
   end;
 
 implementation {***************************************************************}

@@ -9,6 +9,7 @@ uses
   BCEditor.Consts, BCEditor.Editor.CodeFolding, BCEditor.Types;
 
 type
+  TAbstractParserArray = array [AnsiChar] of Pointer;
   TBCEditorHighlighter = class(TObject)
   type
     TAttribute = class;
@@ -18,7 +19,6 @@ type
     TDelimitersParser = class;
     TTokenNodeList = class;
     TBaseParser = class;
-    TAbstractParserArray = array [AnsiChar] of TBaseParser;
 
     TMatchingPairMatch = record
       Attribute: TAttribute;
@@ -407,7 +407,7 @@ type
     FAttributes: TStringList;
     FBeginningOfLine: Boolean;
     FCodeFoldingRangeCount: Integer;
-    FCodeFoldingRegions: TBCEditorCodeFolding.TRegions;
+    FCodeFoldingRegions: TRegions;
     FColors: TColors;
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions;
@@ -471,7 +471,7 @@ type
     property Attribute[AIndex: Integer]: TAttribute read GetAttribute;
     property Attributes: TStringList read FAttributes;
     property CodeFoldingRangeCount: Integer read FCodeFoldingRangeCount write SetCodeFoldingRangeCount;
-    property CodeFoldingRegions: TBCEditorCodeFolding.TRegions read FCodeFoldingRegions write FCodeFoldingRegions;
+    property CodeFoldingRegions: TRegions read FCodeFoldingRegions write FCodeFoldingRegions;
     property Colors: TColors read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
@@ -1304,6 +1304,7 @@ procedure TBCEditorHighlighter.TRange.Reset;
 var
   LAnsiChar: AnsiChar;
   LIndex: Integer;
+  LParser: TBaseParser;
 begin
   if not FPrepared then
     Exit;
@@ -1311,9 +1312,10 @@ begin
   for LIndex := 0 to 255 do
   begin
     LAnsiChar := AnsiChar(LIndex);
-    if Assigned(SymbolList[LAnsiChar]) and (SymbolList[LAnsiChar] <> FDefaultTermSymbol) and (SymbolList[LAnsiChar] <> FDefaultSymbols) then
-      FSymbolList[LAnsiChar].Free;
-    FSymbolList[LAnsiChar] := nil;
+    LParser := SymbolList[LAnsiChar];
+    if Assigned(LParser) and (LParser <> FDefaultTermSymbol) and (LParser <> FDefaultSymbols) then
+      LParser.Free;
+    LParser := nil;
   end;
 
   FDefaultToken.Free;
@@ -1687,7 +1689,7 @@ begin
     Result := btUnspecified;
 end;
 
-function StrToRegionType(const AString: string): TBCEditorCodeFolding.TSkipRegions.TItem.TItemType;
+function StrToRegionType(const AString: string): TItemType;
 begin
   if AString = 'SingleLine' then
     Result := ritSingleLineComment
@@ -1747,7 +1749,7 @@ begin
     FHighlighter.CodeFoldingRangeCount := LCount;
     for i := 0 to LCount - 1 do
     begin
-      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFolding.TRegion.Create(TBCEditorCodeFolding.TRegion.TItem);
+      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFolding.TRegion.Create(TRegionItem);
       LCodeFoldingObject := LArray.Items[i].ObjectValue;
 
       ImportCodeFoldingOptions(FHighlighter.CodeFoldingRegions[i], LCodeFoldingObject);
@@ -1770,7 +1772,7 @@ var
   LJSONObject: TJsonObject;
   LMemberObject: TJsonObject;
   LOpenToken: string;
-  LRegionItem: TBCEditorCodeFolding.TRegion.TItem;
+  LRegionItem: TRegionItem;
   LSkipIfFoundAfterOpenTokenArray: TJsonArray;
 begin
   if ACodeFoldingObject.Contains('FoldRegion') then
@@ -1885,10 +1887,10 @@ var
   LJsonDataValue: PJsonDataValue;
   LJSONObject: TJsonObject;
   LOpenToken: string;
-  LRegionItem: TBCEditorCodeFolding.TRegion.TItem;
+  LRegionItem: TRegionItem;
   LSkipRegionArray: TJsonArray;
   LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
-  LSkipRegionType: TBCEditorCodeFolding.TSkipRegions.TItem.TItemType;
+  LSkipRegionType: TItemType;
 begin
   if ACodeFoldingObject.Contains('SkipRegion') then
   begin
@@ -2713,6 +2715,7 @@ end;
 procedure TBCEditorHighlighter.Clear;
 var
   LIndex: Integer;
+  LRegion: BCEditor.Editor.CodeFolding.TBCEditorCodeFolding.TRegion;
 begin
   FFoldOpenKeyChars := [];
   FFoldCloseKeyChars := [];
@@ -2726,8 +2729,9 @@ begin
   FSample := '';
   for LIndex := 0 to FCodeFoldingRangeCount - 1 do
   begin
-    FCodeFoldingRegions[LIndex].Free;
-    FCodeFoldingRegions[LIndex] := nil;
+    LRegion := FCodeFoldingRegions[LIndex];
+    LRegion.Free;
+    LRegion := nil;
   end;
   CodeFoldingRangeCount := 0;
   TCustomBCEditor(Editor).ClearMatchingPair;

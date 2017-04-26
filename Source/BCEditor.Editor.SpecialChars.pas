@@ -10,8 +10,6 @@ uses
 type
   TBCEditorSpecialChars = class(TPersistent)
   type
-    TOptions = set of TBCEditorSpecialCharsOption;
-
     TSelection = class(TPersistent)
     strict private
       FColor: TColor;
@@ -55,7 +53,7 @@ type
     FColor: TColor;
     FEndOfLine: TEndOfLine;
     FOnChange: TNotifyEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorSpecialCharsOptions;
     FSelection: TSelection;
     FStyle: TBCEditorSpecialCharsStyle;
     FVisible: Boolean;
@@ -63,7 +61,7 @@ type
     procedure SetColor(const AValue: TColor);
     procedure SetEndOfLine(const AValue: TEndOfLine);
     procedure SetOnChange(const AValue: TNotifyEvent);
-    procedure SetOptions(AValue: TOptions);
+    procedure SetOptions(AValue: TBCEditorSpecialCharsOptions);
     procedure SetSelection(const AValue: TSelection);
     procedure SetStyle(const AValue: TBCEditorSpecialCharsStyle);
     procedure SetVisible(const AValue: Boolean);
@@ -75,7 +73,7 @@ type
   published
     property Color: TColor read FColor write SetColor default clWindowText;
     property EndOfLine: TBCEditorSpecialChars.TEndOfLine read FEndOfLine write SetEndOfLine;
-    property Options: TOptions read FOptions write SetOptions default [scoMiddleColor];
+    property Options: TBCEditorSpecialCharsOptions read FOptions write SetOptions default [scoMiddleColor];
     property Selection: TSelection read FSelection write SetSelection;
     property Style: TBCEditorSpecialCharsStyle read FStyle write SetStyle default DefaultStyle;
     property Visible: Boolean read FVisible write SetVisible default False;
@@ -261,7 +259,7 @@ begin
     Exclude(FOptions, AOption);
 end;
 
-procedure TBCEditorSpecialChars.SetOptions(AValue: TOptions);
+procedure TBCEditorSpecialChars.SetOptions(AValue: TBCEditorSpecialCharsOptions);
 begin
   if FOptions <> AValue then
   begin

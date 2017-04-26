@@ -20,8 +20,6 @@ uses
 
 type
   TCustomBCEditor = class(TCustomControl)
-  type
-    TUndoOptions = set of TBCEditorUndoOption;
   strict private type
     TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
     TBCEditorReplace = class(BCEditor.Editor.Replace.TBCEditorReplace);
@@ -184,12 +182,12 @@ type
     FOnAfterLinePaint: TBCEditorLinePaintEvent;
     FOnAfterMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
     FOnAfterMarkPlaced: TNotifyEvent;
-    FOnBeforeCompletionProposalExecute: TBCEditorCompletionProposal.TEvent;
+    FOnBeforeCompletionProposalExecute: TCompletionEvent;
     FOnBeforeDeleteMark: TBCEditorMarkEvent;
     FOnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
     FOnBeforeMarkPlaced: TBCEditorMarkEvent;
     FOnBeforeTokenInfoExecute: TBCEditorTokenInfoEvent;
-    FOnCaretChanged: TBCEditorCaret.TChangedEvent;
+    FOnCaretChanged: TCaretChangedEvent;
     FOnChainCaretMoved: TNotifyEvent;
     FOnChainLinesCleared: TNotifyEvent;
     FOnChainLinesDeleted: TBCEditorLines.TChangeEvent;
@@ -198,22 +196,22 @@ type
     FOnChange: TNotifyEvent;
     FOnCommandProcessed: TBCEditorProcessCommandEvent;
     FOnCompletionProposalCanceled: TNotifyEvent;
-    FOnCompletionProposalSelected: TBCEditorCompletionProposal.TSelectedEvent;
+    FOnCompletionProposalSelected: TSelectedEvent;
     FOnContextHelp: TBCEditorContextHelpEvent;
     FOnCreateFileStream: TBCEditorCreateFileStreamEvent;
     FOnCustomLineColors: TBCEditorCustomLineColorsEvent;
     FOnCustomTokenAttribute: TBCEditorCustomTokenAttributeEvent;
     FOnDropFiles: TBCEditorDropFilesEvent;
     FOnKeyPressW: TBCEditorKeyPressWEvent;
-    FOnLeftMarginClick: TBCEditorLeftMargin.TClickEvent;
+    FOnLeftMarginClick: TMarginClickEvent;
     FOnMarkPanelLinePaint: TBCEditorMarkPanelLinePaintEvent;
     FOnModified: TNotifyEvent;
     FOnPaint: TBCEditorPaintEvent;
     FOnProcessCommand: TBCEditorProcessCommandEvent;
     FOnProcessUserCommand: TBCEditorProcessCommandEvent;
-    FOnReplaceText: TBCEditorReplace.TEvent;
+    FOnReplaceText: TReplaceEvent;
     FOnRightMarginMouseUp: TNotifyEvent;
-    FOnScroll: TBCEditorScroll.TEvent;
+    FOnScroll: TScrollEvent;
     FOnSelectionChanged: TNotifyEvent;
     FOptions: TBCEditorOptions;
     FOriginalLines: TBCEditorLines;
@@ -529,7 +527,6 @@ type
     procedure FreeTokenInfoPopupWindow;
     function GetBookmark(const AIndex: Integer; var ATextPosition: TBCEditorTextPosition): Boolean;
     function GetColorsFileName(const AFileName: string): string;
-    function GetHighlighterFileName(const AFileName: string): string;
     function GetReadOnly: Boolean; virtual;
     function GetRows(): TRows;
     function GetSelLength: Integer;
@@ -614,31 +611,31 @@ type
     property OnAfterLinePaint: TBCEditorLinePaintEvent read FOnAfterLinePaint write FOnAfterLinePaint;
     property OnAfterMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnAfterMarkPanelPaint write FOnAfterMarkPanelPaint;
     property OnAfterMarkPlaced: TNotifyEvent read FOnAfterMarkPlaced write FOnAfterMarkPlaced;
-    property OnBeforeCompletionProposalExecute: TBCEditorCompletionProposal.TEvent read FOnBeforeCompletionProposalExecute write FOnBeforeCompletionProposalExecute;
+    property OnBeforeCompletionProposalExecute: TCompletionEvent read FOnBeforeCompletionProposalExecute write FOnBeforeCompletionProposalExecute;
     property OnBeforeDeleteMark: TBCEditorMarkEvent read FOnBeforeDeleteMark write FOnBeforeDeleteMark;
     property OnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnBeforeMarkPanelPaint write FOnBeforeMarkPanelPaint;
     property OnBeforeMarkPlaced: TBCEditorMarkEvent read FOnBeforeMarkPlaced write FOnBeforeMarkPlaced;
     property OnBeforeTokenInfoExecute: TBCEditorTokenInfoEvent read FOnBeforeTokenInfoExecute write FOnBeforeTokenInfoExecute;
-    property OnCaretChanged: TBCEditorCaret.TChangedEvent read FOnCaretChanged write FOnCaretChanged;
+    property OnCaretChanged: TCaretChangedEvent read FOnCaretChanged write FOnCaretChanged;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnCommandProcessed: TBCEditorProcessCommandEvent read FOnCommandProcessed write FOnCommandProcessed;
     property OnCompletionProposalCanceled: TNotifyEvent read FOnCompletionProposalCanceled write FOnCompletionProposalCanceled;
-    property OnCompletionProposalSelected: TBCEditorCompletionProposal.TSelectedEvent read FOnCompletionProposalSelected write FOnCompletionProposalSelected;
+    property OnCompletionProposalSelected: TSelectedEvent read FOnCompletionProposalSelected write FOnCompletionProposalSelected;
     property OnContextHelp: TBCEditorContextHelpEvent read FOnContextHelp write FOnContextHelp;
     property OnCreateFileStream: TBCEditorCreateFileStreamEvent read FOnCreateFileStream write FOnCreateFileStream;
     property OnCustomLineColors: TBCEditorCustomLineColorsEvent read FOnCustomLineColors write FOnCustomLineColors;
     property OnCustomTokenAttribute: TBCEditorCustomTokenAttributeEvent read FOnCustomTokenAttribute write FOnCustomTokenAttribute;
     property OnDropFiles: TBCEditorDropFilesEvent read FOnDropFiles write FOnDropFiles;
     property OnKeyPress: TBCEditorKeyPressWEvent read FOnKeyPressW write FOnKeyPressW;
-    property OnLeftMarginClick: TBCEditorLeftMargin.TClickEvent read FOnLeftMarginClick write FOnLeftMarginClick;
+    property OnLeftMarginClick: TMarginClickEvent read FOnLeftMarginClick write FOnLeftMarginClick;
     property OnMarkPanelLinePaint: TBCEditorMarkPanelLinePaintEvent read FOnMarkPanelLinePaint write FOnMarkPanelLinePaint;
     property OnModified: TNotifyEvent read FOnModified write FOnModified;
     property OnPaint: TBCEditorPaintEvent read FOnPaint write FOnPaint;
     property OnProcessCommand: TBCEditorProcessCommandEvent read FOnProcessCommand write FOnProcessCommand;
     property OnProcessUserCommand: TBCEditorProcessCommandEvent read FOnProcessUserCommand write FOnProcessUserCommand;
-    property OnReplaceText: TBCEditorReplace.TEvent read FOnReplaceText write FOnReplaceText;
+    property OnReplaceText: TReplaceEvent read FOnReplaceText write FOnReplaceText;
     property OnRightMarginMouseUp: TNotifyEvent read FOnRightMarginMouseUp write FOnRightMarginMouseUp;
-    property OnScroll: TBCEditorScroll.TEvent read FOnScroll write FOnScroll;
+    property OnScroll: TScrollEvent read FOnScroll write FOnScroll;
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
     property Options: TBCEditorOptions read FOptions write SetOptions default DefaultOptions;
     property Rows: TRows read GetRows;
@@ -682,6 +679,7 @@ type
     procedure ExportToHTML(const AFileName: string; const ACharSet: string = ''; AEncoding: TEncoding = nil); overload;
     procedure ExportToHTML(AStream: TStream; const ACharSet: string = ''; AEncoding: TEncoding = nil); overload;
     procedure FindAll;
+    function GetHighlighterFileName(const AFileName: string): string;
     function GetWordAtPixels(const X, Y: Integer): string; deprecated 'Use WordAt[ClientToText()]'; // 2017-03-16
     procedure HookEditorLines(ALines: TBCEditorLines; AUndo, ARedo: TBCEditorLines.TUndoList);
     procedure LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromFile'; // 2017-03-10
@@ -3129,7 +3127,7 @@ var
   LControl: TWinControl;
   LCurrentInput: string;
   LIndex: Integer;
-  LItem: TBCEditorCompletionProposal.TItems.TItem;
+  LItem: TCompletionItems.TItem;
   LItems: TStrings;
   LPoint: TPoint;
 begin
@@ -6446,7 +6444,7 @@ var
 
 var
   LFoldRegion: TBCEditorCodeFolding.TRegion;
-  LFoldRegionItem: TBCEditorCodeFolding.TRegion.TItem;
+  LFoldRegionItem: TRegionItem;
   LIndex1: Integer;
   LIndex2: Integer;
   LLineBeginPos: PChar;
@@ -6507,7 +6505,7 @@ function TCustomBCEditor.IsKeywordAtPositionOrAfter(const APosition: TBCEditorTe
 var
   LCaretPosition: TBCEditorTextPosition;
   LFoldRegion: TBCEditorCodeFolding.TRegion;
-  LFoldRegionItem: TBCEditorCodeFolding.TRegion.TItem;
+  LFoldRegionItem: TRegionItem;
   LIndex1: Integer;
   LIndex2: Integer;
   LLineBeginPos: PChar;
@@ -10654,7 +10652,7 @@ var
     LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
     LIndex: Integer;
     LLineTempPos: PChar;
-    LRegionItem: TBCEditorCodeFolding.TRegion.TItem;
+    LRegionItem: TRegionItem;
     LSkipIfFoundAfterOpenToken: Boolean;
     LTokenEndPos: PChar;
     LTokenFollowEndPos: PChar;
@@ -10937,10 +10935,11 @@ var
     LTextBeginPos: PChar;
     LTextEndPos: PChar;
     LTextPos: PChar;
-    LRegionItem: TBCEditorCodeFolding.TRegion.TItem;
+    LRegionItem: TRegionItem;
     LTokenAttributes: string;
     LTokenAttributesBeginPos: PChar;
     LTokenName: string;
+    LRegion: BCEditor.Editor.CodeFolding.TBCEditorCodeFolding.TRegion;
   begin
     LText := Lines.Text;
     LTextBeginPos := @LText[1];
@@ -10982,12 +10981,15 @@ var
           LCloseToken := '</' + LTokenName + '>';
 
           if (LTextPos^ = '>') and (LTextPos^ <> '/') then
-            if not FHighlighter.CodeFoldingRegions[0].Contains(LOpenToken, LCloseToken) then { First (0) is the default range }
+          begin
+            LRegion := FHighlighter.CodeFoldingRegions[0];
+            if not LRegion.Contains(LOpenToken, LCloseToken) then { First (0) is the default range }
             begin
-              LRegionItem := FHighlighter.CodeFoldingRegions[0].Add(LOpenToken, LCloseToken);
+              LRegionItem := LRegion.Add(LOpenToken, LCloseToken);
               LRegionItem.BreakCharFollows := False;
               LAdded := True;
             end;
+          end;
         end;
       end;
       Inc(LTextPos);

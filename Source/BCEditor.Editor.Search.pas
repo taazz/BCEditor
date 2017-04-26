@@ -11,7 +11,6 @@ type
   TBCEditorSearch = class(TPersistent)
   public type
     TChangeEvent = procedure(Event: TBCEditorSearchEvent) of object;
-    TOptions = set of TBCEditorSearchOption;
 
     THighlighter = class(TPersistent)
     type
@@ -53,11 +52,6 @@ type
 
     TMap = class(TPersistent)
     type
-      TOption = (
-        moShowActiveLine
-      );
-      TOptions = set of TBCEditorSearch.TMap.TOption;
-
       TColors = class(TPersistent)
       strict private
         FActiveLine: TColor;
@@ -84,14 +78,14 @@ type
       FColors: TColors;
       FCursor: TCursor;
       FOnChange: TChangeEvent;
-      FOptions: TBCEditorSearch.TMap.TOptions;
+      FOptions: TBCEditorSearchMapOptions;
       FVisible: Boolean;
       FWidth: Integer;
       procedure DoChange;
       procedure SetAlign(const AValue: TBCEditorSearchMapAlign);
       procedure SetColors(const AValue: TColors);
       procedure SetOnChange(AValue: TChangeEvent);
-      procedure SetOptions(const AValue: TMap.TOptions);
+      procedure SetOptions(const AValue: TBCEditorSearchMapOptions);
       procedure SetVisible(AValue: Boolean);
       procedure SetWidth(AValue: Integer);
     public
@@ -103,7 +97,7 @@ type
       property Align: TBCEditorSearchMapAlign read FAlign write SetAlign default saRight;
       property Colors: TColors read FColors write SetColors;
       property Cursor: TCursor read FCursor write FCursor default crArrow;
-      property Options: TBCEditorSearch.TMap.TOptions read FOptions write SetOptions default DefaultOptions;
+      property Options: TBCEditorSearchMapOptions read FOptions write SetOptions default DefaultOptions;
       property Visible: Boolean read FVisible write SetVisible default False;
       property Width: Integer read FWidth write SetWidth default 5;
       property OnChange: TChangeEvent read FOnChange write SetOnChange;
@@ -139,7 +133,7 @@ type
     FInSelection: TInSelection;
     FMap: TMap;
     FOnChange: TChangeEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorSearchOptions;
     FPattern: string;
     FVisible: Boolean;
     FWholeWordsOnly: Boolean;
@@ -167,7 +161,7 @@ type
     property Highlighter: THighlighter read FHighlighter write SetHighlighter;
     property InSelection: TInSelection read FInSelection write SetInSelection;
     property Map: TMap read FMap write SetMap;
-    property Options: TOptions read FOptions write FOptions default DefaultOptions;
+    property Options: TBCEditorSearchOptions read FOptions write FOptions default DefaultOptions;
     property WholeWordsOnly: Boolean read FWholeWordsOnly write SetWholeWordsOnly default False;
   end;
 
@@ -407,7 +401,7 @@ begin
   FColors.OnChange := FOnChange;
 end;
 
-procedure TBCEditorSearch.TMap.SetOptions(const AValue: TMap.TOptions);
+procedure TBCEditorSearch.TMap.SetOptions(const AValue: TBCEditorSearchMapOptions);
 begin
   if FOptions <> AValue then
   begin

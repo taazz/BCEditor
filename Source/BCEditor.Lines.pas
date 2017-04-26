@@ -10,7 +10,6 @@ uses
 type
   TBCEditorLines = class(TStrings)
   protected type
-    TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
     TCompare = function(Lines: TBCEditorLines; Line1, Line2: Integer): Integer;
 
     TOption = (loColumnTabs, loTrimTrailingSpaces, loTrimTrailingLines,
@@ -80,6 +79,8 @@ type
       Text: string;
     end;
 
+  public type
+    TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
     TUndoList = class(TList<TUndoItem>)
     strict private
       FBlockNumber: Integer;

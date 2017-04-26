@@ -10,10 +10,6 @@ uses
 type
   TBCEditorLeftMargin = class(TPersistent)
   type
-    TGetTextEvent = procedure(ASender: TObject; ALine: Integer; var AText: string) of object;
-    TPaintEvent = procedure(ASender: TObject; ALine: Integer; X, Y: Integer) of object;
-    TClickEvent = procedure(ASender: TObject; AButton: TMouseButton; X, Y, ALine: Integer; AMark: TBCEditorMark) of object;
-
     TColors = class(TPersistent)
     strict private
       FBackground: TColor;
@@ -61,12 +57,9 @@ type
     TMarks = class(TPersistent)
     type
       TPanel = class(TPersistent)
-      type
-        TOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
-
       strict private
         FOnChange: TNotifyEvent;
-        FOptions: TOptions;
+        FOptions: TBCEditorLeftMarginBookMarkPanelOptions;
         FVisible: Boolean;
         FWidth: Integer;
         procedure DoChange;
@@ -76,7 +69,7 @@ type
         constructor Create;
         procedure Assign(ASource: TPersistent); override;
       published
-        property Options: TOptions read FOptions write FOptions default [bpoToggleBookmarkByClick];
+        property Options: TBCEditorLeftMarginBookMarkPanelOptions read FOptions write FOptions default [bpoToggleBookmarkByClick];
         property Visible: Boolean read FVisible write SetVisible default True;
         property Width: Integer read FWidth write SetWidth default 20;
         property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -107,18 +100,16 @@ type
     end;
 
     TLineNumbers = class(TPersistent)
-    type
-      TOptions = set of TBCEditorLeftMarginLineNumberOption;
     strict private
       FAutosizeDigitCount: Integer;
       FDigitCount: Integer;
       FOnChange: TNotifyEvent;
-      FOptions: TOptions;
+      FOptions: TBCEditorLeftMarginLineNumberOptions;
       FStartFrom: Integer;
       FVisible: Boolean;
       procedure DoChange;
       procedure SetDigitCount(AValue: Integer);
-      procedure SetOptions(const AValue: TOptions);
+      procedure SetOptions(const AValue: TBCEditorLeftMarginLineNumberOptions);
       procedure SetStartFrom(const AValue: Integer);
       procedure SetVisible(const AValue: Boolean);
     public
@@ -128,7 +119,7 @@ type
       property AutosizeDigitCount: Integer read FAutosizeDigitCount write FAutosizeDigitCount;
     published
       property DigitCount: Integer read FDigitCount write SetDigitCount default 4;
-      property Options: TOptions read FOptions write SetOptions default [lnoIntens];
+      property Options: TBCEditorLeftMarginLineNumberOptions read FOptions write SetOptions default [lnoIntens];
       property StartFrom: Integer read FStartFrom write SetStartFrom default 1;
       property Visible: Boolean read FVisible write SetVisible default True;
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -468,7 +459,7 @@ begin
     Exclude(FOptions, AOption);
 end;
 
-procedure TBCEditorLeftMargin.TLineNumbers.SetOptions(const AValue: TOptions);
+procedure TBCEditorLeftMargin.TLineNumbers.SetOptions(const AValue: TBCEditorLeftMarginLineNumberOptions);
 begin
   if FOptions <> AValue then
   begin

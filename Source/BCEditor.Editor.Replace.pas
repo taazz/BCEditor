@@ -7,13 +7,11 @@ uses
   BCEditor.Types, BCEditor.Editor.Search;
 
 type
-  TBCEditorReplace = class(TPersistent)
-  type
-    TChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
-    TEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorTextPosition;
+  TChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
+  TReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorTextPosition;
       var AAction: TBCEditorReplaceAction) of object;
-    TOptions = set of TBCEditorReplaceOption;
 
+  TBCEditorReplace = class(TPersistent)
   strict private const
     DefaultOptions = [roPrompt];
   strict private
@@ -21,7 +19,7 @@ type
     FEndPosition: TBCEditorTextPosition;
     FEngine: TBCEditorSearchEngine;
     FOnChange: TChangeEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorReplaceOptions;
     FPattern: string;
     FReplaceText: string;
     procedure SetEngine(const AValue: TBCEditorSearchEngine);
@@ -37,7 +35,7 @@ type
     property ReplaceText: string read FReplaceText write FReplaceText;
   published
     property Engine: TBCEditorSearchEngine read FEngine write SetEngine default seNormal;
-    property Options: TOptions read FOptions write FOptions default DefaultOptions;
+    property Options: TBCEditorReplaceOptions read FOptions write FOptions default DefaultOptions;
   end;
 
 implementation

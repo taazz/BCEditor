@@ -8,16 +8,40 @@ uses
   BCEditor.Types;
 
 type
+  TCompletionEvent = procedure(Sender: TObject; AColumns: Pointer; const AInput: string;
+      var ACanExecute: Boolean) of object;
+
+  TCompletionItems = class(TCollection)
+    type
+
+      TItem = class(TCollectionItem)
+      strict private
+        FImageIndex: Integer;
+        FValue: string;
+      public
+        constructor Create(ACollection: TCollection); override;
+        procedure Assign(ASource: TPersistent); override;
+      published
+        property ImageIndex: Integer read FImageIndex write FImageIndex default -1;
+        property Value: string read FValue write FValue;
+      end;
+
+    strict private
+      FOwner: TPersistent;
+      function GetItem(AIndex: Integer): TItem;
+      procedure SetItem(AIndex: Integer; AValue: TItem);
+    protected
+      function GetOwner: TPersistent; override;
+    public
+      constructor Create(AOwner: TPersistent);
+      function Add: TItem;
+      function FindItemID(AID: Integer): TItem;
+      function Insert(AIndex: Integer): TItem;
+      property Items[AIndex: Integer]: TItem read GetItem write SetItem; default;
+    end;
+
   TBCEditorCompletionProposal = class(TPersistent)
   type
-    TColumns = class;
-
-    TEvent = procedure(Sender: TObject; AColumns: TColumns; const AInput: string;
-      var ACanExecute: Boolean) of object;
-    TOptions = set of TBCEditorCompletionProposalOption;
-    TSelectedEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
-    TValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
-
     TColors = class(TPersistent)
     strict private
       FBackground: TColor;
@@ -46,35 +70,6 @@ type
       property Chars: string read FChars write FChars;
       property Enabled: Boolean read FEnabled write FEnabled default False;
       property Interval: Integer read FInterval write FInterval default 1000;
-    end;
-
-    TItems = class(TCollection)
-    type
-
-      TItem = class(TCollectionItem)
-      strict private
-        FImageIndex: Integer;
-        FValue: string;
-      public
-        constructor Create(ACollection: TCollection); override;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property ImageIndex: Integer read FImageIndex write FImageIndex default -1;
-        property Value: string read FValue write FValue;
-      end;
-
-    strict private
-      FOwner: TPersistent;
-      function GetItem(AIndex: Integer): TItem;
-      procedure SetItem(AIndex: Integer; AValue: TItem);
-    protected
-      function GetOwner: TPersistent; override;
-    public
-      constructor Create(AOwner: TPersistent);
-      function Add: TItem;
-      function FindItemID(AID: Integer): TItem;
-      function Insert(AIndex: Integer): TItem;
-      property Items[AIndex: Integer]: TItem read GetItem write SetItem; default;
     end;
 
     TColumns = class(TCollection)
@@ -120,7 +115,7 @@ type
       strict private
         FAutoWidth: Boolean;
         FFont: TFont;
-        FItems: TItems;
+        FItems: TCompletionItems;
         FTitle: TTitle;
         FVisible: Boolean;
         FWidth: Integer;
@@ -132,7 +127,7 @@ type
       published
         property AutoWidth: Boolean read FAutoWidth write FAutoWidth default True;
         property Font: TFont read FFont write SetFont;
-        property Items: TBCEditorCompletionProposal.TItems read FItems write FItems;
+        property Items: TCompletionItems read FItems write FItems;
         property Title: TBCEditorCompletionProposal.TColumns.TColumn.TTitle read FTitle write FTitle;
         property Visible: Boolean read FVisible write FVisible default True;
         property Width: Integer read FWidth write FWidth default 0;
@@ -166,7 +161,7 @@ type
     FConstraints: TSizeConstraints;
     FEnabled: Boolean;
     FImages: TCustomImageList;
-    FOptions: TBCEditorCompletionProposal.TOptions;
+    FOptions: TBCEditorCompletionProposalOptions;
     FOwner: TComponent;
     FSecondaryShortCut: TShortCut;
     FShortCut: TShortCut;
@@ -190,7 +185,7 @@ type
     property Constraints: TSizeConstraints read FConstraints write FConstraints;
     property Enabled: Boolean read FEnabled write FEnabled default True;
     property Images: TCustomImageList read FImages write SetImages;
-    property Options: TBCEditorCompletionProposal.TOptions read FOptions write FOptions default DefaultOptions;
+    property Options: TBCEditorCompletionProposalOptions read FOptions write FOptions default DefaultOptions;
     property SecondaryShortCut: TShortCut read FSecondaryShortCut write FSecondaryShortCut default DefaultSecondaryShortCut;
     property ShortCut: TShortCut read FShortCut write FShortCut default DefaultShortCut;
     property Trigger: TBCEditorCompletionProposal.TTrigger read FTrigger write FTrigger;
@@ -255,17 +250,17 @@ end;
 
 { TBCEditorCompletionProposal.TItems.TItem ************************************}
 
-constructor TBCEditorCompletionProposal.TItems.TItem.Create(ACollection: TCollection);
+constructor TCompletionItems.TItem.Create(ACollection: TCollection);
 begin
   inherited;
 
   FImageIndex := -1;
 end;
 
-procedure TBCEditorCompletionProposal.TItems.TItem.Assign(ASource: TPersistent);
+procedure TCompletionItems.TItem.Assign(ASource: TPersistent);
 begin
-  if ASource is TBCEditorCompletionProposal.TItems.TItem then
-  with ASource as TBCEditorCompletionProposal.TItems.TItem do
+  if ASource is TCompletionItems.TItem then
+  with ASource as TCompletionItems.TItem do
   begin
     Self.FImageIndex := FImageIndex;
     Self.FValue := FValue;
@@ -276,39 +271,39 @@ end;
 
 { TBCEditorCompletionProposal.TItems ******************************************}
 
-constructor TBCEditorCompletionProposal.TItems.Create(AOwner: TPersistent);
+constructor TCompletionItems.Create(AOwner: TPersistent);
 begin
   inherited Create(TItem);
 
   FOwner := AOwner;
 end;
 
-function TBCEditorCompletionProposal.TItems.Add: TBCEditorCompletionProposal.TItems.TItem;
+function TCompletionItems.Add: TCompletionItems.TItem;
 begin
-  Result := inherited Add as TBCEditorCompletionProposal.TItems.TItem;
+  Result := inherited Add as TCompletionItems.TItem;
 end;
 
-function TBCEditorCompletionProposal.TItems.FindItemID(AID: Integer): TBCEditorCompletionProposal.TItems.TItem;
+function TCompletionItems.FindItemID(AID: Integer): TCompletionItems.TItem;
 begin
-  Result := inherited FindItemID(AID) as TBCEditorCompletionProposal.TItems.TItem;
+  Result := inherited FindItemID(AID) as TCompletionItems.TItem;
 end;
 
-function TBCEditorCompletionProposal.TItems.GetItem(AIndex: Integer): TBCEditorCompletionProposal.TItems.TItem;
+function TCompletionItems.GetItem(AIndex: Integer): TCompletionItems.TItem;
 begin
-  Result := inherited GetItem(AIndex) as TBCEditorCompletionProposal.TItems.TItem;
+  Result := inherited GetItem(AIndex) as TCompletionItems.TItem;
 end;
 
-function TBCEditorCompletionProposal.TItems.GetOwner: TPersistent;
+function TCompletionItems.GetOwner: TPersistent;
 begin
   Result := FOwner;
 end;
 
-function TBCEditorCompletionProposal.TItems.Insert(AIndex: Integer): TBCEditorCompletionProposal.TItems.TItem;
+function TCompletionItems.Insert(AIndex: Integer): TCompletionItems.TItem;
 begin
-  Result := inherited Insert(AIndex) as TBCEditorCompletionProposal.TItems.TItem;
+  Result := inherited Insert(AIndex) as TCompletionItems.TItem;
 end;
 
-procedure TBCEditorCompletionProposal.TItems.SetItem(AIndex: Integer; AValue: TBCEditorCompletionProposal.TItems.TItem);
+procedure TCompletionItems.SetItem(AIndex: Integer; AValue: TCompletionItems.TItem);
 begin
   inherited SetItem(AIndex, AValue);
 end;
@@ -387,7 +382,7 @@ begin
   FFont := TFont.Create;
   FFont.Name := 'Courier New';
   FFont.Size := 8;
-  FItems := TItems.Create(Self);
+  FItems := TCompletionItems.Create(Self);
   FTitle := TTitle.Create;
   FVisible := True;
   FWidth := 0;

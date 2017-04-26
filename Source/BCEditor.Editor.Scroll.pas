@@ -10,9 +10,6 @@ uses
 type
   TBCEditorScroll = class(TPersistent)
   type
-    TEvent = procedure(ASender: TObject; AScrollBar: TScrollBarKind) of object;
-    TOptions = set of TBCEditorScrollOption;
-
     THint = class(TPersistent)
     strict private
       FFormat: TBCEditorScrollHintFormat;
@@ -30,12 +27,12 @@ type
     FIndicator: TBCEditorGlyph;
     FMaxWidth: Integer;
     FOnChange: TNotifyEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorScrollOptions;
     procedure DoChange;
     procedure SetHint(const AValue: TBCEditorScroll.THint);
     procedure SetIndicator(const AValue: TBCEditorGlyph);
     procedure SetOnChange(AValue: TNotifyEvent);
-    procedure SetOptions(const AValue: TOptions);
+    procedure SetOptions(const AValue: TBCEditorScrollOptions);
   public
     constructor Create;
     destructor Destroy; override;
@@ -44,7 +41,7 @@ type
   published
     property Hint: TBCEditorScroll.THint read FHint write SetHint;
     property Indicator: TBCEditorGlyph read FIndicator write SetIndicator;
-    property Options: TOptions read FOptions write SetOptions default DefaultOptions;
+    property Options: TBCEditorScrollOptions read FOptions write SetOptions default DefaultOptions;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   end;
 
@@ -136,7 +133,7 @@ begin
     Exclude(FOptions, AOption);
 end;
 
-procedure TBCEditorScroll.SetOptions(const AValue: TOptions);
+procedure TBCEditorScroll.SetOptions(const AValue: TBCEditorScrollOptions);
 begin
   if FOptions <> AValue then
   begin

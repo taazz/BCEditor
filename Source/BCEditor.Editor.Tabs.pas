@@ -8,26 +8,24 @@ uses
 
 type
   TBCEditorTabs = class(TPersistent)
-  type
-    TOptions = set of TBCEditorTabOption;
   strict private const
     DefaultOptions = [toColumns, toSelectedBlockIndent];
     DefaultWantTabs = True;
     DefaultWidth = 2;
   strict private
     FOnChange: TNotifyEvent;
-    FOptions: TOptions;
+    FOptions: TBCEditorTabOptions;
     FWantTabs: Boolean;
     FWidth: Integer;
     procedure DoChange;
-    procedure SetOptions(const AValue: TOptions);
+    procedure SetOptions(const AValue: TBCEditorTabOptions);
     procedure SetWantTabs(const AValue: Boolean);
     procedure SetWidth(const AValue: Integer);
   public
     constructor Create;
     procedure Assign(ASource: TPersistent); override;
   published
-    property Options: TOptions read FOptions write SetOptions default DefaultOptions;
+    property Options: TBCEditorTabOptions read FOptions write SetOptions default DefaultOptions;
     property WantTabs: Boolean read FWantTabs write SetWantTabs default DefaultWantTabs;
     property Width: Integer read FWidth write SetWidth default DefaultWidth;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -66,7 +64,7 @@ begin
     FOnChange(Self);
 end;
 
-procedure TBCEditorTabs.SetOptions(const AValue: TOptions);
+procedure TBCEditorTabs.SetOptions(const AValue: TBCEditorTabOptions);
 begin
   if FOptions <> AValue then
   begin

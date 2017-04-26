@@ -6,7 +6,7 @@ uses
   Windows,
   Classes, SysUtils,
   Forms, Graphics, Controls,
-  BCEditor.Consts;
+  BCEditor.Consts, BCEditor.Editor.Marks;
 
 type
   TBCEditorArrayOfString = array of string;
@@ -311,6 +311,32 @@ type
   TBCEditorMinimapIndicatorOption = (ioInvertBlending, ioShowBorder, ioUseBlending);
 
   TBCEditorCodeFoldingHintIndicatorOption = (hioShowBorder, hioShowMark);
+
+  TBCEditorCaretOptions = set of TBCEditorCaretOption;
+  TBCEditorCaretMultiEditOptions = set of TBCEditorCaretMultiEditOption;
+  TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
+  TBCEditorMatchingPairOptions = set of TBCEditorMatchingPairOption;
+  TBCEditorSearchOptions = set of TBCEditorSearchOption;
+  TBCEditorSearchMapOptions = set of TBCEditorSearchMapOption;
+  TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
+  TBCEditorReplaceOptions = set of TBCEditorReplaceOption;
+  TBCEditorRightMarginOptions = set of TBCEditorRightMarginOption;
+  TBCEditorScrollOptions = set of TBCEditorScrollOption;
+  TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
+  TBCEditorSpecialCharsOptions = set of TBCEditorSpecialCharsOption;
+  TBCEditorTabOptions = set of TBCEditorTabOption;
+  TBCEditorTokenInfoOptions = set of TBCEditorTokenInfoOption;
+  TUndoOptions = set of TBCEditorUndoOption;
+  TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
+  TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
+  TBCEditorCodeFoldingHintIndicatorOptions = set of TBCEditorCodeFoldingHintIndicatorOption;
+  TItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
+
+  TCaretChangedEvent = procedure(ASender: TObject; X, Y: Integer) of object;
+  TMarginClickEvent = procedure(ASender: TObject; AButton: TMouseButton; X, Y, ALine: Integer; AMark: TBCEditorMark) of object;
+  TScrollEvent = procedure(ASender: TObject; AScrollBar: TScrollBarKind) of object;
+  TSelectedEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
+  TValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
 
   TBCEditorQuadColor = packed record
   case Boolean of

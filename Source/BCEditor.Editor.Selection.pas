@@ -10,8 +10,6 @@ uses
 type
   TBCEditorSelection = class(TPersistent)
   type
-    TOptions = set of TBCEditorSelectionOption;
-
     TColors = class(TPersistent)
     strict private
       FBackground: TColor;
@@ -32,9 +30,9 @@ type
     DefaultOptions = [soTermsCaseSensitive];
   strict private
     FColors: TBCEditorSelection.TColors;
-    FOptions: TOptions;
+    FOptions: TBCEditorSelectionOptions;
     procedure SetColors(const AValue: TColors);
-    procedure SetOptions(AValue: TOptions);
+    procedure SetOptions(AValue: TBCEditorSelectionOptions);
   public
     constructor Create;
     destructor Destroy; override;
@@ -42,7 +40,7 @@ type
     procedure SetOption(const AOption: TBCEditorSelectionOption; const AEnabled: Boolean);
   published
     property Colors: TBCEditorSelection.TColors read FColors write SetColors;
-    property Options: TOptions read FOptions write SetOptions default DefaultOptions;
+    property Options: TBCEditorSelectionOptions read FOptions write SetOptions default DefaultOptions;
   end;
 
 implementation {***************************************************************}
@@ -132,7 +130,7 @@ begin
     Exclude(FOptions, AOption);
 end;
 
-procedure TBCEditorSelection.SetOptions(AValue: TOptions);
+procedure TBCEditorSelection.SetOptions(AValue: TBCEditorSelectionOptions);
 begin
   if FOptions <> AValue then
     FOptions := AValue;

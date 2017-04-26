@@ -10,8 +10,6 @@ uses
 type
   TBCEditorTokenInfo = class(TPersistent)
   type
-    TOptions = set of TBCEditorTokenInfoOption;
-
     TTitle = class(TPersistent)
     type
       TColors = class(TPersistent)
@@ -61,7 +59,7 @@ type
     FEnabled: Boolean;
     FFont: TFont;
     FHeight: Integer;
-    FOptions: TBCEditorTokenInfo.TOptions;
+    FOptions: TBCEditorTokenInfoOptions;
     FTitle: TTitle;
     FWidth: Integer;
     procedure SetFont(const AValue: TFont);
@@ -75,7 +73,7 @@ type
     property Enabled: Boolean read FEnabled write FEnabled default False;
     property Font: TFont read FFont write SetFont;
     property Height: Integer read FHeight write FHeight default 0;
-    property Options: TBCEditorTokenInfo.TOptions read FOptions write FOptions default DefaultOptions;
+    property Options: TBCEditorTokenInfoOptions read FOptions write FOptions default DefaultOptions;
     property Title: TTitle read FTitle write FTitle;
     property Width: Integer read FWidth write FWidth default 0;
   end;
