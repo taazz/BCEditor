@@ -6,7 +6,7 @@ uses
   Windows,
   Classes, SysUtils,
   Forms, Graphics, Controls,
-  BCEditor.Consts, BCEditor.Editor.Marks;
+  BCEditor.Consts;
 
 type
   TBCEditorArrayOfString = array of string;
@@ -314,6 +314,9 @@ type
 
   TBCEditorCaretOptions = set of TBCEditorCaretOption;
   TBCEditorCaretMultiEditOptions = set of TBCEditorCaretMultiEditOption;
+  TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
+  TBCEditorCodeFoldingHintIndicatorOptions = set of TBCEditorCodeFoldingHintIndicatorOption;
+  TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
   TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
   TBCEditorMatchingPairOptions = set of TBCEditorMatchingPairOption;
   TBCEditorSearchOptions = set of TBCEditorSearchOption;
@@ -326,17 +329,9 @@ type
   TBCEditorSpecialCharsOptions = set of TBCEditorSpecialCharsOption;
   TBCEditorTabOptions = set of TBCEditorTabOption;
   TBCEditorTokenInfoOptions = set of TBCEditorTokenInfoOption;
-  TUndoOptions = set of TBCEditorUndoOption;
-  TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
-  TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
-  TBCEditorCodeFoldingHintIndicatorOptions = set of TBCEditorCodeFoldingHintIndicatorOption;
-  TItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
+  TBCEditorUndoOptions = set of TBCEditorUndoOption;
 
-  TCaretChangedEvent = procedure(ASender: TObject; X, Y: Integer) of object;
-  TMarginClickEvent = procedure(ASender: TObject; AButton: TMouseButton; X, Y, ALine: Integer; AMark: TBCEditorMark) of object;
-  TScrollEvent = procedure(ASender: TObject; AScrollBar: TScrollBarKind) of object;
-  TSelectedEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
-  TValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
+  TBCEditorRangeItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
 
   TBCEditorQuadColor = packed record
   case Boolean of

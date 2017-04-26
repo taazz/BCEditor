@@ -29,6 +29,7 @@ type
     property Visible: Boolean read FVisible write FVisible;
   end;
 
+  TBCEditorMarginClickEvent = procedure(ASender: TObject; AButton: TMouseButton; X, Y, ALine: Integer; AMark: TBCEditorMark) of object;
   TBCEditorMarkEvent = procedure(ASender: TObject; var AMark: TBCEditorMark) of object;
   TBCEditorMarks = array of TBCEditorMark;
 

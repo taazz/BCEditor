@@ -8,6 +8,8 @@ uses
   BCEditor.Editor.Glyph, BCEditor.Types;
 
 type
+  TBCEditorScrollEvent = procedure(ASender: TObject; AScrollBar: TScrollBarKind) of object;
+
   TBCEditorScroll = class(TPersistent)
   type
     THint = class(TPersistent)

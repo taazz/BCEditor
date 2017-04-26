@@ -10,6 +10,9 @@ uses
   BCEditor.Editor.CompletionProposal;
 
 type
+  TBCEditorCompletionProposalPopupWindowSelectedEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
+  TBCEditorCompletionProposalPopupWindowValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
+
   TBCEditorCompletionProposalPopupWindow = class(TBCEditorPopupWindow)
   strict private
     FAdjustCompletionStart: Boolean;
@@ -24,8 +27,8 @@ type
     FItems: TStrings;
     FMargin: Integer;
     FOnCanceled: TNotifyEvent;
-    FOnSelected: TSelectedEvent;
-    FOnValidate: TValidateEvent;
+    FOnSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent;
+    FOnValidate: TBCEditorCompletionProposalPopupWindowValidateEvent;
     FSelectedLine: Integer;
     FSendToEditor: Boolean;
     FTitleHeight: Integer;
@@ -61,7 +64,7 @@ type
     property Items: TBCEditorCompletionProposalItems read GetItems;
     property TopLine: Integer read FTopLine write SetTopLine;
     property OnCanceled: TNotifyEvent read FOnCanceled write FOnCanceled;
-    property OnSelected: TSelectedEvent read FOnSelected write FOnSelected;
+    property OnSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent read FOnSelected write FOnSelected;
   end;
 
 implementation {***************************************************************}

@@ -8,6 +8,8 @@ uses
   BCEditor.Types;
 
 type
+  TBCEditorCaretChangedEvent = procedure(ASender: TObject; X, Y: Integer) of object;
+
   TBCEditorCaret = class(TPersistent)
   type
     TStyles = class(TPersistent)

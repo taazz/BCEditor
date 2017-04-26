@@ -79,9 +79,10 @@ type
       Text: string;
     end;
 
-  public type
+  protected type
     TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
     TUndoList = class(TList<TUndoItem>)
+  public type
     strict private
       FBlockNumber: Integer;
       FChanges: Integer;
@@ -108,7 +109,7 @@ type
       property UpdateCount: Integer read FUpdateCount;
     end;
 
-  const
+  protected const
     BOFPosition: TBCEditorTextPosition = (Char: 0; Line: 0);
   strict private const
     DefaultOptions = [loUndoGrouped];

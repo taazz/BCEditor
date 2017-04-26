@@ -123,13 +123,13 @@ type
       strict private
         FCloseToken: string;
         FOpenToken: string;
-        FRegionType: TItemType;
+        FRegionType: TBCEditorRangeItemType;
         FSkipEmptyChars: Boolean;
         FSkipIfNextCharIsNot: Char;
       public
         property OpenToken: string read FOpenToken write FOpenToken;
         property CloseToken: string read FCloseToken write FCloseToken;
-        property RegionType: TItemType read FRegionType write FRegionType;
+        property RegionType: TBCEditorRangeItemType read FRegionType write FRegionType;
         property SkipEmptyChars: Boolean read FSkipEmptyChars write FSkipEmptyChars;
         property SkipIfNextCharIsNot: Char read FSkipIfNextCharIsNot write FSkipIfNextCharIsNot default BCEDITOR_NONE_CHAR;
       end;

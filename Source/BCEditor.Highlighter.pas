@@ -1688,7 +1688,7 @@ begin
     Result := btUnspecified;
 end;
 
-function StrToRegionType(const AString: string): TItemType;
+function StrToRegionType(const AString: string): TBCEditorRangeItemType;
 begin
   if AString = 'SingleLine' then
     Result := ritSingleLineComment
@@ -1889,7 +1889,7 @@ var
   LRegionItem: TRegionItem;
   LSkipRegionArray: TJsonArray;
   LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
-  LSkipRegionType: TItemType;
+  LSkipRegionType: TBCEditorRangeItemType;
 begin
   if ACodeFoldingObject.Contains('SkipRegion') then
   begin
