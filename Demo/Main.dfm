@@ -103,11 +103,6 @@ object MainForm: TMainForm
     LeftMargin.Font.Height = -11
     LeftMargin.Font.Name = 'Courier New'
     LeftMargin.Font.Style = []
-    Minimap.Font.Charset = DEFAULT_CHARSET
-    Minimap.Font.Color = clWindowText
-    Minimap.Font.Height = -1
-    Minimap.Font.Name = 'Courier New'
-    Minimap.Font.Style = []
     TabOrder = 1
     TokenInfo.Font.Charset = DEFAULT_CHARSET
     TokenInfo.Font.Color = clWindowText

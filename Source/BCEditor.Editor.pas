@@ -3135,58 +3135,55 @@ var
 begin
   Assert(FCompletionProposal.CompletionColumnIndex < FCompletionProposal.Columns.Count);
 
-  if (Lines.CaretPosition.Line < Lines.Count) then
+  LPoint := ClientToScreen(DisplayToClient(DisplayCaretPosition));
+  Inc(LPoint.Y, LineHeight);
+
+  FCompletionProposalPopupWindow := TBCEditorCompletionProposalPopupWindow.Create(Self);
+  with FCompletionProposalPopupWindow do
   begin
-    LPoint := ClientToScreen(DisplayToClient(DisplayCaretPosition));
-    Inc(LPoint.Y, LineHeight);
+    LControl := Self;
+    while Assigned(LControl) and not (LControl is TCustomForm) do
+      LControl := LControl.Parent;
+    if LControl is TCustomForm then
+      PopupParent := TCustomForm(LControl);
+    OnCanceled := FOnCompletionProposalCanceled;
+    OnSelected := FOnCompletionProposalSelected;
+    Assign(FCompletionProposal);
 
-    FCompletionProposalPopupWindow := TBCEditorCompletionProposalPopupWindow.Create(Self);
-    with FCompletionProposalPopupWindow do
+    LItems := TStringList.Create;
+    try
+      if cpoParseItemsFromText in FCompletionProposal.Options then
+        SplitTextIntoWords(LItems, False);
+      if cpoAddHighlighterKeywords in FCompletionProposal.Options then
+        AddHighlighterKeywords(LItems);
+      Items.Clear;
+      for LIndex := 0 to LItems.Count - 1 do
+      begin
+        LItem := Items.Add;
+        LItem.Value := LItems[LIndex];
+        { Add empty items for columns }
+        for LColumnIndex := 1 to FCompletionProposal.Columns.Count - 1 do
+          FCompletionProposal.Columns[LColumnIndex].Items.Add;
+      end;
+    finally
+      LItems.Free;
+    end;
+
+    LCurrentInput := GetCurrentInput();
+    LCanExecute := True;
+    if Assigned(FOnBeforeCompletionProposalExecute) then
+      FOnBeforeCompletionProposalExecute(Self, FCompletionProposal.Columns,
+        LCurrentInput, LCanExecute);
+    if LCanExecute then
     begin
-      LControl := Self;
-      while Assigned(LControl) and not (LControl is TCustomForm) do
-        LControl := LControl.Parent;
-      if LControl is TCustomForm then
-        PopupParent := TCustomForm(LControl);
-      OnCanceled := FOnCompletionProposalCanceled;
-      OnSelected := FOnCompletionProposalSelected;
-      Assign(FCompletionProposal);
-
-      LItems := TStringList.Create;
-      try
-        if cpoParseItemsFromText in FCompletionProposal.Options then
-          SplitTextIntoWords(LItems, False);
-        if cpoAddHighlighterKeywords in FCompletionProposal.Options then
-          AddHighlighterKeywords(LItems);
-        Items.Clear;
-        for LIndex := 0 to LItems.Count - 1 do
-        begin
-          LItem := Items.Add;
-          LItem.Value := LItems[LIndex];
-          { Add empty items for columns }
-          for LColumnIndex := 1 to FCompletionProposal.Columns.Count - 1 do
-            FCompletionProposal.Columns[LColumnIndex].Items.Add;
-        end;
-      finally
-        LItems.Free;
-      end;
-
-      LCurrentInput := GetCurrentInput;
-      LCanExecute := True;
-      if Assigned(FOnBeforeCompletionProposalExecute) then
-        FOnBeforeCompletionProposalExecute(Self, FCompletionProposal.Columns,
-          LCurrentInput, LCanExecute);
-      if LCanExecute then
-      begin
-        FAlwaysShowCaretBeforePopup := AlwaysShowCaret;
-        AlwaysShowCaret := True;
-        Execute(LCurrentInput, LPoint)
-      end
-      else
-      begin
-        FCompletionProposalPopupWindow.Free;
-        FCompletionProposalPopupWindow := nil;
-      end;
+      FAlwaysShowCaretBeforePopup := AlwaysShowCaret;
+      AlwaysShowCaret := True;
+      Execute(LCurrentInput, LPoint)
+    end
+    else
+    begin
+      FCompletionProposalPopupWindow.Free;
+      FCompletionProposalPopupWindow := nil;
     end;
   end;
 end;

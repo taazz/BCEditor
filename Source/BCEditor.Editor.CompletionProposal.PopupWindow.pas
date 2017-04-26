@@ -54,7 +54,7 @@ type
     destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
     procedure Execute(const ACurrentString: string; const APoint: TPoint);
-    function GetCurrentInput: string;
+    function GetCurrentInput(): string;
     procedure MouseWheel(AShift: TShiftState; AWheelDelta: Integer; AMousePos: TPoint);
     procedure WndProc(var Msg: TMessage); override;
     property CurrentString: string read FCurrentString write SetCurrentString;
@@ -274,7 +274,7 @@ begin
   end;
 end;
 
-function TBCEditorCompletionProposalPopupWindow.GetCurrentInput: string;
+function TBCEditorCompletionProposalPopupWindow.GetCurrentInput(): string;
 var
   LChar: Integer;
   LLineText: string;
@@ -284,12 +284,12 @@ begin
 
   LTextCaretPosition := TextPosition(TCustomBCEditor(Editor).CaretPos);
 
-  LLineText := TCustomBCEditor(Editor).Lines[LTextCaretPosition.Line];
+  LLineText := TCustomBCEditor(Editor).Lines[Min(LTextCaretPosition.Line, TCustomBCEditor(Editor).Lines.Count - 1)];
   LChar := LTextCaretPosition.Char;
-  if LChar < Length(LLineText) then
+  if (LChar <= Length(LLineText)) then
   begin
     FAdjustCompletionStart := False;
-    while (LChar >= 0) and (LLineText[1 + LChar] > BCEDITOR_SPACE_CHAR) and not TCustomBCEditor(Editor).IsWordBreakChar(LLineText[1 + LChar]) do
+    while ((LChar > 0) and not TCustomBCEditor(Editor).IsWordBreakChar(LLineText[1 + LChar - 1])) do
       Dec(LChar);
 
     FCompletionStartChar := LChar;
