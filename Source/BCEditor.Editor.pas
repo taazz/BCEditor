@@ -182,7 +182,7 @@ type
     FOnAfterLinePaint: TBCEditorLinePaintEvent;
     FOnAfterMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
     FOnAfterMarkPlaced: TNotifyEvent;
-    FOnBeforeCompletionProposalExecute: TCompletionEvent;
+    FOnBeforeCompletionProposalExecute: TBCEditorCompletionProposalEvent;
     FOnBeforeDeleteMark: TBCEditorMarkEvent;
     FOnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
     FOnBeforeMarkPlaced: TBCEditorMarkEvent;
@@ -611,7 +611,7 @@ type
     property OnAfterLinePaint: TBCEditorLinePaintEvent read FOnAfterLinePaint write FOnAfterLinePaint;
     property OnAfterMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnAfterMarkPanelPaint write FOnAfterMarkPanelPaint;
     property OnAfterMarkPlaced: TNotifyEvent read FOnAfterMarkPlaced write FOnAfterMarkPlaced;
-    property OnBeforeCompletionProposalExecute: TCompletionEvent read FOnBeforeCompletionProposalExecute write FOnBeforeCompletionProposalExecute;
+    property OnBeforeCompletionProposalExecute: TBCEditorCompletionProposalEvent read FOnBeforeCompletionProposalExecute write FOnBeforeCompletionProposalExecute;
     property OnBeforeDeleteMark: TBCEditorMarkEvent read FOnBeforeDeleteMark write FOnBeforeDeleteMark;
     property OnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnBeforeMarkPanelPaint write FOnBeforeMarkPanelPaint;
     property OnBeforeMarkPlaced: TBCEditorMarkEvent read FOnBeforeMarkPlaced write FOnBeforeMarkPlaced;
@@ -3127,7 +3127,7 @@ var
   LControl: TWinControl;
   LCurrentInput: string;
   LIndex: Integer;
-  LItem: TCompletionItems.TItem;
+  LItem: TBCEditorCompletionProposalItems.TItem;
   LItems: TStrings;
   LPoint: TPoint;
 begin

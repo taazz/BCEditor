@@ -1315,7 +1315,6 @@ begin
     LParser := SymbolList[LAnsiChar];
     if Assigned(LParser) and (LParser <> FDefaultTermSymbol) and (LParser <> FDefaultSymbols) then
       LParser.Free;
-    LParser := nil;
   end;
 
   FDefaultToken.Free;
@@ -2731,7 +2730,6 @@ begin
   begin
     LRegion := FCodeFoldingRegions[LIndex];
     LRegion.Free;
-    LRegion := nil;
   end;
   CodeFoldingRangeCount := 0;
   TCustomBCEditor(Editor).ClearMatchingPair;

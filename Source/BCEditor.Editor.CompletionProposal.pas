@@ -8,10 +8,7 @@ uses
   BCEditor.Types;
 
 type
-  TCompletionEvent = procedure(Sender: TObject; AColumns: Pointer; const AInput: string;
-      var ACanExecute: Boolean) of object;
-
-  TCompletionItems = class(TCollection)
+  TBCEditorCompletionProposalItems = class(TCollection)
     type
 
       TItem = class(TCollectionItem)
@@ -39,6 +36,85 @@ type
       function Insert(AIndex: Integer): TItem;
       property Items[AIndex: Integer]: TItem read GetItem write SetItem; default;
     end;
+
+  TBCEditorCompletionProposalColumns = class(TCollection)
+  type
+
+    TColumn = class(TCollectionItem)
+    type
+
+      TTitle = class(TPersistent)
+      type
+
+        TColors = class(TPersistent)
+        strict private
+          FBackground: TColor;
+          FBottomBorder: TColor;
+          FRightBorder: TColor;
+        public
+          constructor Create;
+          procedure Assign(ASource: TPersistent); override;
+        published
+          property Background: TColor read FBackground write FBackground default clWindow;
+          property BottomBorder: TColor read FBottomBorder write FBottomBorder default clBtnFace;
+          property RightBorder: TColor read FRightBorder write FRightBorder default clBtnFace;
+        end;
+
+      strict private
+        FCaption: string;
+        FColors: TTitle.TColors;
+        FFont: TFont;
+        FVisible: Boolean;
+        procedure SetFont(const AValue: TFont);
+      public
+        constructor Create;
+        destructor Destroy; override;
+        procedure Assign(ASource: TPersistent); override;
+      published
+        property Caption: string read FCaption write FCaption;
+        property Colors: TTitle.TColors read FColors write FColors;
+        property Font: TFont read FFont write SetFont;
+        property Visible: Boolean read FVisible write FVisible default False;
+      end;
+
+    strict private
+      FAutoWidth: Boolean;
+      FFont: TFont;
+      FItems: TBCEditorCompletionProposalItems;
+      FTitle: TTitle;
+      FVisible: Boolean;
+      FWidth: Integer;
+      procedure SetFont(const AValue: TFont);
+    public
+      constructor Create(ACollection: TCollection); override;
+      destructor Destroy; override;
+      procedure Assign(ASource: TPersistent); override;
+    published
+      property AutoWidth: Boolean read FAutoWidth write FAutoWidth default True;
+      property Font: TFont read FFont write SetFont;
+      property Items: TBCEditorCompletionProposalItems read FItems write FItems;
+      property Title: TTitle read FTitle write FTitle;
+      property Visible: Boolean read FVisible write FVisible default True;
+      property Width: Integer read FWidth write FWidth default 0;
+    end;
+
+  strict private
+    FOwner: TPersistent;
+    function GetItem(AIndex: Integer): TColumn;
+    procedure SetItem(AIndex: Integer; AValue: TColumn);
+  protected
+    function GetOwner: TPersistent; override;
+  public
+    constructor Create(AOwner: TPersistent);
+    function Add: TColumn;
+    function FindItemID(AID: Integer): TColumn;
+    function Insert(AIndex: Integer): TColumn;
+    property Items[AIndex: Integer]: TColumn read GetItem write SetItem; default;
+  end;
+
+  TBCEditorCompletionProposalEvent = procedure(Sender: TObject;
+    const AColumns: TBCEditorCompletionProposalColumns;
+    const AInput: string; var ACanExecute: Boolean) of object;
 
   TBCEditorCompletionProposal = class(TPersistent)
   type
@@ -72,81 +148,6 @@ type
       property Interval: Integer read FInterval write FInterval default 1000;
     end;
 
-    TColumns = class(TCollection)
-    type
-
-      TColumn = class(TCollectionItem)
-      type
-
-        TTitle = class(TPersistent)
-        type
-
-          TColors = class(TPersistent)
-          strict private
-            FBackground: TColor;
-            FBottomBorder: TColor;
-            FRightBorder: TColor;
-          public
-            constructor Create;
-            procedure Assign(ASource: TPersistent); override;
-          published
-            property Background: TColor read FBackground write FBackground default clWindow;
-            property BottomBorder: TColor read FBottomBorder write FBottomBorder default clBtnFace;
-            property RightBorder: TColor read FRightBorder write FRightBorder default clBtnFace;
-          end;
-
-        strict private
-          FCaption: string;
-          FColors: TTitle.TColors;
-          FFont: TFont;
-          FVisible: Boolean;
-          procedure SetFont(const AValue: TFont);
-        public
-          constructor Create;
-          destructor Destroy; override;
-          procedure Assign(ASource: TPersistent); override;
-        published
-          property Caption: string read FCaption write FCaption;
-          property Colors: TTitle.TColors read FColors write FColors;
-          property Font: TFont read FFont write SetFont;
-          property Visible: Boolean read FVisible write FVisible default False;
-        end;
-
-      strict private
-        FAutoWidth: Boolean;
-        FFont: TFont;
-        FItems: TCompletionItems;
-        FTitle: TTitle;
-        FVisible: Boolean;
-        FWidth: Integer;
-        procedure SetFont(const AValue: TFont);
-      public
-        constructor Create(ACollection: TCollection); override;
-        destructor Destroy; override;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property AutoWidth: Boolean read FAutoWidth write FAutoWidth default True;
-        property Font: TFont read FFont write SetFont;
-        property Items: TCompletionItems read FItems write FItems;
-        property Title: TBCEditorCompletionProposal.TColumns.TColumn.TTitle read FTitle write FTitle;
-        property Visible: Boolean read FVisible write FVisible default True;
-        property Width: Integer read FWidth write FWidth default 0;
-      end;
-
-    strict private
-      FOwner: TPersistent;
-      function GetItem(AIndex: Integer): TColumn;
-      procedure SetItem(AIndex: Integer; AValue: TColumn);
-    protected
-      function GetOwner: TPersistent; override;
-    public
-      constructor Create(AOwner: TPersistent);
-      function Add: TColumn;
-      function FindItemID(AID: Integer): TColumn;
-      function Insert(AIndex: Integer): TColumn;
-      property Items[AIndex: Integer]: TColumn read GetItem write SetItem; default;
-    end;
-
   strict private const
     DefaultCloseChars = '()[]. ';
     DefaultOptions = [cpoAutoConstraints, cpoAddHighlighterKeywords, cpoFiltered,
@@ -156,7 +157,7 @@ type
   strict private
     FCloseChars: string;
     FColors: TBCEditorCompletionProposal.TColors;
-    FColumns: TBCEditorCompletionProposal.TColumns;
+    FColumns: TBCEditorCompletionProposalColumns;
     FCompletionColumnIndex: Integer;
     FConstraints: TSizeConstraints;
     FEnabled: Boolean;
@@ -180,7 +181,7 @@ type
   published
     property CloseChars: string read FCloseChars write FCloseChars;
     property Colors: TBCEditorCompletionProposal.TColors read FColors write FColors;
-    property Columns: TBCEditorCompletionProposal.TColumns read FColumns write FColumns;
+    property Columns: TBCEditorCompletionProposalColumns read FColumns write FColumns;
     property CompletionColumnIndex: Integer read FCompletionColumnIndex write FCompletionColumnIndex default 0;
     property Constraints: TSizeConstraints read FConstraints write FConstraints;
     property Enabled: Boolean read FEnabled write FEnabled default True;
@@ -197,6 +198,214 @@ implementation {***************************************************************}
 
 uses
   Menus;
+
+{ TBCEditorCompletionProposalItems.TItem **************************************}
+
+constructor TBCEditorCompletionProposalItems.TItem.Create(ACollection: TCollection);
+begin
+  inherited;
+
+  FImageIndex := -1;
+end;
+
+procedure TBCEditorCompletionProposalItems.TItem.Assign(ASource: TPersistent);
+begin
+  if ASource is TBCEditorCompletionProposalItems.TItem then
+  with ASource as TBCEditorCompletionProposalItems.TItem do
+  begin
+    Self.FImageIndex := FImageIndex;
+    Self.FValue := FValue;
+  end
+  else
+    inherited Assign(ASource);
+end;
+
+{ TBCEditorCompletionProposal.TItems ******************************************}
+
+constructor TBCEditorCompletionProposalItems.Create(AOwner: TPersistent);
+begin
+  inherited Create(TItem);
+
+  FOwner := AOwner;
+end;
+
+function TBCEditorCompletionProposalItems.Add: TBCEditorCompletionProposalItems.TItem;
+begin
+  Result := inherited Add as TBCEditorCompletionProposalItems.TItem;
+end;
+
+function TBCEditorCompletionProposalItems.FindItemID(AID: Integer): TBCEditorCompletionProposalItems.TItem;
+begin
+  Result := inherited FindItemID(AID) as TBCEditorCompletionProposalItems.TItem;
+end;
+
+function TBCEditorCompletionProposalItems.GetItem(AIndex: Integer): TBCEditorCompletionProposalItems.TItem;
+begin
+  Result := inherited GetItem(AIndex) as TBCEditorCompletionProposalItems.TItem;
+end;
+
+function TBCEditorCompletionProposalItems.GetOwner: TPersistent;
+begin
+  Result := FOwner;
+end;
+
+function TBCEditorCompletionProposalItems.Insert(AIndex: Integer): TBCEditorCompletionProposalItems.TItem;
+begin
+  Result := inherited Insert(AIndex) as TBCEditorCompletionProposalItems.TItem;
+end;
+
+procedure TBCEditorCompletionProposalItems.SetItem(AIndex: Integer; AValue: TBCEditorCompletionProposalItems.TItem);
+begin
+  inherited SetItem(AIndex, AValue);
+end;
+
+{ TBCEditorCompletionProposalColumns.TColumn.TTitle.TColors *****************}
+
+constructor TBCEditorCompletionProposalColumns.TColumn.TTitle.TColors.Create;
+begin
+  inherited;
+
+  FBackground := clWindow;
+  FBottomBorder := clBtnFace;
+  FRightBorder := clBtnFace;
+end;
+
+procedure TBCEditorCompletionProposalColumns.TColumn.TTitle.TColors.Assign(ASource: TPersistent);
+begin
+  if ASource is TBCEditorCompletionProposalColumns.TColumn.TTitle.TColors then
+  with ASource as TBCEditorCompletionProposalColumns.TColumn.TTitle.TColors do
+  begin
+    Self.FBackground := FBackground;
+    Self.FBottomBorder := FBottomBorder;
+    Self.FRightBorder := FRightBorder;
+  end
+  else
+    inherited Assign(ASource);
+end;
+
+{ TBCEditorCompletionProposalColumns.TColumn.TTitle *************************}
+
+constructor TBCEditorCompletionProposalColumns.TColumn.TTitle.Create;
+begin
+  inherited;
+
+  FColors := TColors.Create;
+  FFont := TFont.Create;
+  FFont.Name := 'Courier New';
+  FFont.Size := 8;
+  FVisible := False;
+end;
+
+destructor TBCEditorCompletionProposalColumns.TColumn.TTitle.Destroy;
+begin
+  FColors.Free;
+  FFont.Free;
+
+  inherited;
+end;
+
+procedure TBCEditorCompletionProposalColumns.TColumn.TTitle.Assign(ASource: TPersistent);
+begin
+  if ASource is TTitle then
+  with ASource as TTitle do
+  begin
+    Self.FCaption := FCaption;
+    Self.FColors.Assign(FColors);
+    Self.FFont.Assign(FFont);
+    Self.FVisible := FVisible;
+  end
+  else
+    inherited Assign(ASource);
+end;
+
+procedure TBCEditorCompletionProposalColumns.TColumn.TTitle.SetFont(const AValue: TFont);
+begin
+  FFont.Assign(AValue);
+end;
+
+{ TBCEditorCompletionProposalColumns.TColumn ********************************}
+
+constructor TBCEditorCompletionProposalColumns.TColumn.Create(ACollection: TCollection);
+begin
+  inherited;
+
+  FAutoWidth := True;
+  FFont := TFont.Create;
+  FFont.Name := 'Courier New';
+  FFont.Size := 8;
+  FItems := TBCEditorCompletionProposalItems.Create(Self);
+  FTitle := TTitle.Create;
+  FVisible := True;
+  FWidth := 0;
+end;
+
+destructor TBCEditorCompletionProposalColumns.TColumn.Destroy;
+begin
+  FFont.Free;
+  FItems.Free;
+  FTitle.Free;
+
+  inherited;
+end;
+
+procedure TBCEditorCompletionProposalColumns.TColumn.Assign(ASource: TPersistent);
+begin
+  if ASource is TColumn then
+  with ASource as TColumn do
+  begin
+    Self.FAutoWidth := FAutoWidth;
+    Self.FFont.Assign(FFont);
+    Self.FItems.Assign(FItems);
+    Self.FTitle.Assign(FTitle);
+    Self.FWidth := FWidth;
+  end
+  else
+    inherited Assign(ASource);
+end;
+
+procedure TBCEditorCompletionProposalColumns.TColumn.SetFont(const AValue: TFont);
+begin
+  FFont.Assign(AValue);
+end;
+
+{ TBCEditorCompletionProposalColumns ****************************************}
+
+constructor TBCEditorCompletionProposalColumns.Create(AOwner: TPersistent);
+begin
+  inherited Create(TColumn);
+
+  FOwner := AOwner;
+end;
+
+function TBCEditorCompletionProposalColumns.Add: TColumn;
+begin
+  Result := inherited Add as TColumn;
+end;
+
+function TBCEditorCompletionProposalColumns.FindItemID(AID: Integer): TColumn;
+begin
+  Result := inherited FindItemID(AID) as TColumn;
+end;
+
+function TBCEditorCompletionProposalColumns.GetItem(AIndex: Integer): TColumn;
+begin
+  Result := inherited GetItem(AIndex) as TColumn;
+end;
+
+function TBCEditorCompletionProposalColumns.GetOwner: TPersistent;
+begin
+  Result := FOwner;
+end;
+
+function TBCEditorCompletionProposalColumns.Insert(AIndex: Integer): TColumn;
+begin
+  Result := inherited Insert(AIndex) as TColumn;
+end;
+
+procedure TBCEditorCompletionProposalColumns.SetItem(AIndex: Integer; AValue: TColumn);
+begin
+  inherited SetItem(AIndex, AValue);
+end;
 
 { TBCEditorCompletionProposal.TColors *****************************************}
 
@@ -248,214 +457,6 @@ begin
     inherited Assign(ASource);
 end;
 
-{ TBCEditorCompletionProposal.TItems.TItem ************************************}
-
-constructor TCompletionItems.TItem.Create(ACollection: TCollection);
-begin
-  inherited;
-
-  FImageIndex := -1;
-end;
-
-procedure TCompletionItems.TItem.Assign(ASource: TPersistent);
-begin
-  if ASource is TCompletionItems.TItem then
-  with ASource as TCompletionItems.TItem do
-  begin
-    Self.FImageIndex := FImageIndex;
-    Self.FValue := FValue;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorCompletionProposal.TItems ******************************************}
-
-constructor TCompletionItems.Create(AOwner: TPersistent);
-begin
-  inherited Create(TItem);
-
-  FOwner := AOwner;
-end;
-
-function TCompletionItems.Add: TCompletionItems.TItem;
-begin
-  Result := inherited Add as TCompletionItems.TItem;
-end;
-
-function TCompletionItems.FindItemID(AID: Integer): TCompletionItems.TItem;
-begin
-  Result := inherited FindItemID(AID) as TCompletionItems.TItem;
-end;
-
-function TCompletionItems.GetItem(AIndex: Integer): TCompletionItems.TItem;
-begin
-  Result := inherited GetItem(AIndex) as TCompletionItems.TItem;
-end;
-
-function TCompletionItems.GetOwner: TPersistent;
-begin
-  Result := FOwner;
-end;
-
-function TCompletionItems.Insert(AIndex: Integer): TCompletionItems.TItem;
-begin
-  Result := inherited Insert(AIndex) as TCompletionItems.TItem;
-end;
-
-procedure TCompletionItems.SetItem(AIndex: Integer; AValue: TCompletionItems.TItem);
-begin
-  inherited SetItem(AIndex, AValue);
-end;
-
-{ TBCEditorCompletionProposal.TColumns.TColumn.TTitle.TColors *****************}
-
-constructor TBCEditorCompletionProposal.TColumns.TColumn.TTitle.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clWindow;
-  FBottomBorder := clBtnFace;
-  FRightBorder := clBtnFace;
-end;
-
-procedure TBCEditorCompletionProposal.TColumns.TColumn.TTitle.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TBCEditorCompletionProposal.TColumns.TColumn.TTitle.TColors then
-  with ASource as TBCEditorCompletionProposal.TColumns.TColumn.TTitle.TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FBottomBorder := FBottomBorder;
-    Self.FRightBorder := FRightBorder;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorCompletionProposal.TColumns.TColumn.TTitle *************************}
-
-constructor TBCEditorCompletionProposal.TColumns.TColumn.TTitle.Create;
-begin
-  inherited;
-
-  FColors := TColors.Create;
-  FFont := TFont.Create;
-  FFont.Name := 'Courier New';
-  FFont.Size := 8;
-  FVisible := False;
-end;
-
-destructor TBCEditorCompletionProposal.TColumns.TColumn.TTitle.Destroy;
-begin
-  FColors.Free;
-  FFont.Free;
-
-  inherited;
-end;
-
-procedure TBCEditorCompletionProposal.TColumns.TColumn.TTitle.Assign(ASource: TPersistent);
-begin
-  if ASource is TTitle then
-  with ASource as TTitle do
-  begin
-    Self.FCaption := FCaption;
-    Self.FColors.Assign(FColors);
-    Self.FFont.Assign(FFont);
-    Self.FVisible := FVisible;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorCompletionProposal.TColumns.TColumn.TTitle.SetFont(const AValue: TFont);
-begin
-  FFont.Assign(AValue);
-end;
-
-{ TBCEditorCompletionProposal.TColumns.TColumn ********************************}
-
-constructor TBCEditorCompletionProposal.TColumns.TColumn.Create(ACollection: TCollection);
-begin
-  inherited;
-
-  FAutoWidth := True;
-  FFont := TFont.Create;
-  FFont.Name := 'Courier New';
-  FFont.Size := 8;
-  FItems := TCompletionItems.Create(Self);
-  FTitle := TTitle.Create;
-  FVisible := True;
-  FWidth := 0;
-end;
-
-destructor TBCEditorCompletionProposal.TColumns.TColumn.Destroy;
-begin
-  FFont.Free;
-  FItems.Free;
-  FTitle.Free;
-
-  inherited;
-end;
-
-procedure TBCEditorCompletionProposal.TColumns.TColumn.Assign(ASource: TPersistent);
-begin
-  if ASource is TColumn then
-  with ASource as TColumn do
-  begin
-    Self.FAutoWidth := FAutoWidth;
-    Self.FFont.Assign(FFont);
-    Self.FItems.Assign(FItems);
-    Self.FTitle.Assign(FTitle);
-    Self.FWidth := FWidth;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorCompletionProposal.TColumns.TColumn.SetFont(const AValue: TFont);
-begin
-  FFont.Assign(AValue);
-end;
-
-{ TBCEditorCompletionProposal.TColumns ****************************************}
-
-constructor TBCEditorCompletionProposal.TColumns.Create(AOwner: TPersistent);
-begin
-  inherited Create(TColumn);
-
-  FOwner := AOwner;
-end;
-
-function TBCEditorCompletionProposal.TColumns.Add: TColumn;
-begin
-  Result := inherited Add as TColumn;
-end;
-
-function TBCEditorCompletionProposal.TColumns.FindItemID(AID: Integer): TColumn;
-begin
-  Result := inherited FindItemID(AID) as TColumn;
-end;
-
-function TBCEditorCompletionProposal.TColumns.GetItem(AIndex: Integer): TColumn;
-begin
-  Result := inherited GetItem(AIndex) as TColumn;
-end;
-
-function TBCEditorCompletionProposal.TColumns.GetOwner: TPersistent;
-begin
-  Result := FOwner;
-end;
-
-function TBCEditorCompletionProposal.TColumns.Insert(AIndex: Integer): TColumn;
-begin
-  Result := inherited Insert(AIndex) as TColumn;
-end;
-
-procedure TBCEditorCompletionProposal.TColumns.SetItem(AIndex: Integer; AValue: TColumn);
-begin
-  inherited SetItem(AIndex, AValue);
-end;
-
 { TBCEditorCompletionProposal *************************************************}
 
 constructor TBCEditorCompletionProposal.Create(AOwner: TComponent);
@@ -465,7 +466,7 @@ begin
   FOwner := AOwner;
   FCloseChars := DefaultCloseChars;
   FColors := TColors.Create;
-  FColumns := TColumns.Create(Self);
+  FColumns := TBCEditorCompletionProposalColumns.Create(Self);
   FColumns.Add; { default column }
   FCompletionColumnIndex := 0;
   FEnabled := True;
