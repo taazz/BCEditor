@@ -25,7 +25,7 @@ type
     TBCEditorReplace = class(BCEditor.Editor.Replace.TBCEditorReplace);
     TBCEditorSearch = class(BCEditor.Editor.Search.TBCEditorSearch);
 
-    TState = set of (esRowsChanged, esCaretMoved,
+    TState = set of (esRowsChanged, esCaretMoved, esScrolled,
       esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated,
       esIgnoreNextChar, esCaretVisible, esDblClicked, esWaitForDragging,
       esCodeFoldingInfoClicked, esInSelection, esDragging, esFind, esReplace,
@@ -2629,9 +2629,9 @@ var
   LTokenLength: Integer;
 begin
   if (Rows.Count = 0) then
-    Result := Point(LeftMarginWidth + ADisplayPosition.Column * CharWidth, (ADisplayPosition.Row - TopRow) * LineHeight)
+    Result := Point(LeftMarginWidth + ADisplayPosition.Column * CharWidth - HorzTextPos, (ADisplayPosition.Row - TopRow) * LineHeight)
   else if (ADisplayPosition.Row >= Rows.Count) then
-    Result := Point(LeftMarginWidth + ADisplayPosition.Column * CharWidth, (Lines.Count - Rows[Rows.Count - 1].Line - 1 + ADisplayPosition.Row - TopRow) * LineHeight)
+    Result := Point(LeftMarginWidth + ADisplayPosition.Column * CharWidth - HorzTextPos, (Lines.Count - Rows[Rows.Count - 1].Line - 1 + ADisplayPosition.Row - TopRow) * LineHeight)
   else
   begin
     Result := Point(0, (ADisplayPosition.Row - TopRow) * LineHeight);
@@ -11427,18 +11427,18 @@ begin
 end;
 
 procedure TCustomBCEditor.SetHorzTextPos(AValue: Integer);
-var
-  LScrollInfo: TScrollInfo;
 begin
   if (AValue <> FHorzTextPos) then
   begin
     FHorzTextPos := AValue;
 
-    LScrollInfo.cbSize := SizeOf(LScrollInfo);
-    LScrollInfo.fMask := SIF_POS;
-    LScrollInfo.nPos := FHorzTextPos;
-    SetScrollInfo(Handle, SB_HORZ, LScrollInfo, TRUE);
-    Invalidate();
+    if (UpdateCount > 0) then
+      Include(FState, esScrolled)
+    else
+    begin
+      UpdateScrollBars();
+      Invalidate();
+    end;
   end;
 end;
 
@@ -11679,8 +11679,13 @@ begin
     if Assigned(OnScroll) then
       OnScroll(Self, sbVertical);
 
-    UpdateScrollBars;
-    Invalidate();
+    if (UpdateCount > 0) then
+      Include(FState, esScrolled)
+    else
+    begin
+      UpdateScrollBars();
+      Invalidate();
+    end;
   end;
 end;
 
@@ -11754,7 +11759,7 @@ begin
     begin
       if (State * [esCaretMoved] <> []) then
         UpdateCaret();
-      if ((State * [esRowsChanged, esLinesCleared, esLinesUpdated] <> [])
+      if ((State * [esRowsChanged, esLinesCleared, esLinesUpdated, esScrolled] <> [])
         or (State * [esCaretMoved] <> []) and ((Lines.CaretPosition.Line >= Lines.Count) or (Lines.CaretPosition.Char > Rows.MaxLength))) then
         UpdateScrollBars();
       if (Visible) then
@@ -11887,6 +11892,8 @@ begin
         if cfoAutoPadding in FCodeFolding.Options then
           FCodeFolding.Padding := MulDiv(2, Screen.PixelsPerInch, 96);
       end;
+
+      Include(FState, esScrolled);
     finally
       EndUpdate();
       Invalidate();
@@ -12227,7 +12234,9 @@ begin
         end;
       end;
 
-      while ((Result.Row < Rows.Count) and (Result.Column >= Rows[Result.Row].Length)) do
+      while ((Result.Row < Rows.Count)
+        and ((Result.Column > Rows[Result.Row].Length)
+          or not (rfLastRowOfLine in Rows[Result.Row].Flags) and (Result.Column = Rows[Result.Row].Length))) do
       begin
         LIsWrapped := True;
         Dec(Result.Column, Rows[Result.Row].Length);
@@ -12453,10 +12462,9 @@ begin
       LCaretStyle := FCaret.Styles.Overwrite;
 
     LCaretPoint := DisplayToClient(DisplayCaretPosition);
-    LCaretPoint.X := LCaretPoint.X + FCaretOffset.X;
-    if LCaretStyle in [csHorizontalLine, csThinHorizontalLine, csHalfBlock, csBlock] then
-      LCaretPoint.X := LCaretPoint.X + 1;
-    LCaretPoint.Y := LCaretPoint.Y + FCaretOffset.Y;
+    LCaretPoint.Offset(FCaretOffset);
+    if (LCaretStyle in [csHorizontalLine, csThinHorizontalLine, csHalfBlock, csBlock]) then
+      Inc(LCaretPoint.X);
 
     LRect := ClientRect;
     Inc(LRect.Left, LeftMargin.Width + FCodeFolding.GetWidth);

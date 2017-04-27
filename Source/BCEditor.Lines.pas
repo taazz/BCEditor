@@ -1996,10 +1996,15 @@ begin
       else
       begin
         if (Count = 0) then
-          LPosition := BOFPosition
+        begin
+          LPosition := BOFPosition;
+          LText := '';
+        end
         else
+        begin
           LPosition := EOLPosition[Count - 1];
-        LText := '';
+          LText := LineBreak;
+        end;
         for LIndex := Count to APosition.Line - 1 do
           LText := LText + LineBreak;
         LText := LText + StringOfChar(BCEDITOR_SPACE_CHAR, APosition.Char);
