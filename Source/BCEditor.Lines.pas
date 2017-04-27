@@ -1677,8 +1677,12 @@ begin
   end
   else
   begin
-    Assert(ABeginPosition.Char <= Length(Lines[ABeginPosition.Line].Text));
-    Assert(AEndPosition.Char <= Length(Lines[AEndPosition.Line].Text));
+    Assert(ABeginPosition.Char <= Length(Lines[ABeginPosition.Line].Text),
+      'ABeginPosition: ' + ABeginPosition.ToString() + #13#10
+      + 'Length: ' + IntToStr(Length(Lines[AEndPosition.Line].Text)));
+    Assert(AEndPosition.Char <= Length(Lines[AEndPosition.Line].Text),
+      'AEndPosition: ' + AEndPosition.ToString() + #13#10
+      + 'Length: ' + IntToStr(Length(Lines[AEndPosition.Line].Text)));
 
     LEndLine := AEndPosition.Line;
     if ((loTrimTrailingLines in Options) and (lsSaving in State)) then

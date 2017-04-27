@@ -3280,7 +3280,9 @@ begin
       LNewCaretPosition.Char := LLeftSpaceCount
     else
       LNewCaretPosition.Char := 0;
-  end;
+  end
+  else
+    LNewCaretPosition := Lines.BOLPosition[LNewCaretPosition.Line];
 
   MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ASelectionCommand);
 end;
@@ -3919,7 +3921,7 @@ var
   LSearch: TBCEditorLines.TSearch;
   LSearchResult: TSearchResult;
 begin
-  if (Length(Search.Pattern) = 0) then
+  if ((Length(Search.Pattern) = 0) or (ABeginPosition = AEndPosition)) then
   begin
     FSearchStatus := SBCEditorPatternIsEmpty;
     Result := False;
@@ -5874,37 +5876,37 @@ var
   LRow: Integer;
 begin
   if (FRows.Count = 0) then
-  begin
-    Include(FState, esRowsUpdating);
-    try
-      if (WordWrap.Enabled and (WordWrap.Width = wwwPage)) then
-        HandleNeeded();
+    if (WordWrap.Enabled and (WordWrap.Width = wwwPage) and not HandleAllocated) then
+      HandleNeeded()
+    else
+    begin
+      Include(FState, esRowsUpdating);
+      try
+        for LLine := 0 to Lines.Count - 1 do
+          Lines.SetFirstRow(LLine, RowToInsert);
 
-      for LLine := 0 to Lines.Count - 1 do
-        Lines.SetFirstRow(LLine, RowToInsert);
-
-      for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
-      begin
-        LRange := FAllCodeFoldingRanges[LCodeFolding];
-        if (Assigned(LRange) and LRange.Collapsed) then
-          for LLine := LRange.FirstLine + 1 to LRange.LastLine do
-            Lines.SetFirstRow(LLine, -1);
-      end;
-
-      LRow := 0;
-      for LLine := 0 to Lines.Count - 1 do
-        if (Lines.Lines[LLine].FirstRow = RowToInsert) then
+        for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
         begin
-          Lines.SetFirstRow(LLine, LRow);
-          Inc(LRow, InsertLineIntoRows(LLine, LRow));
+          LRange := FAllCodeFoldingRanges[LCodeFolding];
+          if (Assigned(LRange) and LRange.Collapsed) then
+            for LLine := LRange.FirstLine + 1 to LRange.LastLine do
+              Lines.SetFirstRow(LLine, -1);
         end;
-    finally
-      Exclude(FState, esRowsUpdating);
 
-      if (UpdateCount = 0) then
-        UpdateScrollBars(False);
+        LRow := 0;
+        for LLine := 0 to Lines.Count - 1 do
+          if (Lines.Lines[LLine].FirstRow = RowToInsert) then
+          begin
+            Lines.SetFirstRow(LLine, LRow);
+            Inc(LRow, InsertLineIntoRows(LLine, LRow));
+          end;
+      finally
+        Exclude(FState, esRowsUpdating);
+
+        if (UpdateCount = 0) then
+          UpdateScrollBars(False);
+      end;
     end;
-  end;
 
   Result := FRows;
 end;
@@ -7508,7 +7510,7 @@ begin
         LNewCaretPosition.Char := Min(LNewCaretPosition.Char, LLineTextLength);
 
       { Skip combined and non-spacing marks }
-      if ((LNewCaretPosition.Char <= LLineTextLength) and (LLineTextLength > 0)) then
+      if ((0 < LLineTextLength) and (LNewCaretPosition.Char < LLineTextLength)) then
       begin
         LLinePos := @Lines.Lines[Lines.CaretPosition.Line].Text[1 + LNewCaretPosition.Char];
         LLineEndPos := @Lines.Lines[Lines.CaretPosition.Line].Text[Length(Lines.Lines[Lines.CaretPosition.Line].Text)];
@@ -11846,7 +11848,7 @@ var
   LVisibleRows: Integer;
   LWidthChanged: Boolean;
 begin
-  if HandleAllocated and (CharWidth <> 0) then
+  if (HandleAllocated and (CharWidth <> 0)) then
   begin
     BeginUpdate();
     try
@@ -11884,7 +11886,6 @@ begin
         end;
         if cfoAutoPadding in FCodeFolding.Options then
           FCodeFolding.Padding := MulDiv(2, Screen.PixelsPerInch, 96);
-
       end;
     finally
       EndUpdate();
