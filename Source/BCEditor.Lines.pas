@@ -79,10 +79,9 @@ type
       Text: string;
     end;
 
-  protected type
+  public type
     TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
     TUndoList = class(TList<TUndoItem>)
-  public type
     strict private
       FBlockNumber: Integer;
       FChanges: Integer;
