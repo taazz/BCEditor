@@ -209,7 +209,7 @@ type
     FOnPaint: TBCEditorPaintEvent;
     FOnProcessCommand: TBCEditorProcessCommandEvent;
     FOnProcessUserCommand: TBCEditorProcessCommandEvent;
-    FOnReplaceText: TReplaceEvent;
+    FOnReplaceText: TBCEditorReplaceEvent;
     FOnRightMarginMouseUp: TNotifyEvent;
     FOnScroll: TBCEditorScrollEvent;
     FOnSelectionChanged: TNotifyEvent;
@@ -633,7 +633,7 @@ type
     property OnPaint: TBCEditorPaintEvent read FOnPaint write FOnPaint;
     property OnProcessCommand: TBCEditorProcessCommandEvent read FOnProcessCommand write FOnProcessCommand;
     property OnProcessUserCommand: TBCEditorProcessCommandEvent read FOnProcessUserCommand write FOnProcessUserCommand;
-    property OnReplaceText: TReplaceEvent read FOnReplaceText write FOnReplaceText;
+    property OnReplaceText: TBCEditorReplaceEvent read FOnReplaceText write FOnReplaceText;
     property OnRightMarginMouseUp: TNotifyEvent read FOnRightMarginMouseUp write FOnRightMarginMouseUp;
     property OnScroll: TBCEditorScrollEvent read FOnScroll write FOnScroll;
     property OnSelectionChanged: TNotifyEvent read FOnSelectionChanged write FOnSelectionChanged;
@@ -6444,7 +6444,7 @@ var
 
 var
   LFoldRegion: TBCEditorCodeFolding.TRegion;
-  LFoldRegionItem: TRegionItem;
+  LFoldRegionItem: TBCEditorCodeFoldingRegionItem;
   LIndex1: Integer;
   LIndex2: Integer;
   LLineBeginPos: PChar;
@@ -6505,7 +6505,7 @@ function TCustomBCEditor.IsKeywordAtPositionOrAfter(const APosition: TBCEditorTe
 var
   LCaretPosition: TBCEditorTextPosition;
   LFoldRegion: TBCEditorCodeFolding.TRegion;
-  LFoldRegionItem: TRegionItem;
+  LFoldRegionItem: TBCEditorCodeFoldingRegionItem;
   LIndex1: Integer;
   LIndex2: Integer;
   LLineBeginPos: PChar;
@@ -10653,7 +10653,7 @@ var
     LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
     LIndex: Integer;
     LLineTempPos: PChar;
-    LRegionItem: TRegionItem;
+    LRegionItem: TBCEditorCodeFoldingRegionItem;
     LSkipIfFoundAfterOpenToken: Boolean;
     LTokenEndPos: PChar;
     LTokenFollowEndPos: PChar;
@@ -10936,7 +10936,7 @@ var
     LTextBeginPos: PChar;
     LTextEndPos: PChar;
     LTextPos: PChar;
-    LRegionItem: TRegionItem;
+    LRegionItem: TBCEditorCodeFoldingRegionItem;
     LTokenAttributes: string;
     LTokenAttributesBeginPos: PChar;
     LTokenName: string;

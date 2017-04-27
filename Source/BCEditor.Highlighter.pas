@@ -407,7 +407,7 @@ type
     FAttributes: TStringList;
     FBeginningOfLine: Boolean;
     FCodeFoldingRangeCount: Integer;
-    FCodeFoldingRegions: TRegions;
+    FCodeFoldingRegions: TBCEditorCodeFoldingRegions;
     FColors: TColors;
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions;
@@ -471,7 +471,7 @@ type
     property Attribute[AIndex: Integer]: TAttribute read GetAttribute;
     property Attributes: TStringList read FAttributes;
     property CodeFoldingRangeCount: Integer read FCodeFoldingRangeCount write SetCodeFoldingRangeCount;
-    property CodeFoldingRegions: TRegions read FCodeFoldingRegions write FCodeFoldingRegions;
+    property CodeFoldingRegions: TBCEditorCodeFoldingRegions read FCodeFoldingRegions write FCodeFoldingRegions;
     property Colors: TColors read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
@@ -1748,7 +1748,7 @@ begin
     FHighlighter.CodeFoldingRangeCount := LCount;
     for i := 0 to LCount - 1 do
     begin
-      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFolding.TRegion.Create(TRegionItem);
+      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFolding.TRegion.Create(TBCEditorCodeFoldingRegionItem);
       LCodeFoldingObject := LArray.Items[i].ObjectValue;
 
       ImportCodeFoldingOptions(FHighlighter.CodeFoldingRegions[i], LCodeFoldingObject);
@@ -1771,7 +1771,7 @@ var
   LJSONObject: TJsonObject;
   LMemberObject: TJsonObject;
   LOpenToken: string;
-  LRegionItem: TRegionItem;
+  LRegionItem: TBCEditorCodeFoldingRegionItem;
   LSkipIfFoundAfterOpenTokenArray: TJsonArray;
 begin
   if ACodeFoldingObject.Contains('FoldRegion') then
@@ -1886,7 +1886,7 @@ var
   LJsonDataValue: PJsonDataValue;
   LJSONObject: TJsonObject;
   LOpenToken: string;
-  LRegionItem: TRegionItem;
+  LRegionItem: TBCEditorCodeFoldingRegionItem;
   LSkipRegionArray: TJsonArray;
   LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
   LSkipRegionType: TBCEditorRangeItemType;

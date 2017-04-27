@@ -7,8 +7,8 @@ uses
   BCEditor.Types, BCEditor.Editor.Search;
 
 type
-  TChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
-  TReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorTextPosition;
+  TBCEditorReplaceChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
+  TBCEditorReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorTextPosition;
       var AAction: TBCEditorReplaceAction) of object;
 
   TBCEditorReplace = class(TPersistent)
@@ -18,7 +18,7 @@ type
     FBeginPosition: TBCEditorTextPosition;
     FEndPosition: TBCEditorTextPosition;
     FEngine: TBCEditorSearchEngine;
-    FOnChange: TChangeEvent;
+    FOnChange: TBCEditorReplaceChangeEvent;
     FOptions: TBCEditorReplaceOptions;
     FPattern: string;
     FReplaceText: string;
@@ -26,7 +26,7 @@ type
   protected
     property BeginPosition: TBCEditorTextPosition read FBeginPosition write FBeginPosition;
     property EndPosition: TBCEditorTextPosition read FEndPosition write FEndPosition;
-    property OnChange: TChangeEvent read FOnChange write FOnChange;
+    property OnChange: TBCEditorReplaceChangeEvent read FOnChange write FOnChange;
   public
     constructor Create;
     procedure Assign(ASource: TPersistent); override;
