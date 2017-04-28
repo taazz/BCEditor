@@ -29,7 +29,7 @@ type
   strict private const
     DefaultOptions = [soTermsCaseSensitive];
   strict private
-    FColors: TBCEditorSelection.TColors;
+    FColors: TColors;
     FOptions: TBCEditorSelectionOptions;
     procedure SetColors(const AValue: TColors);
     procedure SetOptions(AValue: TBCEditorSelectionOptions);
@@ -39,7 +39,7 @@ type
     procedure Assign(ASource: TPersistent); override;
     procedure SetOption(const AOption: TBCEditorSelectionOption; const AEnabled: Boolean);
   published
-    property Colors: TBCEditorSelection.TColors read FColors write SetColors;
+    property Colors: TColors read FColors write SetColors;
     property Options: TBCEditorSelectionOptions read FOptions write SetOptions default DefaultOptions;
   end;
 
@@ -103,18 +103,19 @@ begin
     inherited Assign(ASource);
 end;
 
-constructor TBCEditorSelection.Create;
+constructor TBCEditorSelection.Create();
 begin
   inherited;
 
-  FColors := TBCEditorSelection.TColors.Create;
+  FColors := TColors.Create();
   FOptions := DefaultOptions;
 end;
 
-destructor TBCEditorSelection.Destroy;
+destructor TBCEditorSelection.Destroy();
 begin
-  FColors.Free;
-  inherited Destroy;
+  FColors.Free();
+
+  inherited;
 end;
 
 procedure TBCEditorSelection.SetColors(const AValue: TBCEditorSelection.TColors);

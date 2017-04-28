@@ -230,19 +230,6 @@ type
     Text: string;
   end;
 
-  TBCEditorSpecialCharsEndOfLineStyle = (
-    eolArrow,
-    eolEnter,
-    eolPilcrow
-  );
-
-  TBCEditorSpecialCharsOption = (
-    scoTextColor,
-    scoMiddleColor,
-    scoShowOnlyInSelection
-  );
-  TBCEditorSpecialCharsStyle = (scsDot, scsSolid);
-
   TBCEditorTabConvertProc = function(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean;
     const ATabChar: Char = BCEDITOR_SPACE_CHAR): string;
 
@@ -259,14 +246,6 @@ type
     mpoUseMatchedColor
   );
 
-  TBCEditorMinimapOption = (
-    moShowBookmarks,
-    moShowIndentGuides,
-    moShowSearchResults,
-    moShowSpecialChars
-  );
-
-  TBCEditorMinimapAlign = (maLeft, maRight);
   TBCEditorSearchMapAlign = (saLeft, saRight);
 
   TBCEditorUndoOption = (
@@ -308,8 +287,6 @@ type
 
   TBCEditorScrollHintFormat = (shfTopLineOnly, shfTopToBottom);
 
-  TBCEditorMinimapIndicatorOption = (ioInvertBlending, ioShowBorder, ioUseBlending);
-
   TBCEditorCodeFoldingHintIndicatorOption = (hioShowBorder, hioShowMark);
 
   TBCEditorCaretOptions = set of TBCEditorCaretOption;
@@ -326,7 +303,6 @@ type
   TBCEditorRightMarginOptions = set of TBCEditorRightMarginOption;
   TBCEditorScrollOptions = set of TBCEditorScrollOption;
   TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
-  TBCEditorSpecialCharsOptions = set of TBCEditorSpecialCharsOption;
   TBCEditorTabOptions = set of TBCEditorTabOption;
   TBCEditorTokenInfoOptions = set of TBCEditorTokenInfoOption;
   TBCEditorUndoOptions = set of TBCEditorUndoOption;

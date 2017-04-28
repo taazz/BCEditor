@@ -33,7 +33,6 @@ const
   BCEDITOR_EXCLAMATION_MARK = #33;
   BCEDITOR_LOW_LINE = #95;
   BCEDITOR_CTRL_BACKSPACE = #127;
-  BCEDITOR_PILCROW_CHAR = Char($00B6);
   BCEDITOR_WORD_BREAK_CHARACTERS = ['.', ',', ';', ':', '"', '''', '!', '?', '[', ']', '(', ')', '{', '}', '^',
     '=', '+', '-', '*', '/', '\', '|', ' '];
   BCEDITOR_EXTRA_WORD_BREAK_CHARACTERS = ['´', '`', '°', '&', '$', '@', '§', '%', '#', '~', '<', '>'];
@@ -50,6 +49,7 @@ const
   clSelectionColor = clHighlight;
   clSearchHighlighter = $0078AAFF;
   clSearchInSelectionBackground = $00FCFDCD;
+  clSpecialChar = clGrayText;
   clActiveLineBackground = $00E6FFFA;
   clLeftMarginBackground = $00F4F4F4;
   clLeftMarginFontForeground = $00CC9999;
@@ -57,8 +57,6 @@ const
   clIndentHighlight = $00CC9999;
   clIndent = $00CC9999;
   clMatchingPairUnderline = $00FFFF00;
-  clMinimapVisibleLines = $00E6FAFF;
-  clMinimapBookmark = clGreen;
   clWordWrapIndicatorArrow = clNavy;
   clWordWrapIndicatorLines = clBlack;
   clSyncEditBackground = $00FCFDCD;

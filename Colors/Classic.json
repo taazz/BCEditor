@@ -50,6 +50,7 @@
         "SearchMapForeground": "clYellow",
         "SelectionBackground": "clSilver",
         "SelectionForeground": "clNavy",
+        "SpecialCharForeground": "clGrayText",
         "SyncEditBackground": "$009999CC",
         "SyncEditEditBorder": "clYellow",
         "SyncEditWordBorder": "clSilver",

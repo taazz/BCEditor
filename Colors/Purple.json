@@ -50,6 +50,7 @@
         "SearchMapForeground": "$0078AAFF",
         "SelectionBackground": "$00A56D53",
         "SelectionForeground": "clWhite",
+        "SpecialCharForeground": "clGrayText",
         "SyncEditBackground": "$00FCFDCD",
         "SyncEditEditBorder": "$00333333",
         "SyncEditWordBorder": "$00A56D53",
