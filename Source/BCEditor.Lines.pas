@@ -1669,7 +1669,10 @@ var
   StringBuilder: TStringBuilder;
 begin
   Assert((BOFPosition <= ABeginPosition) and (AEndPosition <= EOFPosition));
-  Assert(ABeginPosition <= AEndPosition);
+  Assert(ABeginPosition <= AEndPosition,
+    'ABeginPosition: ' + ABeginPosition.ToString() + #13#10
+    + 'AEndPosition: ' + AEndPosition.ToString());
+
   if (Count = 0) then
   begin
     Assert((ABeginPosition = BOFPosition) and (AEndPosition = BOFPosition));

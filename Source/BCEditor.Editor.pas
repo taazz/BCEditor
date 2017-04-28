@@ -11674,7 +11674,7 @@ var
   LVisibleRows: Integer;
   LWidthChanged: Boolean;
 begin
-  if (HandleAllocated and (CharWidth <> 0)) then
+  if (HandleAllocated and (CharWidth <> 0) and (LineHeight > 0)) then
   begin
     BeginUpdate();
     try
