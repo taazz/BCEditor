@@ -49,8 +49,8 @@ end;
 
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
-  HighlighterPath := ExpandFileName('..\..\..\Highlighters\');
-  ColorPath := ExpandFileName('..\..\..\Colors\');
+  HighlighterPath := ExpandFileName('..\..\..\..\Highlighters\');
+  ColorPath := ExpandFileName('..\..\..\..\Colors\');
 
   AddFileNamesFromPathIntoListBox(HighlighterPath, ListBoxHighlighters);
   AddFileNamesFromPathIntoListBox(ColorPath, ListBoxColors);

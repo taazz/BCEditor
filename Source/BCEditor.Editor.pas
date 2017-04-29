@@ -356,7 +356,7 @@ type
     function GetModified(): Boolean;
     function GetMouseMoveScrollCursorIndex: Integer;
     function GetMouseMoveScrollCursors(const AIndex: Integer): HCursor;
-    function GetSearchResultCount: Integer;
+    function GetSearchResultCount: Integer; inline;
     function GetSelectionAvailable(): Boolean;
     function GetSelectionBeginPosition(): TBCEditorTextPosition;
     function GetSelectionEndPosition(): TBCEditorTextPosition;
@@ -8951,7 +8951,7 @@ var
     LRGBColor := RGB(LColor and $FF, (LColor shr 8) and $FF, (LColor shr 16) and $FF);
   end;
 
-  procedure PaintSearchResults(const AText: string; const ATextRect: TRect);
+  procedure PaintSearchResults(const ATokenText: string; const ATextRect: TRect);
   var
     LBeginTextPosition: TBCEditorTextPosition;
     LCharCount: Integer;
@@ -9045,11 +9045,11 @@ var
             Continue;
           end;
 
-          LToken := AText;
+          LToken := ATokenText;
           LSearchRect := ATextRect;
 
           if LSearchItem.BeginPosition.Line < LCurrentLine then
-            LBeginTextPosition := TextPosition(0, 0)
+            LBeginTextPosition := Lines.BOFPosition
           else
             LBeginTextPosition := LSearchItem.BeginPosition;
 
@@ -9057,16 +9057,16 @@ var
 
           if LCharCount > 0 then
           begin
-            LToken := Copy(AText, 1, LCharCount);
+            LToken := Copy(ATokenText, 1, LCharCount);
             Inc(LSearchRect.Left, ComputeTokenWidth(LToken, LCharCount, LPaintedColumn));
-            LToken := Copy(AText, LCharCount + 1, Length(AText));
+            LToken := Copy(ATokenText, LCharCount + 1, Length(ATokenText));
           end
           else
-            LCharCount := LTokenHelper.Length - Length(AText);
+            LCharCount := LTokenHelper.Length - Length(ATokenText);
 
           LToken := LeftStr(LToken, Min(LSearchTextLength, LBeginTextPosition.Char + LSearchTextLength - LTokenHelper.CharsBefore - LCharCount));
           LSearchRect.Right := LSearchRect.Left + ComputeTokenWidth(LToken, Length(LToken), LPaintedColumn);
-          if SameText(AText, LToken) then
+          if SameText(ATokenText, LToken) then
             Inc(LSearchRect.Right, FItalicOffset);
 
           if LToken <> '' then
