@@ -40,6 +40,8 @@
         <Base>true</Base>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
+        <ILINK_Description>BCEditor Components</ILINK_Description>
+        <TLIB_PageSize>64</TLIB_PageSize>
         <DCC_HppOutputARM>true</DCC_HppOutputARM>
         <DCC_HppOutput>.\$(Platform)\$(Config)</DCC_HppOutput>
         <BCC_PCHCache>true</BCC_PCHCache>
@@ -98,7 +100,6 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <ILINK_Description>BCEditor Components</ILINK_Description>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
