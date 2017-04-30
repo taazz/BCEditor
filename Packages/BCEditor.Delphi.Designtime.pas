@@ -1,4 +1,4 @@
-unit BCEditor.Package.Designtime;
+unit BCEditor.Delphi.Designtime;
 
 interface {********************************************************************}
 

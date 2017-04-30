@@ -1,6 +1,6 @@
-package BCEditor.Package.Designtime;
+package BCEditor.Delphi.Designtime;
 
-{$R 'BCEditor.Package.Designtime.dcr'}
+{$R 'BCEditor.Designtime.dcr'}
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
 {$ASSERTIONS ON}
@@ -35,9 +35,9 @@ requires
   vcl,
   dbrtl,
   vcldb,
-  BCEditor.Package.Runtime;
+  BCEditor.Delphi.Runtime;
 
 contains
-  BCEditor.Package.Designtime in 'BCEditor.Package.Designtime.pas';
+  BCEditor.Delphi.Designtime in 'BCEditor.Delphi.Designtime.pas';
 
 end.

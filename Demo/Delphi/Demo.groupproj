@@ -3,10 +3,10 @@
         <ProjectGuid>{46956432-F8D3-4B66-B7EA-C7B3CDE4EA74}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
-        <Projects Include="..\..\Packages\BCEditor.Package.Runtime.dproj">
+        <Projects Include="..\..\Packages\BCEditor.Delphi.Runtime.dproj">
             <Dependencies/>
         </Projects>
-        <Projects Include="..\..\Packages\BCEditor.Package.Designtime.dproj">
+        <Projects Include="..\..\Packages\BCEditor.Delphi.Designtime.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="Demo.dproj">
@@ -21,22 +21,22 @@
         </BorlandProject>
     </ProjectExtensions>
     <Target Name="BCEditor_Package_Runtime">
-        <MSBuild Projects="..\..\Packages\BCEditor.Package.Runtime.dproj"/>
+        <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Runtime.dproj"/>
     </Target>
     <Target Name="BCEditor_Package_Runtime:Clean">
-        <MSBuild Projects="..\..\Packages\BCEditor.Package.Runtime.dproj" Targets="Clean"/>
+        <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Runtime.dproj" Targets="Clean"/>
     </Target>
     <Target Name="BCEditor_Package_Runtime:Make">
-        <MSBuild Projects="..\..\Packages\BCEditor.Package.Runtime.dproj" Targets="Make"/>
+        <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Runtime.dproj" Targets="Make"/>
     </Target>
     <Target Name="BCEditor_Package_Designtime">
-        <MSBuild Projects="..\..\Packages\BCEditor.Package.Designtime.dproj"/>
+        <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Designtime.dproj"/>
     </Target>
     <Target Name="BCEditor_Package_Designtime:Clean">
-        <MSBuild Projects="..\..\Packages\BCEditor.Package.Designtime.dproj" Targets="Clean"/>
+        <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Designtime.dproj" Targets="Clean"/>
     </Target>
     <Target Name="BCEditor_Package_Designtime:Make">
-        <MSBuild Projects="..\..\Packages\BCEditor.Package.Designtime.dproj" Targets="Make"/>
+        <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Designtime.dproj" Targets="Make"/>
     </Target>
     <Target Name="Demo">
         <MSBuild Projects="Demo.dproj"/>

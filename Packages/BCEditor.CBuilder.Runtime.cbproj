@@ -1,13 +1,13 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <ProjectGuid>{D1E759DA-2E08-4700-AD3A-F8883A785619}</ProjectGuid>
+        <ProjectGuid>{F4785022-ED5E-4776-90BD-2BFC0C3CCA59}</ProjectGuid>
         <ProjectVersion>14.6</ProjectVersion>
         <FrameworkType>VCL</FrameworkType>
-        <MainSource>BCEditor.Package.Designtime.cpp</MainSource>
+        <MainSource>BCEditor.CBuilder.Runtime.cpp</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win32</Platform>
-        <TargetedPlatforms>1</TargetedPlatforms>
+        <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Package</AppType>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
@@ -15,6 +15,11 @@
     </PropertyGroup>
     <PropertyGroup Condition="('$(Platform)'=='Win32' and '$(Base)'=='true') or '$(Base_Win32)'!=''">
         <Base_Win32>true</Base_Win32>
+        <CfgParent>Base</CfgParent>
+        <Base>true</Base>
+    </PropertyGroup>
+    <PropertyGroup Condition="('$(Platform)'=='Win64' and '$(Base)'=='true') or '$(Base_Win64)'!=''">
+        <Base_Win64>true</Base_Win64>
         <CfgParent>Base</CfgParent>
         <Base>true</Base>
     </PropertyGroup>
@@ -36,19 +41,20 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base)'!=''">
         <ILINK_Description>BCEditor Components</ILINK_Description>
-        <DCC_AdditionalSwitches>-LUDesignIDE</DCC_AdditionalSwitches>
-        <DCC_HppOutput>.\$(Platform)\$(Config)</DCC_HppOutput>
+        <TLIB_PageSize>64</TLIB_PageSize>
         <DCC_HppOutputARM>true</DCC_HppOutputARM>
-        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <DCC_HppOutput>.\$(Platform)\$(Config)</DCC_HppOutput>
+        <BCC_PCHCache>true</BCC_PCHCache>
         <VerInfo_Locale>1031</VerInfo_Locale>
-        <DesignOnlyPackage>true</DesignOnlyPackage>
+        <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
+        <RuntimeOnlyPackage>true</RuntimeOnlyPackage>
         <ILINK_GenerateLibFile>true</ILINK_GenerateLibFile>
         <_TCHARMapping>char</_TCHARMapping>
         <Multithreaded>true</Multithreaded>
         <ILINK_GenerateImportLibrary>true</ILINK_GenerateImportLibrary>
         <ProjectType>CppPackage</ProjectType>
         <IncludePath>..\Source\;..\Packages\;$(IncludePath)</IncludePath>
-        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
+        <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;Winapi;$(DCC_Namespace)</DCC_Namespace>
         <ILINK_LibraryPath>..\Source\;..\Packages\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
         <DCC_CBuilderOutput>JPHNE</DCC_CBuilderOutput>
         <DynamicRTL>true</DynamicRTL>
@@ -66,6 +72,9 @@
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
+    </PropertyGroup>
+    <PropertyGroup Condition="'$(Base_Win64)'!=''">
+        <IncludePath>$(BDSINCLUDE)\windows\vcl;$(IncludePath)</IncludePath>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <BCC_OptimizeForSpeed>false</BCC_OptimizeForSpeed>
@@ -91,7 +100,6 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
-        <ILINK_Description>BCEditor Components</ILINK_Description>
         <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
@@ -99,150 +107,137 @@
         <TASM_Debugging>None</TASM_Debugging>
     </PropertyGroup>
     <ItemGroup>
-        <CppCompile Include="BCEditor.Package.Designtime.cpp">
+        <CppCompile Include="BCEditor.CBuilder.Runtime.cpp">
             <BuildOrder>0</BuildOrder>
         </CppCompile>
-        <ResFiles Include="BCEditor.Package.Designtime.dcr">
-            <BuildOrder>3</BuildOrder>
-        </ResFiles>
-        <DelphiCompile Include="BCEditor.Package.Designtime.pas">
-            <Suffix>_0</Suffix>
-            <BuildOrder>2</BuildOrder>
-        </DelphiCompile>
-        <PackageImport Include="designide.bpi">
-            <BuildOrder>4</BuildOrder>
+        <PackageImport Include="dbrtl.bpi">
+            <BuildOrder>45</BuildOrder>
         </PackageImport>
         <PackageImport Include="rtl.bpi">
             <BuildOrder>1</BuildOrder>
         </PackageImport>
         <PackageImport Include="vcl.bpi">
-            <BuildOrder>8</BuildOrder>
+            <BuildOrder>43</BuildOrder>
         </PackageImport>
-        <PackageImport Include="vclactnband.bpi">
-            <BuildOrder>6</BuildOrder>
-        </PackageImport>
-        <PackageImport Include="vclx.bpi">
-            <BuildOrder>7</BuildOrder>
-        </PackageImport>
-        <PackageImport Include="xmlrtl.bpi">
-            <BuildOrder>5</BuildOrder>
+        <PackageImport Include="vcldb.bpi">
+            <BuildOrder>44</BuildOrder>
         </PackageImport>
         <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
-            <BuildOrder>9</BuildOrder>
+            <BuildOrder>2</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.ActiveLine.pas">
-            <BuildOrder>10</BuildOrder>
+            <BuildOrder>3</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Caret.pas">
-            <BuildOrder>11</BuildOrder>
+            <BuildOrder>5</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.Hint.Form.pas">
-            <BuildOrder>12</BuildOrder>
+            <BuildOrder>6</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.pas">
-            <BuildOrder>13</BuildOrder>
+            <BuildOrder>7</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CompletionProposal.pas">
-            <BuildOrder>14</BuildOrder>
+            <BuildOrder>8</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas">
-            <BuildOrder>15</BuildOrder>
+            <BuildOrder>9</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Glyph.pas">
-            <BuildOrder>16</BuildOrder>
+            <BuildOrder>10</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.InternalImage.pas">
-            <BuildOrder>17</BuildOrder>
+            <BuildOrder>11</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.KeyCommands.pas">
-            <BuildOrder>18</BuildOrder>
+            <BuildOrder>12</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.LeftMargin.pas">
-            <BuildOrder>19</BuildOrder>
+            <BuildOrder>13</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Marks.pas">
-            <BuildOrder>20</BuildOrder>
+            <BuildOrder>14</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.MatchingPair.pas">
-            <BuildOrder>21</BuildOrder>
+            <BuildOrder>15</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.pas">
-            <BuildOrder>22</BuildOrder>
+            <BuildOrder>17</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.PopupWindow.pas">
-            <BuildOrder>23</BuildOrder>
+            <BuildOrder>18</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Replace.pas">
-            <BuildOrder>24</BuildOrder>
+            <BuildOrder>19</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.RightMargin.pas">
-            <BuildOrder>25</BuildOrder>
+            <BuildOrder>20</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Scroll.pas">
-            <BuildOrder>26</BuildOrder>
+            <BuildOrder>21</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Search.pas">
-            <BuildOrder>27</BuildOrder>
+            <BuildOrder>22</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Selection.pas">
-            <BuildOrder>28</BuildOrder>
+            <BuildOrder>23</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.SpecialChars.pas">
-            <BuildOrder>29</BuildOrder>
+            <BuildOrder>24</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.SyncEdit.pas">
-            <BuildOrder>30</BuildOrder>
+            <BuildOrder>25</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Tabs.pas">
-            <BuildOrder>31</BuildOrder>
+            <BuildOrder>26</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.TokenInfo.pas">
-            <BuildOrder>32</BuildOrder>
+            <BuildOrder>27</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.TokenInfo.PopupWindow.pas">
-            <BuildOrder>33</BuildOrder>
+            <BuildOrder>28</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.WordWrap.pas">
-            <BuildOrder>34</BuildOrder>
+            <BuildOrder>29</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
-            <BuildOrder>35</BuildOrder>
+            <BuildOrder>30</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">
-            <BuildOrder>36</BuildOrder>
+            <BuildOrder>31</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.KeyboardHandler.pas">
-            <BuildOrder>37</BuildOrder>
+            <BuildOrder>32</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Language.pas">
-            <BuildOrder>38</BuildOrder>
+            <BuildOrder>33</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Lines.pas">
-            <BuildOrder>39</BuildOrder>
+            <BuildOrder>34</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.MacroRecorder.pas">
-            <BuildOrder>40</BuildOrder>
+            <BuildOrder>35</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.PaintHelper.pas">
-            <BuildOrder>41</BuildOrder>
+            <BuildOrder>36</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Print.pas">
-            <BuildOrder>42</BuildOrder>
+            <BuildOrder>37</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Print.Preview.pas">
-            <BuildOrder>43</BuildOrder>
+            <BuildOrder>38</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.StyleHooks.pas">
-            <BuildOrder>44</BuildOrder>
+            <BuildOrder>39</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Types.pas">
-            <BuildOrder>45</BuildOrder>
+            <BuildOrder>40</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Utils.pas">
-            <BuildOrder>46</BuildOrder>
+            <BuildOrder>41</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\JsonDataObjects.pas">
-            <BuildOrder>47</BuildOrder>
+            <BuildOrder>42</BuildOrder>
         </DelphiCompile>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
@@ -262,7 +257,7 @@
         <BorlandProject>
             <CPlusPlusBuilder.Personality>
                 <Source>
-                    <Source Name="MainSource">BCEditor.Package.Designtime.cpp</Source>
+                    <Source Name="MainSource">BCEditor.CBuilder.Runtime.cpp</Source>
                 </Source>
                 <VersionInfo>
                     <VersionInfo Name="IncludeVerInfo">False</VersionInfo>
@@ -320,6 +315,7 @@
             <Deployment/>
             <Platforms>
                 <Platform value="Win32">True</Platform>
+                <Platform value="Win64">True</Platform>
             </Platforms>
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>

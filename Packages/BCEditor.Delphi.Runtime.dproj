@@ -1,7 +1,7 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{AC917C2B-5870-48AD-981D-668AD3E4A533}</ProjectGuid>
-        <MainSource>BCEditor.Package.Runtime.dpk</MainSource>
+        <MainSource>BCEditor.Delphi.Runtime.dpk</MainSource>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>3</TargetedPlatforms>
@@ -67,7 +67,7 @@
         <DCC_Description>BCEditor Components</DCC_Description>
         <GenPackage>true</GenPackage>
         <DCC_F>false</DCC_F>
-        <SanitizedProjectName>BCEditor.Package.Runtime</SanitizedProjectName>
+        <SanitizedProjectName>BCEditor.Delphi.Runtime</SanitizedProjectName>
         <VerInfo_Keys>CompanyName=;FileDescription=;FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProductName=;ProductVersion=1.0.0.0;Comments=;CFBundleName=;CFBundleDisplayName=;UIDeviceFamily=;CFBundleIdentifier=;CFBundleVersion=;CFBundlePackageType=;CFBundleSignature=;CFBundleAllowMixedLocalizations=;UISupportedInterfaceOrientations=;CFBundleExecutable=;CFBundleResourceSpecification=;LSRequiresIPhoneOS=;CFBundleInfoDictionaryVersion=;CFBundleDevelopmentRegion=</VerInfo_Keys>
         <DCC_S>false</DCC_S>
         <DCC_N>false</DCC_N>
@@ -183,7 +183,7 @@
         <BorlandProject>
             <Delphi.Personality>
                 <Source>
-                    <Source Name="MainSource">BCEditor.Package.Runtime.dpk</Source>
+                    <Source Name="MainSource">BCEditor.Delphi.Runtime.dpk</Source>
                 </Source>
                 <VersionInfo>
                     <VersionInfo Name="IncludeVerInfo">True</VersionInfo>

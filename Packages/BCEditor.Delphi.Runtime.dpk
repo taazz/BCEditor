@@ -1,4 +1,4 @@
-package BCEditor.Package.Runtime;
+package BCEditor.Delphi.Runtime;
 
 {$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
 {$ALIGN 8}
