@@ -532,7 +532,8 @@ type
     function GetBookmark(const AIndex: Integer; var ATextPosition: TBCEditorTextPosition): Boolean;
     function GetColorsFileName(const AFileName: string): string;
     function GetReadOnly: Boolean; virtual;
-    function GetRows(): TRows;
+    function GetRows(): TRows; overload; inline;
+    function GetRows(const AUpdateScrollBars: Boolean): TRows; overload;
     function GetSelLength: Integer;
     function GetTextPositionOfMouse(out ATextPosition: TBCEditorTextPosition): Boolean;
     procedure GotoBookmark(const AIndex: Integer);
@@ -5875,6 +5876,11 @@ begin
 end;
 
 function TCustomBCEditor.GetRows(): TRows;
+begin
+  Result := GetRows(False);
+end;
+
+function TCustomBCEditor.GetRows(const AUpdateScrollBars: Boolean): TRows;
 const
   RowToInsert = -2;
 var
@@ -5911,7 +5917,7 @@ begin
       finally
         Exclude(FState, esRowsUpdating);
 
-        if (UpdateCount = 0) then
+        if (AUpdateScrollBars and (UpdateCount = 0)) then
           UpdateScrollBars(False);
       end;
     end;
@@ -7771,94 +7777,97 @@ var
   LLastTextRow: Integer;
   LTemp: Integer;
 begin
-  LClipRect := ClientRect;
+  if (LineHeight > 0) then
+  begin
+    LClipRect := ClientRect;
 
-  LFirstRow := TopRow + LClipRect.Top div LineHeight;
-  LTemp := (LClipRect.Bottom + LineHeight - 1) div LineHeight;
-  LLastTextRow := MinMax(TopRow + LTemp - 1, -1, Rows.Count - 1);
-  LLastRow := TopRow + LTemp;
+    LFirstRow := TopRow + LClipRect.Top div LineHeight;
+    LTemp := (LClipRect.Bottom + LineHeight - 1) div LineHeight;
+    LLastTextRow := MinMax(TopRow + LTemp - 1, -1, Rows.Count - 1);
+    LLastRow := TopRow + LTemp;
 
-  HideCaret;
+    HideCaret;
 
-  try
-    Canvas.Brush.Color := FBackgroundColor;
-
-    FPaintHelper.BeginDrawing(Canvas.Handle);
     try
-      FPaintHelper.SetBaseFont(Font);
+      Canvas.Brush.Color := FBackgroundColor;
 
-      { Text lines }
-      LDrawRect.Top := 0;
-      LDrawRect.Left := LeftMarginWidth - HorzTextPos;
-      LDrawRect.Right := ClientRect.Width;
-      LDrawRect.Bottom := LClipRect.Height;
+      FPaintHelper.BeginDrawing(Canvas.Handle);
+      try
+        FPaintHelper.SetBaseFont(Font);
 
-      PaintTextLines(LDrawRect, LFirstRow, LLastTextRow);
+        { Text lines }
+        LDrawRect.Top := 0;
+        LDrawRect.Left := LeftMarginWidth - HorzTextPos;
+        LDrawRect.Right := ClientRect.Width;
+        LDrawRect.Bottom := LClipRect.Height;
 
-      PaintRightMargin(LDrawRect);
+        PaintTextLines(LDrawRect, LFirstRow, LLastTextRow);
 
-      if (FCodeFolding.Visible and (cfoShowIndentGuides in CodeFolding.Options)) then
-        PaintGuides(TopRow, Min(TopRow + VisibleRows, Rows.Count) - 1);
+        PaintRightMargin(LDrawRect);
 
-      if FSyncEdit.Enabled and FSyncEdit.Active then
-        PaintSyncItems;
+        if (FCodeFolding.Visible and (cfoShowIndentGuides in CodeFolding.Options)) then
+          PaintGuides(TopRow, Min(TopRow + VisibleRows, Rows.Count) - 1);
 
-      if FCaret.NonBlinking.Enabled or Assigned(FMultiCarets) and (FMultiCarets.Count > 0) and FDrawMultiCarets then
-        DrawCaret;
+        if FSyncEdit.Enabled and FSyncEdit.Active then
+          PaintSyncItems;
 
-      if (not Assigned(FCompletionProposalPopupWindow)
-        and FCaret.MultiEdit.Enabled
-        and (FMultiCaretPosition.Row >= 0)) then
-        PaintCaretBlock(FMultiCaretPosition);
+        if FCaret.NonBlinking.Enabled or Assigned(FMultiCarets) and (FMultiCarets.Count > 0) and FDrawMultiCarets then
+          DrawCaret;
 
-      if FRightMargin.Moving then
-        PaintRightMarginMove;
+        if (not Assigned(FCompletionProposalPopupWindow)
+          and FCaret.MultiEdit.Enabled
+          and (FMultiCaretPosition.Row >= 0)) then
+          PaintCaretBlock(FMultiCaretPosition);
 
-      if FMouseMoveScrolling then
-        PaintMouseMoveScrollPoint;
+        if FRightMargin.Moving then
+          PaintRightMarginMove;
 
-      { Left margin and code folding }
-      LDrawRect := LClipRect;
-      LDrawRect.Left := 0;
-      if FSearch.Map.Align = saLeft then
-        Inc(LDrawRect.Left, FSearch.Map.GetWidth);
+        if FMouseMoveScrolling then
+          PaintMouseMoveScrollPoint;
 
-      if LeftMargin.Visible then
-      begin
-        LDrawRect.Right := LDrawRect.Left + LeftMargin.Width;
-        PaintLeftMargin(LDrawRect, LFirstRow, LLastTextRow, LLastRow);
-      end;
-
-      if FCodeFolding.Visible then
-      begin
-        Inc(LDrawRect.Left, LeftMargin.Width);
-        LDrawRect.Right := LDrawRect.Left + FCodeFolding.GetWidth;
-        PaintCodeFolding(LDrawRect, LFirstRow, LLastTextRow);
-      end;
-
-      { Search map }
-      if FSearch.Map.Visible then
-      begin
+        { Left margin and code folding }
         LDrawRect := LClipRect;
-        if FSearch.Map.Align = saRight then
-          LDrawRect.Left := ClientRect.Width - FSearch.Map.GetWidth
-        else
-        begin
-          LDrawRect.Left := 0;
-          LDrawRect.Right := FSearch.Map.GetWidth;
-        end;
-        PaintSearchMap(LDrawRect);
-      end;
-    finally
-      FPaintHelper.EndDrawing;
-    end;
+        LDrawRect.Left := 0;
+        if FSearch.Map.Align = saLeft then
+          Inc(LDrawRect.Left, FSearch.Map.GetWidth);
 
-    DoOnPaint;
-  finally
-    FLastTopLine := TopRow;
-    FLastLineNumberCount := Rows.Count;
-    if not FCaret.NonBlinking.Enabled and not Assigned(FMultiCarets) then
-      UpdateCaret;
+        if LeftMargin.Visible then
+        begin
+          LDrawRect.Right := LDrawRect.Left + LeftMargin.Width;
+          PaintLeftMargin(LDrawRect, LFirstRow, LLastTextRow, LLastRow);
+        end;
+
+        if FCodeFolding.Visible then
+        begin
+          Inc(LDrawRect.Left, LeftMargin.Width);
+          LDrawRect.Right := LDrawRect.Left + FCodeFolding.GetWidth;
+          PaintCodeFolding(LDrawRect, LFirstRow, LLastTextRow);
+        end;
+
+        { Search map }
+        if FSearch.Map.Visible then
+        begin
+          LDrawRect := LClipRect;
+          if FSearch.Map.Align = saRight then
+            LDrawRect.Left := ClientRect.Width - FSearch.Map.GetWidth
+          else
+          begin
+            LDrawRect.Left := 0;
+            LDrawRect.Right := FSearch.Map.GetWidth;
+          end;
+          PaintSearchMap(LDrawRect);
+        end;
+      finally
+        FPaintHelper.EndDrawing;
+      end;
+
+      DoOnPaint;
+    finally
+      FLastTopLine := TopRow;
+      FLastLineNumberCount := Rows.Count;
+      if not FCaret.NonBlinking.Enabled and not Assigned(FMultiCarets) then
+        UpdateCaret;
+    end;
   end;
 end;
 

@@ -20,22 +20,22 @@
             <Default.Personality/>
         </BorlandProject>
     </ProjectExtensions>
-    <Target Name="BCEditor_Package_Runtime">
+    <Target Name="BCEditor_Delphi_Runtime">
         <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Runtime.dproj"/>
     </Target>
-    <Target Name="BCEditor_Package_Runtime:Clean">
+    <Target Name="BCEditor_Delphi_Runtime:Clean">
         <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Runtime.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="BCEditor_Package_Runtime:Make">
+    <Target Name="BCEditor_Delphi_Runtime:Make">
         <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Runtime.dproj" Targets="Make"/>
     </Target>
-    <Target Name="BCEditor_Package_Designtime">
+    <Target Name="BCEditor_Delphi_Designtime">
         <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Designtime.dproj"/>
     </Target>
-    <Target Name="BCEditor_Package_Designtime:Clean">
+    <Target Name="BCEditor_Delphi_Designtime:Clean">
         <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Designtime.dproj" Targets="Clean"/>
     </Target>
-    <Target Name="BCEditor_Package_Designtime:Make">
+    <Target Name="BCEditor_Delphi_Designtime:Make">
         <MSBuild Projects="..\..\Packages\BCEditor.Delphi.Designtime.dproj" Targets="Make"/>
     </Target>
     <Target Name="Demo">
@@ -48,13 +48,13 @@
         <MSBuild Projects="Demo.dproj" Targets="Make"/>
     </Target>
     <Target Name="Build">
-        <CallTarget Targets="BCEditor_Package_Runtime;BCEditor_Package_Designtime;Demo"/>
+        <CallTarget Targets="BCEditor_Delphi_Runtime;BCEditor_Delphi_Designtime;Demo"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="BCEditor_Package_Runtime:Clean;BCEditor_Package_Designtime:Clean;Demo:Clean"/>
+        <CallTarget Targets="BCEditor_Delphi_Runtime:Clean;BCEditor_Delphi_Designtime:Clean;Demo:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="BCEditor_Package_Runtime:Make;BCEditor_Package_Designtime:Make;Demo:Make"/>
+        <CallTarget Targets="BCEditor_Delphi_Runtime:Make;BCEditor_Delphi_Designtime:Make;Demo:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>
