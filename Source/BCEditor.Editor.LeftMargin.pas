@@ -638,19 +638,18 @@ procedure TBCEditorLeftMargin.AutosizeDigitCount(ALinesCount: Integer);
 var
   NumberOfDigits: Integer;
 begin
-  if FLineNumbers.Visible and FAutosize then
+  if (FLineNumbers.Visible and FAutosize) then
   begin
-    if FLineNumbers.StartFrom = 0 then
+    if (FLineNumbers.StartFrom = 0) then
       Dec(ALinesCount)
-    else
-    if FLineNumbers.StartFrom > 1 then
+    else if (FLineNumbers.StartFrom > 1) then
       Inc(ALinesCount, FLineNumbers.StartFrom - 1);
 
     NumberOfDigits := Max(Length(ALinesCount.ToString), FLineNumbers.DigitCount);
-    if FLineNumbers.AutosizeDigitCount <> NumberOfDigits then
+    if (FLineNumbers.AutosizeDigitCount <> NumberOfDigits) then
     begin
       FLineNumbers.AutosizeDigitCount := NumberOfDigits;
-      if Assigned(FOnChange) then
+      if (Assigned(FOnChange)) then
         FOnChange(Self);
     end;
   end

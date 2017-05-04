@@ -26,11 +26,11 @@ type
     TBCEditorSearch = class(BCEditor.Editor.Search.TBCEditorSearch);
     TBCEditorSpecialChars = class(BCEditor.Editor.SpecialChars.TBCEditorSpecialChars);
 
-    TState = set of (esRowsChanged, esCaretMoved, esScrolled,
+    TState = set of (esRowsChanged, esCaretMoved, esScrolled, esResized,
       esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated,
       esIgnoreNextChar, esCaretVisible, esDblClicked, esWaitForDragging,
       esCodeFoldingInfoClicked, esInSelection, esDragging, esFind, esReplace,
-      esRowsUpdating);
+      esRowsUpdating, esScrollBarsUpdating);
 
     TMatchingPairTokenMatch = record
       Position: TBCEditorTextPosition;
@@ -3378,8 +3378,14 @@ begin
           FRows.Clear();
           FMultiCaretPosition.Row := -1;
         end;
-        UpdateScrollBars;
-        Invalidate;
+
+        if (UpdateCount > 0) then
+          Include(FState, esResized)
+        else
+        begin
+          UpdateScrollBars();
+          Invalidate()
+        end;
       end;
     end;
     FLeftMarginWidth := GetLeftMarginWidth();
@@ -5116,14 +5122,21 @@ begin
     begin
       if (soEntireScope in FSearch.Options) then
         if (soBackwards in FSearch.Options) then
-          DoSearchPrevious(Lines.EOFPosition, LSearchResult)
+          Result := DoSearchPrevious(Lines.EOFPosition, LSearchResult)
         else
-          DoSearchNext(Lines.BOFPosition, LSearchResult)
+          Result := DoSearchNext(Lines.BOFPosition, LSearchResult)
       else
         if (soBackwards in FSearch.Options) then
-          DoSearchPrevious(Lines.CaretPosition, LSearchResult, soWrapAround in Search.Options)
+          Result := DoSearchPrevious(Lines.CaretPosition, LSearchResult, soWrapAround in Search.Options)
         else
-          DoSearchNext(Lines.CaretPosition, LSearchResult, soWrapAround in Search.Options);
+          Result := DoSearchNext(Lines.CaretPosition, LSearchResult, soWrapAround in Search.Options);
+
+      // Debug 2017-05-04
+      Assert(Result,
+        'LBeginPosition: ' + LBeginPosition.ToString() + #13#10
+        + 'LEndPosition: ' + LBeginPosition.ToString() + #13#10
+        + 'LSearchResult.BeginPosition: ' + LSearchResult.BeginPosition.ToString() + #13#10
+        + 'LSearchResult.EndPosition: ' + LSearchResult.EndPosition.ToString() + #13#10);
 
       if (soBackwards in Search.Options) then
         SetCaretAndSelection(LSearchResult.BeginPosition, LSearchResult.BeginPosition, LSearchResult.EndPosition)
@@ -7961,6 +7974,11 @@ begin
       LTempBitmap.Canvas.Brush.Style := bsClear;
 
       LTextPosition := DisplayToText(ADisplayCaretPosition);
+
+      // Debug 2017-05-04
+      Assert(LTextPosition >= Lines.BOFPosition,
+        'ADisplayCaretPosition: ' + ADisplayCaretPosition.ToString());
+
       if ((LTextPosition.Line < Lines.Count)
         and (LTextPosition.Char < Length(Lines.Lines[LTextPosition.Line].Text))) then
       begin
@@ -10141,7 +10159,10 @@ end;
 
 procedure TCustomBCEditor.Resize();
 begin
-  SizeOrFontChanged(False);
+  if (not (esScrollBarsUpdating in State)) then
+    SizeOrFontChanged(False)
+  else
+    Include(FState, esResized);
 
   inherited;
 end;
@@ -11215,7 +11236,13 @@ begin
   if (AValue <> FHideScrollBars) then
   begin
     FHideScrollBars := AValue;
-    UpdateScrollBars();
+    if (UpdateCount > 0) then
+      Include(FState, esResized)
+    else
+    begin
+      UpdateScrollBars();
+      Invalidate();
+    end;
   end;
 end;
 
@@ -11579,7 +11606,7 @@ begin
     begin
       if (State * [esCaretMoved] <> []) then
         UpdateCaret();
-      if ((State * [esRowsChanged, esLinesCleared, esLinesUpdated, esScrolled] <> [])
+      if ((State * [esRowsChanged, esLinesCleared, esLinesUpdated, esResized, esScrolled] <> [])
         or (State * [esCaretMoved] <> []) and ((Lines.CaretPosition.Line >= Lines.Count) or (Lines.CaretPosition.Char > Rows.MaxLength))) then
         UpdateScrollBars();
       if (Visible) then
@@ -11595,7 +11622,7 @@ begin
       and (not (lsLoading in Lines.State) or (loUndoAfterLoad in Lines.Options))) then
       OnChange(Self);
 
-    FState := FState - [esCaretMoved, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated];
+    FState := FState - [esCaretMoved, esResized, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated];
   end;
 end;
 
@@ -11754,8 +11781,13 @@ end;
 
 procedure TCustomBCEditor.SpecialCharsChanged(ASender: TObject);
 begin
-  UpdateScrollBars();
-  Invalidate();
+  if (UpdateCount > 0) then
+    Include(FState, esResized)
+  else
+  begin
+    UpdateScrollBars();
+    Invalidate();
+  end;
 end;
 
 function TCustomBCEditor.SplitTextIntoWords(AStringList: TStrings; const ACaseSensitive: Boolean): string;
@@ -12448,39 +12480,45 @@ begin
     and (FUpdateCount = 0)
     and not (esRowsUpdating in State)) then
   begin
-    if (AUpdateRows) then
-      Rows; // Make sure, Rows is updated
+    Include(FState, esScrollBarsUpdating);
 
-    LDisplayCaretPosition := DisplayCaretPosition;
+    try
+      if (AUpdateRows) then
+        GetRows(); // Make sure, Rows is updated
 
-    LVertScrollInfo.cbSize := SizeOf(ScrollInfo);
-    LVertScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
-    LVertScrollInfo.nMin := 0;
-    LVertScrollInfo.nMax := Max(LDisplayCaretPosition.Row, FRows.Count - 1);
-    LVertScrollInfo.nPage := VisibleRows;
-    LVertScrollInfo.nPos := TopRow;
-    LVertScrollInfo.nTrackPos := 0;
-    SetScrollInfo(Handle, SB_VERT, LVertScrollInfo, TRUE);
+      LDisplayCaretPosition := DisplayCaretPosition;
 
-    LHorzScrollInfo.cbSize := SizeOf(ScrollInfo);
-    LHorzScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
-    LHorzScrollInfo.nMin := 0;
-    LHorzScrollInfo.nMax := FRows.MaxWidth - 1;
-    if (SpecialChars.Visible) then
-      Inc(LHorzScrollInfo.nMax, FLineBreakSignWidth);
-    if ((LDisplayCaretPosition.Row >= FRows.Count)
-      or (LDisplayCaretPosition.Column > FRows[LDisplayCaretPosition.Row].Length)) then
-      if (AUpdateRows or (LDisplayCaretPosition.Row < FRows.Count)) then
-      LHorzScrollInfo.nMax := Max(DisplayToClient(LDisplayCaretPosition).X - LeftMarginWidth, LHorzScrollInfo.nMax)
-    else
-      LHorzScrollInfo.nMax := LeftMarginWidth + LDisplayCaretPosition.Column * CharWidth;
-    LHorzScrollInfo.nPage := TextWidth;
-    LHorzScrollInfo.nPos := HorzTextPos;
-    LHorzScrollInfo.nTrackPos := 0;
-    SetScrollInfo(Handle, SB_HORZ, LHorzScrollInfo, TRUE);
+      LVertScrollInfo.cbSize := SizeOf(ScrollInfo);
+      LVertScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
+      LVertScrollInfo.nMin := 0;
+      LVertScrollInfo.nMax := Max(LDisplayCaretPosition.Row, FRows.Count - 1);
+      LVertScrollInfo.nPage := VisibleRows;
+      LVertScrollInfo.nPos := TopRow;
+      LVertScrollInfo.nTrackPos := 0;
+      SetScrollInfo(Handle, SB_VERT, LVertScrollInfo, TRUE);
 
-    ShowScrollBar(Handle, SB_VERT, not HideScrollBars or (LVertScrollInfo.nMax > INT(LVertScrollInfo.nPage)));
-    ShowScrollBar(Handle, SB_HORZ, not HideScrollBars or (LHorzScrollInfo.nMax > INT(LHorzScrollInfo.nPage)));
+      LHorzScrollInfo.cbSize := SizeOf(ScrollInfo);
+      LHorzScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
+      LHorzScrollInfo.nMin := 0;
+      LHorzScrollInfo.nMax := FRows.MaxWidth - 1;
+      if (SpecialChars.Visible) then
+        Inc(LHorzScrollInfo.nMax, FLineBreakSignWidth);
+      if ((LDisplayCaretPosition.Row >= FRows.Count)
+        or (LDisplayCaretPosition.Column > FRows[LDisplayCaretPosition.Row].Length)) then
+        if (AUpdateRows or (LDisplayCaretPosition.Row < FRows.Count)) then
+        LHorzScrollInfo.nMax := Max(DisplayToClient(LDisplayCaretPosition).X - LeftMarginWidth, LHorzScrollInfo.nMax)
+      else
+        LHorzScrollInfo.nMax := LeftMarginWidth + LDisplayCaretPosition.Column * CharWidth;
+      LHorzScrollInfo.nPage := TextWidth;
+      LHorzScrollInfo.nPos := HorzTextPos;
+      LHorzScrollInfo.nTrackPos := 0;
+      SetScrollInfo(Handle, SB_HORZ, LHorzScrollInfo, TRUE);
+
+      ShowScrollBar(Handle, SB_VERT, not HideScrollBars or (LVertScrollInfo.nMax > INT(LVertScrollInfo.nPage)));
+      ShowScrollBar(Handle, SB_HORZ, not HideScrollBars or (LHorzScrollInfo.nMax > INT(LHorzScrollInfo.nPage)));
+    finally
+      Exclude(FState, esScrollBarsUpdating);
+    end;
   end;
 end;
 
