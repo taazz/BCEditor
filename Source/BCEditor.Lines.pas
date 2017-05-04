@@ -77,6 +77,7 @@ type
       BeginPosition: TBCEditorTextPosition;
       EndPosition: TBCEditorTextPosition;
       Text: string;
+      function ToString(): string;
     end;
 
   public type
@@ -287,7 +288,9 @@ constructor TBCEditorLines.TSearch.Create(const ALines: TBCEditorLines;
 var
   LIndex: Integer;
 begin
-  Assert((BOFPosition <= ABeginPosition) and (ABeginPosition < AEndPosition) and (AEndPosition <= ALines.EOFPosition));
+  Assert(BOFPosition <= ABeginPosition);
+  Assert(ABeginPosition < AEndPosition);
+  Assert(AEndPosition <= ALines.EOFPosition);
 
   inherited Create();
 
@@ -494,6 +497,22 @@ begin
     Lines.ReplaceText(FFoundPosition, LEndPosition, FRegEx.Replace(Lines.TextBetween[FFoundPosition, LEndPosition], FPattern, FReplaceText, FRegExOptions))
   else
     Lines.ReplaceText(FFoundPosition, LEndPosition, FReplaceText);
+end;
+
+{ TBCEditorLines.TUndoList ****************************************************}
+
+function TBCEditorLines.TUndoItem.ToString(): string;
+begin
+  Result :=
+    'BlockNumber: ' + IntToStr(BlockNumber) + #13#10
+    + 'UndoType: ' + IntToStr(Ord(UndoType)) + #13#10
+    + 'CaretPosition: ' + CaretPosition.ToString() + #13#10
+    + 'SelBeginPosition: ' + SelBeginPosition.ToString() + #13#10
+    + 'SelEndPosition: ' + SelEndPosition.ToString() + #13#10
+    + 'SelMode: ' + IntToStr(Ord(SelMode)) + #13#10
+    + 'BeginPosition: ' + BeginPosition.ToString() + #13#10
+    + 'EndPosition: ' + EndPosition.ToString() + #13#10
+    + 'Text: ' + Text;
 end;
 
 { TBCEditorLines.TUndoList ****************************************************}
@@ -1488,7 +1507,15 @@ begin
              and ((LUndoItem.UndoType in [utReplace])
                or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List = UndoList)))) then
             begin
-              LText := TextBetween[LUndoItem.BeginPosition, LUndoItem.EndPosition];
+              // Debug 2017-05-03
+              try
+                LText := TextBetween[LUndoItem.BeginPosition, LUndoItem.EndPosition];
+              except
+                on E: Exception do
+                  raise Exception.Create(LUndoItem.ToString()
+                    + E.ClassName + ':'
+                    + E.Message);
+              end;
               DoDeleteText(LUndoItem.BeginPosition, LUndoItem.EndPosition);
               if (not (LUndoItem.UndoType in [utReplace])) then
                 LDestinationList.Push(LUndoItem.UndoType, LCaretPosition,
