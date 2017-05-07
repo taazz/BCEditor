@@ -2173,6 +2173,9 @@ var
   LScrollBoundsLeft: Integer;
   LScrollBoundsRight: Integer;
 begin
+  if (LineHeight = 0) then
+    exit; // how can this happens???
+
   if FMouseMoveScrolling then
   begin
     if (APoint.X < ClientRect.Left) or (APoint.X > ClientRect.Right) or (APoint.Y < ClientRect.Top) or
@@ -9709,7 +9712,7 @@ var
       end;
       LIsLineSelected := LSelectionInRow
         and (LSelBeginColumn = 0)
-        and (LSelEndColumn >= Length(Lines.Lines[LLine].Text))
+        and (LSelEndColumn > Length(Lines.Lines[LLine].Text))
         and (LSelBeginPosition.Line <> LSelEndPosition.Line);
 
       LFoldRange := nil;

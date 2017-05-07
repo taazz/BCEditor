@@ -1303,7 +1303,9 @@ var
   LPos: PChar;
 begin
   Assert(BOFPosition <= APosition);
-  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Lines[APosition.Line].Text)));
+  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Lines[APosition.Line].Text)),
+    'APosition: ' + APosition.ToString() + #13#10
+    + 'EOFPosition: ' + EOFPosition.ToString());
 
   if (AText = '') then
     Result := APosition
@@ -1742,6 +1744,13 @@ begin
       if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
         while ((LEndChar > ABeginPosition.Char) and (Lines[ABeginPosition.Line].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
           Dec(LEndChar);
+
+      // Debug 2017-05-07
+      Assert(LEndChar - ABeginPosition.Char >= 0,
+        'LEndChar: ' + IntToStr(LEndChar) + #13#10
+        + 'ABeginPosition.Char: ' + IntToStr(ABeginPosition.Char) + #13#10
+        + 'Length: ' + IntToStr(Length(Lines[ABeginPosition.Line].Text)));
+
       StringBuilder.Append(Lines[ABeginPosition.Line].Text, ABeginPosition.Char, LEndChar - ABeginPosition.Char);
       for LLine := ABeginPosition.Line + 1 to LEndLine - 1 do
       begin
@@ -2154,6 +2163,9 @@ begin
 
       DoDeleteText(ABeginPosition, AEndPosition);
       Result := DoInsertText(ABeginPosition, AText);
+
+      // Debug 2017-05-08
+      Assert(Result.Char <= Length(Lines[Result.Line].Text));
 
       UndoList.Push(utReplace, LCaretPosition,
         LSelBeginPosition, LSelEndPosition, SelMode,
