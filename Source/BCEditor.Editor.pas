@@ -11385,8 +11385,7 @@ begin
 
     if (Assigned(OnChange)
       and (State * [esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> [])
-      and not (csReading in ComponentState)
-      and (not (lsLoading in Lines.State) or (loUndoAfterLoad in Lines.Options))) then
+      and not (csReading in ComponentState)) then
       OnChange(Self);
 
     FState := FState - [esCaretMoved, esResized, esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated];

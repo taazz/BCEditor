@@ -289,7 +289,9 @@ var
   LIndex: Integer;
 begin
   Assert(BOFPosition <= ABeginPosition);
-  Assert(ABeginPosition < AEndPosition);
+  Assert(ABeginPosition < AEndPosition,
+    'ABeginPosition: ' + ABeginPosition.ToString() + #13#10
+    + 'AEndPosition: ' + AEndPosition.ToString() + #13#10);
   Assert(AEndPosition <= ALines.EOFPosition);
 
   inherited Create();
@@ -1540,7 +1542,15 @@ begin
               if (LUndoItem.Text = '') then
                 LEndPosition := LUndoItem.BeginPosition
               else
+              try
                 LEndPosition := DoInsertText(LUndoItem.BeginPosition, LUndoItem.Text);
+              except
+                on E: Exception do
+                  E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
+                    + 'Progress: ' + #13#10#13#10
+                    + E.ClassName + ':' + #13#10
+                    + E.Message));
+              end;
               LDestinationList.Push(LUndoItem.UndoType, LCaretPosition,
                 LSelBeginPosition, LSelEndPosition, LSelMode,
                 LUndoItem.BeginPosition, LEndPosition, LText, LUndoItem.BlockNumber);
