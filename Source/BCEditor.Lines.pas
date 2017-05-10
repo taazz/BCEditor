@@ -1458,6 +1458,9 @@ begin
   Items[ALine2] := LLine;
 end;
 
+var
+  Progress: string;
+
 procedure TBCEditorLines.ExecuteUndoRedo(const List: TUndoList);
 var
   LPreviousBlockNumber: Integer;
@@ -1476,11 +1479,15 @@ begin
     begin
       Include(FState, lsUndo);
       LDestinationList := RedoList;
+
+      LUndoItem := List.Peek();
+      Progress := RightStr(Progress + '-U' + LUndoItem.BlockNumber.ToString(), 50);
     end
     else
     begin
       Include(FState, lsRedo);
       LDestinationList := UndoList;
+      Progress := RightStr(Progress + '-R' + LUndoItem.BlockNumber.ToString(), 50);
     end;
 
     BeginUpdate();
@@ -1514,7 +1521,8 @@ begin
                 LText := TextBetween[LUndoItem.BeginPosition, LUndoItem.EndPosition];
               except
                 on E: Exception do
-                  E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10#13#10
+                  E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
+                    + 'Progress: ' + #13#10#13#10
                     + E.ClassName + ':' + #13#10
                     + E.Message));
               end;

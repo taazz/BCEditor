@@ -7997,7 +7997,7 @@ begin
           if (FFontPitchFixed) then
             LCaretWidth := GetSystemMetrics(SM_CXEDGE)
           else
-            LCaretWidth := GetSystemMetrics(SM_CXEDGE) div 2;
+            LCaretWidth := 0;
           LCaretHeight := LineHeight;
           X := 1;
         end;
@@ -9339,6 +9339,16 @@ begin
           LFontStyles := LFontStyles - [fsBold];
           LText := PChar(FSpecialCharsSpaceText);
         end;
+      BCEDITOR_TAB_CHAR:
+        begin
+          if (FSpecialChars.Visible) then
+            LText := #187
+          else
+            LText := '';
+          LFontStyles := LFontStyles - [fsBold];
+        end;
+      BCEDITOR_LINEFEED,
+      BCEDITOR_CARRIAGE_RETURN,
       BCEDITOR_SPACE_CHAR:
         begin
           if (ALength > Length(FSpecialCharsSpaceText)) then
@@ -9348,14 +9358,6 @@ begin
               FSpecialCharsSpaceText := StringOfChar(' ', ALength);
           LFontStyles := LFontStyles + [fsBold];
           LText := PChar(FSpecialCharsSpaceText);
-        end;
-      BCEDITOR_TAB_CHAR:
-        begin
-          if (FSpecialChars.Visible) then
-            LText := #187
-          else
-            LText := '';
-          LFontStyles := LFontStyles - [fsBold];
         end;
     end;
 
@@ -9462,7 +9464,7 @@ begin
       begin
         DrawText(Canvas.Handle, LText, LLength, LRect, LFormat);
 
-        if (not FFontPitchFixed and (fsItalic in LFontStyles)) then
+        if (fsItalic in LFontStyles) then
         begin
           LDrawHelper.ForegroundColor := LForegroundColor;
           LDrawHelper.FontStyles := LFontStyles;
@@ -9555,7 +9557,7 @@ begin
             LParts[LPartIndex].EndPosition.Char - LParts[LPartIndex].BeginPosition.Char,
             LRect, LFormat);
 
-          if (not FFontPitchFixed and (fsItalic in LFontStyles)) then
+          if (fsItalic in LFontStyles) then
           begin
             LDrawHelper.ForegroundColor := LForegroundColor;
             LDrawHelper.FontStyles := LFontStyles;
@@ -9909,7 +9911,7 @@ begin
         if (FFontPitchFixed) then
           LWidth := GetSystemMetrics(SM_CXEDGE)
         else
-          LWidth := GetSystemMetrics(SM_CXEDGE) div 2;
+          LWidth := 0;
         LHeight := LineHeight;
       end;
   end;

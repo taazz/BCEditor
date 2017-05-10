@@ -551,7 +551,7 @@ begin
   if FBackgroundColor <> AValue then
   begin
     FBackgroundColor := AValue;
-    if FHandle <> 0 then
+    if (FHandle <> 0) then
       SetBkColor(FHandle, ColorToRGB(AValue));
   end;
 end;
@@ -611,10 +611,7 @@ begin
 end;
 
 initialization
-
-finalization
-
-  if Assigned(GFontsInfoManager) then
-    GFontsInfoManager.Free;
-
+finalization {*****************************************************************}
+  if (Assigned(GFontsInfoManager)) then
+    GFontsInfoManager.Free();
 end.
