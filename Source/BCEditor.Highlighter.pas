@@ -22,6 +22,7 @@ type
 
     TMatchingPairMatch = record
       Attribute: TAttribute;
+      Index: Integer;
       OpenText: string;
       CloseText: string;
       OpenPosition: TBCEditorTextPosition;
@@ -412,11 +413,13 @@ type
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions;
     FCurrentLine: string;
+    FCurrentLineIndex: LongInt;
     FCurrentRange: TRange;
     FCurrentToken: TToken;
     FEditor: TCustomControl;
     FEndOfLine: Boolean;
     FFileName: string;
+    FFilePath: string;
     FFoldCloseKeyChars: TBCEditorCharSet;
     FFoldOpenKeyChars: TBCEditorCharSet;
     FLoading: Boolean;
@@ -425,8 +428,8 @@ type
     FMatchingPairs: TList<TMatchingPairToken>;
     FMultiHighlighter: Boolean;
     FName: string;
+    FOnChange: TNotifyEvent;
     FPreviousEndOfLine: Boolean;
-    FCurrentLineIndex: LongInt;
     FSample: string;
     FSkipCloseKeyChars: TBCEditorCharSet;
     FSkipOpenKeyChars: TBCEditorCharSet;
@@ -434,7 +437,10 @@ type
     FTokenPosition: Integer;
     FWordBreakChars: TBCEditorCharSet;
     procedure AddAllAttributes(ARange: TRange);
+    procedure SetFileName(AValue: string);
     procedure UpdateAttributes(ARange: TRange; AParentRange: TRange);
+  private
+    procedure DoChange();
   protected
     function GetAttribute(AIndex: Integer): TAttribute;
     procedure AddAttribute(AHighlighterAttribute: TAttribute);
@@ -444,21 +450,22 @@ type
     procedure SetCodeFoldingRangeCount(AValue: Integer);
     procedure SetWordBreakChars(AChars: TBCEditorCharSet);
     property Editor: TCustomControl read FEditor;
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     constructor Create(AEditor: TCustomControl);
     destructor Destroy; override;
-
     function GetCurrentRange: TRange;
     function GetCurrentRangeAttribute: TAttribute;
-    function GetEndOfLine: Boolean;
-    function GetTokenAttribute: TAttribute;
-    function GetTokenIndex: Integer;
+    function GetEndOfLine: Boolean; inline;
+    function GetTokenAttribute: TAttribute; inline;
+    function GetTokenIndex: Integer; inline;
     function GetTokenKind: TBCEditorRangeType;
-    function GetTokenLength: Integer;
+    function GetTokenLength: Integer; inline;
+    function GetTokenText(): PChar; overload; inline;
+    procedure GetTokenText(out AResult: string); overload;
     procedure AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
     procedure AddKeywords(var AStringList: TStringList);
     procedure Clear;
-    procedure GetTokenText(var AResult: string);
     procedure LoadFromFile(const AFileName: string);
     procedure LoadFromResource(const ResName: string; const ResType: PChar);
     procedure LoadFromStream(AStream: TStream);
@@ -475,7 +482,8 @@ type
     property Colors: TColors read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
-    property FileName: string read FFileName write FFileName;
+    property FileName: string read FFileName write SetFileName;
+    property FilePath: string read FFilePath write FFilePath;
     property FoldCloseKeyChars: TBCEditorCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
     property FoldOpenKeyChars: TBCEditorCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
     property MainRules: TRange read FMainRules;
@@ -669,10 +677,7 @@ procedure TBCEditorHighlighter.TColors.LoadFromFile(const AFileName: string);
 var
   LStream: TStream;
 begin
-  FFileName := AFileName;
-  FName := TPath.GetFileNameWithoutExtension(AFileName);
-
-  LStream := TCustomBCEditor(Highlighter.Editor).CreateFileStream(TCustomBCEditor(Highlighter.Editor).GetColorsFileName(AFileName));
+  LStream := TFileStream.Create(AFileName, fmOpenRead);
   try
     LoadFromStream(LStream);
   finally
@@ -690,16 +695,16 @@ begin
 end;
 
 procedure TBCEditorHighlighter.TColors.LoadFromStream(AStream: TStream);
+var
+  LImportJSON : TIMportJSON;
 begin
-  TCustomBCEditor(Highlighter.Editor).BeginUpdate();
-  with TImportJSON.Create(Highlighter) do
-    try
-      ImportColorsFromStream(AStream);
-    finally
-      Free;
-    end;
+  LImportJSON := TImportJSON.Create(Highlighter);
+  try
+    LImportJSON.ImportColorsFromStream(AStream);
+  finally
+    LImportJSON.Free();
+  end;
   Highlighter.UpdateColors();
-  TCustomBCEditor(Highlighter.Editor).EndUpdate();
 end;
 
 { TBCEditorHighlighter.TAbstractToken *****************************************}
@@ -1715,7 +1720,8 @@ end;
 
 constructor TBCEditorHighlighter.TImportJSON.Create(AHighlighter: TBCEditorHighlighter);
 begin
-  inherited Create;
+  inherited Create();
+
   FHighlighter := AHighlighter;
 end;
 
@@ -1789,7 +1795,7 @@ begin
         LFileName := LJsonDataValue.ObjectValue['File'].Value;
         if LFileName <> '' then
         begin
-          LFileStream := TCustomBCEditor(Highlighter.Editor).CreateFileStream(TCustomBCEditor(Highlighter.Editor).GetHighlighterFileName(LFileName));
+          LFileStream := TFileStream.Create(LFileName, fmOpenRead);
           LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
           if Assigned(LJSONObject) then
           try
@@ -1906,7 +1912,7 @@ begin
         LFileName := LJsonDataValue.ObjectValue['File'].Value;
         if LFileName <> '' then
         begin
-          LFileStream := TCustomBCEditor(Highlighter.Editor).CreateFileStream(TCustomBCEditor(Highlighter.Editor).GetHighlighterFileName(LFileName));
+          LFileStream := TFileStream.Create(LFileName, fmOpenRead);
           LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
           if Assigned(LJSONObject) then
           try
@@ -2083,7 +2089,6 @@ end;
 
 procedure TBCEditorHighlighter.TImportJSON.ImportCompletionProposal(ACompletionProposalObject: TJsonObject);
 var
-  LEditor: TCustomBCEditor;
   LFileName: string;
   LFileStream: TStream;
   LIndex: Integer;
@@ -2106,8 +2111,7 @@ begin
       LFileName := LJsonDataValue.ObjectValue['File'].Value;
       if LFileName <> '' then
       begin
-        LEditor := FHighlighter.Editor as TCustomBCEditor;
-        LFileStream := LEditor.CreateFileStream(LEditor.GetHighlighterFileName(LFileName));
+        LFileStream := TFileStream.Create(LFileName, fmOpenRead);
         LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
         if Assigned(LJSONObject) then
         try
@@ -2216,7 +2220,6 @@ end;
 procedure TBCEditorHighlighter.TImportJSON.ImportMatchingPair(AMatchingPairObject: TJsonObject);
 var
   LArray: TJsonArray;
-  LEditor: TCustomBCEditor;
   LFileName: string;
   LFileStream: TStream;
   LIndex: Integer;
@@ -2238,8 +2241,7 @@ begin
       LFileName := LJsonDataValue.ObjectValue['File'].Value;
       if LFileName <> '' then
       begin
-        LEditor := FHighlighter.Editor as TCustomBCEditor;
-        LFileStream := LEditor.CreateFileStream(LEditor.GetHighlighterFileName(LFileName));
+        LFileStream := TFileStream.Create(LFileName, fmOpenRead);
         LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
         if Assigned(LJSONObject) then
         try
@@ -2287,7 +2289,7 @@ begin
     begin
       LElementPrefix := RangeObject['ElementPrefix'].Value;
       LEditor := FHighlighter.Editor as TCustomBCEditor;
-      LFileStream := LEditor.CreateFileStream(LEditor.GetHighlighterFileName(LFileName));
+      LFileStream := TFileStream.Create(LFileName, fmOpenRead);
       LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
       if Assigned(LJSONObject) then
       try
@@ -2426,6 +2428,19 @@ end;
 
 { TBCEditorHighlighter ********************************************************}
 
+procedure TBCEditorHighlighter.AddAllAttributes(ARange: TRange);
+var
+  LIndex: Integer;
+begin
+  AddAttribute(ARange.Attribute);
+  for LIndex := 0 to ARange.KeyListCount - 1 do
+    AddAttribute(ARange.KeyList[LIndex].Attribute);
+  for LIndex := 0 to ARange.SetCount - 1 do
+    AddAttribute(ARange.Sets[LIndex].Attribute);
+  for LIndex := 0 to ARange.RangeCount - 1 do
+    AddAllAttributes(ARange.Ranges[LIndex]);
+end;
+
 procedure TBCEditorHighlighter.AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
 begin
   case AKeyCharType of
@@ -2487,17 +2502,10 @@ begin
   inherited;
 end;
 
-procedure TBCEditorHighlighter.AddAllAttributes(ARange: TRange);
-var
-  LIndex: Integer;
+procedure TBCEditorHighlighter.DoChange();
 begin
-  AddAttribute(ARange.Attribute);
-  for LIndex := 0 to ARange.KeyListCount - 1 do
-    AddAttribute(ARange.KeyList[LIndex].Attribute);
-  for LIndex := 0 to ARange.SetCount - 1 do
-    AddAttribute(ARange.Sets[LIndex].Attribute);
-  for LIndex := 0 to ARange.RangeCount - 1 do
-    AddAllAttributes(ARange.Ranges[LIndex]);
+  if Assigned(FOnChange) then
+    FOnChange(Self);
 end;
 
 procedure TBCEditorHighlighter.SetCurrentLine(const ANewValue: string);
@@ -2509,7 +2517,7 @@ begin
   FCurrentLine := ANewValue;
   FCurrentLineIndex := 0;
   FTokenPosition := 0;
-  FEndOfLine := False;
+  FEndOfLine := ANewValue = '';
   FBeginningOfLine := True;
   FPreviousEndOfLine := False;
   FCurrentToken := nil;
@@ -2678,7 +2686,12 @@ begin
       AStringList.Add(FMainRules.KeyList[LIndex].KeyList[LIndex2]);
 end;
 
-procedure TBCEditorHighlighter.GetTokenText(var AResult: string);
+function TBCEditorHighlighter.GetTokenText(): PChar;
+begin
+  Result := @FCurrentLine[1 + FTokenPosition];
+end;
+
+procedure TBCEditorHighlighter.GetTokenText(out AResult: string);
 begin
   AResult := Copy(FCurrentLine, 1 + FTokenPosition, FCurrentLineIndex - FTokenPosition);
 end;
@@ -2780,11 +2793,12 @@ begin
     UpdateAttributes(ARange.Ranges[LIndex], ARange);
 end;
 
-procedure TBCEditorHighlighter.UpdateColors;
+procedure TBCEditorHighlighter.UpdateColors();
 var
   LFontDummy: TFont;
 begin
   UpdateAttributes(MainRules, nil);
+  DoChange();
   LFontDummy := TFont.Create;
   try
     LFontDummy.Name := TCustomBCEditor(Editor).Font.Name;
@@ -2801,7 +2815,7 @@ var
 begin
   FFileName := AFileName;
   FName := TPath.GetFileNameWithoutExtension(AFileName);
-  LStream := TCustomBCEditor(Editor).CreateFileStream(TCustomBCEditor(Editor).GetHighlighterFileName(AFileName));
+  LStream := TFileStream.Create(AFileName, fmOpenRead);
   try
     LoadFromStream(LStream);
   finally
@@ -2849,6 +2863,15 @@ end;
 procedure TBCEditorHighlighter.Reset;
 begin
   MainRules.Reset;
+end;
+
+procedure TBCEditorHighlighter.SetFileName(AValue: string);
+begin
+  if (AValue <> FFileName) then
+  begin
+    FFileName := AValue;
+    FFilePath := TPath.GetDirectoryName(AValue);
+  end;
 end;
 
 procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);

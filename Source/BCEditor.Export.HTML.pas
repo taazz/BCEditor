@@ -151,7 +151,7 @@ begin
     if LIndex = 0 then
       FHighlighter.ResetCurrentRange
     else
-      FHighlighter.SetCurrentRange(FLines.Lines[LIndex - 1].Range);
+      FHighlighter.SetCurrentRange(FLines.Items[LIndex - 1].Range);
     FHighlighter.SetCurrentLine(FLines.ExpandedStrings[LIndex]);
     LTextLine := '';
     while not FHighlighter.GetEndOfLine do

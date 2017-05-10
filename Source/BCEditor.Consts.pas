@@ -43,6 +43,7 @@ const
     BCEDITOR_CARRIAGE_RETURN, BCEDITOR_SPACE_CHAR];
   { Encoding }
   { Highlighter attribute elements }
+  BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR = 'Editor';
   BCEDITOR_ATTRIBUTE_ELEMENT_COMMENT = 'Comment';
   BCEDITOR_ATTRIBUTE_ELEMENT_STRING = 'String';
   { Default colors }

@@ -603,11 +603,8 @@ end;
 
 procedure TBCEditorPaintHelper.SetStyle(const AValue: TFontStyles);
 begin
-  with FFontStock do
-  begin
-    SetStyle(AValue);
-    Self.FCurrentFont := FontHandle;
-  end;
+  FFontStock.SetStyle(AValue);
+  FCurrentFont := FFontStock.FontHandle;
   FStockBitmap.Canvas.Font.Style := AValue;
   if FHandle <> 0 then
     SelectObject(FHandle, FCurrentFont);

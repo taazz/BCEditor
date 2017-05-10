@@ -21,6 +21,8 @@ type
     procedure SetOptions(const AValue: TBCEditorTabOptions);
     procedure SetWantTabs(const AValue: Boolean);
     procedure SetWidth(const AValue: Integer);
+  protected
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     constructor Create;
     procedure Assign(ASource: TPersistent); override;
@@ -28,7 +30,6 @@ type
     property Options: TBCEditorTabOptions read FOptions write SetOptions default DefaultOptions;
     property WantTabs: Boolean read FWantTabs write SetWantTabs default DefaultWantTabs;
     property Width: Integer read FWidth write SetWidth default DefaultWidth;
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
 implementation {***************************************************************}

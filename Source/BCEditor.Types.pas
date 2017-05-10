@@ -14,7 +14,7 @@ type
 
   TBCEditorCharMethod = function(const AChar: Char): Boolean of object;
 
-  TBCEditorCaretStyle = (csVerticalLine, csThinVerticalLine, csHorizontalLine, csThinHorizontalLine, csHalfBlock, csBlock);
+  TBCEditorCaretStyle = (csVerticalLine, csHorizontalLine, csHalfBlock, csBlock);
 
   TBCEditorDropFilesEvent = procedure(ASender: TObject; APos: TPoint; AFiles: TStrings) of object;
 
@@ -27,13 +27,15 @@ type
 
   TBCEditorLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
 
-  TBCEditorCustomLineColorsEvent = procedure(ASender: TObject; const ALine: Integer; var AUseColors: Boolean;
-    var AForeground: TColor; var ABackground: TColor) of object;
+  TBCEditorCustomLineColorsEvent = procedure(ASender: TObject;
+    const ALine: Integer; var AForeground, ABackground: TColor) of object;
 
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
 
-  TBCEditorCustomTokenAttributeEvent = procedure(ASender: TObject; const AText: string; const ALine: Integer;
-    const AChar: Integer; var AForegroundColor: TColor; var ABackgroundColor: TColor; var AStyles: TFontStyles;
+  TBCEditorCustomDrowTokenEvent = procedure(ASender: TObject;
+    const APos: TPoint; var AText: PChar; var ALength: Integer;
+    var AForegroundColor, ABackgroundColor: TColor; var AStyles: TFontStyles;
+    var ABorderColor: TColor;
     var ATokenAddon: TBCEditorTokenAddon; var ATokenAddonColor: TColor) of object;
 
   TBCEditorCreateFileStreamEvent = procedure(ASender: TObject; const AFileName: string; var AStream: TStream) of object;
@@ -152,25 +154,33 @@ type
   );
 
   PBCEditorTextPosition = ^TBCEditorTextPosition;
-  TBCEditorTextPosition = record
-    Char: Integer;
-    Line: Integer;
-    class operator Equal(a, b: TBCEditorTextPosition): Boolean;
-    class operator GreaterThan(a, b: TBCEditorTextPosition): Boolean;
-    class operator GreaterThanOrEqual(a, b: TBCEditorTextPosition): Boolean;
-    class operator LessThan(a, b: TBCEditorTextPosition): Boolean;
-    class operator LessThanOrEqual(a, b: TBCEditorTextPosition): Boolean;
-    class operator NotEqual(a, b: TBCEditorTextPosition): Boolean;
+  TBCEditorTextPosition = packed record
+    class operator Equal(a, b: TBCEditorTextPosition): Boolean; inline;
+    class operator GreaterThan(a, b: TBCEditorTextPosition): Boolean; inline;
+    class operator GreaterThanOrEqual(a, b: TBCEditorTextPosition): Boolean; inline;
+    class operator LessThan(a, b: TBCEditorTextPosition): Boolean; inline;
+    class operator LessThanOrEqual(a, b: TBCEditorTextPosition): Boolean; inline;
+    class operator NotEqual(a, b: TBCEditorTextPosition): Boolean; inline;
     function ToString(): string; inline;
+    case Integer of
+      0: (
+        Char: Integer;     // Must be before Line, since the operators using Combined
+        Line: Integer; );  // Must be after Char, since the operators using Combined
+      1: (
+        Combinded: Int64; );
   end;
 
   PBCEditorDisplayPosition = ^TBCEditorDisplayPosition;
-  TBCEditorDisplayPosition = record
-    Column: Integer;
-    Row: Integer;
-    class operator Equal(a, b: TBCEditorDisplayPosition): Boolean;
-    class operator NotEqual(a, b: TBCEditorDisplayPosition): Boolean;
+  TBCEditorDisplayPosition = packed record
+    class operator Equal(a, b: TBCEditorDisplayPosition): Boolean; inline;
+    class operator NotEqual(a, b: TBCEditorDisplayPosition): Boolean; inline;
     function ToString(): string; inline;
+    case Integer of
+      0: (
+        Column: Integer;  // Must be before Row, since the operators using Combined
+        Row: Integer; );  // Must be after Column, since the operators using Combined
+      1: (
+        Combinded: Int64; );
   end;
 
   TBCEditorBreakType = (
@@ -215,21 +225,6 @@ type
     esTab
   );
 
-  TBCEditorTokenHelper = record
-    Background: TColor;
-    Border: TColor;
-    CharsBefore: Integer;
-    EmptySpace: TBCEditorEmptySpace;
-    ExpandedCharsBefore: Integer;
-    FontStyle: TFontStyles;
-    Foreground: TColor;
-    IsItalic: Boolean;
-    Length: Integer;
-    TokenAddon: TBCEditorTokenAddon;
-    TokenAddonColor: TColor;
-    Text: string;
-  end;
-
   TBCEditorTabConvertProc = function(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean;
     const ATabChar: Char = BCEDITOR_SPACE_CHAR): string;
 
@@ -241,7 +236,6 @@ type
 
   TBCEditorMatchingPairOption = (
     mpoHighlightAfterToken,
-    mpoHighlightUnmatched,
     mpoUnderline,
     mpoUseMatchedColor
   );
@@ -323,7 +317,7 @@ function TextPosition(const AChar, ALine: Integer): TBCEditorTextPosition; overl
 function TextPosition(const APos: TPoint): TBCEditorTextPosition; overload; inline;
 
 const
-  InvalidTextPosition: TBCEditorTextPosition = (Char: -1; Line: -1);
+  InvalidTextPosition: TBCEditorTextPosition = ( Char: -1; Line: -1; );
 
 implementation {***************************************************************}
 
@@ -365,54 +359,54 @@ end;
 
 class operator TBCEditorDisplayPosition.Equal(a, b: TBCEditorDisplayPosition): Boolean;
 begin
-  Result := (a.Column = b.Column) and (a.Row = b.Row);
+  Result := a.Combinded = b.Combinded;
 end;
 
 class operator TBCEditorDisplayPosition.NotEqual(a, b: TBCEditorDisplayPosition): Boolean;
 begin
-  Result := (a.Column <> b.Column) or (a.Row <> b.Row);
+  Result := a.Combinded <> b.Combinded;
 end;
 
 function TBCEditorDisplayPosition.ToString(): string;
 begin
-  Result := '(' + IntToStr(Column) + ',' + IntToStr(Row) + ')';
+  Result := '(' + IntToStr(Row) + ',' + IntToStr(Column) + ')';
 end;
 
 { TBCEditorTextPosition *******************************************************}
 
 class operator TBCEditorTextPosition.Equal(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := (a.Char = b.Char) and (a.Line = b.Line);
+  Result := a.Combinded = B.Combinded;
 end;
 
 class operator TBCEditorTextPosition.GreaterThan(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := (a.Line > b.Line) or (a.Char > b.Char) and (a.Line = b.Line);
+  Result := a.Combinded > B.Combinded;
 end;
 
 class operator TBCEditorTextPosition.GreaterThanOrEqual(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := (a.Line > b.Line) or (a.Char >= b.Char) and (a.Line = b.Line);
+  Result := a.Combinded >= B.Combinded;
 end;
 
 class operator TBCEditorTextPosition.LessThan(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := (a.Line < b.Line) or (a.Char < b.Char) and (a.Line = b.Line);
+  Result := a.Combinded < B.Combinded;
 end;
 
 class operator TBCEditorTextPosition.LessThanOrEqual(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := (a.Line < b.Line) or (a.Char <= b.Char) and (a.Line = b.Line);
+  Result := a.Combinded <= B.Combinded;
 end;
 
 class operator TBCEditorTextPosition.NotEqual(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := (a.Char <> b.Char) or (a.Line <> b.Line);
+  Result := a.Combinded <> B.Combinded;
 end;
 
 function TBCEditorTextPosition.ToString(): string;
 begin
-  Result := '(' + IntToStr(Char) + ',' + IntToStr(Line) + ')';
+  Result := '(' + IntToStr(Line) + ',' + IntToStr(Char) + ')';
 end;
 
 end.
