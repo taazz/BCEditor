@@ -5921,7 +5921,7 @@ var
   LRange: TBCEditorCodeFolding.TRanges.TRange;
   LRow: Integer;
 begin
-  if (FRows.Count = 0) then
+  if ((FRows.Count = 0) and (Lines.Count > 0)) then
   begin
     HandleNeeded();
 
@@ -7454,7 +7454,7 @@ begin
     ComputeScroll(FOldMouseMovePoint);
     LDisplayPosition := ClientToDisplay(X, Y);
     if (not (soPastEndOfFile in Scroll.Options)) then
-      LDisplayPosition.Row := Min(LDisplayPosition.Row, Rows.Count - 1);
+      LDisplayPosition.Row := Min(LDisplayPosition.Row, Max(0, Rows.Count - 1));
     if FScrollDeltaX <> 0 then
       LDisplayPosition.Column := DisplayCaretPosition.Column;
     if FScrollDeltaY <> 0 then
