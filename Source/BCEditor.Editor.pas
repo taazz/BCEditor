@@ -1,4 +1,4 @@
-unit BCEditor.Editor;
+﻿unit BCEditor.Editor;
 
 interface {********************************************************************}
 
@@ -440,7 +440,7 @@ type
       const ADisplayPosition: TBCEditorDisplayPosition;
       const AText: PChar; const ALength: Integer;
       const AAttribute: TBCEditorHighlighter.TAttribute;
-      const ACalculate: Boolean = False): Integer;
+      const AComputeWidth: Boolean = False): Integer;
     function PreviousWordPosition(const ATextPosition: TBCEditorTextPosition): TBCEditorTextPosition; overload;
     procedure RemoveDuplicateMultiCarets;
     procedure ReplaceChanged(AEvent: TBCEditorReplaceChanges);
@@ -2306,7 +2306,8 @@ end;
 function TCustomBCEditor.ComputeTokenWidth(const AText: PChar;
   const ALength: Integer; const AColumn: Integer): Integer;
 begin
-  Result := PaintToken(Rect(0, 0, MaxInt, MaxInt), InvalidTextPosition, DisplayPosition(AColumn, -1),
+  Result := PaintToken(Rect(0, 0, MaxInt, MaxInt),
+    InvalidTextPosition, DisplayPosition(AColumn, -1),
     AText, ALength, nil, True);
 end;
 
@@ -9102,7 +9103,7 @@ end;
 function TCustomBCEditor.PaintToken(const ARect: TRect; const ATextPosition: TBCEditorTextPosition;
   const ADisplayPosition: TBCEditorDisplayPosition; const AText: PChar; const ALength: Integer;
   const AAttribute: TBCEditorHighlighter.TAttribute;
-  const ACalculate: Boolean = False): Integer;
+  const AComputeWidth: Boolean = False): Integer;
 
 type
   TPartType = (ptNormal, ptSyncEdit, ptSelection, ptSearchResult, ptSearchResultInSection);
@@ -9253,8 +9254,6 @@ begin
     and (FCurrentMatchingPair in [trCloseAndOpenTokenFound, trOpenAndCloseTokenFound])
     and ((ATextPosition = FCurrentMatchingPairMatch.OpenPosition) or (ATextPosition = FCurrentMatchingPairMatch.ClosePosition));
   LIsLineBreakToken := ADisplayPosition.Column < 0;
-  LIsTabToken := not LIsLineBreakToken and (LText^ = BCEDITOR_TAB_CHAR);
-
 
   if (not LIsLineBreakToken) then
   begin
@@ -9274,6 +9273,42 @@ begin
     LLength := 0;
   end;
 
+  if (AComputeWidth) then
+    FForegroundColor := clNone
+  else if (FTokenHelper.LineForegroundColor <> clNone) then
+    LForegroundColor := FTokenHelper.LineForegroundColor
+  else if (FSpecialChars.Visible
+    and (LIsLineBreakToken or CharInSet(LText^, [BCEDITOR_NONE_CHAR, BCEDITOR_SPACE_CHAR, BCEDITOR_TAB_CHAR]))) then
+    if (FSpecialChars.Color <> clNone) then
+      LForegroundColor := FSpecialChars.Color
+    else
+      LForegroundColor := clSpecialChar
+  else if (Assigned(AAttribute) and (AAttribute.Foreground <> clNone)) then
+    LForegroundColor := AAttribute.Foreground
+  else
+    LForegroundColor := clWindowText;
+
+  LMarkColor := GetMarkBackgroundColor(ATextPosition.Line);
+
+  if (AComputeWidth) then
+    LBackgroundColor := clNone
+  else if (FTokenHelper.LineBackgroundColor <> clNone) then
+    LBackgroundColor := FTokenHelper.LineBackgroundColor
+  else if (LIsMatchingPairToken and (mpoUseMatchedColor in FMatchingPair.Options)) then
+    LBackgroundColor := FMatchingPair.Colors.Matched
+  else if (LMarkColor <> clNone) then
+    LBackgroundColor := LMarkColor
+  else if (ActiveLine.Visible
+    and (Assigned(FMultiCarets) and IsMultiEditCaretFound(ATextPosition.Line + 1)
+      or (not Assigned(FMultiCarets) and (ATextPosition.Line = Lines.CaretPosition.Line)))) then
+    LBackgroundColor := ActiveLine.Color
+  else if (FSpecialChars.Visible
+    and (LIsLineBreakToken or CharInSet(LText^, [BCEDITOR_NONE_CHAR, BCEDITOR_SPACE_CHAR, BCEDITOR_TAB_CHAR]))) then
+    LBackgroundColor := clWindow
+  else if (Assigned(AAttribute) and (AAttribute.Background <> clNone)) then
+    LBackgroundColor := AAttribute.Background
+  else
+    LBackgroundColor := clWindow;
 
   if (Assigned(AAttribute)) then
     LFontStyles := AAttribute.FontStyles
@@ -9324,6 +9359,8 @@ begin
       LForegroundColor, LBackgroundColor, LFontStyles,
       LBorderColor, LTokenAddon, LTokenAddonColor);
 
+  LIsTabToken := Assigned(LText) and (LText^ = BCEDITOR_TAB_CHAR);
+
   FPaintHelper.SetStyle(LFontStyles);
 
   LRect := ARect;
@@ -9341,7 +9378,7 @@ begin
   end
   else
   begin
-    if (ACalculate or not Assigned(LParts)) then
+    if (AComputeWidth or not Assigned(LParts)) then
       if (LLength = 0) then
         LRect.Right := LRect.Left
       else if (FFontPitchFixed) then
@@ -9353,7 +9390,7 @@ begin
       end;
   end;
 
-  if (not ACalculate
+  if (not AComputeWidth
     and (LRect.Right >= FLeftMarginWidth) and (LRect.Left <= ClientWidth)) then
   begin
     LDrawHelper.Text := nil;
