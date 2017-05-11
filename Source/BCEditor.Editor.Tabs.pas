@@ -17,7 +17,7 @@ type
     FOptions: TBCEditorTabOptions;
     FWantTabs: Boolean;
     FWidth: Integer;
-    procedure DoChange;
+    procedure DoChange();
     procedure SetOptions(const AValue: TBCEditorTabOptions);
     procedure SetWantTabs(const AValue: Boolean);
     procedure SetWidth(const AValue: Integer);
@@ -47,13 +47,12 @@ end;
 
 procedure TBCEditorTabs.Assign(ASource: TPersistent);
 begin
-  if ASource is TBCEditorTabs then
-  with ASource as TBCEditorTabs do
+  if (ASource is TBCEditorTabs) then
   begin
-    Self.FOptions := FOptions;
-    Self.FWantTabs := FWantTabs;
-    Self.FWidth := FWidth;
-    Self.DoChange;
+    FOptions := TBCEditorTabs(ASource).FOptions;
+    FWantTabs := TBCEditorTabs(ASource).FWantTabs;
+    FWidth := TBCEditorTabs(ASource).FWidth;
+    DoChange();
   end
   else
     inherited Assign(ASource);
@@ -61,25 +60,25 @@ end;
 
 procedure TBCEditorTabs.DoChange;
 begin
-  if Assigned(FOnChange) then
+  if (Assigned(FOnChange)) then
     FOnChange(Self);
 end;
 
 procedure TBCEditorTabs.SetOptions(const AValue: TBCEditorTabOptions);
 begin
-  if FOptions <> AValue then
+  if (FOptions <> AValue) then
   begin
     FOptions := AValue;
-    DoChange;
+    DoChange();
   end;
 end;
 
 procedure TBCEditorTabs.SetWantTabs(const AValue: Boolean);
 begin
-  if FWantTabs <> AValue then
+  if (FWantTabs <> AValue) then
   begin
     FWantTabs := AValue;
-    DoChange;
+    DoChange();
   end;
 end;
 
@@ -88,7 +87,7 @@ begin
   if ((FWidth <> AValue) and (1 <= AValue) and (AValue < 256)) then
   begin
     FWidth := AValue;
-    DoChange;
+    DoChange();
   end;
 end;
 

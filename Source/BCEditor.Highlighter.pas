@@ -526,16 +526,6 @@ end;
 
 { TBCEditorHighlighter.TAttribute *********************************************}
 
-constructor TBCEditorHighlighter.TAttribute.Create(const AttributeName: string);
-begin
-  inherited Create;
-
-  FBackground := clNone;
-  FForeground := clNone;
-  FName := AttributeName;
-  FEscapeChar := BCEDITOR_NONE_CHAR;
-end;
-
 procedure TBCEditorHighlighter.TAttribute.Assign(ASource: TPersistent);
 begin
   if Assigned(ASource) and (ASource is TAttribute) then
@@ -578,6 +568,16 @@ procedure TBCEditorHighlighter.TAttribute.Changed;
 begin
   if Assigned(FOnChange) then
     FOnChange(Self);
+end;
+
+constructor TBCEditorHighlighter.TAttribute.Create(const AttributeName: string);
+begin
+  inherited Create;
+
+  FBackground := clNone;
+  FForeground := clNone;
+  FName := AttributeName;
+  FEscapeChar := BCEDITOR_NONE_CHAR;
 end;
 
 function TBCEditorHighlighter.TAttribute.GetBackgroundColorStored: Boolean;
@@ -631,6 +631,15 @@ end;
 
 { TBCEditorHighlighter.TColors ************************************************}
 
+procedure TBCEditorHighlighter.TColors.Clear;
+var
+  LIndex: Integer;
+begin
+  for LIndex := FElements.Count - 1 downto 0 do
+    Dispose(PElement(FElements.Items[LIndex]));
+  FElements.Clear;
+end;
+
 constructor TBCEditorHighlighter.TColors.Create(const AHighlighter: TBCEditorHighlighter);
 begin
   inherited Create;
@@ -648,15 +657,6 @@ begin
   FInfo.Free;
 
   inherited;
-end;
-
-procedure TBCEditorHighlighter.TColors.Clear;
-var
-  LIndex: Integer;
-begin
-  for LIndex := FElements.Count - 1 downto 0 do
-    Dispose(PElement(FElements.Items[LIndex]));
-  FElements.Clear;
 end;
 
 function TBCEditorHighlighter.TColors.GetElement(const Name: string): PElement;
@@ -709,6 +709,11 @@ end;
 
 { TBCEditorHighlighter.TAbstractToken *****************************************}
 
+procedure TBCEditorHighlighter.TAbstractToken.Clear;
+begin
+  FBreakType := btUnspecified;
+end;
+
 constructor TBCEditorHighlighter.TAbstractToken.Create;
 begin
   inherited;
@@ -731,12 +736,17 @@ begin
   FAttribute := AHighlighterAttribute;
 end;
 
-procedure TBCEditorHighlighter.TAbstractToken.Clear;
+{ TBCEditorHighlighter.TMultiToken ********************************************}
+
+function TBCEditorHighlighter.TMultiToken.AddSymbol(const ASymbol: string): Integer;
 begin
-  FBreakType := btUnspecified;
+  Result := FSymbols.Add(ASymbol);
 end;
 
-{ TBCEditorHighlighter.TMultiToken ********************************************}
+procedure TBCEditorHighlighter.TMultiToken.Clear;
+begin
+  FSymbols.Clear;
+end;
 
 constructor TBCEditorHighlighter.TMultiToken.Create;
 begin
@@ -767,16 +777,6 @@ begin
   inherited;
 end;
 
-function TBCEditorHighlighter.TMultiToken.AddSymbol(const ASymbol: string): Integer;
-begin
-  Result := FSymbols.Add(ASymbol);
-end;
-
-procedure TBCEditorHighlighter.TMultiToken.Clear;
-begin
-  FSymbols.Clear;
-end;
-
 procedure TBCEditorHighlighter.TMultiToken.DeleteSymbol(const AIndex: Integer);
 begin
   if (AIndex > -1) and (AIndex < FSymbols.Count) then
@@ -802,6 +802,11 @@ begin
 end;
 
 { TBCEditorHighlighter.TToken *************************************************}
+
+procedure TBCEditorHighlighter.TToken.Clear;
+begin
+  Symbol := '';
+end;
 
 constructor TBCEditorHighlighter.TToken.Create;
 begin
@@ -831,11 +836,6 @@ begin
   Symbol := AToken.Symbol;
 end;
 
-procedure TBCEditorHighlighter.TToken.Clear;
-begin
-  Symbol := '';
-end;
-
 { TBCEditorHighlighter.TTokenNode *********************************************}
 
 constructor TBCEditorHighlighter.TTokenNode.Create(const AChar: Char);
@@ -863,6 +863,11 @@ end;
 
 { TBCEditorHighlighter.TTokenNodeList *****************************************}
 
+procedure TBCEditorHighlighter.TTokenNodeList.AddNode(const ANode: TTokenNode);
+begin
+  FNodeList.Add(ANode);
+end;
+
 constructor TBCEditorHighlighter.TTokenNodeList.Create;
 begin
   inherited;
@@ -874,11 +879,6 @@ destructor TBCEditorHighlighter.TTokenNodeList.Destroy;
 begin
   FreeList(FNodeList);
   inherited;
-end;
-
-procedure TBCEditorHighlighter.TTokenNodeList.AddNode(const ANode: TTokenNode);
-begin
-  FNodeList.Add(ANode);
 end;
 
 function TBCEditorHighlighter.TTokenNodeList.FindNode(const AChar: Char): TTokenNode;
@@ -962,52 +962,6 @@ end;
 
 { TBCEditorHighlighter.TRange *************************************************}
 
-constructor TBCEditorHighlighter.TRange.Create(const AOpenToken: string; const ACloseToken: string);
-begin
-  inherited Create;
-
-  FOpenToken := TMultiToken.Create;
-  FCloseToken := TMultiToken.Create;
-  AddTokenRange(AOpenToken, btUnspecified, ACloseToken, btUnspecified);
-
-  SetCaseSensitive(False);
-
-  FAlternativeCloseArrayCount := 0;
-
-  FPrepared := False;
-
-  FRanges := TList.Create;
-  FKeyList := TList.Create;
-  FSets := TList.Create;
-  FTokens := TList.Create;
-
-  FDelimiters := BCEDITOR_DEFAULT_DELIMITERS;
-
-  FAttribute.Foreground := clWindowText;
-  FAttribute.Background := clWindow;
-end;
-
-destructor TBCEditorHighlighter.TRange.Destroy;
-begin
-  Clear;
-  Reset;
-
-  FOpenToken.Free;
-  FOpenToken := nil;
-  FCloseToken.Free;
-  FCloseToken := nil;
-  FAttribute.Free;
-  FAttribute := nil;
-  FKeyList.Free;
-  FSets.Free;
-  FTokens.Free;
-  FTokens := nil;
-  FRanges.Free;
-  FRanges := nil;
-
-  inherited;
-end;
-
 procedure TBCEditorHighlighter.TRange.AddKeyList(NewKeyList: TKeyList);
 begin
   FKeyList.Add(NewKeyList);
@@ -1083,6 +1037,52 @@ begin
   ClearList(FTokens);
   ClearList(FKeyList);
   ClearList(FSets);
+end;
+
+constructor TBCEditorHighlighter.TRange.Create(const AOpenToken: string; const ACloseToken: string);
+begin
+  inherited Create;
+
+  FOpenToken := TMultiToken.Create;
+  FCloseToken := TMultiToken.Create;
+  AddTokenRange(AOpenToken, btUnspecified, ACloseToken, btUnspecified);
+
+  SetCaseSensitive(False);
+
+  FAlternativeCloseArrayCount := 0;
+
+  FPrepared := False;
+
+  FRanges := TList.Create;
+  FKeyList := TList.Create;
+  FSets := TList.Create;
+  FTokens := TList.Create;
+
+  FDelimiters := BCEDITOR_DEFAULT_DELIMITERS;
+
+  FAttribute.Foreground := clWindowText;
+  FAttribute.Background := clWindow;
+end;
+
+destructor TBCEditorHighlighter.TRange.Destroy;
+begin
+  Clear;
+  Reset;
+
+  FOpenToken.Free;
+  FOpenToken := nil;
+  FCloseToken.Free;
+  FCloseToken := nil;
+  FAttribute.Free;
+  FAttribute := nil;
+  FKeyList.Free;
+  FSets.Free;
+  FTokens.Free;
+  FTokens := nil;
+  FRanges.Free;
+  FRanges := nil;
+
+  inherited;
 end;
 
 function TBCEditorHighlighter.TRange.FindToken(const AString: string): TToken;
@@ -1369,13 +1369,6 @@ end;
 
 { TBCEditorHighlighter.TComments **********************************************}
 
-destructor TBCEditorHighlighter.TComments.Destroy;
-begin
-  Clear;
-
-  inherited Destroy;
-end;
-
 procedure TBCEditorHighlighter.TComments.AddChars(const AToken: string);
 var
   LIndex: Integer;
@@ -1429,36 +1422,14 @@ begin
   FChars := [];
 end;
 
+destructor TBCEditorHighlighter.TComments.Destroy;
+begin
+  Clear;
+
+  inherited Destroy;
+end;
+
 { TBCEditorHighlighter.TParser ************************************************}
-
-constructor TBCEditorHighlighter.TParser.Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType);
-begin
-  inherited Create;
-
-  FHeadNode := TTokenNode.Create(AChar, AToken, ABreakType);
-  FSets := TList.Create;
-end;
-
-constructor TBCEditorHighlighter.TParser.Create(ASet: TSet);
-begin
-  inherited Create;
-
-  FSets := TList.Create;
-  AddSet(ASet);
-end;
-
-destructor TBCEditorHighlighter.TParser.Destroy;
-begin
-  if Assigned(FHeadNode) then
-  begin
-    FHeadNode.Free;
-    FHeadNode := nil;
-  end;
-  FSets.Clear;
-  FSets.Free;
-  FSets := nil;
-  inherited;
-end;
 
 procedure TBCEditorHighlighter.TParser.AddSet(ASet: TSet);
 begin
@@ -1593,6 +1564,35 @@ begin
       end;
     end;
   AIndex := LStartPosition + 1;
+end;
+
+constructor TBCEditorHighlighter.TParser.Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType);
+begin
+  inherited Create;
+
+  FHeadNode := TTokenNode.Create(AChar, AToken, ABreakType);
+  FSets := TList.Create;
+end;
+
+constructor TBCEditorHighlighter.TParser.Create(ASet: TSet);
+begin
+  inherited Create;
+
+  FSets := TList.Create;
+  AddSet(ASet);
+end;
+
+destructor TBCEditorHighlighter.TParser.Destroy;
+begin
+  if Assigned(FHeadNode) then
+  begin
+    FHeadNode.Free;
+    FHeadNode := nil;
+  end;
+  FSets.Clear;
+  FSets.Free;
+  FSets := nil;
+  inherited;
 end;
 
 { TBCEditorHighlighter.TDefaultParser *****************************************}
@@ -2451,6 +2451,47 @@ begin
   end;
 end;
 
+procedure TBCEditorHighlighter.AddKeywords(var AStringList: TStringList);
+var
+  LIndex: Integer;
+  LIndex2: Integer;
+begin
+  if not Assigned(AStringList) then
+    Exit;
+  for LIndex := 0 to FMainRules.KeyListCount - 1 do
+    for LIndex2 := 0 to FMainRules.KeyList[LIndex].KeyList.Count - 1 do
+      AStringList.Add(FMainRules.KeyList[LIndex].KeyList[LIndex2]);
+end;
+
+procedure TBCEditorHighlighter.AddAttribute(AHighlighterAttribute: TAttribute);
+begin
+  FAttributes.AddObject(AHighlighterAttribute.Name, AHighlighterAttribute);
+end;
+
+procedure TBCEditorHighlighter.Clear;
+var
+  LIndex: Integer;
+  LRegion: BCEditor.Editor.CodeFolding.TBCEditorCodeFolding.TRegion;
+begin
+  FFoldOpenKeyChars := [];
+  FFoldCloseKeyChars := [];
+  FSkipOpenKeyChars := [];
+  FSkipCloseKeyChars := [];
+  FAttributes.Clear;
+  FMainRules.Clear;
+  FComments.Clear;
+  FCompletionProposalSkipRegions.Clear;
+  FMatchingPairs.Clear;
+  FSample := '';
+  for LIndex := 0 to FCodeFoldingRangeCount - 1 do
+  begin
+    LRegion := FCodeFoldingRegions[LIndex];
+    LRegion.Free;
+  end;
+  CodeFoldingRangeCount := 0;
+  TCustomBCEditor(Editor).ClearMatchingPair;
+end;
+
 constructor TBCEditorHighlighter.Create(AEditor: TCustomControl);
 begin
   inherited Create;
@@ -2487,6 +2528,12 @@ begin
   FLoading := False;
 end;
 
+procedure TBCEditorHighlighter.DoChange();
+begin
+  if Assigned(FOnChange) then
+    FOnChange(Self);
+end;
+
 destructor TBCEditorHighlighter.Destroy();
 begin
   Clear();
@@ -2502,26 +2549,114 @@ begin
   inherited;
 end;
 
-procedure TBCEditorHighlighter.DoChange();
+function TBCEditorHighlighter.GetAttribute(AIndex: Integer): TAttribute;
 begin
-  if Assigned(FOnChange) then
-    FOnChange(Self);
+  Result := nil;
+  if (AIndex >= 0) and (AIndex < FAttributes.Count) then
+    Result := TAttribute(FAttributes.Objects[AIndex]);
 end;
 
-procedure TBCEditorHighlighter.SetCurrentLine(const ANewValue: string);
+function TBCEditorHighlighter.GetCurrentRangeAttribute: TAttribute;
 begin
+  Result := nil;
   if Assigned(FCurrentRange) then
-    if not FCurrentRange.Prepared then
-      Prepare;
+    Result := FCurrentRange.Attribute;
+end;
 
-  FCurrentLine := ANewValue;
-  FCurrentLineIndex := 0;
-  FTokenPosition := 0;
-  FEndOfLine := ANewValue = '';
-  FBeginningOfLine := True;
-  FPreviousEndOfLine := False;
-  FCurrentToken := nil;
-  Next;
+function TBCEditorHighlighter.GetEndOfLine: Boolean;
+begin
+  Result := FEndOfLine;
+end;
+
+function TBCEditorHighlighter.GetCurrentRange: TRange;
+begin
+  Result := FCurrentRange;
+end;
+
+function TBCEditorHighlighter.GetTokenAttribute: TAttribute;
+begin
+  if Assigned(FCurrentToken) then
+    Result := FCurrentToken.Attribute
+  else
+    Result := nil;
+end;
+
+function TBCEditorHighlighter.GetTokenKind: TBCEditorRangeType;
+var
+  LCurrentRangeKeyList: TKeyList;
+  LIndex: Integer;
+  LToken: string;
+  LTokenType: TBCEditorRangeType;
+begin
+  LTokenType := FCurrentRange.TokenType;
+  if LTokenType <> ttUnspecified then
+    Result := LTokenType
+  else
+  { keyword token type }
+  begin
+    GetTokenText(LToken);
+    for LIndex := 0 to FCurrentRange.KeyListCount - 1 do
+    begin
+      LCurrentRangeKeyList := FCurrentRange.KeyList[LIndex];
+      if LCurrentRangeKeyList.KeyList.IndexOf(LToken) <> -1 then
+        Exit(LCurrentRangeKeyList.TokenType);
+    end;
+    Result := ttUnspecified
+  end;
+end;
+
+function TBCEditorHighlighter.GetTokenLength: Integer;
+begin
+  Result := FCurrentLineIndex - FTokenPosition;
+end;
+
+procedure TBCEditorHighlighter.GetTokenText(out AResult: string);
+begin
+  AResult := Copy(FCurrentLine, 1 + FTokenPosition, FCurrentLineIndex - FTokenPosition);
+end;
+
+function TBCEditorHighlighter.GetTokenIndex: Integer;
+begin
+  Result := FTokenPosition;
+end;
+
+procedure TBCEditorHighlighter.LoadFromFile(const AFileName: string);
+var
+  LStream: TStream;
+begin
+  FFileName := AFileName;
+  FName := TPath.GetFileNameWithoutExtension(AFileName);
+  LStream := TFileStream.Create(AFileName, fmOpenRead);
+  try
+    LoadFromStream(LStream);
+  finally
+    LStream.Free;
+  end;
+end;
+
+procedure TBCEditorHighlighter.LoadFromResource(const ResName: string; const ResType: PChar);
+var
+  Stream: TResourceStream;
+begin
+  Stream := TResourceStream.Create(HInstance, PChar(ResName), ResType);
+  LoadFromStream(Stream);
+  Stream.Free();
+end;
+
+procedure TBCEditorHighlighter.LoadFromStream(AStream: TStream);
+var
+  ImportJSON: TImportJSON;
+begin
+  Clear;
+  FLoading := True;
+  ImportJSON := TImportJSON.Create(Self);
+  try
+    ImportJSON.ImportFromStream(AStream);
+  finally
+    ImportJSON.Free();
+  end;
+  UpdateColors;
+  FLoading := False;
 end;
 
 procedure TBCEditorHighlighter.Next;
@@ -2630,34 +2765,59 @@ begin
     FPreviousEndOfLine := True;
 end;
 
-function TBCEditorHighlighter.GetCurrentRangeAttribute: TAttribute;
+procedure TBCEditorHighlighter.NextToEndOfLine;
 begin
-  Result := nil;
-  if Assigned(FCurrentRange) then
-    Result := FCurrentRange.Attribute;
-end;
-
-function TBCEditorHighlighter.GetEndOfLine: Boolean;
-begin
-  Result := FEndOfLine;
-end;
-
-function TBCEditorHighlighter.GetCurrentRange: TRange;
-begin
-  Result := FCurrentRange;
-end;
-
-function TBCEditorHighlighter.GetTokenAttribute: TAttribute;
-begin
-  if Assigned(FCurrentToken) then
-    Result := FCurrentToken.Attribute
-  else
-    Result := nil;
+  while not GetEndOfLine do
+    Next;
 end;
 
 procedure TBCEditorHighlighter.ResetCurrentRange;
 begin
   FCurrentRange := MainRules;
+end;
+
+procedure TBCEditorHighlighter.Prepare;
+begin
+  FAttributes.Clear;
+  AddAllAttributes(MainRules);
+  FMainRules.Prepare(FMainRules);
+end;
+
+procedure TBCEditorHighlighter.Reset;
+begin
+  MainRules.Reset;
+end;
+
+procedure TBCEditorHighlighter.SetAttributesOnChange(AEvent: TNotifyEvent);
+var
+  LHighlighterAttribute: TAttribute;
+  LIndex: Integer;
+begin
+  for LIndex := FAttributes.Count - 1 downto 0 do
+  begin
+    LHighlighterAttribute := TAttribute(FAttributes.Objects[LIndex]);
+    if Assigned(LHighlighterAttribute) then
+    begin
+      LHighlighterAttribute.OnChange := AEvent;
+      LHighlighterAttribute.InternalSaveDefaultValues;
+    end;
+  end;
+end;
+
+procedure TBCEditorHighlighter.SetCurrentLine(const ANewValue: string);
+begin
+  if Assigned(FCurrentRange) then
+    if not FCurrentRange.Prepared then
+      Prepare;
+
+  FCurrentLine := ANewValue;
+  FCurrentLineIndex := 0;
+  FTokenPosition := 0;
+  FEndOfLine := ANewValue = '';
+  FBeginningOfLine := True;
+  FPreviousEndOfLine := False;
+  FCurrentToken := nil;
+  Next;
 end;
 
 procedure TBCEditorHighlighter.SetCodeFoldingRangeCount(AValue: Integer);
@@ -2674,86 +2834,23 @@ begin
   FCurrentRange := TRange(AValue);
 end;
 
-procedure TBCEditorHighlighter.AddKeywords(var AStringList: TStringList);
-var
-  LIndex: Integer;
-  LIndex2: Integer;
-begin
-  if not Assigned(AStringList) then
-    Exit;
-  for LIndex := 0 to FMainRules.KeyListCount - 1 do
-    for LIndex2 := 0 to FMainRules.KeyList[LIndex].KeyList.Count - 1 do
-      AStringList.Add(FMainRules.KeyList[LIndex].KeyList[LIndex2]);
-end;
-
 function TBCEditorHighlighter.GetTokenText(): PChar;
 begin
   Result := @FCurrentLine[1 + FTokenPosition];
 end;
 
-procedure TBCEditorHighlighter.GetTokenText(out AResult: string);
+procedure TBCEditorHighlighter.SetFileName(AValue: string);
 begin
-  AResult := Copy(FCurrentLine, 1 + FTokenPosition, FCurrentLineIndex - FTokenPosition);
-end;
-
-function TBCEditorHighlighter.GetTokenIndex: Integer;
-begin
-  Result := FTokenPosition;
-end;
-
-function TBCEditorHighlighter.GetTokenKind: TBCEditorRangeType;
-var
-  LCurrentRangeKeyList: TKeyList;
-  LIndex: Integer;
-  LToken: string;
-  LTokenType: TBCEditorRangeType;
-begin
-  LTokenType := FCurrentRange.TokenType;
-  if LTokenType <> ttUnspecified then
-    Result := LTokenType
-  else
-  { keyword token type }
+  if (AValue <> FFileName) then
   begin
-    GetTokenText(LToken);
-    for LIndex := 0 to FCurrentRange.KeyListCount - 1 do
-    begin
-      LCurrentRangeKeyList := FCurrentRange.KeyList[LIndex];
-      if LCurrentRangeKeyList.KeyList.IndexOf(LToken) <> -1 then
-        Exit(LCurrentRangeKeyList.TokenType);
-    end;
-    Result := ttUnspecified
+    FFileName := AValue;
+    FFilePath := TPath.GetDirectoryName(AValue);
   end;
 end;
 
-procedure TBCEditorHighlighter.Clear;
-var
-  LIndex: Integer;
-  LRegion: BCEditor.Editor.CodeFolding.TBCEditorCodeFolding.TRegion;
+procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);
 begin
-  FFoldOpenKeyChars := [];
-  FFoldCloseKeyChars := [];
-  FSkipOpenKeyChars := [];
-  FSkipCloseKeyChars := [];
-  FAttributes.Clear;
-  FMainRules.Clear;
-  FComments.Clear;
-  FCompletionProposalSkipRegions.Clear;
-  FMatchingPairs.Clear;
-  FSample := '';
-  for LIndex := 0 to FCodeFoldingRangeCount - 1 do
-  begin
-    LRegion := FCodeFoldingRegions[LIndex];
-    LRegion.Free;
-  end;
-  CodeFoldingRangeCount := 0;
-  TCustomBCEditor(Editor).ClearMatchingPair;
-end;
-
-procedure TBCEditorHighlighter.Prepare;
-begin
-  FAttributes.Clear;
-  AddAllAttributes(MainRules);
-  FMainRules.Prepare(FMainRules);
+  FWordBreakChars := AChars;
 end;
 
 procedure TBCEditorHighlighter.UpdateAttributes(ARange: TRange; AParentRange: TRange);
@@ -2807,103 +2904,6 @@ begin
   finally
     LFontDummy.Free;
   end;
-end;
-
-procedure TBCEditorHighlighter.LoadFromFile(const AFileName: string);
-var
-  LStream: TStream;
-begin
-  FFileName := AFileName;
-  FName := TPath.GetFileNameWithoutExtension(AFileName);
-  LStream := TFileStream.Create(AFileName, fmOpenRead);
-  try
-    LoadFromStream(LStream);
-  finally
-    LStream.Free;
-  end;
-end;
-
-procedure TBCEditorHighlighter.LoadFromResource(const ResName: string; const ResType: PChar);
-var
-  Stream: TResourceStream;
-begin
-  Stream := TResourceStream.Create(HInstance, PChar(ResName), ResType);
-  LoadFromStream(Stream);
-  Stream.Free();
-end;
-
-procedure TBCEditorHighlighter.LoadFromStream(AStream: TStream);
-var
-  ImportJSON: TImportJSON;
-begin
-  Clear;
-  FLoading := True;
-  ImportJSON := TImportJSON.Create(Self);
-  try
-    ImportJSON.ImportFromStream(AStream);
-  finally
-    ImportJSON.Free();
-  end;
-  UpdateColors;
-  FLoading := False;
-end;
-
-function TBCEditorHighlighter.GetAttribute(AIndex: Integer): TAttribute;
-begin
-  Result := nil;
-  if (AIndex >= 0) and (AIndex < FAttributes.Count) then
-    Result := TAttribute(FAttributes.Objects[AIndex]);
-end;
-
-procedure TBCEditorHighlighter.AddAttribute(AHighlighterAttribute: TAttribute);
-begin
-  FAttributes.AddObject(AHighlighterAttribute.Name, AHighlighterAttribute);
-end;
-
-procedure TBCEditorHighlighter.Reset;
-begin
-  MainRules.Reset;
-end;
-
-procedure TBCEditorHighlighter.SetFileName(AValue: string);
-begin
-  if (AValue <> FFileName) then
-  begin
-    FFileName := AValue;
-    FFilePath := TPath.GetDirectoryName(AValue);
-  end;
-end;
-
-procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);
-begin
-  FWordBreakChars := AChars;
-end;
-
-procedure TBCEditorHighlighter.NextToEndOfLine;
-begin
-  while not GetEndOfLine do
-    Next;
-end;
-
-procedure TBCEditorHighlighter.SetAttributesOnChange(AEvent: TNotifyEvent);
-var
-  LHighlighterAttribute: TAttribute;
-  LIndex: Integer;
-begin
-  for LIndex := FAttributes.Count - 1 downto 0 do
-  begin
-    LHighlighterAttribute := TAttribute(FAttributes.Objects[LIndex]);
-    if Assigned(LHighlighterAttribute) then
-    begin
-      LHighlighterAttribute.OnChange := AEvent;
-      LHighlighterAttribute.InternalSaveDefaultValues;
-    end;
-  end;
-end;
-
-function TBCEditorHighlighter.GetTokenLength: Integer;
-begin
-  Result := FCurrentLineIndex - FTokenPosition;
 end;
 
 end.
