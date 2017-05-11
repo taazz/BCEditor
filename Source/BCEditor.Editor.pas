@@ -5922,41 +5922,40 @@ var
   LRow: Integer;
 begin
   if (FRows.Count = 0) then
-    if (not HandleAllocated or WordWrap.Enabled and (WordWrap.Width = wwwPage)) then
-      HandleNeeded()
-    else
-    begin
-      Include(FState, esRowsUpdating);
-      try
-        Canvas.Font.Assign(Font);
+  begin
+    HandleNeeded();
 
-        for LLine := 0 to Lines.Count - 1 do
-          Lines.SetFirstRow(LLine, RowToInsert);
+    Include(FState, esRowsUpdating);
+    try
+      Canvas.Font.Assign(Font);
 
-        for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
-        begin
-          LRange := FAllCodeFoldingRanges[LCodeFolding];
-          if (Assigned(LRange) and LRange.Collapsed) then
-            for LLine := LRange.FirstLine + 1 to LRange.LastLine do
-              Lines.SetFirstRow(LLine, -1);
-        end;
+      for LLine := 0 to Lines.Count - 1 do
+        Lines.SetFirstRow(LLine, RowToInsert);
 
-        LRow := 0;
-        for LLine := 0 to Lines.Count - 1 do
-          if (Lines.Items[LLine].FirstRow = RowToInsert) then
-          begin
-            Lines.SetFirstRow(LLine, LRow);
-            Inc(LRow, InsertLineIntoRows(LLine, LRow));
-          end;
-      finally
-        Exclude(FState, esRowsUpdating);
-
-        if (AUpdateScrollBars) then
-          if (UpdateCount > 0) then
-          else
-            UpdateScrollBars(False);
+      for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
+      begin
+        LRange := FAllCodeFoldingRanges[LCodeFolding];
+        if (Assigned(LRange) and LRange.Collapsed) then
+          for LLine := LRange.FirstLine + 1 to LRange.LastLine do
+            Lines.SetFirstRow(LLine, -1);
       end;
+
+      LRow := 0;
+      for LLine := 0 to Lines.Count - 1 do
+        if (Lines.Items[LLine].FirstRow = RowToInsert) then
+        begin
+          Lines.SetFirstRow(LLine, LRow);
+          Inc(LRow, InsertLineIntoRows(LLine, LRow));
+        end;
+    finally
+      Exclude(FState, esRowsUpdating);
+
+      if (AUpdateScrollBars) then
+        if (UpdateCount > 0) then
+        else
+          UpdateScrollBars(False);
     end;
+  end;
 
   Result := FRows;
 end;
