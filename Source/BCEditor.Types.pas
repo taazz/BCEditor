@@ -218,13 +218,6 @@ type
 
   TBCEditorMouseCursorEvent = procedure(ASender: TObject; const ALineCharPos: TBCEditorTextPosition; var ACursor: TCursor) of object;
 
-  TBCEditorEmptySpace = (
-    esNone,
-    esNoneChar,
-    esSpace,
-    esTab
-  );
-
   TBCEditorTabConvertProc = function(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean;
     const ATabChar: Char = BCEDITOR_SPACE_CHAR): string;
 
