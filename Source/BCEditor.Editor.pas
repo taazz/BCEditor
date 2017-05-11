@@ -5923,37 +5923,41 @@ var
 begin
   if ((FRows.Count = 0) and (Lines.Count > 0)) then
   begin
-    HandleNeeded();
-
     Include(FState, esRowsUpdating);
+
     try
-      Canvas.Font.Assign(Font);
+      BeginUpdate();
+      try
+        HandleNeeded();
 
-      for LLine := 0 to Lines.Count - 1 do
-        Lines.SetFirstRow(LLine, RowToInsert);
+        for LLine := 0 to Lines.Count - 1 do
+          Lines.SetFirstRow(LLine, RowToInsert);
 
-      for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
-      begin
-        LRange := FAllCodeFoldingRanges[LCodeFolding];
-        if (Assigned(LRange) and LRange.Collapsed) then
-          for LLine := LRange.FirstLine + 1 to LRange.LastLine do
-            Lines.SetFirstRow(LLine, -1);
-      end;
-
-      LRow := 0;
-      for LLine := 0 to Lines.Count - 1 do
-        if (Lines.Items[LLine].FirstRow = RowToInsert) then
+        for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
         begin
-          Lines.SetFirstRow(LLine, LRow);
-          Inc(LRow, InsertLineIntoRows(LLine, LRow));
+          LRange := FAllCodeFoldingRanges[LCodeFolding];
+          if (Assigned(LRange) and LRange.Collapsed) then
+            for LLine := LRange.FirstLine + 1 to LRange.LastLine do
+              Lines.SetFirstRow(LLine, -1);
         end;
-    finally
-      Exclude(FState, esRowsUpdating);
 
-      if (AUpdateScrollBars) then
-        if (UpdateCount > 0) then
-        else
-          UpdateScrollBars(False);
+        LRow := 0;
+        for LLine := 0 to Lines.Count - 1 do
+          if (Lines.Items[LLine].FirstRow = RowToInsert) then
+          begin
+            Lines.SetFirstRow(LLine, LRow);
+            Inc(LRow, InsertLineIntoRows(LLine, LRow));
+          end;
+      finally
+        Exclude(FState, esRowsUpdating);
+
+        if (AUpdateScrollBars) then
+          if (UpdateCount > 0) then
+          else
+            UpdateScrollBars(False);
+      end;
+    finally
+      EndUpdate();
     end;
   end;
 
@@ -9645,6 +9649,9 @@ begin
 
     FTokenHelper.Previous.FontStyles := LFontStyles;
   end;
+
+  if (Assigned(LParts)) then
+    LParts.Free();
 
   Result := LRect.Right - ARect.Left;
 end;
