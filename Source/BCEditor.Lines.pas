@@ -1525,6 +1525,7 @@ begin
                 on E: Exception do
                   E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
                     + 'Progress: ' + #13#10#13#10
+                    + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10
                     + E.ClassName + ':' + #13#10
                     + E.Message));
               end;

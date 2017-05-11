@@ -362,7 +362,7 @@ end;
 
 function TBCEditorDisplayPosition.ToString(): string;
 begin
-  Result := '(' + IntToStr(Row) + ',' + IntToStr(Column) + ')';
+  Result := '(' + IntToStr(Column) + ',' + IntToStr(Row) + ')';
 end;
 
 { TBCEditorTextPosition *******************************************************}
@@ -399,7 +399,7 @@ end;
 
 function TBCEditorTextPosition.ToString(): string;
 begin
-  Result := '(' + IntToStr(Line) + ',' + IntToStr(Char) + ')';
+  Result := '(' + IntToStr(Char) + ',' + IntToStr(Line) + ')';
 end;
 
 end.

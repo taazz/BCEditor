@@ -5801,7 +5801,12 @@ begin
           if (LTextCaretPosition.Line = 0) then
             FHighlighter.ResetCurrentRange()
           else
+          begin
+            // Debug 2017-05-12
+            Assert((0 <= LTextCaretPosition.Line) and (LTextCaretPosition.Line < Lines.Count));
+
             FHighlighter.SetCurrentRange(Lines.Items[LTextCaretPosition.Line - 1].Range);
+          end;
           FHighlighter.SetCurrentLine(Lines.Items[LTextCaretPosition.Line].Text);
 
           while (not FHighlighter.GetEndOfLine() and (FHighlighter.GetTokenIndex() < AMatchingPairMatch.ClosePosition.Char)) do
