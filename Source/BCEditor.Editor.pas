@@ -1763,9 +1763,17 @@ begin
         FHighlighter.ResetCurrentRange()
       else
         if (APosType = ptText) then
+        begin
+          Assert((0 <= LItem) and (LItem < Lines.Count),
+            'LItem: ' + IntToStr(LItem));
           FHighlighter.SetCurrentRange(Lines.Items[LItem].Range)
+        end
         else
+        begin
+          Assert((0 <= LItem) and (LItem < Rows.Count),
+            'LItem: ' + IntToStr(LItem));
           FHighlighter.SetCurrentRange(Rows.Items[LItem].Range);
+        end;
       if (APosType = ptText) then
         FHighlighter.SetCurrentLine(Lines[LItem])
       else
