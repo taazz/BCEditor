@@ -1755,10 +1755,9 @@ begin
 
     LColumn := 0;
 
-    if ((APosType = ptText) and (LItem >= Lines.Count)
-      or (APosType = ptDisplay) and (LItem >= Rows.Count)) then
-      FHighlighter.ResetCurrentRange()
-    else
+    FHighlighter.ResetCurrentRange();
+    if ((APosType = ptText) and (LItem < Lines.Count)
+      or (APosType = ptDisplay) and (LItem < Rows.Count)) then
     begin
       if (LItem = 0) then
         FHighlighter.ResetCurrentRange()
@@ -5800,6 +5799,10 @@ begin
           begin
             LMatchingPairTokenResult := trCloseTokenFound;
             LTextCaretPosition := AMatchingPairMatch.ClosePosition;
+
+            // Debug 2017-05-13
+            Assert((0 <= LTextCaretPosition.Line) and (LTextCaretPosition.Line < Lines.Count),
+              'LTextCaretPosition: ' + LTextCaretPosition.ToString());
           end;
         end;
 
@@ -5810,15 +5813,14 @@ begin
           LMatchStackIndex := -1;
           LLevel := -1;
 
+          // Debug 2017-05-13
+          Assert((0 <= LTextCaretPosition.Line) and (LTextCaretPosition.Line < Lines.Count),
+            'LTextCaretPosition: ' + LTextCaretPosition.ToString());
+
           if (LTextCaretPosition.Line = 0) then
             FHighlighter.ResetCurrentRange()
           else
-          begin
-            // Debug 2017-05-12
-            Assert((0 <= LTextCaretPosition.Line) and (LTextCaretPosition.Line < Lines.Count));
-
             FHighlighter.SetCurrentRange(Lines.Items[LTextCaretPosition.Line - 1].Range);
-          end;
           FHighlighter.SetCurrentLine(Lines.Items[LTextCaretPosition.Line].Text);
 
           while (not FHighlighter.GetEndOfLine() and (FHighlighter.GetTokenIndex() < AMatchingPairMatch.ClosePosition.Char)) do
