@@ -254,7 +254,6 @@ type
     FCanvas: TCanvas;
     FCharWidth: Integer;
     FColors: Boolean;
-    FColumns: Boolean;
     FCopies: Integer;
     FDefaultBackground: TColor;
     FDocumentTitle: string;
@@ -1602,7 +1601,7 @@ begin
       Clear;
       for LIndex := 0 to AValue.Count - 1 do
       begin
-        LLine := ConvertTabs(AValue[LIndex], FTabWidth, LHasTabs, FColumns);
+        LLine := ConvertTabs(AValue[LIndex], FTabWidth, LHasTabs);
         LPosition := Pos(BCEDITOR_TAB_CHAR, LLine);
         while LPosition > 0 do
         begin
@@ -2224,7 +2223,6 @@ begin
   Highlighter := AValue.Highlighter;
   Font := AValue.Font;
   CharWidth := AValue.CharWidth;
-  FColumns := toColumns in AValue.Tabs.Options;
   FTabWidth := AValue.Tabs.Width;
   SetLines(AValue.Lines);
   FSelectionAvailable := AValue.SelectionAvailable;

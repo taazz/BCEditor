@@ -69,7 +69,6 @@ type
   );
 
   TBCEditorTabOption = (
-    toColumns,
     toPreviousLineIndent,
     toSelectedBlockIndent,
     toTabsToSpaces

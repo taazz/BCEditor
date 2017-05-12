@@ -10,7 +10,7 @@ function CaseNone(const AChar: Char): Char;
 function CaseStringNone(const AString: string): string;
 function CaseUpper(const AChar: Char): Char;
 procedure ClearList(var AList: TList);
-function ConvertTabs(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean; const AColumns: Boolean): string;
+function ConvertTabs(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean): string;
 procedure FreeList(var AList: TList);
 function MinMax(const AValue, AMinValue, AMaxValue: Integer): Integer;
 function TextHeight(ACanvas: TCanvas; const AText: string): Integer;
@@ -57,7 +57,7 @@ begin
   AList.Clear;
 end;
 
-function ConvertTabs(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean; const AColumns: Boolean): string;
+function ConvertTabs(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean): string;
 var
   LCount: Integer;
   LPosition: Integer;
@@ -75,10 +75,7 @@ begin
 
     Delete(Result, LPosition, Length(BCEDITOR_TAB_CHAR));
 
-    if AColumns then
-      LCount := ATabWidth - (LPosition - ATabWidth - 1) mod ATabWidth
-    else
-      LCount := ATabWidth;
+    LCount := ATabWidth - (LPosition - ATabWidth - 1) mod ATabWidth;
 
     Insert(StringOfChar(BCEDITOR_SPACE_CHAR, LCount), Result, LPosition);
     Inc(LPosition, LCount);

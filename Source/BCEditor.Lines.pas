@@ -12,7 +12,7 @@ type
   protected type
     TCompare = function(Lines: TBCEditorLines; Line1, Line2: Integer): Integer;
 
-    TOption = (loColumnTabs, loTrimTrailingSpaces, loTrimTrailingLines,
+    TOption = (loTrimTrailingSpaces, loTrimTrailingLines,
       loUndoGrouped, loUndoAfterLoad, loUndoAfterSave);
     TOptions = set of TOption;
 
@@ -712,7 +712,7 @@ begin
     Result := ''
   else
   begin
-    Result := ConvertTabs(Items.List[ALine].Text, FTabWidth, LHasTabs, loColumnTabs in Options);
+    Result := ConvertTabs(Items.List[ALine].Text, FTabWidth, LHasTabs);
 
     if (LHasTabs) then
     begin

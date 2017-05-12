@@ -9,7 +9,7 @@ uses
 type
   TBCEditorTabs = class(TPersistent)
   strict private const
-    DefaultOptions = [toColumns, toSelectedBlockIndent];
+    DefaultOptions = [toSelectedBlockIndent];
     DefaultWantTabs = True;
     DefaultWidth = 2;
   strict private
