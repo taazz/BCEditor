@@ -118,7 +118,6 @@ type
     FCaseSensitive: Boolean;
     FEditor: TCustomControl;
     FItems: TItems;
-    FMaxLengthLine: Integer;
     FModified: Boolean;
     FOldCaretPosition: TBCEditorTextPosition;
     FOldSelBeginPosition: TBCEditorTextPosition;
@@ -808,7 +807,6 @@ begin
   FCaretPosition := BOFPosition;
   FCaseSensitive := False;
   FItems := TItems.Create();
-  FMaxLengthLine := -1;
   FModified := False;
   FOnAfterUpdate := nil;
   FOnBeforeUpdate := nil;
@@ -1078,12 +1076,6 @@ end;
 procedure TBCEditorLines.DoDelete(ALine: Integer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
-
-  if (FMaxLengthLine >= 0) then
-    if (FMaxLengthLine = ALine) then
-      FMaxLengthLine := -1
-    else if (FMaxLengthLine > ALine) then
-      Dec(FMaxLengthLine);
 
   Items.Delete(ALine);
 
@@ -2020,7 +2012,6 @@ begin
     ClearUndo();
 
   Items.Clear();
-  FMaxLengthLine := -1;
   LineBreak := BCEDITOR_CARRIAGE_RETURN + BCEDITOR_LINEFEED;
   FCaretPosition := BOFPosition;
   FSelBeginPosition := BOFPosition;

@@ -1820,7 +1820,13 @@ begin
     end;
 
     if (LX >= LItemWidth + LTokenWidth) then
-      Result := Point(LColumn + (LX + CharWidth div 2) div CharWidth, LItem)
+    begin
+      Result := Point(LColumn + (LX - LItemWidth) div CharWidth, LItem);
+      if (not AFromCursor) then
+        Result := Point(LColumn + (LX - LItemWidth) div CharWidth, LItem)
+      else
+        Result := Point(LColumn + (LX - LItemWidth + CharWidth div 2) div CharWidth, LItem);
+    end
     else
     begin
       SetLength(LWidths, FHighlighter.GetTokenLength() + 1);
@@ -2729,7 +2735,7 @@ var
   LLineEndPos: PChar;
   LLinePos: PChar;
 begin
-  if ((Rows.Count = 0) or (ADisplayPosition.Column = 0)) then
+  if (Rows.Count = 0) then
     Result := TextPosition(ADisplayPosition.Column, ADisplayPosition.Row)
   else if (ADisplayPosition.Row >= Rows.Count) then
     Result := TextPosition(ADisplayPosition.Column, Rows.Items[Rows.Count - 1].Line + ADisplayPosition.Row - Rows.Count + 1)
@@ -2739,9 +2745,17 @@ begin
 
     if (not (rfHasTabs in Rows.Items[ADisplayPosition.Row].Flags)) then
     begin
-      LChar := ADisplayPosition.Column - Rows.Items[ADisplayPosition.Row].Char;
-      LLinePos := @Lines[LLine][1 + LChar];
-      LLineEndPos := @Lines[LLine][1 + Min(Rows.Items[ADisplayPosition.Row].Length, Length(Lines[LLine]))];
+      LChar := Rows.Items[ADisplayPosition.Row].Char + ADisplayPosition.Column;
+      if (Lines[LLine] = '') then
+      begin
+        LLinePos := nil;
+        LLineEndPos := nil;
+      end
+      else
+      begin
+        LLinePos := @Lines[LLine][1 + LChar];
+        LLineEndPos := @Lines[LLine][1 + Min(Rows.Items[ADisplayPosition.Row].Length, Length(Lines[LLine]))];
+      end;
     end
     else
     begin
@@ -2758,15 +2772,16 @@ begin
       Inc(LChar, ADisplayPosition.Column - LColumn);
     end;
 
-    while ((LLinePos <= LLineEndPos)
-      and ((LLinePos^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
-        or ((LLinePos - 1)^ <> BCEDITOR_NONE_CHAR)
-          and ((LLinePos - 1)^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
-          and not IsCombiningDiacriticalMark((LLinePos - 1)^))) do
-    begin
-      Inc(LChar);
-      Inc(LLinePos);
-    end;
+    if (Assigned(LLinePos)) then
+      while ((LLinePos <= LLineEndPos)
+        and ((LLinePos^.GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
+          or ((LLinePos - 1)^ <> BCEDITOR_NONE_CHAR)
+            and ((LLinePos - 1)^.GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
+            and not IsCombiningDiacriticalMark((LLinePos - 1)^))) do
+      begin
+        Inc(LChar);
+        Inc(LLinePos);
+      end;
 
     Result := TextPosition(LChar, LLine);
   end;
@@ -9433,16 +9448,12 @@ begin
       LRect.Right := LRect.Left + LLength * CharWidth
   else if (LIsTabToken) then
     LRect.Right := LRect.Left + (FTabs.Width - ADisplayPosition.Column mod FTabs.Width) * FTabSignWidth
+  else if (not Assigned(LText) or (LLength = 0)) then
+    LRect.Right := LRect.Left
+  else if (FFontPitchFixed) then
+    LRect.Right := LRect.Left + LLength * CharWidth
   else
-  begin
-    if (not Assigned(APaintData) or (APaintData^.Parts.Count = 0)) then
-      if (not Assigned(LText) or (LLength = 0)) then
-        LRect.Right := LRect.Left
-      else if (FFontPitchFixed) then
-        LRect.Right := LRect.Left + LLength * CharWidth
-      else
-        LRect.Right := LRect.Left + FPaintHelper.ComputeTextWidth(LText, LLength);
-  end;
+    LRect.Right := LRect.Left + FPaintHelper.ComputeTextWidth(LText, LLength);
 
   if (Assigned(APaintData)
     and (LRect.Right >= FLeftMarginWidth) and (LRect.Left <= ClientWidth)) then
@@ -11836,12 +11847,12 @@ begin
     Result := DisplayPosition(ATextPosition.Char, Rows.Count + ATextPosition.Line - Rows.Items[Rows.Count - 1].Line - 1)
   else if ((Rows.Count >= 0) and (Lines.Items[ATextPosition.Line].FirstRow < 0)) then
     // Rows.Count >= 0 is not needed, but GetRows must be called to initialize Lines.FirstRow
-    raise ERangeError.CreateFmt(SBCEditorLineIsNotVisible, [ATextPosition.Line])
+    raise ERangeError.CreateFmt(SBCEditorLineIsNotVisible + ' (Lines.Count: %d)', [ATextPosition.Line, Lines.Count])
   else
   begin
     LRow := Lines.Items[ATextPosition.Line].FirstRow;
     LChar := ATextPosition.Char;
-    while ((LChar > Rows.Items[LRow].Length) and not (rfLastRowOfLine in Rows.Items[LRow].Flags)) do
+    while ((LChar >= Rows.Items[LRow].Length) and not (rfLastRowOfLine in Rows.Items[LRow].Flags)) do
     begin
       Dec(LChar, Rows.Items[LRow].Length);
       Inc(LRow);
