@@ -3,12 +3,12 @@ unit BCEditor.Editor.Caret;
 interface {********************************************************************}
 
 uses
-  Classes,
+  Classes, Types,
   Graphics,
   BCEditor.Types;
 
 type
-  TBCEditorCaretChangedEvent = procedure(ASender: TObject; X, Y: Integer) of object;
+  TBCEditorCaretChangedEvent = procedure(ASender: TObject; ACaretPos: TPoint) of object;
 
   TBCEditorCaret = class(TPersistent)
   type

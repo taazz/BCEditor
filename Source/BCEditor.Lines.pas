@@ -21,12 +21,12 @@ type
 
     TLine = packed record
     type
+      TFlags = set of (lfHasTabs);
       TState = (lsLoaded, lsModified, lsSaved);
     public
       Background: TColor;
-      ExpandedLength: Integer;
-      Flags: set of (sfHasTabs, sfHasNoTabs);
       FirstRow: Integer;
+      Flags: TFlags;
       Foreground: TColor;
       Range: Pointer;
       State: TLine.TState;
@@ -140,9 +140,7 @@ type
     FSelMode: TBCEditorSelectionMode;
     FSortOrder: TBCEditorSortOrder;
     FState: TState;
-    FTabWidth: Integer;
     FUndoList: TUndoList;
-    function ComputeExpandString(ALine: Integer): string;
     procedure DoDelete(ALine: Integer);
     procedure DoDeleteIndent(ABeginPosition, AEndPosition: TBCEditorTextPosition;
       const AIndentText: string; const ASelMode: TBCEditorSelectionMode);
@@ -161,9 +159,6 @@ type
     function GetChar(APosition: TBCEditorTextPosition): Char;
     function GetEOFPosition(): TBCEditorTextPosition;
     function GetEOLPosition(ALine: Integer): TBCEditorTextPosition; inline;
-    function GetExpandedString(ALine: Integer): string;
-    function GetExpandedStringLength(ALine: Integer): Integer;
-    function GetMaxLength(): Integer; inline;
     function GetTextBetween(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string; overload;
     function GetTextBetweenColumn(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string; overload;
     procedure InternalClear(const AClearUndo: Boolean); overload;
@@ -205,7 +200,6 @@ type
     procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
     procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
     procedure SetRange(const ALine: Integer; const AValue: Pointer); inline;
-    procedure SetTabWidth(const AValue: Integer);
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
@@ -220,10 +214,7 @@ type
     property Editor: TCustomControl read FEditor write FEditor;
     property EOFPosition: TBCEditorTextPosition read GetEOFPosition;
     property EOLPosition[ALine: Integer]: TBCEditorTextPosition read GetEOLPosition;
-    property ExpandedStringLengths[ALine: Integer]: Integer read GetExpandedStringLength;
-    property ExpandedStrings[Line: Integer]: string read GetExpandedString;
     property Items: TItems read FItems;
-    property MaxLength: Integer read GetMaxLength;
     property Modified: Boolean read FModified write SetModified;
     property OnAfterUpdate: TNotifyEvent read FOnAfterUpdate write FOnAfterUpdate;
     property OnBeforeUpdate: TNotifyEvent read FOnBeforeUpdate write FOnBeforeUpdate;
@@ -241,7 +232,6 @@ type
     property SelMode: TBCEditorSelectionMode read FSelMode write FSelMode;
     property SortOrder: TBCEditorSortOrder read FSortOrder write FSortOrder;
     property State: TState read FState;
-    property TabWidth: Integer read FTabWidth write SetTabWidth;
     property TextBetween[const BeginPosition, EndPosition: TBCEditorTextPosition]: string read GetTextBetween;
     property TextBetweenColumn[const BeginPosition, EndPosition: TBCEditorTextPosition]: string read GetTextBetweenColumn;
     property UndoList: TUndoList read FUndoList;
@@ -704,30 +694,6 @@ begin
   CaretPosition := ABeginPosition;
 end;
 
-function TBCEditorLines.ComputeExpandString(ALine: Integer): string;
-var
-  LHasTabs: Boolean;
-begin
-  if (Items.List[ALine].Text = '') then
-    Result := ''
-  else
-  begin
-    Result := ConvertTabs(Items.List[ALine].Text, FTabWidth, LHasTabs);
-
-    if (LHasTabs) then
-    begin
-      Include(Items.List[ALine].Flags, sfHasTabs);
-      Exclude(Items.List[ALine].Flags, sfHasNoTabs);
-    end
-    else
-    begin
-      Exclude(Items.List[ALine].Flags, sfHasTabs);
-      Include(Items.List[ALine].Flags, sfHasNoTabs);
-    end;
-    Items.List[ALine].ExpandedLength := Length(Result);
-  end;
-end;
-
 function TBCEditorLines.CharIndexToPosition(const ACharIndex: Integer): TBCEditorTextPosition;
 begin
   Result := CharIndexToPosition(ACharIndex, BOFPosition);
@@ -860,7 +826,6 @@ begin
   FSelMode := smNormal;
   FState := [];
   FUndoList := TUndoList.Create(Self);
-  TabWidth := 4;
 end;
 
 procedure TBCEditorLines.CustomSort(const ABeginLine, AEndLine: Integer;
@@ -1251,10 +1216,9 @@ begin
   Assert((0 <= ALine) and (ALine <= Count));
 
   LLine.Background := clNone;
-  LLine.ExpandedLength := -1;
+  LLine.Flags := [];
   LLine.FirstRow := -1;
   LLine.Foreground := clNone;
-  LLine.Flags := [sfHasTabs, sfHasNoTabs];
   LLine.Range := nil;
   LLine.State := lsModified;
   LLine.Text := '';
@@ -1423,22 +1387,33 @@ end;
 procedure TBCEditorLines.DoPut(ALine: Integer; const AText: string);
 var
   LModified: Boolean;
+  LPos: PChar;
+  LEndPos: PChar;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
   LModified := AText <> Items[ALine].Text;
   if (LModified) then
   begin
-    Items.List[ALine].Flags := Items.List[ALine].Flags - [sfHasTabs, sfHasNoTabs];
+    Items.List[ALine].Flags := [];
     Items.List[ALine].State := lsModified;
     Items.List[ALine].Text := AText;
-  end;
 
-  if (LModified and (FMaxLengthLine >= 0)) then
-    if (ExpandedStringLengths[ALine] >= Items[FMaxLengthLine].ExpandedLength) then
-      FMaxLengthLine := ALine
-    else if (ALine = FMaxLengthLine) then
-      FMaxLengthLine := -1;
+    if (AText <> '') then
+    begin
+      LPos := @AText[1];
+      LEndPos := @AText[Length(AText)];
+      while (LPos <= LEndPos) do
+      begin
+        if (LPos^ = BCEDITOR_TAB_CHAR) then
+        begin
+          Include(Items.List[ALine].Flags, lfHasTabs);
+          break;
+        end;
+        Inc(LPos);
+      end;
+    end;
+  end;
 
   CaretPosition := EOLPosition[ALine];
 
@@ -1524,8 +1499,8 @@ begin
               except
                 on E: Exception do
                   E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
-                    + 'Progress: ' + #13#10#13#10
-                    + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10
+                    + 'Progress: ' + Progress + #13#10
+                    + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10#13#10
                     + E.ClassName + ':' + #13#10
                     + E.Message));
               end;
@@ -1662,51 +1637,6 @@ begin
   Assert((0 <= ALine) and (ALine < Count));
 
   Result := TextPosition(Length(Items[ALine].Text), ALine)
-end;
-
-function TBCEditorLines.GetExpandedString(ALine: Integer): string;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  if (sfHasNoTabs in Items[ALine].Flags) then
-    Result := Items[ALine].Text
-  else
-    Result := ComputeExpandString(ALine);
-end;
-
-function TBCEditorLines.GetExpandedStringLength(ALine: Integer): Integer;
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  if (Items[ALine].ExpandedLength >= 0) then
-    Items.List[ALine].ExpandedLength := Length(ExpandedStrings[ALine]);
-  Result := Items[ALine].ExpandedLength;
-end;
-
-function TBCEditorLines.GetMaxLength(): Integer;
-var
-  LMaxLength: Integer;
-  LLine: Integer;
-begin
-  if (FMaxLengthLine < 0) then
-  begin
-    LMaxLength := 0;
-    for LLine := 0 to Count - 1 do
-    begin
-      if (Items[LLine].ExpandedLength < 0) then
-        ComputeExpandString(LLine);
-      if (Items[LLine].ExpandedLength > LMaxLength) then
-      begin
-        LMaxLength := Items[LLine].ExpandedLength;
-        FMaxLengthLine := LLine;
-      end;
-    end;
-  end;
-
-  if (FMaxLengthLine < 0) then
-    Result := 0
-  else
-    Result := Items[FMaxLengthLine].ExpandedLength;
 end;
 
 function TBCEditorLines.GetTextBetween(const ABeginPosition, AEndPosition: TBCEditorTextPosition): string;
@@ -2323,27 +2253,18 @@ begin
   end;
 end;
 
-procedure TBCEditorLines.SetTabWidth(const AValue: Integer);
-var
-  LLine: Integer;
-begin
-  if FTabWidth <> AValue then
-  begin
-    FTabWidth := AValue;
-    FMaxLengthLine := -1;
-    for LLine := 0 to Count - 1 do
-    begin
-      Items.List[LLine].ExpandedLength := -1;
-      Exclude(Items.List[LLine].Flags, sfHasNoTabs);
-    end;
-  end;
-end;
-
 procedure TBCEditorLines.SetTextStr(const AValue: string);
 var
   LEndPosition: TBCEditorTextPosition;
   LLine: Integer;
+  LOldCaretPosition: TBCEditorTextPosition;
+  LOldSelBeginPosition: TBCEditorTextPosition;
+  LOldSelEndPosition: TBCEditorTextPosition;
 begin
+  LOldCaretPosition := CaretPosition;
+  LOldSelBeginPosition := SelBeginPosition;
+  LOldSelEndPosition := SelEndPosition;
+
   Include(FState, lsLoading);
 
   BeginUpdate();
@@ -2367,6 +2288,11 @@ begin
   end;
 
   CaretPosition := BOFPosition;
+
+  if (LOldCaretPosition = BOFPosition) then
+    Exclude(FState, lsCaretMoved);
+  if ((LOldSelBeginPosition = BOFPosition) and (LOldSelEndPosition = BOFPosition)) then
+    Exclude(FState, lsSelChanged);
 
   EndUpdate();
 

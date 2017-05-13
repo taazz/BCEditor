@@ -17,6 +17,7 @@ type
     FHighlighter: TBCEditorHighlighter;
     FLines: TBCEditorLines;
     FStringList: TStrings;
+    FTabWidth: Integer;
     procedure CreateFooter;
     procedure CreateHeader;
     procedure CreateHTMLDocument;
@@ -24,7 +25,8 @@ type
     procedure CreateLines;
   public
     constructor Create(ALines: BCEditor.Lines.TBCEditorLines;
-      AHighlighter: TBCEditorHighlighter; AFont: TFont; const ACharSet: string); overload;
+      AHighlighter: TBCEditorHighlighter; AFont: TFont; const ATabWidth: Integer;
+      const ACharSet: string); overload;
     destructor Destroy; override;
     procedure SaveToStream(AStream: TStream; AEncoding: System.SysUtils.TEncoding);
   end;
@@ -33,11 +35,12 @@ implementation
 
 uses
   Windows,
-  UITypes,
+  UITypes, StrUtils,
   BCEditor.Consts, BCEditor.Utils;
 
 constructor TBCEditorExportHTML.Create(ALines: BCEditor.Lines.TBCEditorLines;
-  AHighlighter: TBCEditorHighlighter; AFont: TFont; const ACharSet: string);
+  AHighlighter: TBCEditorHighlighter; AFont: TFont; const ATabWidth: Integer;
+  const ACharSet: string);
 begin
   inherited Create;
 
@@ -49,6 +52,7 @@ begin
   FLines := TBCEditorLines(ALines);
   FHighlighter := AHighlighter;
   FFont := AFont;
+  FTabWidth := ATabWidth;
 end;
 
 destructor TBCEditorExportHTML.Destroy;
@@ -139,6 +143,7 @@ end;
 
 procedure TBCEditorExportHTML.CreateLines;
 var
+  LColumn: Integer;
   LHighlighterAttribute: TBCEditorHighlighter.TAttribute;
   LIndex: Integer;
   LPreviousElement: string;
@@ -152,12 +157,23 @@ begin
       FHighlighter.ResetCurrentRange
     else
       FHighlighter.SetCurrentRange(FLines.Items[LIndex - 1].Range);
-    FHighlighter.SetCurrentLine(FLines.ExpandedStrings[LIndex]);
+    FHighlighter.SetCurrentLine(FLines[LIndex]);
     LTextLine := '';
+    LColumn := 0;
     while not FHighlighter.GetEndOfLine do
     begin
       LHighlighterAttribute := FHighlighter.GetTokenAttribute;
       FHighlighter.GetTokenText(LToken);
+      if LToken = BCEDITOR_TAB_CHAR then
+      begin
+        LTextLine := LTextLine + ReplaceStr(StringOfChar(BCEDITOR_SPACE_CHAR, FTabWidth - LColumn mod FTabWidth), BCEDITOR_SPACE_CHAR, '&nbsp;');
+        Inc(LColumn, FTabWidth - LColumn mod FTabWidth);
+      end
+      else
+        Inc(LColumn, FHighlighter.GetTokenLength());
+      if LToken = BCEDITOR_TAB_CHAR then
+        // Added before
+      else
       if LToken = BCEDITOR_SPACE_CHAR then
         LTextLine := LTextLine + '&nbsp;'
       else
