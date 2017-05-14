@@ -30,12 +30,10 @@ type
   strict private
     FActivator: TBCEditorGlyph;
     FActive: Boolean;
-    FBlockBeginPosition: TBCEditorTextPosition;
-    FBlockEndPosition: TBCEditorTextPosition;
+    FBlockArea: TBCEditorTextArea;
     FBlockSelected: Boolean;
     FColors: TBCEditorSyncEdit.TColors;
-    FEditBeginPosition: TBCEditorTextPosition;
-    FEditEndPosition: TBCEditorTextPosition;
+    FEditArea: TBCEditorTextArea;
     FEditWidth: Integer;
     FEnabled: Boolean;
     FInEditor: Boolean;
@@ -52,17 +50,13 @@ type
     procedure Abort;
     procedure Assign(ASource: TPersistent); override;
     procedure ClearSyncItems;
-    function IsTextPositionInBlock(ATextPosition: TBCEditorTextPosition): Boolean;
-    function IsTextPositionInEdit(ATextPosition: TBCEditorTextPosition): Boolean;
     procedure MoveBeginPositionChar(ACount: Integer);
     procedure MoveEndPositionChar(ACount: Integer);
     procedure SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
     property Active: Boolean read FActive write SetActive default False;
-    property BlockBeginPosition: TBCEditorTextPosition read FBlockBeginPosition write FBlockBeginPosition;
-    property BlockEndPosition: TBCEditorTextPosition read FBlockEndPosition write FBlockEndPosition;
+    property BlockArea: TBCEditorTextArea read FBlockArea write FBlockArea;
     property BlockSelected: Boolean read FBlockSelected write FBlockSelected default False;
-    property EditBeginPosition: TBCEditorTextPosition read FEditBeginPosition write FEditBeginPosition;
-    property EditEndPosition: TBCEditorTextPosition read FEditEndPosition write FEditEndPosition;
+    property EditArea: TBCEditorTextArea read FEditArea write FEditArea;
     property EditWidth: Integer read FEditWidth write FEditWidth;
     property InEditor: Boolean read FInEditor write FInEditor default False;
     property SyncItems: TList read FSyncItems write FSyncItems;
@@ -164,32 +158,14 @@ begin
     FOnChange(ASender);
 end;
 
-function TBCEditorSyncEdit.IsTextPositionInBlock(ATextPosition: TBCEditorTextPosition): Boolean;
-begin
-  Result := ((ATextPosition.Line > FBlockBeginPosition.Line) or
-    (ATextPosition.Line = FBlockBeginPosition.Line) and (ATextPosition.Char >= FBlockBeginPosition.Char))
-    and
-    ((ATextPosition.Line < FBlockEndPosition.Line) or
-    (ATextPosition.Line = FBlockEndPosition.Line) and (ATextPosition.Char < FBlockEndPosition.Char));
-end;
-
-function TBCEditorSyncEdit.IsTextPositionInEdit(ATextPosition: TBCEditorTextPosition): Boolean;
-begin
-  Result := ((ATextPosition.Line > FEditBeginPosition.Line) or
-    (ATextPosition.Line = FEditBeginPosition.Line) and (ATextPosition.Char >= FEditBeginPosition.Char))
-    and
-    ((ATextPosition.Line < FEditEndPosition.Line) or
-    (ATextPosition.Line = FEditEndPosition.Line) and (ATextPosition.Char < FEditEndPosition.Char));
-end;
-
 procedure TBCEditorSyncEdit.MoveBeginPositionChar(ACount: Integer);
 begin
-  Inc(FEditBeginPosition.Char, ACount);
+  Inc(FEditArea.BeginPosition.Char, ACount);
 end;
 
 procedure TBCEditorSyncEdit.MoveEndPositionChar(ACount: Integer);
 begin
-  Inc(FEditEndPosition.Char, ACount);
+  Inc(FEditArea.EndPosition.Char, ACount);
 end;
 
 procedure TBCEditorSyncEdit.SetActivator(const AValue: TBCEditorGlyph);

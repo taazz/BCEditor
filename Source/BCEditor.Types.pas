@@ -33,7 +33,8 @@ type
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
 
   TBCEditorCustomDrowTokenEvent = procedure(ASender: TObject;
-    const APos: TPoint; var AText: PChar; var ALength: Integer;
+    const APos: TPoint; const AAttribute: Pointer;
+    var AText: PChar; var ALength: Integer;
     var AForegroundColor, ABackgroundColor: TColor; var AStyles: TFontStyles;
     var ABorderColor: TColor;
     var ATokenAddon: TBCEditorTokenAddon; var ATokenAddonColor: TColor) of object;
@@ -169,6 +170,16 @@ type
         Combinded: Int64; );
   end;
 
+  TBCEditorTextArea = record
+    BeginPosition: TBCEditorTextPosition;
+    EndPosition: TBCEDitorTextPosition;
+    function Containts(Position: TBCEditorTextPosition): Boolean; inline;
+    class operator Equal(a, b: TBCEditorTextArea): Boolean; inline;
+    function IsEmpty(): Boolean; inline;
+    class operator NotEqual(a, b: TBCEditorTextArea): Boolean; inline;
+    function ToString(): string; inline;
+  end;
+
   PBCEditorDisplayPosition = ^TBCEditorDisplayPosition;
   TBCEditorDisplayPosition = packed record
     class operator Equal(a, b: TBCEditorDisplayPosition): Boolean; inline;
@@ -228,7 +239,6 @@ type
 
   TBCEditorMatchingPairOption = (
     mpoHighlightAfterToken,
-    mpoUnderline,
     mpoUseMatchedColor
   );
 
@@ -302,16 +312,24 @@ type
   end;
   PBCEditorQuadColor = ^TBCEditorQuadColor;
 
-function Point(const APosition: TBCEditorTextPosition): TPoint; overload; inline;
+function Empty(const AArea: TBCEditorTextArea): Boolean; inline;
 function Max(const A, B: TBCEditorTextPosition): TBCEditorTextPosition; overload; inline;
 function Min(const A, B: TBCEditorTextPosition): TBCEditorTextPosition; overload; inline;
+function Point(const APosition: TBCEditorTextPosition): TPoint; overload; inline;
+function TextArea(const ABeginPosition, AEndPosition: TBCEditorTextPosition): TBCEditorTextArea; inline;
 function TextPosition(const AChar, ALine: Integer): TBCEditorTextPosition; overload; inline;
 function TextPosition(const APos: TPoint): TBCEditorTextPosition; overload; inline;
 
 const
+  InvalidTextArea: TBCEditorTextArea = ( BeginPosition: ( Char: -1; Line: -1; ); EndPosition: ( Char: -1; Line: -1; ) );
   InvalidTextPosition: TBCEditorTextPosition = ( Char: -1; Line: -1; );
 
 implementation {***************************************************************}
+
+function Empty(const AArea: TBCEditorTextArea): Boolean; inline;
+begin
+  Result := AArea.BeginPosition = AArea.EndPosition;
+end;
 
 function Max(const A, B: TBCEditorTextPosition): TBCEditorTextPosition;
 begin
@@ -333,6 +351,12 @@ function Point(const APosition: TBCEditorTextPosition): TPoint;
 begin
   Result.X := APosition.Char;
   Result.Y := APosition.Line;
+end;
+
+function TextArea(const ABeginPosition, AEndPosition: TBCEditorTextPosition): TBCEditorTextArea;
+begin
+  Result.BeginPosition := ABeginPosition;
+  Result.EndPosition := AEndPosition;
 end;
 
 function TextPosition(const AChar, ALine: Integer): TBCEditorTextPosition;
@@ -368,37 +392,64 @@ end;
 
 class operator TBCEditorTextPosition.Equal(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := a.Combinded = B.Combinded;
+  Result := a.Combinded = b.Combinded;
 end;
 
 class operator TBCEditorTextPosition.GreaterThan(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := a.Combinded > B.Combinded;
+  Result := a.Combinded > b.Combinded;
 end;
 
 class operator TBCEditorTextPosition.GreaterThanOrEqual(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := a.Combinded >= B.Combinded;
+  Result := a.Combinded >= b.Combinded;
 end;
 
 class operator TBCEditorTextPosition.LessThan(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := a.Combinded < B.Combinded;
+  Result := a.Combinded < b.Combinded;
 end;
 
 class operator TBCEditorTextPosition.LessThanOrEqual(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := a.Combinded <= B.Combinded;
+  Result := a.Combinded <= b.Combinded;
 end;
 
 class operator TBCEditorTextPosition.NotEqual(a, b: TBCEditorTextPosition): Boolean;
 begin
-  Result := a.Combinded <> B.Combinded;
+  Result := a.Combinded <> b.Combinded;
 end;
 
 function TBCEditorTextPosition.ToString(): string;
 begin
   Result := '(' + IntToStr(Char) + ',' + IntToStr(Line) + ')';
+end;
+
+{ TBCEditorTextPosition *******************************************************}
+
+function TBCEditorTextArea.Containts(Position: TBCEditorTextPosition): Boolean;
+begin
+  Result := (BeginPosition <= Position) and (Position <= EndPosition);
+end;
+
+class operator TBCEditorTextArea.Equal(a, b: TBCEditorTextArea): Boolean;
+begin
+  Result := (a.BeginPosition = b.BeginPosition) and (a.EndPosition = b.EndPosition);
+end;
+
+class operator TBCEditorTextArea.NotEqual(a, b: TBCEditorTextArea): Boolean;
+begin
+  Result := (a.BeginPosition <> b.BeginPosition) or (a.EndPosition <> b.EndPosition);
+end;
+
+function TBCEditorTextArea.IsEmpty(): Boolean;
+begin
+  Result := BeginPosition = EndPosition;
+end;
+
+function TBCEditorTextArea.ToString(): string;
+begin
+  Result := '(' + BeginPosition.ToString() + '-' + EndPosition.ToString() + ')';
 end;
 
 end.

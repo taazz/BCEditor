@@ -20,15 +20,6 @@ type
     TTokenNodeList = class;
     TBaseParser = class;
 
-    TMatchingPairMatch = record
-      Attribute: TAttribute;
-      Index: Integer;
-      OpenText: string;
-      CloseText: string;
-      OpenPosition: TBCEditorTextPosition;
-      ClosePosition: TBCEditorTextPosition;
-    end;
-
     TMatchingPairToken = record
       OpenToken: string;
       CloseToken: string;

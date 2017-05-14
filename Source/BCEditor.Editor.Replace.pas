@@ -15,8 +15,7 @@ type
   strict private const
     DefaultOptions = [roPrompt];
   strict private
-    FBeginPosition: TBCEditorTextPosition;
-    FEndPosition: TBCEditorTextPosition;
+    FArea: TBCEditorTextArea;
     FEngine: TBCEditorSearchEngine;
     FOnChange: TBCEditorReplaceChangeEvent;
     FOptions: TBCEditorReplaceOptions;
@@ -24,8 +23,7 @@ type
     FReplaceText: string;
     procedure SetEngine(const AValue: TBCEditorSearchEngine);
   protected
-    property BeginPosition: TBCEditorTextPosition read FBeginPosition write FBeginPosition;
-    property EndPosition: TBCEditorTextPosition read FEndPosition write FEndPosition;
+    property Area: TBCEditorTextArea read FArea write FArea;
     property OnChange: TBCEditorReplaceChangeEvent read FOnChange write FOnChange;
   public
     constructor Create;
@@ -44,8 +42,7 @@ constructor TBCEditorReplace.Create;
 begin
   inherited;
 
-  FBeginPosition := InvalidTextPosition;
-  FEndPosition := InvalidTextPosition;
+  FArea := InvalidTextArea;
   FEngine := seNormal;
   FOptions := DefaultOptions;
 end;
