@@ -160,7 +160,7 @@ type
     procedure InternalClear(const AClearUndo: Boolean); overload;
     procedure SetCaretPosition(const AValue: TBCEditorTextPosition);
     procedure SetModified(const AValue: Boolean);
-    procedure SetSelArea(const AValue: TBCEditorTextArea);
+    procedure SetSelArea(AValue: TBCEditorTextArea);
     procedure QuickSort(ALeft, ARight: Integer; ACompare: TCompare);
   protected
     procedure Backspace(AArea: TBCEditorTextArea);
@@ -198,6 +198,7 @@ type
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
     procedure Undo(); inline;
     procedure UndoGroupBreak();
+    function ValidPosition(const APosition: TBCEditorTextPosition): Boolean;
     property Area: TBCEditorTextArea read GetArea;
     property BOLPosition[Line: Integer]: TBCEditorTextPosition read GetBOLPosition;
     property CanRedo: Boolean read GetCanRedo;
@@ -246,7 +247,6 @@ uses
   Math, StrUtils, SysConst;
 
 resourcestring
-  SBCEditorCharIndexInLineBreak = 'Character index is inside line break (%d)';
   SBCEditorPatternContainsWordBreakChar = 'Pattern contains word break character';
 
 function HasLineBreak(const AText: string): Boolean;
@@ -272,11 +272,7 @@ constructor TBCEditorLines.TSearch.Create(const ALines: TBCEditorLines;
 var
   LIndex: Integer;
 begin
-  Assert(BOFPosition <= AArea.BeginPosition);
-  Assert(AArea.BeginPosition <= AArea.EndPosition,
-    'AArea.BeginPosition: ' + AArea.BeginPosition.ToString() + #13#10
-    + 'AArea.EndPosition: ' + AArea.EndPosition.ToString() + #13#10);
-  Assert(AArea.EndPosition <= ALines.EOFPosition);
+  Assert((BOFPosition <= AArea.BeginPosition) and (AArea.BeginPosition <= AArea.EndPosition) and (AArea.EndPosition <= ALines.EOFPosition));
 
   inherited Create();
 
@@ -719,9 +715,9 @@ begin
       Dec(Result.Line);
 
       if (Result.Line < 0) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
+        Exit(InvalidTextPosition)
       else if (LLength > 0) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+        Exit(BOLPosition[Result.Line]);
 
       while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do
       begin
@@ -743,7 +739,7 @@ begin
       Inc(Result.Line);
 
       if (LLength < 0) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+        Exit(BOLPosition[Result.Line]);
 
       while ((Result.Line < Count) and (LLength >= Length(Items[Result.Line].Text) + LLineBreakLength)) do
       begin
@@ -752,15 +748,9 @@ begin
       end;
 
       if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds + #13#10
-          + 'ACharIndex: ' + IntToStr(ACharIndex) + #13#10
-          + 'ARelativePosition: ' + IntToStr(PositionToCharIndex(ARelativePosition)) + #13#10
-          + 'Length: ' + IntToStr(Length(Text)) + #13#10
-          + 'Count: ' + IntToStr(Count) + #13#10
-          + 'Result: ' + Result.ToString + #13#10,
-          [ACharIndex + PositionToCharIndex(ARelativePosition)])
+        Exit(InvalidTextPosition)
       else if (LLength > Length(Items[Result.Line].Text)) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+        Exit(BOLPosition[Result.Line]);
 
       Result.Char := LLength;
     end;
@@ -2096,7 +2086,7 @@ begin
 
     FCaretPosition := AValue;
 
-    SelArea := TextArea(AValue, AValue);
+    SelArea := TextArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
 
     Include(FState, lsCaretMoved);
     EndUpdate();
@@ -2148,10 +2138,8 @@ begin
   Items.List[ALine].Range := AValue;
 end;
 
-procedure TBCEditorLines.SetSelArea(const AValue: TBCEditorTextArea);
+procedure TBCEditorLines.SetSelArea(AValue: TBCEditorTextArea);
 begin
-  Assert((BOFPosition <= AValue.BeginPosition) and (AValue.EndPosition <= EOFPosition));
-
   if (AValue <> FSelArea) then
   begin
     BeginUpdate();
@@ -2288,6 +2276,12 @@ procedure TBCEditorLines.UndoGroupBreak();
 begin
   if ((loUndoGrouped in Options) and CanUndo) then
     UndoList.GroupBreak();
+end;
+
+function TBCEditorLines.ValidPosition(const APosition: TBCEditorTextPosition): Boolean;
+begin
+  Result := (0 <= APosition.Line) and (APosition.Line < Count)
+    and (0 <= APosition.Char) and (APosition.Char < Length(Items[APosition.Line].Text));
 end;
 
 end.

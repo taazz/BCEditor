@@ -237,11 +237,6 @@ type
     lnoAfterLastLine
   );
 
-  TBCEditorMatchingPairOption = (
-    mpoHighlightAfterToken,
-    mpoUseMatchedColor
-  );
-
   TBCEditorSearchMapAlign = (saLeft, saRight);
 
   TBCEditorUndoOption = (
@@ -291,7 +286,6 @@ type
   TBCEditorCodeFoldingHintIndicatorOptions = set of TBCEditorCodeFoldingHintIndicatorOption;
   TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
   TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
-  TBCEditorMatchingPairOptions = set of TBCEditorMatchingPairOption;
   TBCEditorSearchOptions = set of TBCEditorSearchOption;
   TBCEditorSearchMapOptions = set of TBCEditorSearchMapOption;
   TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;

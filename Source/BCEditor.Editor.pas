@@ -401,7 +401,7 @@ type
     function InsertLineIntoRows(const ALine: Integer; const ARow: Integer): Integer; overload;
     function IsCommentAtCaretPosition: Boolean;
     function IsKeywordAtPosition(const APosition: TBCEditorTextPosition;
-      const APOpenKeyWord: PBoolean = nil; const AHighlightAfterToken: Boolean = True): Boolean;
+      const APOpenKeyWord: PBoolean = nil): Boolean;
     function IsKeywordAtPositionOrAfter(const APosition: TBCEditorTextPosition): Boolean;
     function IsMultiEditCaretFound(const ALine: Integer): Boolean;
     function IsWordSelected: Boolean;
@@ -493,7 +493,8 @@ type
     procedure UpdateFoldRanges(const ACurrentLine: Integer; const ALineCount: Integer); overload;
     procedure UpdateFoldRanges(AFoldRanges: TBCEditorCodeFolding.TRanges; const ALineCount: Integer); overload;
     procedure UpdateRows(const ALine: Integer);
-    procedure UpdateScrollBars(const AUpdateRows: Boolean = True);
+    procedure UpdateScrollBars(const AUpdateRows: Boolean = True;
+      const AUpdateAlways: Boolean = False);
     procedure UpdateWordWrap(const AValue: Boolean);
     procedure WMCaptureChanged(var AMessage: TMessage); message WM_CAPTURECHANGED;
     procedure WMChar(var AMessage: TWMChar); message WM_CHAR;
@@ -1681,8 +1682,7 @@ var
   LNewFoldRange: TBCEditorCodeFolding.TRanges.TRange;
   LOpenKeyWord: Boolean;
 begin
-  LIsKeyWord := IsKeywordAtPosition(Lines.CaretPosition,
-    @LOpenKeyWord, mpoHighlightAfterToken in FMatchingPair.Options);
+  LIsKeyWord := IsKeywordAtPosition(Lines.CaretPosition, @LOpenKeyWord);
 
   LNewFoldRange := nil;
 
@@ -1771,9 +1771,7 @@ begin
   LTokenWidth := 0;
   LItemWidth := 0;
 
-  if ((X < FLeftMarginWidth)
-    or (APosType = ptText) and (LItem >= Lines.Count)
-    or (APosType = ptDisplay) and (LItem >= Rows.Count)) then
+  if (X < FLeftMarginWidth) then
     Result := Point(0, LItem)
   else
   begin
@@ -6280,7 +6278,7 @@ begin
 end;
 
 function TCustomBCEditor.IsKeywordAtPosition(const APosition: TBCEditorTextPosition;
-  const APOpenKeyWord: PBoolean = nil; const AHighlightAfterToken: Boolean = True): Boolean;
+  const APOpenKeyWord: PBoolean = nil): Boolean;
 var
   LLineEndPos: PChar;
   LLinePos: PChar;
@@ -7030,7 +7028,7 @@ begin
     if not (esDblClicked in FState) then
     begin
       if ssShift in AShift then
-        Lines.SelArea := TextArea(Lines.CaretPosition, Lines.CaretPosition)
+        MoveCaretAndSelection(Lines.SelArea.BeginPosition, FMouseDownTextPosition, True)
       else
       begin
         if soALTSetsColumnMode in FSelection.Options then
@@ -7048,7 +7046,7 @@ begin
             FAltEnabled := False;
           end;
         end;
-        Lines.SelArea := TextArea(Lines.CaretPosition, Lines.CaretPosition);
+        MoveCaretAndSelection(Lines.SelArea.BeginPosition, FMouseDownTextPosition, False);
       end;
     end;
 
@@ -8560,7 +8558,10 @@ begin
   LPaintData.Previous.FontStyles := [];
   LPaintData.SearchResultIndex := 0;
   if (Lines.SelMode = smNormal) then
-    LPaintData.SelTextArea := Lines.SelArea
+  begin
+    LPaintData.SelTextArea.BeginPosition := Min(Lines.SelArea.BeginPosition, Lines.SelArea.EndPosition);
+    LPaintData.SelTextArea.EndPosition := Max(Lines.SelArea.BeginPosition, Lines.SelArea.EndPosition);
+  end
   else
   begin
     LSelBeginDisplayPosition := TextToDisplay(Lines.SelArea.BeginPosition);
@@ -9209,7 +9210,7 @@ begin
           ptMatchingPair:
             begin
               LPartForegroundColor := LForegroundColor;
-              if ((mpoUseMatchedColor in FMatchingPair.Options) and (FMatchingPair.Colors.Matched <> clNone)) then
+              if (FMatchingPair.Colors.Matched <> clNone) then
                 LPartBackgroundColor := FMatchingPair.Colors.Matched
               else
                 LPartBackgroundColor := LBackgroundColor;
@@ -10410,71 +10411,92 @@ begin
 end;
 
 procedure TCustomBCEditor.ScanMatchingPair();
-var
-  LArea: TBCEditorTextArea;
-  LFoundLength: Integer;
-  LMatchingPair: Integer;
-  LSearch: TBCEditorLines.TSearch;
-begin
-  for LMatchingPair := 0 to FHighlighter.MatchingPairs.Count - 1 do
-    if (FCurrentMatchingPair.State = mpsClear) then
-    begin
-      LArea.BeginPosition := TextPosition(Max(0, Lines.CaretPosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), Lines.CaretPosition.Line);
-      LArea.EndPosition := TextPosition(Min(Length(Lines[Lines.CaretPosition.Line]), Lines.CaretPosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), Lines.CaretPosition.Line);
 
-      LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
-        False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-      FCurrentMatchingPair.CloseArea.BeginPosition := LArea.BeginPosition;
-      if (not LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
-        LSearch.Free()
-      else
+  procedure ScanAtPosition(const APosition: TBCEditorTextPosition);
+  var
+    LArea: TBCEditorTextArea;
+    LFoundLength: Integer;
+    LMatchingPair: Integer;
+    LSearch: TBCEditorLines.TSearch;
+  begin
+    for LMatchingPair := 0 to FHighlighter.MatchingPairs.Count - 1 do
+      if (FCurrentMatchingPair.State = mpsClear) then
       begin
-        FCurrentMatchingPair.CloseArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
-        LSearch.Free();
+        LArea.BeginPosition := TextPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line);
+        LArea.EndPosition := TextPosition(Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line);
 
-        LArea.BeginPosition := VisibleArea.BeginPosition;
-        LArea.EndPosition := Lines.CharIndexToPosition(-1 - Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.EndPosition);
-        LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
-          False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-        FCurrentMatchingPair.OpenArea.BeginPosition := LArea.EndPosition;
-        if (LSearch.Find(FCurrentMatchingPair.OpenArea.BeginPosition, LFoundLength)) then
-        begin
-          FCurrentMatchingPair.State := mpsFound;
-          FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.OpenArea.BeginPosition);
-        end;
-        LSearch.Free();
-      end;
-    end;
-
-  for LMatchingPair := 0 to FHighlighter.MatchingPairs.Count - 1 do
-    if (FCurrentMatchingPair.State = mpsClear) then
-    begin
-      LArea.BeginPosition := TextPosition(Max(0, Lines.CaretPosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), Lines.CaretPosition.Line);
-      LArea.EndPosition := TextPosition(Min(Length(Lines[Lines.CaretPosition.Line]), Lines.CaretPosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken)), Lines.CaretPosition.Line);
-
-      LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
-        False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-      FCurrentMatchingPair.OpenArea.BeginPosition := LArea.BeginPosition;
-      if (not LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
-        LSearch.Free()
-      else
-      begin
-        FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
-        LSearch.Free();
-
-        LArea.BeginPosition := FCurrentMatchingPair.OpenArea.EndPosition;
-        LArea.EndPosition := VisibleArea.EndPosition;
         LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
         FCurrentMatchingPair.CloseArea.BeginPosition := LArea.BeginPosition;
-        if (LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
+        if (not LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
+          LSearch.Free()
+        else
         begin
-          FCurrentMatchingPair.State := mpsFound;
           FCurrentMatchingPair.CloseArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
+          LSearch.Free();
+
+          LArea.BeginPosition := Lines.BOFPosition;
+          LArea.EndPosition := Lines.CharIndexToPosition(-1 - Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.EndPosition);
+          if (LArea.EndPosition <> InvalidTextPosition) then
+          begin
+            LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
+              False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
+            FCurrentMatchingPair.OpenArea.BeginPosition := LArea.EndPosition;
+            if (LSearch.Find(FCurrentMatchingPair.OpenArea.BeginPosition, LFoundLength)) then
+            begin
+              FCurrentMatchingPair.State := mpsFound;
+              FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.OpenArea.BeginPosition);
+            end;
+            LSearch.Free();
+          end;
         end;
-        LSearch.Free();
       end;
-    end;
+
+    for LMatchingPair := 0 to FHighlighter.MatchingPairs.Count - 1 do
+      if (FCurrentMatchingPair.State = mpsClear) then
+      begin
+        LArea.BeginPosition := TextPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line);
+        LArea.EndPosition := TextPosition(Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken)), APosition.Line);
+
+        LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
+          False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
+        FCurrentMatchingPair.OpenArea.BeginPosition := LArea.BeginPosition;
+        if (not LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
+          LSearch.Free()
+        else
+        begin
+          FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
+          LSearch.Free();
+
+          LArea.BeginPosition := FCurrentMatchingPair.OpenArea.EndPosition;
+          LArea.EndPosition := Lines.EOFPosition;
+          LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
+            False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
+          FCurrentMatchingPair.CloseArea.BeginPosition := LArea.BeginPosition;
+          if (LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
+          begin
+            FCurrentMatchingPair.State := mpsFound;
+            FCurrentMatchingPair.CloseArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
+          end;
+          LSearch.Free();
+        end;
+      end;
+  end;
+
+var
+  LTextCaretPosition: TBCEditorTextPosition;
+begin
+  if (Lines.ValidPosition(Lines.CaretPosition)) then
+    ScanAtPosition(Lines.CaretPosition);
+
+  if ((FCurrentMatchingPair.State = mpsClear)
+    and (CaretStyle = csVerticalLine)
+    and (Lines.CaretPosition.Char < Length(Lines[Lines.CaretPosition.Line]))) then
+  begin
+    LTextCaretPosition := TextPosition(Lines.CaretPosition.Char - 1, Lines.CaretPosition.Line);
+    if (Lines.ValidPosition(LTextCaretPosition)) then
+      ScanAtPosition(LTextCaretPosition);
+  end;
 
   if (FCurrentMatchingPair.State = mpsClear) then
     FCurrentMatchingPair.State := mpsNotFound;
@@ -11095,7 +11117,7 @@ begin
         if (State * [esCaretMoved] <> []) then
           UpdateCaret();
         if (State * [esRowsChanged, esLinesCleared, esLinesUpdated, esScrolled] <> []) then
-          UpdateScrollBars()
+          UpdateScrollBars(False, True)
         else if (State * [esCaretMoved] <> []) then
         begin
           LDisplayCaretPosition := DisplayCaretPosition;
@@ -11917,13 +11939,14 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.UpdateScrollBars(const AUpdateRows: Boolean = True);
+procedure TCustomBCEditor.UpdateScrollBars(const AUpdateRows: Boolean = True;
+  const AUpdateAlways: Boolean = False);
 var
   LDisplayCaretPosition: TBCEditorDisplayPosition;
   LHorzScrollInfo: TScrollInfo;
   LVertScrollInfo: TScrollInfo;
 begin
-  if (HandleAllocated) then
+  if (HandleAllocated and (not (esUpdating in FState) or AUpdateAlways)) then
   begin
     LDisplayCaretPosition := DisplayCaretPosition;
 
