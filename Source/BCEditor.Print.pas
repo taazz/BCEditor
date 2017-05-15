@@ -249,8 +249,8 @@ type
     TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
   strict private
     FAbort: Boolean;
-    FBlockBeginPosition: TBCEditorTextPosition;
-    FBlockEndPosition: TBCEditorTextPosition;
+    FBlockBeginPosition: TBCEditorLinesPosition;
+    FBlockEndPosition: TBCEditorLinesPosition;
     FCanvas: TCanvas;
     FCharWidth: Integer;
     FColors: Boolean;

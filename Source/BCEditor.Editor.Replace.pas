@@ -8,14 +8,14 @@ uses
 
 type
   TBCEditorReplaceChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
-  TBCEditorReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorTextPosition;
+  TBCEditorReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorLinesPosition;
       var AAction: TBCEditorReplaceAction) of object;
 
   TBCEditorReplace = class(TPersistent)
   strict private const
     DefaultOptions = [roPrompt];
   strict private
-    FArea: TBCEditorTextArea;
+    FArea: TBCEditorLinesArea;
     FEngine: TBCEditorSearchEngine;
     FOnChange: TBCEditorReplaceChangeEvent;
     FOptions: TBCEditorReplaceOptions;
@@ -23,7 +23,7 @@ type
     FReplaceText: string;
     procedure SetEngine(const AValue: TBCEditorSearchEngine);
   protected
-    property Area: TBCEditorTextArea read FArea write FArea;
+    property Area: TBCEditorLinesArea read FArea write FArea;
     property OnChange: TBCEditorReplaceChangeEvent read FOnChange write FOnChange;
   public
     constructor Create;

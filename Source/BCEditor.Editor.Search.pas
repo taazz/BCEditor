@@ -108,15 +108,15 @@ type
       FActive: Boolean;
       FBackground: TColor;
       FOnChange: TChangeEvent;
-      FSelectionBeginPosition: TBCEditorTextPosition;
-      FSelectionEndPosition: TBCEditorTextPosition;
+      FSelectionBeginPosition: TBCEditorLinesPosition;
+      FSelectionEndPosition: TBCEditorLinesPosition;
       procedure SetActive(AValue: Boolean);
       procedure SetBackground(const AValue: TColor);
     public
       constructor Create;
       procedure Assign(ASource: TPersistent); override;
-      property SelectionBeginPosition: TBCEditorTextPosition read FSelectionBeginPosition write FSelectionBeginPosition;
-      property SelectionEndPosition: TBCEditorTextPosition read FSelectionEndPosition write FSelectionEndPosition;
+      property SelectionBeginPosition: TBCEditorLinesPosition read FSelectionBeginPosition write FSelectionBeginPosition;
+      property SelectionEndPosition: TBCEditorLinesPosition read FSelectionEndPosition write FSelectionEndPosition;
     published
       property Active: Boolean read FActive write SetActive default False;
       property Background: TColor read FBackground write SetBackground default clSearchInSelectionBackground;

@@ -8,7 +8,7 @@ uses
   BCEditor.Types, BCEditor.Lines, BCEditor.Editor.PopupWindow, BCEditor.Editor.TokenInfo;
 
 type
-  TBCEditorTokenInfoEvent = procedure(ASender: TObject; const ATextPosition: TBCEditorTextPosition;
+  TBCEditorTokenInfoEvent = procedure(ASender: TObject; const ATextPosition: TBCEditorLinesPosition;
     const AToken: string; AContent: TBCEditorLines; ATitleContent: TBCEditorLines; var AShowInfo: Boolean) of object;
 
   TBCEditorTokenInfoTextStyle = (tsBold, tsItalic, tsReference);

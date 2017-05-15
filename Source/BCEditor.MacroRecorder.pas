@@ -68,7 +68,7 @@ type
 
   TBCEditorPositionEvent = class(TBCEditorBasicEvent)
   protected
-    FPosition: TBCEditorTextPosition;
+    FPosition: TBCEditorLinesPosition;
     function GetAsString: string; override;
     procedure InitEventParameters(AString: string); override;
   public
@@ -76,7 +76,7 @@ type
     procedure LoadFromStream(AStream: TStream); override;
     procedure Playback(AEditor: TCustomBCEditor); override;
     procedure SaveToStream(AStream: TStream); override;
-    property Position: TBCEditorTextPosition read FPosition write FPosition;
+    property Position: TBCEditorLinesPosition read FPosition write FPosition;
   end;
 
   TBCEditorDataEvent = class(TBCEditorBasicEvent)
@@ -530,7 +530,7 @@ begin
       LEvent.Initialize(ACommand, AChar, AData);
       FEvents.Add(LEvent);
       if SaveMarkerPos and (ACommand >= ecSetBookmark1) and (ACommand <= ecSetBookmark9) and not Assigned(AData) then
-        TBCEditorPositionEvent(LEvent).Position := TextPosition(FCurrentEditor.CaretPos.X + 1, FCurrentEditor.CaretPos.Y);
+        TBCEditorPositionEvent(LEvent).Position := LinesPosition(FCurrentEditor.CaretPos.X + 1, FCurrentEditor.CaretPos.Y);
     end;
   end
   else
@@ -918,7 +918,7 @@ begin
     LClosePosition := Pos(')', AString);
     LValue := Copy(AString, 1, LClosePosition - 1);
     Y := StrToIntDef(LValue, 1);
-    Position := TextPosition(X, Y);
+    Position := LinesPosition(X, Y);
     Delete(AString, 1, LClosePosition);
     AString := Trim(AString);
     RepeatCount := StrToIntDef(AString, 1);
@@ -929,9 +929,9 @@ procedure TBCEditorPositionEvent.Initialize(ACommand: TBCEditorCommand; AChar: C
 begin
   inherited;
   if Assigned(AData) then
-    Position := TBCEditorTextPosition(AData^)
+    Position := TBCEditorLinesPosition(AData^)
   else
-    Position := TextPosition(0, 0);
+    Position := LinesPosition(0, 0);
 end;
 
 procedure TBCEditorPositionEvent.LoadFromStream(AStream: TStream);

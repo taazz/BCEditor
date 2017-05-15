@@ -48,7 +48,7 @@ type
     procedure ExecuteKeyDown(ASender: TObject; var Key: Word; Shift: TShiftState);
     procedure ExecuteKeyPress(ASender: TObject; var Key: Char);
     procedure ExecuteKeyUp(ASender: TObject; var Key: Word; Shift: TShiftState);
-    procedure ExecuteMouseCursor(ASender: TObject; const ALineCharPos: TBCEditorTextPosition; var ACursor: TCursor);
+    procedure ExecuteMouseCursor(ASender: TObject; const ALineCharPos: TBCEditorLinesPosition; var ACursor: TCursor);
     procedure ExecuteMouseDown(ASender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure ExecuteMouseUp(ASender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
     procedure RemoveKeyDownHandler(AHandler: TKeyEvent);
@@ -249,7 +249,7 @@ begin
   end;
 end;
 
-procedure TBCEditorKeyboardHandler.ExecuteMouseCursor(ASender: TObject; const ALineCharPos: TBCEditorTextPosition;
+procedure TBCEditorKeyboardHandler.ExecuteMouseCursor(ASender: TObject; const ALineCharPos: TBCEditorLinesPosition;
   var ACursor: TCursor);
 var
   LIndex: Integer;

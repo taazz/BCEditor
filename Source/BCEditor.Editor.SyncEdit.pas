@@ -30,10 +30,10 @@ type
   strict private
     FActivator: TBCEditorGlyph;
     FActive: Boolean;
-    FBlockArea: TBCEditorTextArea;
+    FBlockArea: TBCEditorLinesArea;
     FBlockSelected: Boolean;
     FColors: TBCEditorSyncEdit.TColors;
-    FEditArea: TBCEditorTextArea;
+    FEditArea: TBCEditorLinesArea;
     FEditWidth: Integer;
     FEnabled: Boolean;
     FInEditor: Boolean;
@@ -54,9 +54,9 @@ type
     procedure MoveEndPositionChar(ACount: Integer);
     procedure SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
     property Active: Boolean read FActive write SetActive default False;
-    property BlockArea: TBCEditorTextArea read FBlockArea write FBlockArea;
+    property BlockArea: TBCEditorLinesArea read FBlockArea write FBlockArea;
     property BlockSelected: Boolean read FBlockSelected write FBlockSelected default False;
-    property EditArea: TBCEditorTextArea read FEditArea write FEditArea;
+    property EditArea: TBCEditorLinesArea read FEditArea write FEditArea;
     property EditWidth: Integer read FEditWidth write FEditWidth;
     property InEditor: Boolean read FInEditor write FInEditor default False;
     property SyncItems: TList read FSyncItems write FSyncItems;

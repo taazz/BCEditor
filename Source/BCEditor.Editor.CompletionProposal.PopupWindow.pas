@@ -281,11 +281,11 @@ function TBCEditorCompletionProposalPopupWindow.GetCurrentInput(): string;
 var
   LChar: Integer;
   LLineText: string;
-  LTextCaretPosition: TBCEditorTextPosition;
+  LTextCaretPosition: TBCEditorLinesPosition;
 begin
   Result := '';
 
-  LTextCaretPosition := TextPosition(TCustomBCEditor(Editor).CaretPos);
+  LTextCaretPosition := LinesPosition(TCustomBCEditor(Editor).CaretPos);
 
   LLineText := TCustomBCEditor(Editor).Lines[Min(LTextCaretPosition.Line, TCustomBCEditor(Editor).Lines.Count - 1)];
   LChar := LTextCaretPosition.Char;
@@ -362,7 +362,7 @@ end;
 procedure TBCEditorCompletionProposalPopupWindow.HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
 var
   LLine: string;
-  LTextPosition: TBCEditorTextPosition;
+  LTextPosition: TBCEditorLinesPosition;
   LValue: string;
 begin
   with TCustomBCEditor(Editor) do
@@ -370,18 +370,18 @@ begin
     BeginUpdate;
     Lines.BeginUpdate();
     try
-      LTextPosition := TextPosition(CaretPos);
+      LTextPosition := LinesPosition(CaretPos);
 
       if not SelectionAvailable then
       begin
-        SelectionBeginPosition := TextPosition(FCompletionStartChar, LTextPosition.Line);
+        SelectionBeginPosition := LinesPosition(FCompletionStartChar, LTextPosition.Line);
         if AEndToken = BCEDITOR_NONE_CHAR then
         begin
           LLine := Lines[LTextPosition.Line];
           if (LTextPosition.Char < Length(LLine)) and IsWordBreakChar(LLine[1 + LTextPosition.Char]) then
             SelectionEndPosition := LTextPosition
           else
-            SelectionEndPosition := TextPosition(WordEnd().Char, LTextPosition.Line)
+            SelectionEndPosition := LinesPosition(WordEnd().Char, LTextPosition.Line)
         end
         else
           SelectionEndPosition := LTextPosition;
@@ -404,7 +404,7 @@ begin
 
       ScrollToCaret;
       CaretPos := Point(SelectionEndPosition);
-      SelectionBeginPosition := TextPosition(CaretPos.X + 1, CaretPos.Y);
+      SelectionBeginPosition := LinesPosition(CaretPos.X + 1, CaretPos.Y);
     finally
       Lines.EndUpdate();
       EndUpdate;
@@ -415,7 +415,7 @@ end;
 procedure TBCEditorCompletionProposalPopupWindow.KeyDown(var Key: Word; Shift: TShiftState);
 var
   LChar: Char;
-  LTextCaretPosition: TBCEditorTextPosition;
+  LTextCaretPosition: TBCEditorLinesPosition;
 begin
   FSendToEditor := True;
   case Key of
@@ -447,7 +447,7 @@ begin
     VK_RIGHT:
       with TCustomBCEditor(Editor) do
       begin
-        LTextCaretPosition := TextPosition(CaretPos);
+        LTextCaretPosition := LinesPosition(CaretPos);
         if LTextCaretPosition.Char < Length(Lines[LTextCaretPosition.Line]) then
           LChar := Lines[LTextCaretPosition.Line][1 + LTextCaretPosition.Char]
         else
