@@ -240,6 +240,49 @@ type
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); override;
   end;
 
+  TBCEditorRow = record
+  type
+    TFlags = set of (rfFirstRowOfLine, rfLastRowOfLine, rfHasTabs);
+  public
+    Char: Integer;
+    Columns: Integer;
+    Flags: TFlags;
+    Length: Integer;
+    Line: Integer;
+    Range: Pointer;
+    Width: Integer;
+  end;
+
+  TBCEditorRows = class(TList<TBCEditorRow>)
+  strict private
+    FLines: TBCEditorLines;
+    FMaxColumns: Integer;
+    FMaxColumnsRow: Integer;
+    FMaxWidth: Integer;
+    FMaxWidthRow: Integer;
+    function GetBORPosition(ARow: Integer): TBCEditorTextPosition;
+    function GetEORPosition(ARow: Integer): TBCEditorTextPosition; inline;
+    function GetMaxColumns(): Integer;
+    function GetMaxWidth(): Integer;
+    function GetText(ARow: Integer): string; inline;
+  strict protected
+    property Lines: TBCEditorLines read FLines;
+  public
+    procedure Add(const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
+      const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer); inline;
+    procedure Clear();
+    constructor Create(const ALines: TBCEditorLines);
+    procedure Delete(ARow: Integer);
+    procedure Insert(ARow: Integer;
+      const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
+      const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
+    property BORPosition[Row: Integer]: TBCEditorTextPosition read GetBORPosition;
+    property EORPosition[Row: Integer]: TBCEditorTextPosition read GetEORPosition;
+    property MaxColumns: Integer read GetMaxColumns;
+    property MaxWidth: Integer read GetMaxWidth;
+    property Text[Row: Integer]: string read GetText; default;
+  end;
+
 implementation {***************************************************************}
 
 uses
@@ -365,18 +408,29 @@ begin
         if (FFoundPosition.Char > 0) then
           Dec(FFoundPosition.Char)
         else
+        begin
+          // Debug 2017-05-15
+          Assert((FFoundPosition.Char >= 0) and (FFoundPosition.Line > 0),
+            'FFoundPosition: ' + FFoundPosition.ToString() + #13#10
+            + 'APosition: ' + APosition.ToString() + #13#10
+            + 'FArea: ' + FArea.ToString());
+
           FFoundPosition := Lines.EOLPosition[FFoundPosition.Line - 1];
+        end;
 
       LLineLength := Length(Lines.Items[FFoundPosition.Line].Text);
 
       if (LLineLength > 0) then
       begin
-        // Make sure, the text will be copied - not only the pointer of the string,
-        // since we modifiy it with CharLowerBuff maybe
-        LLineText := Copy(Lines.Items[FFoundPosition.Line].Text, 1, LLineLength);
-
-        if (not FCaseSensitive) then
+        if (FCaseSensitive) then
+          LLineText := Lines.Items[FFoundPosition.Line].Text
+        else
+        begin
+          // Since we modify the text with CharLowerBuff, we need a copy of the
+          // text - not only a copy of the pointer to the text...
+          LLineText := Copy(Lines.Items[FFoundPosition.Line].Text, 1, LLineLength);
           CharLowerBuff(PChar(LLineText), Length(LLineText));
+        end;
 
         while (not Result
           and (FBackwards and (FFoundPosition.Char >= 0)
@@ -2282,6 +2336,156 @@ function TBCEditorLines.ValidPosition(const APosition: TBCEditorTextPosition): B
 begin
   Result := (0 <= APosition.Line) and (APosition.Line < Count)
     and (0 <= APosition.Char) and (APosition.Char < Length(Items[APosition.Line].Text));
+end;
+
+{ TBCEditorRows ***************************************************************}
+
+procedure TBCEditorRows.Add(const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
+  const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
+begin
+  Insert(Count, AFlags, ALine, AChar, ALength, AColumns, AWidth, ARange);
+end;
+
+procedure TBCEditorRows.Clear();
+begin
+  inherited;
+
+  FMaxColumns := -1;
+  FMaxColumnsRow := -1;
+end;
+
+constructor TBCEditorRows.Create(const ALines: TBCEditorLines);
+begin
+  inherited Create();
+
+  FLines := ALines;
+
+  FMaxColumns := -1;
+  FMaxColumnsRow := -1;
+end;
+
+procedure TBCEditorRows.Delete(ARow: Integer);
+begin
+  inherited;
+
+  if (FMaxColumnsRow = ARow) then
+  begin
+    FMaxColumns := -1;
+    FMaxColumnsRow := -1;
+  end
+  else if (FMaxColumnsRow > ARow) then
+    Dec(FMaxColumnsRow);
+  if (FMaxWidthRow = ARow) then
+  begin
+    FMaxWidth := -1;
+    FMaxWidthRow := -1;
+  end
+  else if (FMaxWidthRow > ARow) then
+    Dec(FMaxWidthRow);
+end;
+
+function TBCEditorRows.GetBORPosition(ARow: Integer): TBCEditorTextPosition;
+begin
+  if (ARow < Count) then
+    Result := Lines.BOLPosition[Items[ARow].Line]
+  else
+    Result := Lines.BOLPosition[Lines.Count];
+end;
+
+function TBCEditorRows.GetEORPosition(ARow: Integer): TBCEditorTextPosition;
+begin
+  if (not (rfLastRowOfLine in Items[ARow].Flags)) then
+    Result := TextPosition(Items[ARow].Char + Items[ARow].Length - 1, Items[ARow].Line)
+  else
+    Result := Lines.EOLPosition[Items[ARow].Line];
+end;
+
+function TBCEditorRows.GetMaxColumns(): Integer;
+var
+  LRow: Integer;
+begin
+  if ((FMaxColumns < 0) and (Count > 0)) then
+    for LRow := 0 to Count - 1 do
+      if (Items[LRow].Columns > FMaxColumns) then
+      begin
+        FMaxColumnsRow := LRow;
+        FMaxColumns := Items[LRow].Columns;
+      end;
+
+  Result := FMaxColumns;
+end;
+
+function TBCEditorRows.GetMaxWidth(): Integer;
+var
+  LRow: Integer;
+begin
+  if ((FMaxWidth < 0) and (Count > 0)) then
+    for LRow := 0 to Count - 1 do
+      if (Items[LRow].Width > FMaxWidth) then
+      begin
+        FMaxWidthRow := LRow;
+        FMaxWidth := Items[LRow].Width;
+      end;
+
+  Result := FMaxWidth;
+end;
+
+function TBCEditorRows.GetText(ARow: Integer): string;
+begin
+  Assert((0 <= ARow) and (ARow < Count));
+
+  Result := Copy(Lines.Items[Items[ARow].Line].Text, 1 + Items[ARow].Char, Items[ARow].Length);
+end;
+
+procedure TBCEditorRows.Insert(ARow: Integer; const AFlags: TBCEditorRow.TFlags;
+  const ALine: Integer; const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
+var
+  LItem: TBCEditorRow;
+  LPos: PChar;
+  LEndPos: PChar;
+begin
+  Assert((0 <= ARow) and (ARow <= Count));
+
+  LItem.Flags := AFlags;
+  LItem.Char := AChar;
+  LItem.Length := ALength;
+  LItem.Line := ALine;
+  LItem.Range := ARange;
+  LItem.Columns := AColumns;
+  LItem.Width := AWidth;
+
+  if ((ALength > 0) and (lfHasTabs in Lines.Items[ALine].Flags)) then
+  begin
+    LPos := @Lines.Items[ALine].Text[1 + AChar];
+    LEndPos := @LPos[ALength - 1];
+    while (LPos <= LEndPos) do
+    begin
+      if (LPos^ = BCEDITOR_TAB_CHAR) then
+      begin
+        Include(LItem.Flags, rfHasTabs);
+        break;
+      end;
+      Inc(LPos);
+    end;
+  end;
+
+  inherited Insert(ARow, LItem);
+
+  if ((FMaxColumns >= 0) and (AColumns > FMaxColumns)) then
+  begin
+    FMaxColumns := AColumns;
+    FMaxColumnsRow := ARow;
+  end
+  else if (FMaxColumnsRow >= ARow) then
+    Inc(FMaxColumnsRow);
+
+  if ((FMaxWidth >= 0) and (AWidth > FMaxWidth)) then
+  begin
+    FMaxWidth := AWidth;
+    FMaxWidthRow := ARow;
+  end
+  else if (FMaxWidthRow >= ARow) then
+    Inc(FMaxWidthRow);
 end;
 
 end.

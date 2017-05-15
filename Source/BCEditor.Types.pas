@@ -14,7 +14,7 @@ type
 
   TBCEditorCharMethod = function(const AChar: Char): Boolean of object;
 
-  TBCEditorCaretStyle = (csVerticalLine, csHorizontalLine, csHalfBlock, csBlock);
+  TBCEditorCaretStyle = (csVerticalLine, csHorizontalLine, csBlock);
 
   TBCEditorDropFilesEvent = procedure(ASender: TObject; APos: TPoint; AFiles: TStrings) of object;
 
