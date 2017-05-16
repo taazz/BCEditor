@@ -519,7 +519,7 @@ begin
       'DrawingIndex: ' + IntToStr(FDrawingIndex) + #13#10
       + 'DrawingCount: ' + IntToStr(FDrawingCount) + #13#10
       + 'AHandle: ' + IntToStr(AHandle) + #13#10
-      + 'FHandle: ' + IntToStr(AHandle));
+      + 'FHandle: ' + IntToStr(FHandle));
 
     FDrawingIndex := ADrawingIndex;
     FHandle := AHandle;

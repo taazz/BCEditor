@@ -1274,7 +1274,8 @@ begin
   Assert(BOFPosition <= APosition);
   Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Items[APosition.Line].Text)),
     'APosition: ' + APosition.ToString() + #13#10
-    + 'EOFPosition: ' + EOFPosition.ToString());
+    + 'EOFPosition: ' + EOFPosition.ToString() + #13#10
+    + 'Length: ' + IntToStr(Length(Items[APosition.Line].Text)));
 
   if (AText = '') then
     Result := APosition

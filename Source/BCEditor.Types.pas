@@ -77,8 +77,8 @@ type
 
   PBCEditorSelectionMode = ^TBCEditorSelectionMode;
   TBCEditorSelectionMode = (
-    smColumn,
-    smNormal
+    smNormal,
+    smColumn
   );
 
   TBCEditorSelectionOption = (
