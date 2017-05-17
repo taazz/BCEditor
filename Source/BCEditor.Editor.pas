@@ -32,7 +32,7 @@ type
       esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated,
       esIgnoreNextChar, esCaretVisible, esDblClicked, esWaitForDragging,
       esCodeFoldingInfoClicked, esInSelection, esDragging, esFind, esReplace,
-      esUpdating, esUpdatingScrollBars);
+      esUpdating, esUpdatingScrollBars, esBuildingRows);
 
     TMatchingPairTokenMatch = record
       Position: TBCEditorLinesPosition;
@@ -247,6 +247,7 @@ type
     procedure AfterLinesUpdate(Sender: TObject);
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarkListChange(Sender: TObject);
+    function BuildRows(const AUpdateScrollBars: Boolean): TBCEditorRows;
     procedure CaretChanged(ASender: TObject);
     procedure CheckIfAtMatchingKeywords;
     procedure ClearCaret();
@@ -541,7 +542,6 @@ type
     function GetBookmark(const AIndex: Integer; var ATextPosition: TBCEditorLinesPosition): Boolean;
     function GetReadOnly: Boolean; virtual;
     function GetRows(): TBCEditorRows; overload;
-    function GetRows(const AUpdateScrollBars: Boolean): TBCEditorRows; overload;
     function GetSelLength: Integer;
     function GetTextPositionOfMouse(out ATextPosition: TBCEditorLinesPosition): Boolean;
     procedure GotoBookmark(const AIndex: Integer);
@@ -896,8 +896,6 @@ type
 var
   GScrollHintWindow: THintWindow;
   GRightMarginHintWindow: THintWindow;
-
-  GGetRowsProgress: string;
 
 function RowsPosition(const AColumn: Integer; const ARow: Integer): TBCEditorRowsPosition; overload;
 begin
@@ -1407,6 +1405,49 @@ end;
 procedure TCustomBCEditor.BookmarkListChange(Sender: TObject);
 begin
   Invalidate;
+end;
+
+function TCustomBCEditor.BuildRows(const AUpdateScrollBars: Boolean): TBCEditorRows;
+const
+  RowToInsert = -2;
+var
+  LCodeFolding: Integer;
+  LLine: Integer;
+  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRow: Integer;
+begin
+  if ((FRows.Count = 0) and (Lines.Count > 0)) then
+  begin
+    HandleNeeded();
+
+    FPaintHelper.BeginDrawing(Canvas.Handle);
+    Include(FState, esBuildingRows);
+    try
+      for LLine := 0 to Lines.Count - 1 do
+        Lines.SetFirstRow(LLine, RowToInsert);
+
+      for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
+      begin
+        LRange := FAllCodeFoldingRanges[LCodeFolding];
+        if (Assigned(LRange) and LRange.Collapsed) then
+          for LLine := LRange.FirstLine + 1 to LRange.LastLine do
+            Lines.SetFirstRow(LLine, -1);
+      end;
+
+      LRow := 0;
+      for LLine := 0 to Lines.Count - 1 do
+        if (Lines.Items[LLine].FirstRow = RowToInsert) then
+        begin
+          Lines.SetFirstRow(LLine, LRow);
+          Inc(LRow, InsertLineIntoRows(LLine, LRow));
+        end;
+    finally
+      Exclude(FState, esBuildingRows);
+      FPaintHelper.EndDrawing();
+    end;
+  end;
+
+  Result := FRows;
 end;
 
 procedure TCustomBCEditor.CaretChanged(ASender: TObject);
@@ -5310,9 +5351,7 @@ end;
 
 function TCustomBCEditor.GetDisplayCaretPosition(): TBCEditorRowsPosition;
 begin
-  GGetRowsProgress := GGetRowsProgress + '1';
   Result := TextToDisplay(Lines.CaretPosition);
-  GGetRowsProgress := GGetRowsProgress + '2';
 
   // Debug 2017-05-16
   Assert(Result.Column >= 0,
@@ -5508,54 +5547,7 @@ end;
 
 function TCustomBCEditor.GetRows(): TBCEditorRows;
 begin
-  Result := GetRows(False);
-end;
-
-function TCustomBCEditor.GetRows(const AUpdateScrollBars: Boolean): TBCEditorRows;
-const
-  RowToInsert = -2;
-var
-  LCodeFolding: Integer;
-  LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
-  LRow: Integer;
-begin
-  if ((FRows.Count = 0) and (Lines.Count > 0)) then
-  begin
-    GGetRowsProgress := 'a';
-
-    HandleNeeded();
-
-    FPaintHelper.BeginDrawing(Canvas.Handle);
-    try
-      GGetRowsProgress := GGetRowsProgress + 'b';
-      for LLine := 0 to Lines.Count - 1 do
-        Lines.SetFirstRow(LLine, RowToInsert);
-      GGetRowsProgress := GGetRowsProgress + 'c';
-
-      for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
-      begin
-        LRange := FAllCodeFoldingRanges[LCodeFolding];
-        if (Assigned(LRange) and LRange.Collapsed) then
-          for LLine := LRange.FirstLine + 1 to LRange.LastLine do
-            Lines.SetFirstRow(LLine, -1);
-      end;
-      GGetRowsProgress := GGetRowsProgress + 'd';
-
-      LRow := 0;
-      for LLine := 0 to Lines.Count - 1 do
-        if (Lines.Items[LLine].FirstRow = RowToInsert) then
-        begin
-          Lines.SetFirstRow(LLine, LRow);
-          Inc(LRow, InsertLineIntoRows(LLine, LRow));
-        end;
-      GGetRowsProgress := GGetRowsProgress + 'e';
-    finally
-      FPaintHelper.EndDrawing();
-    end;
-  end;
-
-  Result := FRows;
+  Result := BuildRows(False);
 end;
 
 function TCustomBCEditor.GetSearchResultCount: Integer;
@@ -6065,13 +6057,14 @@ begin
   if (FMultiCaretPosition.Row >= ARow) then
     Inc(FMultiCaretPosition.Row, Result);
 
-  if (UpdateCount > 0) then
-    Include(FState, esRowsChanged)
-  else
-  begin
-    UpdateScrollBars();
-    Invalidate();
-  end;
+  if (not (esBuildingRows in FState)) then
+    if (UpdateCount > 0) then
+      Include(FState, esRowsChanged)
+    else
+    begin
+      UpdateScrollBars();
+      Invalidate();
+    end;
 end;
 
 function TCustomBCEditor.IsCommentAtCaretPosition(): Boolean;
@@ -10284,13 +10277,8 @@ procedure TCustomBCEditor.ScanMatchingPair();
           FCurrentMatchingPair.CloseArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
           LSearch.Free();
 
-          Assert(FCurrentMatchingPair.CloseArea.EndPosition.Char >= 2,
-            'EndPosition: ' + FCurrentMatchingPair.CloseArea.EndPosition.ToString() + #13#10
-            + 'LFoundLength: ' + LFoundLength.ToString() + #13#10
-            + 'BeginPosition: ' + FCurrentMatchingPair.CloseArea.BeginPosition.ToString());
-
           LArea.BeginPosition := Lines.BOFPosition;
-          LArea.EndPosition := Lines.CharIndexToPosition(-1 - Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.EndPosition);
+          LArea.EndPosition := Lines.CharIndexToPosition(-1 - Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.BeginPosition);
           if (LArea.EndPosition <> InvalidTextPosition) then
           begin
             LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
@@ -10319,7 +10307,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
           LSearch.Free()
         else
         begin
-          FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
+          FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(1, FCurrentMatchingPair.OpenArea.EndPosition);
           LSearch.Free();
 
           LArea.BeginPosition := FCurrentMatchingPair.OpenArea.EndPosition;
@@ -11413,11 +11401,7 @@ begin
     Result := RowsPosition(ATextPosition.Char, Rows.Count + ATextPosition.Line - Rows.Items[Rows.Count - 1].Line - 1)
   else if ((Rows.Count >= 0) and (Lines.Items[ATextPosition.Line].FirstRow < 0)) then
     // Rows.Count >= 0 is not needed, but GetRows must be called to initialize Lines.FirstRow
-    raise ERangeError.Create(SBCEditorLineIsNotVisible
-      + 'Lines.Count: ' + IntToStr(ATextPosition.Line) + #13#10
-      + 'Rows.Count: ' + IntToStr(Rows.Count) + #13#10
-      + 'FirstRow: ' + IntToStr(Lines.Items[ATextPosition.Line].FirstRow) + #13#10
-      + 'GGetRowsProgress: ' + GGetRowsProgress)
+    raise ERangeError.Create(SBCEditorLineIsNotVisible)
   else
   begin
     LRow := Lines.Items[ATextPosition.Line].FirstRow;

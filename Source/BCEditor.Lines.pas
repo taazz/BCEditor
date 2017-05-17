@@ -290,6 +290,7 @@ uses
   Math, StrUtils, SysConst;
 
 resourcestring
+  SBCEditorCharIndexInLineBreak = 'Character index is inside line break (%d)';
   SBCEditorPatternContainsWordBreakChar = 'Pattern contains word break character';
 
 function HasLineBreak(const AText: string): Boolean;
@@ -762,9 +763,9 @@ begin
       Dec(Result.Line);
 
       if (Result.Line < 0) then
-        Exit(InvalidTextPosition)
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
       else if (LLength > 0) then
-        Exit(BOLPosition[Result.Line]);
+        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
       while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do
       begin
@@ -786,7 +787,7 @@ begin
       Inc(Result.Line);
 
       if (LLength < 0) then
-        Exit(BOLPosition[Result.Line]);
+        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
       while ((Result.Line < Count) and (LLength >= Length(Items[Result.Line].Text) + LLineBreakLength)) do
       begin
@@ -795,9 +796,9 @@ begin
       end;
 
       if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
-        Exit(InvalidTextPosition)
-      else if (LLength > Length(Items[Result.Line].Text)) then
-        Exit(BOLPosition[Result.Line]);
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
+      else if ((LLength > 0) and (LLength > Length(Items[Result.Line].Text))) then
+        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
 
       Result.Char := LLength;
     end;
