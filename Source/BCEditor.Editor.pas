@@ -1638,8 +1638,18 @@ begin
   LTokenWidth := 0;
   LItemWidth := 0;
 
+  // Debug 2017-05-17
+  Assert((0 <= TopRow) and (TopRow < Rows.Count),
+    'TopRow: ' + TopRow.ToString() + #13#10
+    + 'Count: ' + Rows.Count.ToString());
+
+  if (not AFromCursor) then
+    Result.Y := Rows.Items[TopRow].Line
+  else
+    Result.Y := TopRow;
+
   if (X <= FLeftMarginWidth) then
-    Result := Point(0, LItem)
+    Result.X := 0
   else
   begin
     FPaintHelper.BeginDrawing(Canvas.Handle);
@@ -1680,13 +1690,10 @@ begin
       end;
 
       if (LX >= LItemWidth + LTokenWidth) then
-      begin
-        Result := Point(LColumn + (LX - LItemWidth) div CharWidth, LItem);
         if (not AFromCursor) then
-          Result := Point(LColumn + (LX - LItemWidth) div CharWidth, LItem)
+          Result.X := LColumn + (LX - LItemWidth) div CharWidth
         else
-          Result := Point(LColumn + (LX - LItemWidth + CharWidth div 2) div CharWidth, LItem);
-      end
+          Result.X := LColumn + (LX - LItemWidth + CharWidth div 2) div CharWidth
       else
       begin
         SetLength(LWidths, FHighlighter.GetTokenLength() + 1);
@@ -1739,7 +1746,10 @@ begin
           Result.X := LColumn + LRight;
 
         if (APosType = ptText) then
+        begin
+          // Debug
           Result.Y := Rows.Items[TopRow].Line + LItem
+        end
         else
           Result.Y := TopRow + LItem;
 
@@ -10283,19 +10293,16 @@ procedure TCustomBCEditor.ScanMatchingPair();
           LSearch.Free();
 
           LArea.BeginPosition := Lines.BOFPosition;
-          LArea.EndPosition := Lines.CharIndexToPosition(-1 - Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.BeginPosition);
-          if (LArea.EndPosition <> InvalidTextPosition) then
+          LArea.EndPosition := Lines.CharIndexToPosition(- Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.BeginPosition);
+          LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
+            False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
+          FCurrentMatchingPair.OpenArea.BeginPosition := LArea.EndPosition;
+          if (LSearch.Find(FCurrentMatchingPair.OpenArea.BeginPosition, LFoundLength)) then
           begin
-            LSearch := TBCEditorLines.TSearch.Create(Lines, LArea,
-              False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-            FCurrentMatchingPair.OpenArea.BeginPosition := LArea.EndPosition;
-            if (LSearch.Find(FCurrentMatchingPair.OpenArea.BeginPosition, LFoundLength)) then
-            begin
-              FCurrentMatchingPair.State := mpsFound;
-              FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.OpenArea.BeginPosition);
-            end;
-            LSearch.Free();
+            FCurrentMatchingPair.State := mpsFound;
+            FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.OpenArea.BeginPosition);
           end;
+          LSearch.Free();
         end;
       end;
 

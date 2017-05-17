@@ -327,14 +327,17 @@ begin
   FWholeWords := AWholeWords;
   FRegExpr := ARegExpr;
   FBackwards := ABackwards;
-  FPattern := APattern;
+  if (FCaseSensitive or FRegExpr) then
+    FPattern := APattern
+  else
+  begin
+    FPattern := Copy(APattern, 1, Length(APattern));
+    CharLowerBuff(PChar(FPattern), Length(FPattern));
+  end;
   FReplaceText := AReplaceText;
 
   if (not FRegExpr) then
   begin
-    if (not FCaseSensitive) then
-      CharLowerBuff(PChar(FPattern), Length(FPattern));
-
     if (FWholeWords) then
       for LIndex := 1 to Length(FPattern) do
         if (FLines.IsWordBreakChar(FPattern[LIndex])) then
@@ -363,7 +366,8 @@ function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
 begin
   Assert((0 <= APosition.Line) and (APosition.Line < FLines.Count));
   Assert((0 <= APosition.Char) and (APosition.Char <= Length(FLines[APosition.Line])),
-    'APosition: ' + APosition.ToString());
+    'APosition: ' + APosition.ToString()
+    + 'Length: ' + Length(FLines[APosition.Line]).ToString());
 
   if (FRegExpr) then
     Result := FindRegEx(APosition, AFoundLength)
