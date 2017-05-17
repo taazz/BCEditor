@@ -767,9 +767,7 @@ begin
       Dec(Result.Line);
 
       if (Result.Line < 0) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
-      else if (LLength > 0) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
 
       while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do
       begin
@@ -777,11 +775,15 @@ begin
         Dec(Result.Line);
       end;
 
-      if ((Result.Line < 0)
-        or (- LLength > Length(Items[Result.Line].Text))) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
+      if (Result.Line < 0) then
+        Result := BOFPosition
+      else
+      begin
+        if (- LLength > Length(Items[Result.Line].Text)) then
+          raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
 
-      Result.Char := LLength + Length(Items[Result.Line].Text);
+        Result.Char := LLength + Length(Items[Result.Line].Text);
+      end;
     end
     else
     begin
@@ -791,7 +793,7 @@ begin
       Inc(Result.Line);
 
       if (LLength < 0) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
+        LLength := 0;
 
       while ((Result.Line < Count) and (LLength >= Length(Items[Result.Line].Text) + LLineBreakLength)) do
       begin
@@ -799,12 +801,9 @@ begin
         Inc(Result.Line);
       end;
 
-      if ((Result.Line > Count) or (Result.Line = Count) and (Result.Char > 0)) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex])
-      else if ((LLength > 0) and (LLength > Length(Items[Result.Line].Text))) then
-        raise ERangeError.CreateFmt(SBCEditorCharIndexInLineBreak, [ACharIndex]);
-
       Result.Char := LLength;
+
+      Result := Min(Result, EOFPosition);
     end;
   end;
 end;

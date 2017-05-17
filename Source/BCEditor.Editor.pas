@@ -46,7 +46,7 @@ type
       State: (mpsClear, mpsFound, mpsNotFound);
     end;
 
-    TPosType = (ptText, ptDisplay);
+    TPosType = (ptLines, ptRows);
 
     TMultiCarets = class(TList<TBCEditorRowsPosition>)
     private
@@ -1616,7 +1616,7 @@ end;
 
 function TCustomBCEditor.ClientToDisplay(const X, Y: Integer; const AFromCursor: Boolean = False): TBCEditorRowsPosition;
 begin
-  Result := DisplayPosition(ClientToPosition(X, Y, ptDisplay, AFromCursor));
+  Result := DisplayPosition(ClientToPosition(X, Y, ptRows, AFromCursor));
 end;
 
 function TCustomBCEditor.ClientToPosition(const X, Y: Integer; const APosType: TPosType; const AFromCursor: Boolean = False): TPoint;
@@ -1638,15 +1638,12 @@ begin
   LTokenWidth := 0;
   LItemWidth := 0;
 
-  // Debug 2017-05-17
-  Assert((0 <= TopRow) and (TopRow < Rows.Count),
-    'TopRow: ' + TopRow.ToString() + #13#10
-    + 'Count: ' + Rows.Count.ToString());
-
-  if (not AFromCursor) then
-    Result.Y := Rows.Items[TopRow].Line
+  if (APosType = ptRows) then
+    Result.Y := TopRow + LItem
+  else if (Rows.Count = 0) then
+    Result.Y := LItem
   else
-    Result.Y := TopRow;
+    Result.Y := Rows.Items[TopRow].Line + LItem;
 
   if (X <= FLeftMarginWidth) then
     Result.X := 0
@@ -1659,17 +1656,17 @@ begin
       LColumn := 0;
 
       FHighlighter.ResetCurrentRange();
-      if ((APosType = ptText) and (LItem < Lines.Count)
-        or (APosType = ptDisplay) and (LItem < Rows.Count)) then
+      if ((APosType = ptLines) and (LItem < Lines.Count)
+        or (APosType = ptRows) and (LItem < Rows.Count)) then
       begin
         if (LItem = 0) then
           FHighlighter.ResetCurrentRange()
         else
-          if (APosType = ptText) then
+          if (APosType = ptLines) then
             FHighlighter.SetCurrentRange(Lines.Items[LItem].Range)
           else
             FHighlighter.SetCurrentRange(Rows.Items[LItem].Range);
-        if (APosType = ptText) then
+        if (APosType = ptLines) then
           FHighlighter.SetCurrentLine(Lines[LItem])
         else
           FHighlighter.SetCurrentLine(Rows[LItem]);
@@ -1718,7 +1715,7 @@ begin
             0:
               begin
                 Result := Point(LColumn + LMiddle, LItem);
-                if (APosType = ptText) then
+                if (APosType = ptLines) then
                   LText := Lines[LItem]
                 else
                   LText := Rows[LItem];
@@ -1745,7 +1742,7 @@ begin
         else
           Result.X := LColumn + LRight;
 
-        if (APosType = ptText) then
+        if (APosType = ptLines) then
         begin
           // Debug
           Result.Y := Rows.Items[TopRow].Line + LItem
@@ -1753,7 +1750,7 @@ begin
         else
           Result.Y := TopRow + LItem;
 
-        if (APosType = ptText) then
+        if (APosType = ptLines) then
           LText := Lines[LItem]
         else
           LText := Rows[LItem];
@@ -1773,7 +1770,7 @@ end;
 
 function TCustomBCEditor.ClientToPos(const X, Y: Integer): TPoint;
 begin
-  Result := ClientToPosition(X, Y, ptText);
+  Result := ClientToPosition(X, Y, ptLines);
 end;
 
 function TCustomBCEditor.ClientToText(const X, Y: Integer): TPoint;
@@ -1783,7 +1780,7 @@ end;
 
 function TCustomBCEditor.ClientToTextPosition(const X, Y: Integer; const AFromCursor: Boolean = False): TBCEditorLinesPosition;
 begin
-  Result := LinesPosition(ClientToPosition(X, Y, ptText, AFromCursor));
+  Result := LinesPosition(ClientToPosition(X, Y, ptLines, AFromCursor));
 end;
 
 function TCustomBCEditor.CodeFoldingCollapsableFoldRangeForLine(const ALine: Integer): TBCEditorCodeFolding.TRanges.TRange;
