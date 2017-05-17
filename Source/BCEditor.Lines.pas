@@ -147,14 +147,14 @@ type
     procedure DoPut(ALine: Integer; const AText: string);
     procedure ExchangeItems(ALine1, ALine2: Integer);
     procedure ExecuteUndoRedo(const List: TUndoList);
-    function GetArea(): TBCEditorLinesArea; inline;
-    function GetBOLPosition(ALine: Integer): TBCEditorLinesPosition; inline;
+    function GetArea(): TBCEditorLinesArea;
+    function GetBOLPosition(ALine: Integer): TBCEditorLinesPosition;
     function GetCanRedo(): Boolean;
     function GetCanUndo(): Boolean;
     function GetChar(APosition: TBCEditorLinesPosition): Char;
     function GetEOFPosition(): TBCEditorLinesPosition;
-    function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition; inline;
-    function GetLineArea(ALine: Integer): TBCEditorLinesArea; inline;
+    function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition;
+    function GetLineArea(ALine: Integer): TBCEditorLinesArea;
     function GetTextIn(const AArea: TBCEditorLinesArea): string;
     function GetTextInColumnArea(const AArea: TBCEditorLinesArea): string;
     procedure InternalClear(const AClearUndo: Boolean); overload;
@@ -165,7 +165,7 @@ type
   protected
     procedure Backspace(AArea: TBCEditorLinesArea);
     procedure ClearUndo();
-    function CharIndexToPosition(const ACharIndex: Integer): TBCEditorLinesPosition; overload; inline;
+    function CharIndexToPosition(const ACharIndex: Integer): TBCEditorLinesPosition; overload;
     function CharIndexToPosition(const ACharIndex: Integer;
       const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     function CompareStrings(const S1, S2: string): Integer; override;
@@ -184,19 +184,19 @@ type
     function InsertText(APosition: TBCEditorLinesPosition;
       const AText: string): TBCEditorLinesPosition; overload;
     function IsPositionInSelection(const APosition: TBCEditorLinesPosition): Boolean;
-    function IsWordBreakChar(const AChar: Char): Boolean; inline;
+    function IsWordBreakChar(const AChar: Char): Boolean;
     function PositionToCharIndex(const APosition: TBCEditorLinesPosition): Integer;
     procedure Put(ALine: Integer; const AText: string); override;
-    procedure Redo(); inline;
+    procedure Redo();
     function ReplaceText(const AArea: TBCEditorLinesArea; const AText: string): TBCEditorLinesPosition;
-    procedure SetBackground(const ALine: Integer; const AValue: TColor); inline;
-    procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
-    procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
-    procedure SetRange(const ALine: Integer; const AValue: Pointer); inline;
+    procedure SetBackground(const ALine: Integer; const AValue: TColor);
+    procedure SetFirstRow(const ALine: Integer; const AValue: Integer);
+    procedure SetForeground(const ALine: Integer; const AValue: TColor);
+    procedure SetRange(const ALine: Integer; const AValue: Pointer);
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
-    procedure Undo(); inline;
+    procedure Undo();
     procedure UndoGroupBreak();
     function ValidPosition(const APosition: TBCEditorLinesPosition): Boolean;
     property Area: TBCEditorLinesArea read GetArea;
@@ -261,15 +261,15 @@ type
     FMaxWidth: Integer;
     FMaxWidthRow: Integer;
     function GetBORPosition(ARow: Integer): TBCEditorLinesPosition;
-    function GetEORPosition(ARow: Integer): TBCEditorLinesPosition; inline;
+    function GetEORPosition(ARow: Integer): TBCEditorLinesPosition;
     function GetMaxColumns(): Integer;
     function GetMaxWidth(): Integer;
-    function GetText(ARow: Integer): string; inline;
+    function GetText(ARow: Integer): string;
   strict protected
     property Lines: TBCEditorLines read FLines;
   public
     procedure Add(const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
-      const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer); inline;
+      const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
     procedure Clear();
     constructor Create(const ALines: TBCEditorLines);
     procedure Delete(ARow: Integer);
