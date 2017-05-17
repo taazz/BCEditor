@@ -99,7 +99,6 @@ type
     FCharWidth: Integer;
     FColor: TColor;
     FCurrentFont: HFont;
-    FDrawingIndex: Integer;
     FDrawingCount: Integer;
     FFontStock: TBCEditorFontStock;
     FHandle: HDC;
@@ -110,7 +109,7 @@ type
   public
     constructor Create(ACalcExtentBaseStyle: TFontStyles; ABaseFont: TFont);
     destructor Destroy; override;
-    procedure BeginDrawing(AHandle: HDC; const ADrawingIndex: Integer);
+    procedure BeginDrawing(AHandle: HDC);
     function ComputeTextWidth(const AText: PChar; const ALength: Integer): Integer;
     procedure EndDrawing();
     procedure SetBackgroundColor(AValue: TColor);
@@ -509,19 +508,14 @@ begin
   inherited;
 end;
 
-procedure TBCEditorPaintHelper.BeginDrawing(AHandle: HDC; const ADrawingIndex: Integer);
+procedure TBCEditorPaintHelper.BeginDrawing(AHandle: HDC);
 begin
   if (AHandle = FHandle) then
     Assert(FHandle <> 0)
   else
   begin
-    Assert((FHandle = 0) and (AHandle <> 0) and (FDrawingCount = 0),
-      'DrawingIndex: ' + IntToStr(FDrawingIndex) + #13#10
-      + 'DrawingCount: ' + IntToStr(FDrawingCount) + #13#10
-      + 'AHandle: ' + IntToStr(AHandle) + #13#10
-      + 'FHandle: ' + IntToStr(FHandle));
+    Assert((FHandle = 0) and (AHandle <> 0) and (FDrawingCount = 0));
 
-    FDrawingIndex := ADrawingIndex;
     FHandle := AHandle;
     FSaveHandle := SaveDC(AHandle);
     SelectObject(AHandle, FCurrentFont);

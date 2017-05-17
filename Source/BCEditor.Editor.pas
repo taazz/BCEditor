@@ -97,6 +97,11 @@ type
     FBookmarkList: TBCEditorMarkList;
     FBorderStyle: TBorderStyle;
     FCaret: TBCEditorCaret;
+    FCaretClientPos: record
+      Valid: Boolean;
+      X: Integer;
+      Y: Integer;
+    end;
     FCaretCreated: Boolean;
     FCaretOffset: TPoint;
     FChainedEditor: TCustomBCEditor;
@@ -244,7 +249,9 @@ type
     procedure BookmarkListChange(Sender: TObject);
     procedure CaretChanged(ASender: TObject);
     procedure CheckIfAtMatchingKeywords;
+    procedure ClearCaret();
     procedure ClearCodeFolding;
+    procedure ClearRows();
     function ClientToDisplay(const X, Y: Integer; const AFromCursor: Boolean = False): TBCEditorRowsPosition;
     function ClientToPosition(const X, Y: Integer; const APosType: TPosType; const AFromCursor: Boolean = False): TPoint;
     function ClientToTextPosition(const X, Y: Integer; const AFromCursor: Boolean = False): TBCEditorLinesPosition;
@@ -541,7 +548,6 @@ type
     procedure GotoLineAndCenter(const ALine: Integer; const AChar: Integer = 1);
     procedure GotoNextBookmark;
     procedure GotoPreviousBookmark;
-    procedure HideCaret;
     function IsCommentChar(const AChar: Char): Boolean;
     function IsEmptyChar(const AChar: Char): Boolean;
     function IsWordBreakChar(const AChar: Char): Boolean;
@@ -581,7 +587,6 @@ type
     procedure SetUndoOption(const AOption: TBCEditorUndoOption; const AEnabled: Boolean);
     procedure SetUpdateState(AUpdating: Boolean); virtual;
     procedure SetWantReturns(const AValue: Boolean);
-    procedure ShowCaret;
     procedure ScrollToCaret(ACenterVertical: Boolean = False; AScrollAlways: Boolean = False);
     function TextToDisplay(const ATextPosition: TBCEditorLinesPosition): TBCEditorRowsPosition;
     procedure ToggleBookmark(const AIndex: Integer = -1);
@@ -1015,6 +1020,7 @@ begin
   FBackgroundColor := clWindow;
   FForegroundColor := clWindowText;
   FBorderStyle := bsSingle;
+  FCaretClientPos.Valid := False;
   FDoubleClickTime := GetDoubleClickTime;
   FHWheelAccumulator := 0;
   FLastSortOrder := soDesc;
@@ -1513,8 +1519,7 @@ end;
 procedure TCustomBCEditor.Clear;
 begin
   Lines.Clear();
-  FRows.Clear();
-  FMultiCaretPosition.Row := -1;
+  ClearRows();
   ClearCodeFolding();
   ClearMatchingPair();
   ClearBookmarks;
@@ -1529,6 +1534,12 @@ procedure TCustomBCEditor.ClearBookmarks;
 begin
   while FBookmarkList.Count > 0 do
     DeleteBookmark(FBookmarkList[0]);
+end;
+
+procedure TCustomBCEditor.ClearCaret();
+begin
+  FCaretClientPos.Valid := False;
+  FMultiCaretPosition.Row := -1;
 end;
 
 procedure TCustomBCEditor.ClearCodeFolding;
@@ -1549,6 +1560,12 @@ end;
 procedure TCustomBCEditor.ClearMatchingPair();
 begin
   FCurrentMatchingPair.State := mpsClear;
+end;
+
+procedure TCustomBCEditor.ClearRows();
+begin
+  ClearCaret();
+  FRows.Clear();
 end;
 
 procedure TCustomBCEditor.ClearUndo();
@@ -1584,7 +1601,7 @@ begin
     Result := Point(0, LItem)
   else
   begin
-    FPaintHelper.BeginDrawing(Canvas.Handle, 1);
+    FPaintHelper.BeginDrawing(Canvas.Handle);
     try
       LX := X - FLeftMarginWidth + HorzTextPos;
 
@@ -2128,9 +2145,12 @@ function TCustomBCEditor.ComputeTokenWidth(const AText: PChar;
   const ALength: Integer; const AColumn: Integer;
   const AAttribute: TBCEditorHighlighter.TAttribute): Integer;
 begin
-  Result := PaintToken(Rect(0, 0, MaxInt, MaxInt),
-    InvalidTextPosition, RowsPosition(AColumn, -1),
-    AText, ALength, nil);
+  if (FFontPitchFixed) then
+    Result := ComputeTextColumns(AText, ALength, AColumn) * CharWidth
+  else
+    Result := PaintToken(Rect(0, 0, MaxInt, MaxInt),
+      InvalidTextPosition, RowsPosition(AColumn, -1),
+      AText, ALength, nil);
 end;
 
 procedure TCustomBCEditor.CopyToClipboard();
@@ -2331,6 +2351,11 @@ begin
         LDeletedRows := LRow - LFirstRow;
         LLastRow := LRow - 1;
 
+        if ((Lines.CaretPosition.Line >= ALine) and FCaretClientPos.Valid) then
+        begin
+          Dec(FCaretClientPos.Y, LDeletedRows * LineHeight);
+          Windows.SetCaretPos(FCaretClientPos.X, FCaretClientPos.Y);
+        end;
         if ((LFirstRow <= FMultiCaretPosition.Row) and (FMultiCaretPosition.Row <= LLastRow)) then
           FMultiCaretPosition.Row := -1
         else if (FMultiCaretPosition.Row > FLastRow) then
@@ -2476,7 +2501,7 @@ begin
     Result := Point(FLeftMarginWidth + ADisplayPosition.Column * CharWidth - HorzTextPos, (Lines.Count - Rows.Items[Rows.Count - 1].Line - 1 + ADisplayPosition.Row - TopRow) * LineHeight)
   else
   begin
-    FPaintHelper.BeginDrawing(Canvas.Handle, 2);
+    FPaintHelper.BeginDrawing(Canvas.Handle);
     try
       LRow := ADisplayPosition.Row;
 
@@ -3168,10 +3193,7 @@ begin
       begin
         FTextWidth := ClientWidth - FLeftMarginWidth;
         if WordWrap.Enabled then
-        begin
-          FRows.Clear();
-          FMultiCaretPosition.Row := -1;
-        end;
+          ClearRows();
 
         if (UpdateCount > 0) then
           Include(FState, esScrolled)
@@ -5100,11 +5122,11 @@ var
   LItalicSize: TSize;
   LSize: TSize;
 begin
-  FRows.Clear();
+  ClearRows();
 
   if (HandleAllocated) then
   begin
-    FPaintHelper.BeginDrawing(Canvas.Handle, 3);
+    FPaintHelper.BeginDrawing(Canvas.Handle);
     try
       Canvas.Font.Assign(Font);
 
@@ -5504,7 +5526,7 @@ begin
 
     HandleNeeded();
 
-    FPaintHelper.BeginDrawing(Canvas.Handle, 6);
+    FPaintHelper.BeginDrawing(Canvas.Handle);
     try
       GGetRowsProgress := GGetRowsProgress + 'b';
       for LLine := 0 to Lines.Count - 1 do
@@ -5746,19 +5768,11 @@ begin
     GotoBookmark(FBookmarkList.Items[FBookmarkList.Count - 1].Index);
 end;
 
-procedure TCustomBCEditor.HideCaret;
-begin
-  if esCaretVisible in FState then
-    if Windows.HideCaret(Handle) then
-      Exclude(FState, esCaretVisible);
-end;
-
 procedure TCustomBCEditor.HighlighterChanged(ASender: TObject);
 var
   LElement: TBCEditorHighlighter.PElement;
 begin
-  FRows.Clear();
-  FMultiCaretPosition.Row := -1;
+  ClearRows();
 
   LElement := FHighlighter.Colors.GetElement(BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR);
   if (Assigned(LElement)) then
@@ -5865,6 +5879,12 @@ begin
     if (ANewLine) then
       for LRow := LRow + LInsertedRows to FRows.Count - 1 do
         FRows.List[LRow].Line := FRows.List[LRow].Line + 1;
+
+    if ((Lines.CaretPosition.Line >= ALine) and FCaretClientPos.Valid) then
+    begin
+      Inc(FCaretClientPos.Y, LInsertedRows * LineHeight);
+      Windows.SetCaretPos(FCaretClientPos.X, FCaretClientPos.Y);
+    end;
   end;
 end;
 
@@ -5890,11 +5910,11 @@ var
 begin
   ClearMatchingPair();
 
-  FPaintHelper.BeginDrawing(Canvas.Handle, 7);
+  FPaintHelper.BeginDrawing(Canvas.Handle);
   try
     if (not WordWrap.Enabled) then
     begin
-      FPaintHelper.BeginDrawing(Canvas.Handle, 4);
+      FPaintHelper.BeginDrawing(Canvas.Handle);
       try
         if (ALine = 0) then
           FHighlighter.ResetCurrentRange()
@@ -6040,6 +6060,8 @@ begin
     FPaintHelper.EndDrawing();
   end;
 
+  if (Lines.CaretPosition.Line >= ALine) then
+    Inc(FCaretClientPos.X, Result * LineHeight);
   if (FMultiCaretPosition.Row >= ARow) then
     Inc(FMultiCaretPosition.Row, Result);
 
@@ -6507,6 +6529,7 @@ end;
 procedure TCustomBCEditor.CaretMoved(ASender: TObject);
 begin
   ClearMatchingPair();
+  ClearCaret();
 
   if (FUpdateCount > 0) then
     Include(FState, esCaretMoved)
@@ -6648,8 +6671,7 @@ begin
   ClearMatchingPair();
   ClearBookmarks;
   FMarkList.Clear;
-  FRows.Clear();
-  FMultiCaretPosition.Row := -1;
+  ClearRows();
 
   Modified := True;
 
@@ -7434,12 +7456,10 @@ begin
     LLastTextRow := MinMax(TopRow + LTemp - 1, -1, Rows.Count - 1);
     LLastRow := TopRow + LTemp;
 
-    HideCaret;
-
     try
       Canvas.Brush.Color := FBackgroundColor;
 
-      FPaintHelper.BeginDrawing(Canvas.Handle, 5);
+      FPaintHelper.BeginDrawing(Canvas.Handle);
       try
         FPaintHelper.SetBaseFont(Font);
 
@@ -9194,6 +9214,20 @@ begin
     APaintData^.Parts.Clear();
 
   Result := LRect.Right - ARect.Left;
+
+//  if (not FCaretClientPos.Valid
+//    and (Lines.CaretPosition.Line = ATextPosition.Line)
+//    and (ATextPosition.Char <= Lines.CaretPosition.Char) and (Lines.CaretPosition.Char < ATextPosition.Char + ALength)) then
+//  begin
+//    LLength := Lines.CaretPosition.Char - ATextPosition.Char;
+//    if (LLength = 0) then
+//      FCaretClientPos.X := ARect.Left
+//    else
+//      FCaretClientPos.X := ARect.Left + FPaintHelper.ComputeTextWidth(LText, LLength);
+//    FCaretClientPos.Y := ARect.Top;
+//    FCaretClientPos.Valid := True;
+//    Windows.SetCaretPos(FCaretClientPos.X, FCaretClientPos.Y);
+//  end;
 end;
 
 procedure TCustomBCEditor.PasteFromClipboard();
@@ -9433,7 +9467,7 @@ end;
 procedure TCustomBCEditor.Resize();
 begin
   if (FWordWrap.Enabled) then
-    FRows.Clear();
+    ClearRows();
 
   inherited;
 
@@ -9453,10 +9487,7 @@ end;
 procedure TCustomBCEditor.RightMarginChanged(ASender: TObject);
 begin
   if (WordWrap.Enabled and (FWordWrap.Width = wwwRightMargin)) then
-  begin
-    FRows.Clear();
-    FMultiCaretPosition.Row := -1;
-  end;
+    ClearRows();
 
   Invalidate();
 end;
@@ -10253,6 +10284,11 @@ procedure TCustomBCEditor.ScanMatchingPair();
           FCurrentMatchingPair.CloseArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
           LSearch.Free();
 
+          Assert(FCurrentMatchingPair.CloseArea.EndPosition.Char >= 2,
+            'EndPosition: ' + FCurrentMatchingPair.CloseArea.EndPosition.ToString() + #13#10
+            + 'LFoundLength: ' + LFoundLength.ToString() + #13#10
+            + 'BeginPosition: ' + FCurrentMatchingPair.CloseArea.BeginPosition.ToString());
+
           LArea.BeginPosition := Lines.BOFPosition;
           LArea.EndPosition := Lines.CharIndexToPosition(-1 - Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.EndPosition);
           if (LArea.EndPosition <> InvalidTextPosition) then
@@ -10441,19 +10477,15 @@ end;
 
 procedure TCustomBCEditor.SetAlwaysShowCaret(const AValue: Boolean);
 begin
-  if FAlwaysShowCaret <> AValue then
+  if (AValue <> FAlwaysShowCaret) then
   begin
     FAlwaysShowCaret := AValue;
-    if not (csDestroying in ComponentState) and not Focused then
-    begin
-      if AValue then
-        ResetCaret
-      else
-      begin
-        HideCaret;
-        DestroyCaret;
-      end;
-    end;
+    if (not Focused() and not (csDestroying in ComponentState)) then
+      if (AValue) then
+        ResetCaret()
+      else if ((esCaretVisible in FState)
+        and Windows.HideCaret(Handle)) then
+        Exclude(FState, esCaretVisible);
   end;
 end;
 
@@ -10588,7 +10620,7 @@ procedure TCustomBCEditor.SetHorzTextPos(AValue: Integer);
 begin
   if (AValue <> FHorzTextPos) then
   begin
-    ClearMatchingPair();
+    ClearCaret();
 
     FHorzTextPos := AValue;
 
@@ -10837,7 +10869,7 @@ begin
 
   if (LValue <> FTopRow) then
   begin
-    ClearMatchingPair();
+    ClearCaret();
 
     FTopRow := LValue;
 
@@ -11031,29 +11063,20 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.ShowCaret;
-begin
-  if not FCaret.NonBlinking.Enabled and not (esCaretVisible in FState) then
-    if Windows.ShowCaret(Handle) then
-      Include(FState, esCaretVisible);
-end;
-
 procedure TCustomBCEditor.SizeOrFontChanged(const AFontChanged: Boolean);
 var
   LScrollBarInfo: TScrollBarInfo;
   LTextWidth: Integer;
   LVisibleRows: Integer;
 begin
+  ClearCaret();
+
   if (HandleAllocated and (CharWidth <> 0) and (LineHeight > 0)) then
   begin
     FPaintHelper.SetBaseFont(Font);
 
-    if AFontChanged then
-    begin
-      if LeftMargin.LineNumbers.Visible then
-        LeftMarginChanged(Self);
-      ResetCaret;
-    end;
+    if (AFontChanged and LeftMargin.LineNumbers.Visible) then
+      LeftMarginChanged(Self);
 
     LScrollBarInfo.cbSize := SizeOf(LScrollBarInfo);
     GetScrollBarInfo(Handle, Integer(OBJID_VSCROLL), LScrollBarInfo);
@@ -11074,10 +11097,7 @@ begin
     if ((LTextWidth <> FTextWidth) or (LVisibleRows <> VisibleRows)) then
     begin
       if (FWordWrap.Enabled and (LTextWidth <> FTextWidth)) then
-      begin
-        FRows.Clear();
-        FMultiCaretPosition.Row := -1;
-      end;
+        ClearRows();
 
       FTextWidth := LTextWidth;
       FVisibleRows := LVisibleRows;
@@ -11370,10 +11390,7 @@ end;
 procedure TCustomBCEditor.TabsChanged(ASender: TObject);
 begin
   if (WordWrap.Enabled) then
-  begin
-    FRows.Clear();
-    FMultiCaretPosition.Row := -1;
-  end;
+    ClearRows();
   Invalidate();
 end;
 
@@ -11604,28 +11621,39 @@ end;
 
 procedure TCustomBCEditor.UpdateCaret();
 var
-  LCaretPoint: TPoint;
   LCompositionForm: TCompositionForm;
+  LCaretClientPos: TPoint;
   LRect: TRect;
 begin
-  if (FUpdateCount = 0) then
+  if ((FUpdateCount = 0)
+    and not FCaret.NonBlinking.Enabled
+    and Visible
+    and (Focused() or AlwaysShowCaret)) then
   begin
-    LCaretPoint := DisplayToClient(DisplayCaretPosition);
-    LCaretPoint.Offset(FCaretOffset);
-    if (FFontPitchFixed and (CaretStyle in [csHorizontalLine, csBlock])) then
-      Inc(LCaretPoint.X);
-    Windows.SetCaretPos(LCaretPoint.X, LCaretPoint.Y);
+    if (FCaretClientPos.Valid) then
+      LCaretClientPos := Point(FCaretClientPos.X, FCaretClientPos.Y)
+    else
+    begin
+      LCaretClientPos := DisplayToClient(TextToDisplay(Lines.CaretPosition));
+      FCaretClientPos.X := LCaretClientPos.X;
+      FCaretClientPos.Y := LCaretClientPos.Y;
+      FCaretClientPos.Valid := True;
+    end;
 
     LRect := ClientRect;
-    Inc(LRect.Left, LeftMargin.Width + FCodeFolding.GetWidth);
-    if (LRect.Contains(LCaretPoint) and (Focused() or AlwaysShowCaret)) then
-      ShowCaret()
-    else
-      HideCaret();
+    Inc(LRect.Left, FLeftMarginWidth);
+    if (LRect.Contains(LCaretClientPos)) then
+    begin
+      Windows.SetCaretPos(FCaretClientPos.X, FCaretClientPos.Y);
 
-    LCompositionForm.dwStyle := CFS_POINT;
-    LCompositionForm.ptCurrentPos := LCaretPoint;
-    ImmSetCompositionWindow(ImmGetContext(Handle), @LCompositionForm);
+      LCompositionForm.dwStyle := CFS_POINT;
+      LCompositionForm.ptCurrentPos.X := FCaretClientPos.X;
+      LCompositionForm.ptCurrentPos.Y := FCaretClientPos.Y;
+      ImmSetCompositionWindow(ImmGetContext(Handle), @LCompositionForm);
+
+      if (not (esCaretVisible in FState) and Windows.ShowCaret(Handle)) then
+        Include(FState, esCaretVisible);
+    end;
   end;
 end;
 
@@ -12068,8 +12096,10 @@ procedure TCustomBCEditor.WMKillFocus(var AMessage: TWMKillFocus);
 begin
   inherited;
 
-  if (not AlwaysShowCaret) then
-    UpdateCaret();
+  if (not AlwaysShowCaret
+    and (esCaretVisible in FState)
+    and Windows.HideCaret(Handle)) then
+    Exclude(FState, esCaretVisible);
 
   if (HideSelection and SelectionAvailable) then
     Invalidate();
@@ -12319,8 +12349,7 @@ end;
 
 procedure TCustomBCEditor.WordWrapChanged(ASender: TObject);
 begin
-  FRows.Clear();
-  FMultiCaretPosition.Row := -1;
+  ClearRows();
 
   Invalidate();
 end;

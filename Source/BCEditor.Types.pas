@@ -34,7 +34,7 @@ type
 
   TBCEditorCustomDrowTokenEvent = procedure(ASender: TObject;
     const APos: TPoint; const AAttribute: Pointer;
-    var AText: PChar; var ALength: Integer;
+    const AText: PChar; const ALength: Integer;
     var AForegroundColor, ABackgroundColor: TColor; var AStyles: TFontStyles;
     var ABorderColor: TColor;
     var ATokenAddon: TBCEditorTokenAddon; var ATokenAddonColor: TColor) of object;

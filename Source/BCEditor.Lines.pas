@@ -361,7 +361,8 @@ function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
   out AFoundLength: Integer): Boolean;
 begin
   Assert((0 <= APosition.Line) and (APosition.Line < FLines.Count));
-  Assert((0 <= APosition.Char) and (APosition.Char <= Length(FLines[APosition.Line])));
+  Assert((0 <= APosition.Char) and (APosition.Char <= Length(FLines[APosition.Line])),
+    'APosition: ' + APosition.ToString());
 
   if (FRegExpr) then
     Result := FindRegEx(APosition, AFoundLength)
