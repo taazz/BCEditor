@@ -1638,7 +1638,7 @@ begin
   LTokenWidth := 0;
   LItemWidth := 0;
 
-  if (X < FLeftMarginWidth) then
+  if (X <= FLeftMarginWidth) then
     Result := Point(0, LItem)
   else
   begin
@@ -1734,9 +1734,14 @@ begin
             LRight, LColumn, FHighlighter.GetTokenAttribute());
 
         if ((LX - LWidths[LLeft]) < (LWidths[LRight] - LX)) then
-          Result := Point(LColumn + LLeft, LItem)
+          Result.X := LColumn + LLeft
         else
-          Result := Point(LColumn + LRight, LItem);
+          Result.X := LColumn + LRight;
+
+        if (APosType = ptText) then
+          Result.Y := Rows.Items[TopRow].Line + LItem
+        else
+          Result.Y := TopRow + LItem;
 
         if (APosType = ptText) then
           LText := Lines[LItem]
@@ -10272,7 +10277,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
         FCurrentMatchingPair.CloseArea.BeginPosition := LArea.BeginPosition;
         if (not LSearch.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLength)) then
           LSearch.Free()
-        else
+        else if (FCurrentMatchingPair.CloseArea.BeginPosition > Lines.BOFPosition) then
         begin
           FCurrentMatchingPair.CloseArea.EndPosition := Lines.CharIndexToPosition(LFoundLength, FCurrentMatchingPair.CloseArea.BeginPosition);
           LSearch.Free();
@@ -10307,7 +10312,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
           LSearch.Free()
         else
         begin
-          FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(1, FCurrentMatchingPair.OpenArea.EndPosition);
+          FCurrentMatchingPair.OpenArea.EndPosition := Lines.CharIndexToPosition(1, FCurrentMatchingPair.OpenArea.BeginPosition);
           LSearch.Free();
 
           LArea.BeginPosition := FCurrentMatchingPair.OpenArea.EndPosition;
