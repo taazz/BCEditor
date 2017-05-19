@@ -37,28 +37,33 @@ type
     TSearch = class
     private
       FBackwards: Boolean;
+      FBeginPosition: TBCEditorLinesPosition;
       FCaseSensitive: Boolean;
-      FArea: TBCEditorLinesArea;
+      FEndPosition: TBCEditorLinesPosition;
+      FEngine: (eNormal, eLinesRegExpr, eTextRegExpr);
       FErrorMessage: string;
       FFoundLength: Integer;
       FFoundPosition: TBCEditorLinesPosition;
       FLines: TBCEditorLines;
       FPattern: string;
       FRegEx: TRegEx;
-      FRegExpr: Boolean;
       FRegExOptions: TRegexOptions;
       FReplaceText: string;
       FWholeWords: Boolean;
+      function FindLinesRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
       function FindNormal(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
-      function FindRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
+      function FindTextRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
     protected
       property Lines: TBCEditorLines read FLines;
     public
-      constructor Create(const ALines: TBCEditorLines; const AArea: TBCEditorLinesArea;
+      constructor Create(const ALines: TBCEditorLines;
+        const ABeginPosition, AEndPosition: TBCEditorLinesPosition;
         const ACaseSensitive, AWholeWords, ARegExpr, ABackwards: Boolean;
         const APattern: string; const AReplaceText: string = '');
       function Find(var APosition: TBCEditorLinesPosition; out AFoundLength: Integer): Boolean;
       procedure Replace();
+      property BeginPosition: TBCEditorLinesPosition read FBeginPosition;
+      property EndPosition: TBCEditorLinesPosition read FEndPosition;
       property ErrorMessage: string read FErrorMessage;
     end;
 
@@ -165,9 +170,6 @@ type
   protected
     procedure Backspace(AArea: TBCEditorLinesArea);
     procedure ClearUndo();
-    function CharIndexToPosition(const ACharIndex: Integer): TBCEditorLinesPosition; overload;
-    function CharIndexToPosition(const ACharIndex: Integer;
-      const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     function CompareStrings(const S1, S2: string): Integer; override;
     procedure CustomSort(const ABeginLine, AEndLine: Integer; ACompare: TCompare);
     procedure DeleteIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
@@ -180,12 +182,15 @@ type
     function GetTextStr(): string; override;
     procedure InsertIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
       const AIndentText: string; const ASelMode: TBCEditorSelectionMode);
+    function CharIndexOf(const APosition: TBCEditorLinesPosition): Integer;
     procedure InsertText(AArea: TBCEditorLinesArea; const AText: string); overload;
     function InsertText(APosition: TBCEditorLinesPosition;
       const AText: string): TBCEditorLinesPosition; overload;
     function IsPositionInSelection(const APosition: TBCEditorLinesPosition): Boolean;
     function IsWordBreakChar(const AChar: Char): Boolean;
-    function PositionToCharIndex(const APosition: TBCEditorLinesPosition): Integer;
+    function PositionOf(const ACharIndex: Integer): TBCEditorLinesPosition; overload;
+    function PositionOf(const ACharIndex: Integer;
+      const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     procedure Put(ALine: Integer; const AText: string); override;
     procedure Redo();
     function ReplaceText(const AArea: TBCEditorLinesArea; const AText: string): TBCEditorLinesPosition;
@@ -240,49 +245,6 @@ type
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); override;
   end;
 
-  TBCEditorRow = record
-  type
-    TFlags = set of (rfFirstRowOfLine, rfLastRowOfLine, rfHasTabs);
-  public
-    Char: Integer;
-    Columns: Integer;
-    Flags: TFlags;
-    Length: Integer;
-    Line: Integer;
-    Range: Pointer;
-    Width: Integer;
-  end;
-
-  TBCEditorRows = class(TList<TBCEditorRow>)
-  strict private
-    FLines: TBCEditorLines;
-    FMaxColumns: Integer;
-    FMaxColumnsRow: Integer;
-    FMaxWidth: Integer;
-    FMaxWidthRow: Integer;
-    function GetBORPosition(ARow: Integer): TBCEditorLinesPosition;
-    function GetEORPosition(ARow: Integer): TBCEditorLinesPosition;
-    function GetMaxColumns(): Integer;
-    function GetMaxWidth(): Integer;
-    function GetText(ARow: Integer): string;
-  strict protected
-    property Lines: TBCEditorLines read FLines;
-  public
-    procedure Add(const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
-      const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
-    procedure Clear();
-    constructor Create(const ALines: TBCEditorLines);
-    procedure Delete(ARow: Integer);
-    procedure Insert(ARow: Integer;
-      const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
-      const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
-    property BORPosition[Row: Integer]: TBCEditorLinesPosition read GetBORPosition;
-    property EORPosition[Row: Integer]: TBCEditorLinesPosition read GetEORPosition;
-    property MaxColumns: Integer read GetMaxColumns;
-    property MaxWidth: Integer read GetMaxWidth;
-    property Text[Row: Integer]: string read GetText; default;
-  end;
-
 implementation {***************************************************************}
 
 uses
@@ -310,24 +272,30 @@ end;
 { TBCEditorLines.TSearch ******************************************************}
 
 constructor TBCEditorLines.TSearch.Create(const ALines: TBCEditorLines;
-  const AArea: TBCEditorLinesArea;
+  const ABeginPosition, AEndPosition: TBCEditorLinesPosition;
   const ACaseSensitive, AWholeWords, ARegExpr, ABackwards: Boolean;
   const APattern: string; const AReplaceText: string = '');
 var
   LIndex: Integer;
 begin
-  Assert((BOFPosition <= AArea.BeginPosition) and (AArea.BeginPosition <= AArea.EndPosition) and (AArea.EndPosition <= ALines.EOFPosition));
+  Assert((BOFPosition <= ABeginPosition) and (ABeginPosition <= AEndPosition) and (AEndPosition <= ALines.EOFPosition));
 
   inherited Create();
 
   FLines := ALines;
 
-  FArea := AArea;
+  FBeginPosition := ABeginPosition;
+  FEndPosition := AEndPosition;
   FCaseSensitive := ACaseSensitive;
   FWholeWords := AWholeWords;
-  FRegExpr := ARegExpr;
+  if (not ARegExpr) then
+    FEngine := eNormal
+  else if (Pos(ReplaceStr(ReplaceStr(Lines.LineBreak, #13, '\r'), #10, '\n'), APattern) > 0) then
+    FEngine := eTextRegExpr
+  else
+    FEngine := eLinesRegExpr;
   FBackwards := ABackwards;
-  if (FCaseSensitive or FRegExpr) then
+  if (FCaseSensitive or (FEngine <> eNormal)) then
     FPattern := APattern
   else
   begin
@@ -336,7 +304,7 @@ begin
   end;
   FReplaceText := AReplaceText;
 
-  if (not FRegExpr) then
+  if (FEngine = eNormal) then
   begin
     if (FWholeWords) then
       for LIndex := 1 to Length(FPattern) do
@@ -366,24 +334,80 @@ function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
 begin
   Assert((0 <= APosition.Line) and (APosition.Line < FLines.Count));
   Assert((0 <= APosition.Char) and (APosition.Char <= Length(FLines[APosition.Line])),
-    'APosition: ' + APosition.ToString()
+    'APosition: ' + APosition.ToString() + #13#10
     + 'Length: ' + Length(FLines[APosition.Line]).ToString());
 
-  if (FRegExpr) then
-    Result := FindRegEx(APosition, AFoundLength)
-  else
-    Result := FindNormal(APosition, AFoundLength);
+  case (FEngine) of
+    eNormal: Result := FindNormal(APosition, AFoundLength);
+    eLinesRegExpr: Result := FindLinesRegEx(APosition, AFoundLength);
+    eTextRegExpr: Result := FindTextRegEx(APosition, AFoundLength);
+    else raise ERangeError.Create('FEngine: ' + IntToStr(Ord(FEngine)));
+  end;
 
   if (FBackwards) then
-    Result := Result and (FFoundPosition >= FArea.BeginPosition)
+    Result := Result and (FFoundPosition >= FBeginPosition)
   else
-    Result := Result and (FFoundPosition <= FArea.EndPosition);
+    Result := Result and (FFoundPosition <= FEndPosition);
 
   if (Result) then
   begin
     APosition := FFoundPosition;
     AFoundLength := FFoundLength;
   end;
+end;
+
+function TBCEditorLines.TSearch.FindLinesRegEx(const APosition: TBCEditorLinesPosition;
+  const AFoundLength: Integer): Boolean;
+var
+  LMatch: TMatch;
+begin
+  FFoundPosition := APosition;
+
+  Result := False;
+  if (FBackwards) then
+    while (not Result and (FFoundPosition.Line >= 0)) do
+    begin
+      try
+        LMatch := FRegEx.Match(FLines[FFoundPosition.Line]);
+      except
+        on E: Exception do
+          FErrorMessage := E.Message;
+      end;
+
+      Result := (FErrorMessage = '') and LMatch.Success and (LMatch.Index - 1 < FFoundPosition.Char);
+      while (Result and LMatch.Success) do
+      begin
+        FFoundPosition.Char := LMatch.Index - 1;
+        LMatch := LMatch.NextMatch();
+      end;
+
+      if (not Result) then
+        if (FFoundPosition.Line = 0) then
+          FFoundPosition := LinesPosition(0, -1)
+        else
+          FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1];
+    end
+  else
+    while (not Result and (FFoundPosition.Line < FLines.Count)) do
+    begin
+      try
+        LMatch := FRegEx.Match(FLines[FFoundPosition.Line]);
+        while (LMatch.Success and (LMatch.Index - 1 < FFoundPosition.Char)) do
+          LMatch := LMatch.NextMatch();
+      except
+        on E: Exception do
+          FErrorMessage := E.Message;
+      end;
+
+      Result := (FErrorMessage = '') and LMatch.Success;
+      if (Result) then
+        FFoundPosition.Char := LMatch.Index - 1
+      else
+        FFoundPosition := FLines.BOLPosition[FFoundPosition.Line + 1];
+    end;
+
+  if (Result) then
+    FFoundLength := LMatch.Length;
 end;
 
 function TBCEditorLines.TSearch.FindNormal(const APosition: TBCEditorLinesPosition;
@@ -411,10 +435,11 @@ begin
         or not FBackwards and (FFoundPosition <= FLines.EOFPosition))) do
     begin
       if FBackwards then
-        if (FFoundPosition.Char > 0) then
-          Dec(FFoundPosition.Char)
-        else
+      begin
+        if (FFoundPosition.Char < 0) then
           FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1];
+        Dec(FFoundPosition.Char);
+      end;
 
       LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
 
@@ -450,7 +475,7 @@ begin
           end;
 
           if (not Result) then
-            if FBackwards then
+            if (FBackwards) then
               Dec(FFoundPosition.Char)
             else
               Inc(FFoundPosition.Char);
@@ -467,58 +492,57 @@ begin
   end;
 end;
 
-function TBCEditorLines.TSearch.FindRegEx(const APosition: TBCEditorLinesPosition;
+function TBCEditorLines.TSearch.FindTextRegEx(const APosition: TBCEditorLinesPosition;
   const AFoundLength: Integer): Boolean;
 var
+  LFoundPosition: Integer;
+  LInput: string;
   LMatch: TMatch;
 begin
   FFoundPosition := APosition;
 
-  Result := False;
+  LInput := Lines.Text;
+  LFoundPosition := Lines.CharIndexOf(FFoundPosition);
+
   if (FBackwards) then
-    while (not Result and (FFoundPosition.Line >= 0)) do
-    begin
-      try
-        LMatch := FRegEx.Match(FLines.Items[FFoundPosition.Line].Text, 1, FFoundPosition.Char)
-      except
-        on E: Exception do
-          FErrorMessage := E.Message;
-      end;
-
-      Result := (FErrorMessage = '') and LMatch.Success and (LMatch.Index - 1 < FFoundPosition.Char);
-      while (Result and LMatch.Success) do
-      begin
-        FFoundPosition.Char := LMatch.Index - 1;
-        LMatch := LMatch.NextMatch();
-      end;
-
-      if (not Result) then
-        if (FFoundPosition.Line = 0) then
-          FFoundPosition := LinesPosition(0, -1)
-        else
-          FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1];
-    end
-  else
-    while (not Result and (FFoundPosition.Line < FLines.Count)) do
-    begin
-      try
-        LMatch := FRegEx.Match(FLines.Items[FFoundPosition.Line].Text, 1, FFoundPosition.Char);
-        while (LMatch.Success and (LMatch.Index - 1 < FFoundPosition.Char)) do
-          LMatch := LMatch.NextMatch();
-      except
-        on E: Exception do
-          FErrorMessage := E.Message;
-      end;
-
-      Result := (FErrorMessage = '') and LMatch.Success;
-      if (Result) then
-        FFoundPosition.Char := LMatch.Index - 1
-      else
-        FFoundPosition := FLines.BOLPosition[FFoundPosition.Line + 1];
+  begin
+    try
+      LMatch := FRegEx.Match(LInput);
+    except
+      on E: Exception do
+        FErrorMessage := E.Message;
     end;
 
+    Result := (FErrorMessage = '') and LMatch.Success and (LMatch.Index - 1 < LFoundPosition);
+    while (Result and LMatch.Success) do
+    begin
+      LFoundPosition := LMatch.Index - 1;
+      LMatch := LMatch.NextMatch();
+    end;
+  end
+  else
+  begin
+    try
+      LMatch := FRegEx.Match(LInput);
+      while (LMatch.Success and (LMatch.Index - 1 < LFoundPosition)) do
+        LMatch := LMatch.NextMatch();
+    except
+      on E: Exception do
+        FErrorMessage := E.Message;
+    end;
+
+    Result := (FErrorMessage = '') and LMatch.Success;
+    if (Result) then
+      LFoundPosition := LMatch.Index - 1
+    else
+      LFoundPosition := Length(LInput);
+  end;
+
   if (Result) then
+  begin
+    FFoundPosition := Lines.PositionOf(LFoundPosition);
     FFoundLength := LMatch.Length;
+  end;
 end;
 
 procedure TBCEditorLines.TSearch.Replace();
@@ -527,12 +551,14 @@ var
 begin
   Assert((BOFPosition <= FFoundPosition) and (FFoundPosition <= FLines.EOFPosition));
 
-  LEndPosition := FLines.CharIndexToPosition(FFoundLength, FFoundPosition);
+  LEndPosition := FLines.PositionOf(FFoundLength, FFoundPosition);
 
-  if (FRegExpr) then
-    FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition), FRegEx.Replace(FLines.TextIn[LinesArea(FFoundPosition, LEndPosition)], FPattern, FReplaceText, FRegExOptions))
+  if (FEngine = eNormal) then
+    FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition), FReplaceText)
+  else if (FEngine = eLinesRegExpr) then
+    Assert(False)
   else
-    FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition), FReplaceText);
+    FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition), FRegEx.Replace(FLines.TextIn[LinesArea(FFoundPosition, LEndPosition)], FPattern, FReplaceText, FRegExOptions));
 end;
 
 { TBCEditorLines.TUndoList ****************************************************}
@@ -730,82 +756,6 @@ begin
   end;
 
   CaretPosition := AArea.BeginPosition;
-end;
-
-function TBCEditorLines.CharIndexToPosition(const ACharIndex: Integer): TBCEditorLinesPosition;
-begin
-  Result := CharIndexToPosition(ACharIndex, BOFPosition);
-end;
-
-function TBCEditorLines.CharIndexToPosition(const ACharIndex: Integer;
-  const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition;
-var
-  LLength: Integer;
-  LLineBreakLength: Integer;
-begin
-  Assert((BOFPosition <= ARelativePosition) and (ARelativePosition <= EOFPosition));
-
-  if (Count = 0) then
-  begin
-    if (ACharIndex <> 0) then
-      raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
-    Result := BOFPosition;
-  end
-  else
-  begin
-    LLength := ACharIndex;
-
-    Result := ARelativePosition;
-
-    if ((0 <= Result.Char + LLength) and (Result.Char + LLength <= Length(Items[Result.Line].Text))) then
-      Inc(Result.Char, LLength)
-    else if (LLength < 0) then
-    begin
-      LLineBreakLength := Length(LineBreak);
-
-      Inc(LLength, Result.Char + LLineBreakLength);
-      Dec(Result.Line);
-
-      if (Result.Line < 0) then
-        raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
-
-      while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do
-      begin
-        Inc(LLength, Length(Items[Result.Line].Text) + LLineBreakLength);
-        Dec(Result.Line);
-      end;
-
-      if (Result.Line < 0) then
-        Result := BOFPosition
-      else
-      begin
-        if (- LLength > Length(Items[Result.Line].Text)) then
-          raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
-
-        Result.Char := LLength + Length(Items[Result.Line].Text);
-      end;
-    end
-    else
-    begin
-      LLineBreakLength := Length(LineBreak);
-
-      Dec(LLength, (Length(Items[Result.Line].Text) - Result.Char) + LLineBreakLength);
-      Inc(Result.Line);
-
-      if (LLength < 0) then
-        LLength := 0;
-
-      while ((Result.Line < Count) and (LLength >= Length(Items[Result.Line].Text) + LLineBreakLength)) do
-      begin
-        Dec(LLength, Length(Items[Result.Line].Text) + LLineBreakLength);
-        Inc(Result.Line);
-      end;
-
-      Result.Char := LLength;
-
-      Result := Min(Result, EOFPosition);
-    end;
-  end;
 end;
 
 procedure TBCEditorLines.Clear();
@@ -1804,6 +1754,21 @@ begin
   end;
 end;
 
+function TBCEditorLines.CharIndexOf(const APosition: TBCEditorLinesPosition): Integer;
+var
+  LLine: Integer;
+  LLineBreakLength: Integer;
+begin
+  LLineBreakLength := Length(LineBreak);
+  Result := 0;
+  for LLine := 0 to APosition.Line - 1 do
+  begin
+    Inc(Result, Length(Items[LLine].Text));
+    Inc(Result, LLineBreakLength);
+  end;
+  Inc(Result, APosition.Char);
+end;
+
 procedure TBCEditorLines.Insert(ALine: Integer; const AText: string);
 var
   LCaretPosition: TBCEditorLinesPosition;
@@ -2028,6 +1993,82 @@ begin
     [BCEDITOR_NONE_CHAR .. BCEDITOR_SPACE_CHAR]
     + BCEDITOR_WORD_BREAK_CHARACTERS
     + BCEDITOR_EXTRA_WORD_BREAK_CHARACTERS);
+end;
+
+function TBCEditorLines.PositionOf(const ACharIndex: Integer): TBCEditorLinesPosition;
+begin
+  Result := PositionOf(ACharIndex, BOFPosition);
+end;
+
+function TBCEditorLines.PositionOf(const ACharIndex: Integer;
+  const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition;
+var
+  LLength: Integer;
+  LLineBreakLength: Integer;
+begin
+  Assert((BOFPosition <= ARelativePosition) and (ARelativePosition <= EOFPosition));
+
+  if (Count = 0) then
+  begin
+    if (ACharIndex <> 0) then
+      raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
+    Result := BOFPosition;
+  end
+  else
+  begin
+    LLength := ACharIndex;
+
+    Result := ARelativePosition;
+
+    if ((0 <= Result.Char + LLength) and (Result.Char + LLength <= Length(Items[Result.Line].Text))) then
+      Inc(Result.Char, LLength)
+    else if (LLength < 0) then
+    begin
+      LLineBreakLength := Length(LineBreak);
+
+      Inc(LLength, Result.Char + LLineBreakLength);
+      Dec(Result.Line);
+
+      if ((0 < LLength) and (LLength < LLineBreakLength)) then
+        LLength := 0
+      else
+        while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do
+        begin
+          Inc(LLength, Length(Items[Result.Line].Text) + LLineBreakLength);
+          Dec(Result.Line);
+        end;
+
+      if (Result.Line < 0) then
+        Result := BOFPosition
+      else
+      begin
+        if (- LLength > Length(Items[Result.Line].Text)) then
+          raise ERangeError.CreateFmt(SCharIndexOutOfBounds, [ACharIndex]);
+
+        Result.Char := LLength + Length(Items[Result.Line].Text);
+      end;
+    end
+    else
+    begin
+      LLineBreakLength := Length(LineBreak);
+
+      Dec(LLength, (Length(Items[Result.Line].Text) - Result.Char) + LLineBreakLength);
+      Inc(Result.Line);
+
+      if (LLength < 0) then
+        LLength := 0;
+
+      while ((Result.Line < Count) and (LLength >= Length(Items[Result.Line].Text) + LLineBreakLength)) do
+      begin
+        Dec(LLength, Length(Items[Result.Line].Text) + LLineBreakLength);
+        Inc(Result.Line);
+      end;
+
+      Result.Char := LLength;
+
+      Result := Min(Result, EOFPosition);
+    end;
+  end;
 end;
 
 procedure TBCEditorLines.Put(ALine: Integer; const AText: string);
@@ -2304,21 +2345,6 @@ begin
   CustomSort(ABeginLine, AEndLine, CompareLines);
 end;
 
-function TBCEditorLines.PositionToCharIndex(const APosition: TBCEditorLinesPosition): Integer;
-var
-  LLine: Integer;
-  LLineBreakLength: Integer;
-begin
-  LLineBreakLength := Length(LineBreak);
-  Result := 0;
-  for LLine := 0 to APosition.Line - 1 do
-  begin
-    Inc(Result, Length(Items[LLine].Text));
-    Inc(Result, LLineBreakLength);
-  end;
-  Inc(Result, APosition.Char);
-end;
-
 procedure TBCEditorLines.Undo();
 begin
   ExecuteUndoRedo(UndoList);
@@ -2334,156 +2360,6 @@ function TBCEditorLines.ValidPosition(const APosition: TBCEditorLinesPosition): 
 begin
   Result := (0 <= APosition.Line) and (APosition.Line < Count)
     and (0 <= APosition.Char) and (APosition.Char < Length(Items[APosition.Line].Text));
-end;
-
-{ TBCEditorRows ***************************************************************}
-
-procedure TBCEditorRows.Add(const AFlags: TBCEditorRow.TFlags; const ALine: Integer;
-  const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
-begin
-  Insert(Count, AFlags, ALine, AChar, ALength, AColumns, AWidth, ARange);
-end;
-
-procedure TBCEditorRows.Clear();
-begin
-  inherited;
-
-  FMaxColumns := -1;
-  FMaxColumnsRow := -1;
-end;
-
-constructor TBCEditorRows.Create(const ALines: TBCEditorLines);
-begin
-  inherited Create();
-
-  FLines := ALines;
-
-  FMaxColumns := -1;
-  FMaxColumnsRow := -1;
-end;
-
-procedure TBCEditorRows.Delete(ARow: Integer);
-begin
-  inherited;
-
-  if (FMaxColumnsRow = ARow) then
-  begin
-    FMaxColumns := -1;
-    FMaxColumnsRow := -1;
-  end
-  else if (FMaxColumnsRow > ARow) then
-    Dec(FMaxColumnsRow);
-  if (FMaxWidthRow = ARow) then
-  begin
-    FMaxWidth := -1;
-    FMaxWidthRow := -1;
-  end
-  else if (FMaxWidthRow > ARow) then
-    Dec(FMaxWidthRow);
-end;
-
-function TBCEditorRows.GetBORPosition(ARow: Integer): TBCEditorLinesPosition;
-begin
-  if (ARow < Count) then
-    Result := Lines.BOLPosition[Items[ARow].Line]
-  else
-    Result := Lines.BOLPosition[Lines.Count];
-end;
-
-function TBCEditorRows.GetEORPosition(ARow: Integer): TBCEditorLinesPosition;
-begin
-  if (not (rfLastRowOfLine in Items[ARow].Flags)) then
-    Result := LinesPosition(Items[ARow].Char + Items[ARow].Length - 1, Items[ARow].Line)
-  else
-    Result := Lines.EOLPosition[Items[ARow].Line];
-end;
-
-function TBCEditorRows.GetMaxColumns(): Integer;
-var
-  LRow: Integer;
-begin
-  if ((FMaxColumns < 0) and (Count > 0)) then
-    for LRow := 0 to Count - 1 do
-      if (Items[LRow].Columns > FMaxColumns) then
-      begin
-        FMaxColumnsRow := LRow;
-        FMaxColumns := Items[LRow].Columns;
-      end;
-
-  Result := FMaxColumns;
-end;
-
-function TBCEditorRows.GetMaxWidth(): Integer;
-var
-  LRow: Integer;
-begin
-  if ((FMaxWidth < 0) and (Count > 0)) then
-    for LRow := 0 to Count - 1 do
-      if (Items[LRow].Width > FMaxWidth) then
-      begin
-        FMaxWidthRow := LRow;
-        FMaxWidth := Items[LRow].Width;
-      end;
-
-  Result := FMaxWidth;
-end;
-
-function TBCEditorRows.GetText(ARow: Integer): string;
-begin
-  Assert((0 <= ARow) and (ARow < Count));
-
-  Result := Copy(Lines.Items[Items[ARow].Line].Text, 1 + Items[ARow].Char, Items[ARow].Length);
-end;
-
-procedure TBCEditorRows.Insert(ARow: Integer; const AFlags: TBCEditorRow.TFlags;
-  const ALine: Integer; const AChar, ALength, AColumns, AWidth: Integer; const ARange: Pointer);
-var
-  LItem: TBCEditorRow;
-  LPos: PChar;
-  LEndPos: PChar;
-begin
-  Assert((0 <= ARow) and (ARow <= Count));
-
-  LItem.Flags := AFlags;
-  LItem.Char := AChar;
-  LItem.Length := ALength;
-  LItem.Line := ALine;
-  LItem.Range := ARange;
-  LItem.Columns := AColumns;
-  LItem.Width := AWidth;
-
-  if ((ALength > 0) and (lfHasTabs in Lines.Items[ALine].Flags)) then
-  begin
-    LPos := @Lines.Items[ALine].Text[1 + AChar];
-    LEndPos := @LPos[ALength - 1];
-    while (LPos <= LEndPos) do
-    begin
-      if (LPos^ = BCEDITOR_TAB_CHAR) then
-      begin
-        Include(LItem.Flags, rfHasTabs);
-        break;
-      end;
-      Inc(LPos);
-    end;
-  end;
-
-  inherited Insert(ARow, LItem);
-
-  if ((FMaxColumns >= 0) and (AColumns > FMaxColumns)) then
-  begin
-    FMaxColumns := AColumns;
-    FMaxColumnsRow := ARow;
-  end
-  else if (FMaxColumnsRow >= ARow) then
-    Inc(FMaxColumnsRow);
-
-  if ((FMaxWidth >= 0) and (AWidth > FMaxWidth)) then
-  begin
-    FMaxWidth := AWidth;
-    FMaxWidthRow := ARow;
-  end
-  else if (FMaxWidthRow >= ARow) then
-    Inc(FMaxWidthRow);
 end;
 
 end.
