@@ -1848,16 +1848,20 @@ begin
       if ((APosType = ptLines) and (LItem < Lines.Count)
         or (APosType = ptRows) and (LItem < Rows.Count)) then
       begin
-        if (LItem < 0) then
-          Write;
-
         if (LItem = 0) then
           FHighlighter.ResetCurrentRange()
         else
           if (APosType = ptLines) then
             FHighlighter.SetCurrentRange(Lines.Items[LItem].Range)
           else
+          begin
+            // Debug 2017-05-21
+            Assert((0 <= LItem) and (LItem < Rows.Count),
+              'LItem: ' + IntToStr(LItem) + #13#10
+              + 'Count: ' + IntToStr(Rows.Count));
+
             FHighlighter.SetCurrentRange(Rows.Items[LItem].Range);
+          end;
         if (APosType = ptLines) then
           FHighlighter.SetCurrentLine(Lines[LItem])
         else
