@@ -1817,7 +1817,7 @@ begin
   LItemWidth := 0;
 
   if (X <= FLeftMarginWidth) then
-    Result.Column := 0
+    Result := RowsPosition(0, LRow)
   else
   begin
     FPaintHelper.BeginDrawing(Canvas.Handle);
@@ -1865,7 +1865,6 @@ begin
 
         LLeft := 0;
         LRight := Length(LWidths) - 1;
-        Result.Column := -1;
         while (LRight - LLeft >= 2) do
         begin
           LMiddle := (LLeft + LRight) div 2;
