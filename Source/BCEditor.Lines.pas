@@ -2056,6 +2056,7 @@ end;
 procedure TBCEditorLines.SetFirstRow(const ALine: Integer; const AValue: Integer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
+  Assert(AValue <> -1); {$MESSAGE 'Nils'}
 
   Items.List[ALine].FirstRow := AValue;
 end;

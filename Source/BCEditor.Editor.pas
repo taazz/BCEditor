@@ -1094,6 +1094,8 @@ end;
 
 function TCustomBCEditor.TRows.GetEORPosition(ARow: Integer): TBCEditorLinesPosition;
 begin
+  Assert((0 <= ARow) and (ARow < Count));
+
   if (not (rfLastRowOfLine in Items[ARow].Flags)) then
     Result := LinesPosition(Items[ARow].Char + Items[ARow].Length - 1, Items[ARow].Line)
   else
@@ -1593,7 +1595,7 @@ end;
 
 function TCustomBCEditor.BuildRows(const AUpdateScrollBars: Boolean): TRows;
 const
-  RowToInsert = -2;
+  RowToInsert = -3;
 var
   LCodeFolding: Integer;
   LLine: Integer;
@@ -1850,9 +1852,9 @@ begin
 
       if (LX >= LItemWidth + LTokenWidth) then
         if (not AForCaret) then
-          Result.Column := LColumn + (LX - LItemWidth) div CharWidth
+          Result := RowsPosition(LColumn + (LX - LItemWidth) div CharWidth, LRow)
         else
-          Result.Column := LColumn + (LX - LItemWidth + CharWidth div 2) div CharWidth
+          Result := RowsPosition(LColumn + (LX - LItemWidth + CharWidth div 2) div CharWidth, LRow)
       else
       begin
         SetLength(LWidths, FHighlighter.GetTokenLength() + 1);
@@ -3130,12 +3132,10 @@ procedure TCustomBCEditor.DoEndKey(const ASelectionCommand: Boolean);
 var
   LNewCaretPosition: TBCEditorLinesPosition;
 begin
-  if (FWordWrap.Enabled) then
+  if (Rows.CaretPosition.Row < Rows.Count) then
     LNewCaretPosition := Rows.EORPosition[Rows.CaretPosition.Row]
-  else if (Lines.CaretPosition.Line < Lines.Count) then
-    LNewCaretPosition := Lines.EOLPosition[Lines.CaretPosition.Line]
   else
-    LNewCaretPosition := LinesPosition(0, Lines.CaretPosition.Line);
+    LNewCaretPosition := Lines.BOLPosition[Lines.CaretPosition.Line];
   MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ASelectionCommand);
 end;
 
@@ -6016,7 +6016,7 @@ begin
 
     Lines.SetFirstRow(ALine, ARow);
     for LLine := ALine + 1 to Lines.Count - 1 do
-      if (Lines.Items[LLine].FirstRow >= ARow) then
+      if (Lines.Items[LLine].FirstRow >= 0) then
         Lines.SetFirstRow(LLine, Lines.Items[LLine].FirstRow + Result);
   finally
     FPaintHelper.EndDrawing();
@@ -11728,7 +11728,12 @@ begin
 
       if (LDeletedRows > 0) then
         for LLine := ALine + 1 to Lines.Count - 1 do
-          Lines.SetFirstRow(LLine, Lines.Items[LLine].FirstRow - LDeletedRows);
+          if (Lines.Items[LLine].FirstRow >= 0) then
+          try
+            Lines.SetFirstRow(LLine, Lines.Items[LLine].FirstRow - LDeletedRows);
+          except
+            Write; {$MESSAGE 'Nils'}
+          end;
 
       InsertLineIntoRows(ALine, LRow);
     end;
