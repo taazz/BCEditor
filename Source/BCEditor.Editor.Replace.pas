@@ -42,7 +42,7 @@ constructor TBCEditorReplace.Create;
 begin
   inherited;
 
-  FArea := InvalidTextArea;
+  FArea := InvalidLinesArea;
   FEngine := seNormal;
   FOptions := DefaultOptions;
 end;

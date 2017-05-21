@@ -58,9 +58,6 @@ const
   ecInsertMode = 221;
   ecOverwriteMode = 222;
   ecToggleMode = 223;
-  { Selection modes }
-  ecNormalSelect = 231;
-  ecColumnSelect = 232;
   { Bookmark }
   ecToggleBookmark = 300;
   ecGotoBookmark1 = 310;
@@ -119,14 +116,6 @@ const
   ecAlternatingCase = 622;
   ecSentenceCase = 623;
   ecTitleCase = 624;
-  ecUpperCaseBlock = 625;
-  ecLowerCaseBlock = 626;
-  ecAlternatingCaseBlock = 627;
-  { Move }
-  ecMoveLineUp = 701;
-  ecMoveLineDown = 702;
-  ecMoveCharLeft = 703;
-  ecMoveCharRight = 704;
   { Search }
   ecSearchFindFirst = 802;
   ecSearchFind = 803;
@@ -230,7 +219,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 110] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 101] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -276,8 +265,6 @@ const
     (Value: ecInsertMode; Name: 'ecInsertMode'),
     (Value: ecOverwriteMode; Name: 'ecOverwriteMode'),
     (Value: ecToggleMode; Name: 'ecToggleMode'),
-    (Value: ecNormalSelect; Name: 'ecNormalSelect'),
-    (Value: ecColumnSelect; Name: 'ecColumnSelect'),
     (Value: ecToggleBookmark; Name: 'ecToggleBookmark'),
     (Value: ecGotoBookmark1; Name: 'ecGotoBookmark1'),
     (Value: ecGotoBookmark2; Name: 'ecGotoBookmark2'),
@@ -327,13 +314,6 @@ const
     (Value: ecAlternatingCase; Name: 'ecAlternatingCase'),
     (Value: ecSentenceCase; Name: 'ecSentenceCase'),
     (Value: ecTitleCase; Name: 'ecTitleCase'),
-    (Value: ecUpperCaseBlock; Name: 'ecUpperCaseBlock'),
-    (Value: ecLowerCaseBlock; Name: 'ecLowerCaseBlock'),
-    (Value: ecAlternatingCaseBlock; Name: 'ecAlternatingCaseBlock'),
-    (Value: ecMoveLineUp; Name: 'ecMoveLineUp'),
-    (Value: ecMoveLineDown; Name: 'ecMoveLineDown'),
-    (Value: ecMoveCharLeft; Name: 'ecMoveCharLeft'),
-    (Value: ecMoveCharRight; Name: 'ecMoveCharRight'),
     (Value: ecSearchFindFirst; Name: 'ecSearchFindFirst'),
     (Value: ecSearchFind; Name: 'ecSearchFind'),
     (Value: ecSearchReplace; Name: 'ecSearchReplace'),
@@ -707,12 +687,8 @@ begin
   Add(ecDeleteWord, [ssCtrl], VK_DELETE);
   { Line operations }
   Add(ecInsertLine, [ssCtrl], Ord('M'));
-  Add(ecMoveLineUp, [ssCtrl, ssAlt], VK_UP);
-  Add(ecMoveLineDown, [ssCtrl, ssAlt], VK_DOWN);
   Add(ecDeleteLine, [ssCtrl], Ord('Y'));
   Add(ecDeleteEndOfLine, [ssCtrl, ssShift], Ord('Y'));
-  Add(ecMoveCharLeft, [ssAlt, ssCtrl], VK_LEFT);
-  Add(ecMoveCharRight, [ssAlt, ssCtrl], VK_RIGHT);
   { Bookmarks }
   Add(ecToggleBookmark, [ssCtrl], VK_F2);
   Add(ecGotoBookmark1, [ssCtrl], Ord('1'));
@@ -735,9 +711,6 @@ begin
   Add(ecSetBookmark9, [ssCtrl, ssShift], Ord('9'));
   Add(ecGotoNextBookmark, [], VK_F2);
   Add(ecGotoPreviousBookmark, [ssShift], VK_F2);
-  { Selection modes }
-  Add(ecNormalSelect, [ssCtrl, ssAlt], Ord('N'));
-  Add(ecColumnSelect, [ssCtrl, ssAlt], Ord('C'));
   { Comments }
   Add(ecLineComment, [ssCtrl], VK_OEM_2);
   Add(ecBlockComment, [ssCtrl, ssShift], VK_OEM_2);

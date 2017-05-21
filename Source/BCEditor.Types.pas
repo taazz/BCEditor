@@ -75,14 +75,7 @@ type
     toTabsToSpaces
   );
 
-  PBCEditorSelectionMode = ^TBCEditorSelectionMode;
-  TBCEditorSelectionMode = (
-    smNormal,
-    smColumn
-  );
-
   TBCEditorSelectionOption = (
-    soALTSetsColumnMode,
     soExpandRealNumbers,
     soTermsCaseSensitive,
     soToEndOfLine,
@@ -307,8 +300,9 @@ function LinesPosition(const APos: TPoint): TBCEditorLinesPosition; overload; in
 function Point(const APosition: TBCEditorLinesPosition): TPoint; overload; inline;
 
 const
-  InvalidTextArea: TBCEditorLinesArea = ( BeginPosition: ( Char: -1; Line: -1; ); EndPosition: ( Char: -1; Line: -1; ) );
-  InvalidTextPosition: TBCEditorLinesPosition = ( Char: -1; Line: -1; );
+  InvalidLinesArea: TBCEditorLinesArea = ( BeginPosition: ( Char: -1; Line: -1; ); EndPosition: ( Char: -1; Line: -1; ) );
+  InvalidLinesPosition: TBCEditorLinesPosition = ( Char: -1; Line: -1; );
+  InvalidRowsPosition: TBCEditorRowsPosition = ( Column: -1; Row: -1; );
 
 implementation {***************************************************************}
 

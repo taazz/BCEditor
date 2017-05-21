@@ -288,7 +288,6 @@ type
     FPrinting: Boolean;
     FSelectionAvailable: Boolean;
     FSelectedOnly: Boolean;
-    FSelectionMode: TBCEditorSelectionMode;
     FTabWidth: Integer;
     FTitle: string;
     FWrap: Boolean;
@@ -1779,11 +1778,11 @@ begin
         LText := FLines[LIndex]
       else
       begin
-        if (FSelectionMode = smColumn) or (LIndex = FBlockBeginPosition.Line - 1) then
+        if (LIndex = FBlockBeginPosition.Line - 1) then
           LSelectionStart := FBlockBeginPosition.Char
         else
           LSelectionStart := 1;
-        if (FSelectionMode = smColumn) or (LIndex = FBlockEndPosition.Line - 1) then
+        if (LIndex = FBlockEndPosition.Line - 1) then
           LSelectionLength := FBlockEndPosition.Char - LSelectionStart
         else
           LSelectionLength := MaxInt;
@@ -2104,11 +2103,11 @@ begin
             WriteLine(FLines[i])
           else
           begin
-            if (FSelectionMode = smColumn) or (i = FBlockBeginPosition.Line - 1) then
+            if (i = FBlockBeginPosition.Line - 1) then
               LSelectionStart := FBlockBeginPosition.Char
             else
               LSelectionStart := 1;
-            if (FSelectionMode = smColumn) or (i = FBlockEndPosition.Line - 1) then
+            if (i = FBlockEndPosition.Line - 1) then
               LSelectionLength := FBlockEndPosition.Char - LSelectionStart
             else
               LSelectionLength := MaxInt;
@@ -2228,7 +2227,6 @@ begin
   FSelectionAvailable := AValue.SelectionAvailable;
   FBlockBeginPosition := AValue.SelectionBeginPosition;
   FBlockEndPosition := AValue.SelectionEndPosition;
-  FSelectionMode := AValue.SelectionMode;
 end;
 
 procedure TBCEditorPrint.LoadFromStream(AStream: TStream);
