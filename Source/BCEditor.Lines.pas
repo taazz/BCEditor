@@ -328,7 +328,7 @@ begin
   Assert((0 <= APosition.Line) and (APosition.Line < FLines.Count));
   Assert((0 <= APosition.Char) and (APosition.Char <= Length(FLines[APosition.Line])),
     'APosition: ' + APosition.ToString() + #13#10
-    + 'Length: ' + Length(FLines[APosition.Line]).ToString());
+    + 'Length: ' + IntToStr(Length(FLines[APosition.Line])));
 
   case (FEngine) of
     eNormal: Result := FindNormal(APosition, AFoundLength);
@@ -1007,26 +1007,26 @@ procedure TBCEditorLines.DoDeleteIndent(ABeginPosition, AEndPosition: TBCEditorL
   const AIndentText: string);
 var
   LLine: Integer;
-  LTextBeginPosition: TBCEditorLinesPosition;
-  LTextEndPosition: TBCEditorLinesPosition;
+  LLinesBeginPosition: TBCEditorLinesPosition;
+  LLinesEndPosition: TBCEditorLinesPosition;
 begin
   Assert((BOFPosition <= ABeginPosition) and (AEndPosition <= EOFPosition));
   Assert(ABeginPosition <= AEndPosition);
 
   if (Count > 0) then
   begin
-    LTextBeginPosition := BOLPosition[ABeginPosition.Line];
+    LLinesBeginPosition := BOLPosition[ABeginPosition.Line];
     if (ABeginPosition = AEndPosition) then
-      LTextEndPosition := EOLPosition[AEndPosition.Line]
+      LLinesEndPosition := EOLPosition[AEndPosition.Line]
     else if ((AEndPosition.Char = 0) and (AEndPosition.Line > ABeginPosition.Line)) then
-      LTextEndPosition := EOLPosition[AEndPosition.Line - 1]
+      LLinesEndPosition := EOLPosition[AEndPosition.Line - 1]
     else
-      LTextEndPosition := AEndPosition;
+      LLinesEndPosition := AEndPosition;
 
     BeginUpdate();
 
     try
-      for LLine := LTextBeginPosition.Line to LTextEndPosition.Line do
+      for LLine := LLinesBeginPosition.Line to LLinesEndPosition.Line do
         if (LeftStr(Items[LLine].Text, Length(AIndentText)) = AIndentText) then
           DoPut(LLine, Copy(Items[LLine].Text, 1 + Length(AIndentText), MaxInt));
     finally
@@ -2056,7 +2056,6 @@ end;
 procedure TBCEditorLines.SetFirstRow(const ALine: Integer; const AValue: Integer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
-  Assert(AValue <> -1); {$MESSAGE 'Nils'}
 
   Items.List[ALine].FirstRow := AValue;
 end;

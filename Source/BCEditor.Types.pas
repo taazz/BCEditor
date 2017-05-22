@@ -14,8 +14,6 @@ type
 
   TBCEditorCharMethod = function(const AChar: Char): Boolean of object;
 
-  TBCEditorCaretStyle = (csVerticalLine, csHorizontalLine, csBlock);
-
   TBCEditorDropFilesEvent = procedure(ASender: TObject; APos: TPoint; AFiles: TStrings) of object;
 
   TBCEditorPaintEvent = procedure(ASender: TObject; ACanvas: TCanvas) of object;
@@ -169,7 +167,6 @@ type
     function ToString(): string; inline;
   end;
 
-  PBCEditorDisplayPosition = ^TBCEditorRowsPosition;
   TBCEditorRowsPosition = packed record
     Column: Integer;
     Row: Integer;
