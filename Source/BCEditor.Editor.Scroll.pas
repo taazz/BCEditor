@@ -23,7 +23,7 @@ type
     end;
 
   strict private const
-    DefaultOptions = [soPastEndOfLine, soShowVerticalScrollHint, soWheelClickMove];
+    DefaultOptions = [soShowVerticalScrollHint, soWheelClickMove];
   strict private
     FHint: TBCEditorScroll.THint;
     FIndicator: TBCEditorGlyph;

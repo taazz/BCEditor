@@ -7025,6 +7025,13 @@ end;
 procedure TCustomBCEditor.MoveCaretAndSelection(ABeforeLinesPosition, AAfterLinesPosition: TBCEditorLinesPosition;
   const ASelectionCommand: Boolean);
 begin
+  if (not (soPastEndOfLine in FScroll.Options)) then
+    if (AAfterLinesPosition.Line < Lines.Count) then
+      AAfterLinesPosition.Char := Min(AAfterLinesPosition.Char, Length(Lines[AAfterLinesPosition.Line]))
+    else
+      AAfterLinesPosition.Char := 0;
+  if (not (soPastEndOfLine in FScroll.Options)) then
+    AAfterLinesPosition.Line := Max(0, Min(AAfterLinesPosition.Line, Lines.Count - 1));
   if (not ASelectionCommand) then
     Lines.CaretPosition := AAfterLinesPosition
   else
@@ -8668,7 +8675,7 @@ begin
       else
         LForegroundColor := clSpecialChar
     else if ((ALinesPosition.Line < Lines.Count) and (Lines.Items[ALinesPosition.Line].Foreground <> clNone)) then
-      LBackgroundColor := Lines.Items[ALinesPosition.Line].Foreground
+      LForegroundColor := Lines.Items[ALinesPosition.Line].Foreground
     else if (LIsLineBreakToken) then
       LForegroundColor := clNone
     else if (Assigned(AAttribute) and (AAttribute.Foreground <> clNone)) then
@@ -9273,7 +9280,7 @@ begin
     else
     begin
       LLinePos := @Lines[LLine][1 + Rows.Items[ARowsPosition.Row].Char];
-      LLineEndPos := @Lines[LLine][1 + Min(Rows.Items[ARowsPosition.Row].Length, Length(Lines[LLine]))];
+      LLineEndPos := @Lines[LLine][Min(Rows.Items[ARowsPosition.Row].Length, Length(Lines[LLine]))];
       LColumn := 0;
       LChar := 0;
       while ((LColumn < ARowsPosition.Column) and (LLinePos < LLineEndPos)) do
