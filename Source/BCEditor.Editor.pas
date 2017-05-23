@@ -3212,7 +3212,7 @@ begin
   begin
     LInsertText := Lines.LineBreak;
     if ((Lines.CaretPosition.Char > 0) and (eoAutoIndent in FOptions)) then
-      LInsertText := LInsertText + ComputeIndentText(Min(Lines.CaretPosition.Char, LeftSpaceCount(Lines.Items[Lines.CaretPosition.Line].Text, True)));
+      LInsertText := LInsertText + ComputeIndentText(Min(Rows.CaretPosition.Column, LeftSpaceCount(Lines.Items[Lines.CaretPosition.Line].Text, True)));
     Lines.InsertText(Lines.CaretPosition, LInsertText);
   end
   else
