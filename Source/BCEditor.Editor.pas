@@ -6534,9 +6534,9 @@ begin
       Inc(LRow);
     end;
 
-    if (not (rfHasTabs in Rows.Items[LRow].Flags)) then
-      Result := RowsPosition(ALinesPosition.Char - Rows.Items[LRow].Char, LRow)
-    else
+//    if (not (rfHasTabs in Rows.Items[LRow].Flags)) then
+//      Result := RowsPosition(ALinesPosition.Char - Rows.Items[LRow].Char, LRow)
+//    else
     begin
       LColumn := 0;
       LLinePos := @Lines[ALinesPosition.Line][1 + Rows.Items[LRow].Char];
@@ -7238,7 +7238,6 @@ var
   LFirstRow: Integer;
   LLastRow: Integer;
   LLastTextRow: Integer;
-  LPaintStruct: TPaintStruct;
   LTemp: Integer;
 begin
   if (LineHeight > 0) then
@@ -7253,7 +7252,6 @@ begin
     try
       Canvas.Brush.Color := FBackgroundColor;
 
-      BeginPaint(Handle, LPaintStruct);
       FPaintHelper.BeginDrawing(Canvas.Handle);
       try
         FPaintHelper.SetBaseFont(Font);
@@ -7322,7 +7320,6 @@ begin
         end;
       finally
         FPaintHelper.EndDrawing();
-        EndPaint(Handle, LPaintStruct);
       end;
 
       DoOnPaint;
@@ -10803,7 +10800,7 @@ begin
         if (Visible) then
         begin
           SendMessage(Handle, WM_SETREDRAW, WPARAM(TRUE), 0);
-          if (State * [esRowsChanged, esLinesCleared, esLinesUpdated, esResized, esScrolled] <> []) then
+//          if (State * [esRowsChanged, esLinesCleared, esLinesUpdated, esResized, esScrolled] <> []) then
             Invalidate();
         end;
 
