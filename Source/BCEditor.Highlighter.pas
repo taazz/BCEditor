@@ -448,7 +448,7 @@ type
     function GetCurrentRange: TRange;
     function GetCurrentRangeAttribute: TAttribute;
     function GetEndOfLine: Boolean; inline;
-    function GetTokenAttribute: TAttribute; inline;
+    function GetTokenAttribute(): TAttribute; inline;
     function GetTokenIndex: Integer; inline;
     function GetTokenKind: TBCEditorRangeType;
     function GetTokenLength: Integer; inline;

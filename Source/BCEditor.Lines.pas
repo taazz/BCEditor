@@ -128,6 +128,7 @@ type
     FOnCaretMoved: TNotifyEvent;
     FOnCleared: TNotifyEvent;
     FOnDeleted: TChangeEvent;
+    FOnDeleting: TChangeEvent;
     FOnInserted: TChangeEvent;
     FOnSelChange: TNotifyEvent;
     FOnUpdated: TChangeEvent;
@@ -150,14 +151,14 @@ type
     procedure DoPut(ALine: Integer; const AText: string);
     procedure ExchangeItems(ALine1, ALine2: Integer);
     procedure ExecuteUndoRedo(const List: TUndoList);
-    function GetArea(): TBCEditorLinesArea;
-    function GetBOLPosition(ALine: Integer): TBCEditorLinesPosition;
+    function GetArea(): TBCEditorLinesArea; inline;
+    function GetBOLPosition(ALine: Integer): TBCEditorLinesPosition; inline;
     function GetCanRedo(): Boolean;
     function GetCanUndo(): Boolean;
     function GetChar(APosition: TBCEditorLinesPosition): Char;
     function GetEOFPosition(): TBCEditorLinesPosition;
-    function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition;
-    function GetLineArea(ALine: Integer): TBCEditorLinesArea;
+    function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition; inline;
+    function GetLineArea(ALine: Integer): TBCEditorLinesArea; inline;
     function GetTextIn(const AArea: TBCEditorLinesArea): string;
     procedure InternalClear(const AClearUndo: Boolean); overload;
     procedure SetCaretPosition(const AValue: TBCEditorLinesPosition);
@@ -182,21 +183,21 @@ type
     procedure InsertText(AArea: TBCEditorLinesArea; const AText: string); overload;
     function InsertText(APosition: TBCEditorLinesPosition;
       const AText: string): TBCEditorLinesPosition; overload;
-    function IsWordBreakChar(const AChar: Char): Boolean;
-    function PositionOf(const ACharIndex: Integer): TBCEditorLinesPosition; overload;
+    function IsWordBreakChar(const AChar: Char): Boolean; inline;
+    function PositionOf(const ACharIndex: Integer): TBCEditorLinesPosition; overload; inline;
     function PositionOf(const ACharIndex: Integer;
       const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     procedure Put(ALine: Integer; const AText: string); override;
-    procedure Redo();
+    procedure Redo(); inline;
     function ReplaceText(const AArea: TBCEditorLinesArea; const AText: string): TBCEditorLinesPosition;
-    procedure SetBackground(const ALine: Integer; const AValue: TColor);
-    procedure SetFirstRow(const ALine: Integer; const AValue: Integer);
-    procedure SetForeground(const ALine: Integer; const AValue: TColor);
-    procedure SetRange(const ALine: Integer; const AValue: Pointer);
+    procedure SetBackground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
+    procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetRange(const ALine: Integer; const AValue: Pointer); inline;
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
-    procedure Undo();
+    procedure Undo(); inline;
     procedure UndoGroupBreak();
     function ValidPosition(const APosition: TBCEditorLinesPosition): Boolean;
     property Area: TBCEditorLinesArea read GetArea;
@@ -217,6 +218,7 @@ type
     property OnCaretMoved: TNotifyEvent read FOnCaretMoved write FOnCaretMoved;
     property OnCleared: TNotifyEvent read FOnCleared write FOnCleared;
     property OnDeleted: TChangeEvent read FOnDeleted write FOnDeleted;
+    property OnDeleting: TChangeEvent read FOnDeleting write FOnDeleting;
     property OnInserted: TChangeEvent read FOnInserted write FOnInserted;
     property OnSelChange: TNotifyEvent read FOnSelChange write FOnSelChange;
     property OnUpdated: TChangeEvent read FOnUpdated write FOnUpdated;
@@ -785,6 +787,7 @@ begin
   FOnCaretMoved := nil;
   FOnCleared := nil;
   FOnDeleted := nil;
+  FOnDeleting := nil;
   FOnInserted := nil;
   FOnSelChange := nil;
   FOnUpdated := nil;
@@ -984,6 +987,9 @@ end;
 procedure TBCEditorLines.DoDelete(ALine: Integer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
+
+  if (Assigned(OnDeleting)) then
+    OnDeleting(Self, ALine);
 
   Items.Delete(ALine);
 
@@ -2151,11 +2157,6 @@ begin
   end;
 
   CaretPosition := BOFPosition;
-
-  if (LOldCaretPosition = BOFPosition) then
-    Exclude(FState, lsCaretMoved);
-  if ((LOldSelArea.BeginPosition = BOFPosition) and (LOldSelArea.EndPosition = BOFPosition)) then
-    Exclude(FState, lsSelChanged);
 
   EndUpdate();
 

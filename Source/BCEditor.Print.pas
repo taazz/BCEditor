@@ -1943,13 +1943,13 @@ var
     begin
       LTempText := Copy(AText, LLast + 1, TBCEditorWrapPosition(AList[LCount]).Index - LLast);
       LLast := TBCEditorWrapPosition(AList[LCount]).Index;
-      ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.CharWidth, FYPos, LTempText);
+      ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.SpaceWidth, FYPos, LTempText);
       LFirstPosition := 0;
       LCount := LCount + 1;
       FYPos := FYPos + FLineHeight;
     end;
     LTempText := Copy(AText, LLast + 1, LTokenEnd - LLast);
-    ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.CharWidth, FYPos, LTempText);
+    ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.SpaceWidth, FYPos, LTempText);
     LTokenStart := LTokenPosition + Length(LToken) - Length(LTempText);
   end;
 
@@ -2221,7 +2221,7 @@ begin
   FEditor := AValue;
   Highlighter := AValue.Highlighter;
   Font := AValue.Font;
-  CharWidth := AValue.CharWidth;
+  CharWidth := AValue.PaintHelper.SpaceWidth;
   FTabWidth := AValue.Tabs.Width;
   SetLines(AValue.Lines);
   FSelectionAvailable := AValue.SelectionAvailable;

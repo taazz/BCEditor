@@ -64,7 +64,6 @@ type
     FUsingFontHandles: Boolean;
     function GetBaseFont: TFont;
   protected
-    procedure CalculateFontMetrics(AHandle: HDC; ACharHeight: PInteger; ACharWidth: PInteger);
     function GetCharHeight: Integer;
     function GetCharWidth: Integer;
     function GetFontData(AIndex: Integer): PBCEditorFontData;
@@ -96,14 +95,15 @@ type
     FBackgroundColor: TColor;
     FCalcExtentBaseStyle: TFontStyles;
     FCharHeight: Integer;
-    FCharWidth: Integer;
     FColor: TColor;
     FCurrentFont: HFont;
     FDrawingCount: Integer;
     FFontStock: TBCEditorFontStock;
     FHandle: HDC;
     FSaveHandle: Integer;
+    FSpaceWidth: Integer;
     FStockBitmap: Graphics.TBitmap;
+    FStyle: TFontStyles;
   protected
     property DrawingCount: Integer read FDrawingCount;
   public
@@ -119,11 +119,12 @@ type
     procedure SetStyle(const AValue: TFontStyles);
     property BackgroundColor: TColor read FBackgroundColor;
     property CharHeight: Integer read FCharHeight;
-    property CharWidth: Integer read FCharWidth;
     property Color: TColor read FColor;
     property FontStock: TBCEditorFontStock read FFontStock;
     property Handle: HDC read FHandle;
+    property SpaceWidth: Integer read FSpaceWidth;
     property StockBitmap: Graphics.TBitmap read FStockBitmap;
+    property Style: TFontStyles read FStyle;
   end;
 
   EBCEditorPaintHelperException = class(Exception);
@@ -302,31 +303,6 @@ end;
 
 { TBCEditorFontStock }
 
-procedure TBCEditorFontStock.CalculateFontMetrics(AHandle: HDC; ACharHeight: PInteger; ACharWidth: PInteger);
-var
-  LCharInfo: TABC;
-  LHasABC: Boolean;
-  LTextMetric: TTextMetric;
-begin
-  GetTextMetrics(AHandle, LTextMetric);
-
-  LHasABC := GetCharABCWidths(AHandle, Ord(' '), Ord(' '), LCharInfo);
-  if not LHasABC then
-  begin
-    with LCharInfo do
-    begin
-      abcA := 0;
-      abcB := LTextMetric.tmAveCharWidth;
-      abcC := 0;
-    end;
-    LTextMetric.tmOverhang := 0;
-  end;
-
-  with LCharInfo do
-    ACharWidth^ := abcA + Integer(abcB) + abcC + LTextMetric.tmOverhang;
-  ACharHeight^ := Abs(LTextMetric.tmHeight)
-end;
-
 function TBCEditorFontStock.GetBaseFont: TFont;
 begin
   Result := FPSharedFontsInfo^.BaseFont;
@@ -436,8 +412,7 @@ var
   LHandle: HDC;
   LIndex: Integer;
   LOldFont: HFont;
-  LSize1: TSize;
-  LSize2: TSize;
+  LSize: TSize;
 begin
   Assert(SizeOf(TFontStyles) = 1);
 
@@ -462,14 +437,11 @@ begin
   LHandle := InternalGetHandle;
   LOldFont := SelectObject(LHandle, FCurrentFont);
 
-  GetTextExtentPoint32(LHandle, 'W', 1, LSize1);
-  GetTextExtentPoint32(LHandle, '!', 1, LSize2);
+  GetTextExtentPoint32(LHandle, ' ', 1, LSize);
+  FPCurrentFontData^.CharWidth := LSize.cx;
+  FPCurrentFontData^.CharHeight := LSize.cy;
 
-  with FPCurrentFontData^ do
-  begin
-    Handle := FCurrentFont;
-    CalculateFontMetrics(LHandle, @CharHeight, @CharWidth);
-  end;
+  FPCurrentFontData^.Handle := FCurrentFont;
 
   SelectObject(LHandle, LOldFont);
   InternalReleaseDC(LHandle);
@@ -498,6 +470,7 @@ begin
   SetBaseFont(ABaseFont);
   FColor := clWindowText;
   FBackgroundColor := clWindow;
+  FStyle := [];
 end;
 
 destructor TBCEditorPaintHelper.Destroy;
@@ -569,8 +542,8 @@ begin
     begin
       SetBaseFont(AValue);
       Style := FCalcExtentBaseStyle;
-      FCharWidth := GetCharWidth;
       FCharHeight := GetCharHeight;
+      FSpaceWidth := GetCharWidth;
     end;
     SetStyle(AValue.Style);
   end
@@ -586,8 +559,8 @@ begin
     with FFontStock do
     begin
       Style := AValue;
-      FCharWidth := GetCharWidth;
       FCharHeight := GetCharHeight;
+      FSpaceWidth := GetCharWidth;
     end;
   end;
 end;
@@ -604,15 +577,20 @@ end;
 
 procedure TBCEditorPaintHelper.SetStyle(const AValue: TFontStyles);
 begin
-  FFontStock.SetStyle(AValue);
-  FCurrentFont := FFontStock.FontHandle;
-  FStockBitmap.Canvas.Font.Style := AValue;
-  if FHandle <> 0 then
-    SelectObject(FHandle, FCurrentFont);
+  if (AValue <> FStyle) then
+  begin
+    FStyle := AValue;
+    FFontStock.SetStyle(AValue);
+    FCurrentFont := FFontStock.FontHandle;
+    FStockBitmap.Canvas.Font.Style := AValue;
+    if FHandle <> 0 then
+      SelectObject(FHandle, FCurrentFont);
+  end;
 end;
 
-initialization {***************************************************************}
-finalization {*****************************************************************}
+initialization
+  GFontsInfoManager := nil;
+finalization
   if (Assigned(GFontsInfoManager)) then
     GFontsInfoManager.Free();
 end.

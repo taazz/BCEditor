@@ -30,13 +30,6 @@ type
 
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
 
-  TBCEditorCustomDrowTokenEvent = procedure(ASender: TObject;
-    const APos: TPoint; const AAttribute: Pointer;
-    const AText: PChar; const ALength: Integer;
-    var AForegroundColor, ABackgroundColor: TColor; var AStyles: TFontStyles;
-    var ABorderColor: TColor;
-    var ATokenAddon: TBCEditorTokenAddon; var ATokenAddonColor: TColor) of object;
-
   TBCEditorCreateFileStreamEvent = procedure(ASender: TObject; const AFileName: string; var AStream: TStream) of object;
 
   TBCEditorOption = (
@@ -295,6 +288,7 @@ function LinesArea(const ABeginPosition, AEndPosition: TBCEditorLinesPosition): 
 function LinesPosition(const AChar, ALine: Integer): TBCEditorLinesPosition; overload; inline;
 function LinesPosition(const APos: TPoint): TBCEditorLinesPosition; overload; inline;
 function Point(const APosition: TBCEditorLinesPosition): TPoint; overload; inline;
+function RowsPosition(const AColumn: Integer; const ARow: Integer): TBCEditorRowsPosition; inline;
 
 const
   InvalidLinesArea: TBCEditorLinesArea = ( BeginPosition: ( Char: -1; Line: -1; ); EndPosition: ( Char: -1; Line: -1; ) );
@@ -346,6 +340,12 @@ function Point(const APosition: TBCEditorLinesPosition): TPoint;
 begin
   Result.X := APosition.Char;
   Result.Y := APosition.Line;
+end;
+
+function RowsPosition(const AColumn: Integer; const ARow: Integer): TBCEditorRowsPosition;
+begin
+  Result.Column := AColumn;
+  Result.Row := ARow;
 end;
 
 { TBCEditorRowsPosition *******************************************************}
