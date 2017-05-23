@@ -1056,7 +1056,7 @@ end;
 
 function TCustomBCEditor.TRows.GetCaretPosition(): TBCEditorRowsPosition;
 begin
-//  if (FCaretPosition = InvalidRowsPosition) then
+  if (FCaretPosition = InvalidRowsPosition) then
     FCaretPosition := FEditor.LinesToRows(FEditor.Lines.CaretPosition);
 
   Result := FCaretPosition;
@@ -11383,7 +11383,7 @@ begin
     and not FCaret.NonBlinking.Enabled
     and Visible) then
   begin
-//    if (not FCaretClientPos.Valid) then
+    if (not FCaretClientPos.Valid) then
     begin
       LCaretClientPos := RowsToClient(Rows.CaretPosition);
       FCaretClientPos.X := LCaretClientPos.X;
