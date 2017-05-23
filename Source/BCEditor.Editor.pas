@@ -6534,13 +6534,13 @@ begin
       Inc(LRow);
     end;
 
-//    if (not (rfHasTabs in Rows.Items[LRow].Flags)) then
-//      Result := RowsPosition(ALinesPosition.Char - Rows.Items[LRow].Char, LRow)
-//    else
+    if (not (rfHasTabs in Rows.Items[LRow].Flags)) then
+      Result := RowsPosition(ALinesPosition.Char - Rows.Items[LRow].Char, LRow)
+    else
     begin
       LColumn := 0;
       LLinePos := @Lines[ALinesPosition.Line][1 + Rows.Items[LRow].Char];
-      LLineEndPos := @Lines[ALinesPosition.Line][1 + Min(Rows.Items[LRow].Char + LChar, Length(Lines[ALinesPosition.Line]))];
+      LLineEndPos := @Lines[ALinesPosition.Line][Min(1 + Rows.Items[LRow].Char + LChar, Length(Lines[ALinesPosition.Line]))];
       while (LLinePos < LLineEndPos) do
       begin
         Inc(LColumn, ComputeTextColumns(LLinePos, 1, LColumn));
