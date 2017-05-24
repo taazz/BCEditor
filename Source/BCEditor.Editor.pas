@@ -3578,11 +3578,7 @@ begin
         begin
           ClipboardData := GlobalLock(Global);
           if (Assigned(ClipboardData)) then
-          begin
-            SetString(Text, PChar(ClipboardData), GlobalSize(Global) div SizeOf(Text[1]));
-            if ((Length(Text) > 0) and (Text[Length(Text)] = #0)) then
-              SetLength(Text, Length(Text) - 1);
-          end;
+            Text := StrPas(PChar(ClipboardData));
           GlobalUnlock(Global);
         end;
       finally

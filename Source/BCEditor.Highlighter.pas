@@ -2247,7 +2247,8 @@ begin
 
     LTokenMatch.OpenToken := LJsonDataValue.ObjectValue['OpenToken'].Value;
     LTokenMatch.CloseToken := LJsonDataValue.ObjectValue['CloseToken'].Value;
-    FHighlighter.MatchingPairs.Add(LTokenMatch)
+    if ((LTokenMatch.OpenToken <> '') and (LTokenMatch.CloseToken <> '')) then
+      FHighlighter.MatchingPairs.Add(LTokenMatch)
   end;
 end;
 
