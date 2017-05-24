@@ -10123,7 +10123,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
           FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.EndPosition;
 
           // Debug 2017-05-24
-          Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char < Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
+          Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char <= Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
             'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
             + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
             + 'OpenToken.Area: ' + LSearchOpenToken.Area.ToString + #13#10
@@ -10159,7 +10159,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
             end;
 
             // Debug 2017-05-24
-            Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char < Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
+            Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char <= Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
               'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
               + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
               + 'OpenToken.Area: ' + LSearchOpenToken.Area.ToString + #13#10
