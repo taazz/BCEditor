@@ -36,10 +36,9 @@ type
 
     TSearch = class
     private
+      FArea: TBCEditorLinesArea;
       FBackwards: Boolean;
-      FBeginPosition: TBCEditorLinesPosition;
       FCaseSensitive: Boolean;
-      FEndPosition: TBCEditorLinesPosition;
       FEngine: (eNormal, eLinesRegExpr, eTextRegExpr);
       FErrorMessage: string;
       FFoundLength: Integer;
@@ -57,13 +56,12 @@ type
       property Lines: TBCEditorLines read FLines;
     public
       constructor Create(const ALines: TBCEditorLines;
-        const ABeginPosition, AEndPosition: TBCEditorLinesPosition;
+        const AArea: TBCEditorLinesArea;
         const ACaseSensitive, AWholeWords, ARegExpr, ABackwards: Boolean;
         const APattern: string; const AReplaceText: string = '');
       function Find(var APosition: TBCEditorLinesPosition; out AFoundLength: Integer): Boolean;
       procedure Replace();
-      property BeginPosition: TBCEditorLinesPosition read FBeginPosition;
-      property EndPosition: TBCEditorLinesPosition read FEndPosition;
+      property Area: TBCEditorLinesArea read FArea;
       property ErrorMessage: string read FErrorMessage;
     end;
 
@@ -267,20 +265,19 @@ end;
 { TBCEditorLines.TSearch ******************************************************}
 
 constructor TBCEditorLines.TSearch.Create(const ALines: TBCEditorLines;
-  const ABeginPosition, AEndPosition: TBCEditorLinesPosition;
+  const AArea: TBCEditorLinesArea;
   const ACaseSensitive, AWholeWords, ARegExpr, ABackwards: Boolean;
   const APattern: string; const AReplaceText: string = '');
 var
   LIndex: Integer;
 begin
-  Assert((BOFPosition <= ABeginPosition) and (ABeginPosition <= AEndPosition) and (AEndPosition <= ALines.EOFPosition));
+  Assert((BOFPosition <= AArea.BeginPosition) and (AArea.BeginPosition <= AArea.EndPosition) and (AArea.EndPosition <= ALines.EOFPosition));
 
   inherited Create();
 
   FLines := ALines;
 
-  FBeginPosition := ABeginPosition;
-  FEndPosition := AEndPosition;
+  FArea := AArea;
   FCaseSensitive := ACaseSensitive;
   FWholeWords := AWholeWords;
   if (not ARegExpr) then
@@ -340,9 +337,9 @@ begin
   end;
 
   if (FBackwards) then
-    Result := Result and (FFoundPosition >= FBeginPosition)
+    Result := Result and (FFoundPosition >= FArea.BeginPosition)
   else
-    Result := Result and (FFoundPosition <= FEndPosition);
+    Result := Result and (FFoundPosition <= FArea.EndPosition);
 
   if (Result) then
   begin

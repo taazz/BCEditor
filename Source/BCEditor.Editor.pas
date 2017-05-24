@@ -41,8 +41,8 @@ type
     end;
 
     TMatchingPairResult = record
-      CloseArea: TBCEditorLinesArea;
-      OpenArea: TBCEditorLinesArea;
+      CloseTokenArea: TBCEditorLinesArea;
+      OpenTokenArea: TBCEditorLinesArea;
       State: (mpsClear, mpsFound, mpsNotFound);
     end;
 
@@ -1796,7 +1796,8 @@ begin
   LTokenWidth := 0;
   LItemWidth := 0;
 
-  if (X <= FLeftMarginWidth) then
+  if ((X <= FLeftMarginWidth)
+    or (Rows.Count = 0)) then
     Result := RowsPosition(0, LRow)
   else
   begin
@@ -3521,7 +3522,7 @@ begin
   end;
 
   LNewCaretPosition := RowsToLines(RowsPosition(Rows.CaretPosition.Column, LNewRow));
-  if (not (soPastEndOfFile in Scroll.Options)) then
+  if (not (soBeyondEndOfFile in Scroll.Options)) then
     LNewCaretPosition.Line := Min(LNewCaretPosition.Line, Lines.Count - 1);
 
   MoveCaretAndSelection(Lines.CaretPosition, LNewCaretPosition, ACommand in [ecSelectionPageTop, ecSelectionPageBottom]);
@@ -3607,8 +3608,6 @@ end;
 function TCustomBCEditor.DoReplaceText(): Integer;
 var
   LActionReplace: TBCEditorReplaceAction;
-  LBeginPosition: TBCEditorLinesPosition;
-  LEndPosition: TBCEditorLinesPosition;
   LFindLength: Integer;
   LFindEndPosition: TBCEditorLinesPosition;
   LPromptReplace: Boolean;
@@ -3635,14 +3634,22 @@ begin
       Lines.BeginUpdate();
     try
       LSearch := TBCEditorLines.TSearch.Create(Lines,
-        Replace.Area.BeginPosition, Replace.Area.EndPosition,
+        Replace.Area,
         roCaseSensitive in Replace.Options, roWholeWordsOnly in Replace.Options, Replace.Engine = seRegularExpression, roBackwards in Replace.Options,
         Replace.Pattern, Replace.ReplaceText);
 
       if (roBackwards in FReplace.Options) then
-        LSearchPosition := LEndPosition
+        LSearchPosition := LSearch.Area.EndPosition
       else
-        LSearchPosition := LBeginPosition;
+        LSearchPosition := LSearch.Area.BeginPosition;
+      if (Lines.Count = 0) then
+        LSearchPosition := Lines.BOFPosition
+      else
+      begin
+        LSearchPosition := Lines.CaretPosition;
+        LSearchPosition.Line := Min(LSearchPosition.Line, Lines.Count - 1);
+        LSearchPosition.Char := Min(LSearchPosition.Char, Length(Lines[LSearchPosition.Line]));
+      end;
 
       if (roReplaceAll in Replace.Options) then
         LActionReplace := raReplaceAll
@@ -3739,7 +3746,7 @@ begin
     else
     begin
       LSearch := TBCEditorLines.TSearch.Create(Lines,
-        AArea.BeginPosition, AArea.EndPosition,
+        AArea,
         soCaseSensitive in Search.Options, soWholeWordsOnly in Search.Options, Search.Engine = seRegularExpression, soBackwards in Search.Options,
         Search.Pattern, '');
 
@@ -4161,17 +4168,17 @@ begin
       if FTextEntryMode = temInsert then
         Lines.InsertText(LLinesCaretPosition, LTabText);
 
-      LChangeScrollPastEndOfLine := not (soPastEndOfLine in FScroll.Options);
+      LChangeScrollPastEndOfLine := not (soBeyondEndOfLine in FScroll.Options);
       try
         if LChangeScrollPastEndOfLine then
-          FScroll.SetOption(soPastEndOfLine, True);
+          FScroll.SetOption(soBeyondEndOfLine, True);
         if FTextEntryMode = temOverwrite then
           LTabText := StringReplace(LTabText, BCEDITOR_TAB_CHAR, StringOfChar(BCEDITOR_SPACE_CHAR, FTabs.Width),
             [rfReplaceAll]);
         Lines.CaretPosition := LinesPosition(LLinesCaretPosition.Char + Length(LTabText), Lines.CaretPosition.Line);
       finally
         if LChangeScrollPastEndOfLine then
-          FScroll.SetOption(soPastEndOfLine, False);
+          FScroll.SetOption(soBeyondEndOfLine, False);
       end;
     finally
       Lines.EndUpdate();
@@ -4462,14 +4469,14 @@ begin
             end;
           end;
 
-          LChangeScrollPastEndOfLine := not (soPastEndOfLine in FScroll.Options);
+          LChangeScrollPastEndOfLine := not (soBeyondEndOfLine in FScroll.Options);
           try
             if LChangeScrollPastEndOfLine then
-              FScroll.SetOption(soPastEndOfLine, True);
+              FScroll.SetOption(soBeyondEndOfLine, True);
             Lines.InsertText(LNewCaretPosition, LDragDropText);
           finally
             if LChangeScrollPastEndOfLine then
-              FScroll.SetOption(soPastEndOfLine, False);
+              FScroll.SetOption(soBeyondEndOfLine, False);
           end;
 
           CommandProcessor(ecSelectionGotoXY, BCEDITOR_NONE_CHAR, @LNewCaretPosition);
@@ -4849,7 +4856,15 @@ begin
 
   Include(FState, esFind);
   try
-    LPosition := Lines.CaretPosition;
+    if (Lines.Count = 0) then
+      LPosition := Lines.BOFPosition
+    else
+    begin
+      LPosition := Lines.CaretPosition;
+      LPosition.Line := Min(LPosition.Line, Lines.Count - 1);
+      LPosition.Char := Min(LPosition.Char, Length(Lines[LPosition.Line]));
+    end;
+
     Result := DoSearch(LArea, LPosition);
     if (Result) then
     begin
@@ -6914,7 +6929,7 @@ begin
     FOldMouseMovePoint := Point(X, Y);
     ComputeScroll(FOldMouseMovePoint);
     LRowsPosition := ClientToRows(X, Y);
-    if (not (soPastEndOfFile in Scroll.Options)) then
+    if (not (soBeyondEndOfFile in Scroll.Options)) then
       LRowsPosition.Row := Min(LRowsPosition.Row, Max(0, Rows.Count - 1));
     if FScrollDeltaX <> 0 then
       LRowsPosition.Column := Rows.CaretPosition.Column;
@@ -7025,12 +7040,12 @@ end;
 procedure TCustomBCEditor.MoveCaretAndSelection(ABeforeLinesPosition, AAfterLinesPosition: TBCEditorLinesPosition;
   const ASelectionCommand: Boolean);
 begin
-  if (not (soPastEndOfLine in FScroll.Options)) then
+  if (not (soBeyondEndOfLine in FScroll.Options)) then
     if (AAfterLinesPosition.Line < Lines.Count) then
       AAfterLinesPosition.Char := Min(AAfterLinesPosition.Char, Length(Lines[AAfterLinesPosition.Line]))
     else
       AAfterLinesPosition.Char := 0;
-  if (not (soPastEndOfLine in FScroll.Options)) then
+  if (not (soBeyondEndOfLine in FScroll.Options)) then
     AAfterLinesPosition.Line := Max(0, Min(AAfterLinesPosition.Line, Lines.Count - 1));
   if (not ASelectionCommand) then
     Lines.CaretPosition := AAfterLinesPosition
@@ -7052,7 +7067,7 @@ begin
       LLineTextLength := Length(Lines.Items[Lines.CaretPosition.Line].Text);
 
       LNewCaretPosition := LinesPosition(Max(0, Lines.CaretPosition.Char + Cols), Lines.CaretPosition.Line);
-      if (not (soPastEndOfLine in FScroll.Options) or WordWrap.Enabled) then
+      if (not (soBeyondEndOfLine in FScroll.Options) or WordWrap.Enabled) then
         LNewCaretPosition.Char := Min(LNewCaretPosition.Char, LLineTextLength);
 
       { Skip combined and non-spacing marks }
@@ -7073,7 +7088,7 @@ begin
 
       MoveCaretAndSelection(Lines.SelArea.BeginPosition, LNewCaretPosition, SelectionCommand);
     end
-    else if ((soPastEndOfLine in FScroll.Options) and not WordWrap.Enabled) then
+    else if ((soBeyondEndOfLine in FScroll.Options) and not WordWrap.Enabled) then
       MoveCaretAndSelection(Lines.SelArea.BeginPosition, LinesPosition(Lines.CaretPosition.Char + Cols, Lines.CaretPosition.Line), SelectionCommand);
 end;
 
@@ -7085,13 +7100,13 @@ begin
   LX := RowsToClient(Rows.CaretPosition).X;
 
   LNewCaretPosition := Rows.CaretPosition;
-  if ((ARows < 0) or (soPastEndOfFile in Scroll.Options)) then
+  if ((ARows < 0) or (soBeyondEndOfFile in Scroll.Options)) then
     LNewCaretPosition.Row := Max(0, LNewCaretPosition.Row + ARows)
   else
     LNewCaretPosition.Row := Min(Rows.Count - 1, LNewCaretPosition.Row + ARows);
   LNewCaretPosition.Column := ClientToRows(LX, LNewCaretPosition.Row * LineHeight, True).Column;
 
-  if (not (soPastEndOfLine in FScroll.Options) or WordWrap.Enabled) then
+  if (not (soBeyondEndOfLine in FScroll.Options) or WordWrap.Enabled) then
     if (LNewCaretPosition.Row < Rows.Count) then
       if (not (rfLastRowOfLine in Rows.Items[LNewCaretPosition.Row].Flags)) then
         LNewCaretPosition.Column := Min(LNewCaretPosition.Column, Rows.Items[LNewCaretPosition.Row].Length - 1)
@@ -8724,8 +8739,8 @@ begin
 
     if (FCurrentMatchingPair.State = mpsFound) then
     begin
-      ApplyPart(FCurrentMatchingPair.OpenArea, ptMatchingPair);
-      ApplyPart(FCurrentMatchingPair.CloseArea, ptMatchingPair);
+      ApplyPart(FCurrentMatchingPair.OpenTokenArea, ptMatchingPair);
+      ApplyPart(FCurrentMatchingPair.CloseTokenArea, ptMatchingPair);
     end;
 
     if (not APaintData^.SelArea.IsEmpty()) then
@@ -10083,121 +10098,130 @@ procedure TCustomBCEditor.ScanMatchingPair();
     LFoundLengthOpen: Integer;
     LMatchingPair: Integer;
     LPosition: TBCEditorLinesPosition;
-    LSearchClose: TBCEditorLines.TSearch;
-    LSearchOPen: TBCEditorLines.TSearch;
+    LSearchCloseToken: TBCEditorLines.TSearch;
+    LSearchOpenToken: TBCEditorLines.TSearch;
   begin
     for LMatchingPair := 0 to FHighlighter.MatchingPairs.Count - 1 do
       if (FCurrentMatchingPair.State = mpsClear) then
       begin
-        LSearchClose := TBCEditorLines.TSearch.Create(Lines,
-          LinesPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
-          LinesPosition(Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
+        LSearchCloseToken := TBCEditorLines.TSearch.Create(Lines,
+          LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
+            LinesPosition(Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line)),
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-        FCurrentMatchingPair.CloseArea.BeginPosition := LSearchClose.BeginPosition;
-        if (LSearchClose.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLengthClose)
-          and (FCurrentMatchingPair.CloseArea.BeginPosition > Lines.BOFPosition)) then
+        FCurrentMatchingPair.CloseTokenArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
+        if (LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthClose)
+          and (FCurrentMatchingPair.CloseTokenArea.BeginPosition > Lines.BOFPosition)) then
         begin
-          FCurrentMatchingPair.CloseArea.EndPosition := Lines.PositionOf(LFoundLengthClose, FCurrentMatchingPair.CloseArea.BeginPosition);
+          FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthClose, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
 
           LDeep := 0;
 
-          LSearchOpen := TBCEditorLines.TSearch.Create(Lines,
-            Lines.BOFPosition,
-            Lines.PositionOf(- Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseArea.BeginPosition),
+          LSearchOpenToken := TBCEditorLines.TSearch.Create(Lines,
+            LinesArea(Lines.BOFPosition,
+              Lines.PositionOf(- Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseTokenArea.BeginPosition)),
             False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-          FCurrentMatchingPair.OpenArea.BeginPosition := LSearchOpen.EndPosition;
+          FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.EndPosition;
 
-          // Debug 2017-05-22
-          Assert(FCurrentMatchingPair.OpenArea.BeginPosition.Char < Length(Lines[FCurrentMatchingPair.OpenArea.BeginPosition.Line]));
+          // Debug 2017-05-24
+          Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char < Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
+            'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
+            + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
+            + 'OpenToken.Area: ' + LSearchOpenToken.Area.ToString + #13#10
+            + 'CloseToken.Area: ' + FCurrentMatchingPair.CloseTokenArea.ToString + #13#10
+            + 'Length: ' + IntToStr(Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line])));
 
-          LPosition := LSearchOpen.EndPosition;
+          LPosition := LSearchOpenToken.Area.EndPosition;
           while ((FCurrentMatchingPair.State = mpsClear)
-            and LSearchOpen.Find(FCurrentMatchingPair.OpenArea.BeginPosition, LFoundLengthOpen)) do
+            and LSearchOpenToken.Find(FCurrentMatchingPair.OpenTokenArea.BeginPosition, LFoundLengthOpen)) do
           begin
-            LSearchClose.Free();
-            LSearchClose := TBCEditorLines.TSearch.Create(Lines,
-              LSearchOpen.BeginPosition,
-              FCurrentMatchingPair.CloseArea.BeginPosition,
+            LSearchCloseToken.Free();
+            LSearchCloseToken := TBCEditorLines.TSearch.Create(Lines,
+              LinesArea(LSearchOpenToken.Area.BeginPosition,
+                FCurrentMatchingPair.CloseTokenArea.BeginPosition),
               False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-            if (LSearchClose.Find(LPosition, LFoundLengthClose)
-              and (LPosition > FCurrentMatchingPair.OpenArea.BeginPosition)) then
+            if (LSearchCloseToken.Find(LPosition, LFoundLengthClose)
+              and (LPosition > FCurrentMatchingPair.OpenTokenArea.BeginPosition)) then
             begin
               Inc(LDeep);
               LPosition := Lines.PositionOf(-1, LPosition);
-              FCurrentMatchingPair.OpenArea.BeginPosition := LPosition;
+              FCurrentMatchingPair.OpenTokenArea.BeginPosition := LPosition;
             end
             else if (LDeep > 0) then
             begin
               Dec(LDeep);
-              LPosition := Lines.PositionOf(-1, FCurrentMatchingPair.OpenArea.BeginPosition);
-              FCurrentMatchingPair.OpenArea.BeginPosition := LPosition;
+              LPosition := Lines.PositionOf(-1, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
+              FCurrentMatchingPair.OpenTokenArea.BeginPosition := LPosition;
             end
             else
             begin
               FCurrentMatchingPair.State := mpsFound;
-              FCurrentMatchingPair.OpenArea.EndPosition := Lines.PositionOf(LFoundLengthOpen, FCurrentMatchingPair.OpenArea.BeginPosition);
+              FCurrentMatchingPair.OpenTokenArea.EndPosition := Lines.PositionOf(LFoundLengthOpen, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
             end;
 
-            // Debug 2017-05-22
-            Assert((FCurrentMatchingPair.State <> mpsClear)
-              or (FCurrentMatchingPair.OpenArea.BeginPosition.Char < Length(Lines[FCurrentMatchingPair.OpenArea.BeginPosition.Line])));
+            // Debug 2017-05-24
+            Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char < Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
+              'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
+              + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
+              + 'OpenToken.Area: ' + LSearchOpenToken.Area.ToString + #13#10
+              + 'CloseToken.Area: ' + FCurrentMatchingPair.CloseTokenArea.ToString + #13#10
+              + 'Length: ' + IntToStr(Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line])));
           end;
-          LSearchOpen.Free();
+          LSearchOpenToken.Free();
         end;
-        LSearchClose.Free();
+        LSearchCloseToken.Free();
       end;
 
     for LMatchingPair := 0 to FHighlighter.MatchingPairs.Count - 1 do
       if (FCurrentMatchingPair.State = mpsClear) then
       begin
-        LSearchOpen := TBCEditorLines.TSearch.Create(Lines,
-          LinesPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
-          LinesPosition(Min(Length(Lines[APosition.Line]), Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken))), APosition.Line),
+        LSearchOpenToken := TBCEditorLines.TSearch.Create(Lines,
+          LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
+            LinesPosition(Min(Length(Lines[APosition.Line]), Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken))), APosition.Line)),
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-        FCurrentMatchingPair.OpenArea.BeginPosition := LSearchOpen.BeginPosition;
-        if (LSearchOpen.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLengthOpen)
-          and (FCurrentMatchingPair.CloseArea.BeginPosition < Lines.PositionOf(-1, Lines.EOFPosition))) then
+        FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.BeginPosition;
+        if (LSearchOpenToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthOpen)
+          and (FCurrentMatchingPair.CloseTokenArea.BeginPosition < Lines.PositionOf(-1, Lines.EOFPosition))) then
         begin
-          FCurrentMatchingPair.OpenArea.EndPosition := Lines.PositionOf(1, FCurrentMatchingPair.OpenArea.BeginPosition);
+          FCurrentMatchingPair.OpenTokenArea.EndPosition := Lines.PositionOf(1, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
 
           LDeep := 0;
 
-          LSearchClose := TBCEditorLines.TSearch.Create(Lines,
-            FCurrentMatchingPair.OpenArea.EndPosition,
-            Lines.EOFPosition,
+          LSearchCloseToken := TBCEditorLines.TSearch.Create(Lines,
+            LinesArea(FCurrentMatchingPair.OpenTokenArea.EndPosition,
+              Lines.EOFPosition),
             False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-          FCurrentMatchingPair.CloseArea.BeginPosition := LSearchClose.BeginPosition;
-          LPosition := LSearchClose.BeginPosition;
+          FCurrentMatchingPair.CloseTokenArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
+          LPosition := LSearchCloseToken.Area.BeginPosition;
           while ((FCurrentMatchingPair.State = mpsClear)
-            and LSearchClose.Find(FCurrentMatchingPair.CloseArea.BeginPosition, LFoundLengthClose)) do
+            and LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthClose)) do
           begin
-            LSearchOpen.Free();
-            LSearchOpen := TBCEditorLines.TSearch.Create(Lines,
-              LSearchClose.BeginPosition,
-              FCurrentMatchingPair.CloseArea.BeginPosition,
+            LSearchOpenToken.Free();
+            LSearchOpenToken := TBCEditorLines.TSearch.Create(Lines,
+              LinesArea(LSearchCloseToken.Area.BeginPosition,
+                FCurrentMatchingPair.CloseTokenArea.BeginPosition),
               False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-            if (LSearchOpen.Find(LPosition, LFoundLengthOpen)
-              and (LPosition < FCurrentMatchingPair.CloseArea.BeginPosition)) then
+            if (LSearchOpenToken.Find(LPosition, LFoundLengthOpen)
+              and (LPosition < FCurrentMatchingPair.CloseTokenArea.BeginPosition)) then
             begin
               Inc(LDeep);
               LPosition := Lines.PositionOf(1, LPosition);
-              FCurrentMatchingPair.CloseArea.BeginPosition := LPosition;
+              FCurrentMatchingPair.CloseTokenArea.BeginPosition := LPosition;
             end
             else if (LDeep > 0) then
             begin
               Dec(LDeep);
-              LPosition := Lines.PositionOf(1, FCurrentMatchingPair.CloseArea.BeginPosition);
-              FCurrentMatchingPair.CloseArea.BeginPosition := LPosition;
+              LPosition := Lines.PositionOf(1, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
+              FCurrentMatchingPair.CloseTokenArea.BeginPosition := LPosition;
             end
             else
             begin
               FCurrentMatchingPair.State := mpsFound;
-              FCurrentMatchingPair.CloseArea.EndPosition := Lines.PositionOf(LFoundLengthClose, FCurrentMatchingPair.CloseArea.BeginPosition);
+              FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthClose, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
             end;
           end;
-          LSearchClose.Free();
+          LSearchCloseToken.Free();
         end;
-        LSearchOpen.Free()
+        LSearchOpenToken.Free()
       end;
   end;
 
@@ -10699,7 +10723,7 @@ var
   LValue: Integer;
 begin
   LValue := AValue;
-  if (not (soPastEndOfLine in FScroll.Options)) then
+  if (not (soBeyondEndOfLine in FScroll.Options)) then
     LValue := Min(AValue, Rows.Count - VisibleRows + 1);
   LValue := Max(0, LValue);
 
