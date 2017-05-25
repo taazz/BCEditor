@@ -1365,7 +1365,8 @@ begin
                 on E: Exception do
                   E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
                     + 'Progress: ' + Progress + #13#10
-                    + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10#13#10
+                    + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10
+                    + 'Area: ' + Area.ToString() + #13#10#13#10
                     + E.ClassName + ':' + #13#10
                     + E.Message));
               end;
@@ -1511,7 +1512,10 @@ var
   LLine: Integer;
   StringBuilder: TStringBuilder;
 begin
-  Assert((BOFPosition <= AArea.BeginPosition) and (AArea.EndPosition <= EOFPosition));
+  Assert((BOFPosition <= AArea.BeginPosition) and (AArea.EndPosition <= EOFPosition),
+    'BOFPosition: ' + BOFPosition.ToString() + #13#10
+    + 'AArea: ' + AArea.ToString() + #13#10
+    + 'EOFPosition: ' + EOFPosition.ToString());
   Assert(AArea.BeginPosition <= AArea.EndPosition,
     'AArea: ' + AArea.ToString() + #13#10
     + 'Length(' + IntToStr(AArea.BeginPosition.Line) + '):' + IntToStr(Length(Items[AArea.BeginPosition.Line].Text)) + #13#10

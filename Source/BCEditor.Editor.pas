@@ -59,7 +59,6 @@ type
 
     TPaintTokenPartType = (ptNormal, ptSyncEdit, ptMatchingPair, ptSelection, ptSearchResult, ptSearchResultInSection);
 
-    PPaintTokenPart = ^TPaintTokenPart;
     TPaintTokenPart = record
       BeginPosition: TBCEditorLinesPosition;
       EndPosition: TBCEditorLinesPosition;
@@ -1878,12 +1877,15 @@ begin
         else
           Result := RowsPosition(LColumn + LRight, LRow);
 
-        LText := Rows[LRow];
-        while (Result.Column < LText.Length - 1)
-          and ((LText[1 + Result.Column + 1].GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
-            or (LText[1 + Result.Column].GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
-              and not IsCombiningDiacriticalMark(LText[1 + Result.Column])) do
-          Inc(Result.Column);
+        if (LRow < Rows.Count) then
+        begin
+          LText := Rows[LRow];
+          while (Result.Column < LText.Length - 1)
+            and ((LText[1 + Result.Column + 1].GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark])
+              or (LText[1 + Result.Column].GetUnicodeCategory = TUnicodeCategory.ucNonSpacingMark)
+                and not IsCombiningDiacriticalMark(LText[1 + Result.Column])) do
+            Inc(Result.Column);
+        end;
       end
       else if (not AForCaret) then
         Result := RowsPosition(LColumn + (LX - LItemWidth) div FPaintHelper.SpaceWidth, LRow)
@@ -7099,7 +7101,7 @@ begin
   if ((ARows < 0) or (soBeyondEndOfFile in Scroll.Options)) then
     LNewCaretPosition.Row := Max(0, LNewCaretPosition.Row + ARows)
   else
-    LNewCaretPosition.Row := Min(Rows.Count - 1, LNewCaretPosition.Row + ARows);
+    LNewCaretPosition.Row := Max(0, Min(Rows.Count - 1, LNewCaretPosition.Row + ARows));
   LNewCaretPosition.Column := ClientToRows(LX, LNewCaretPosition.Row * LineHeight, True).Column;
 
   if (not (soBeyondEndOfLine in FScroll.Options) or WordWrap.Enabled) then
@@ -10122,8 +10124,9 @@ procedure TCustomBCEditor.ScanMatchingPair();
           Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char <= Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
             'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
             + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
-            + 'OpenToken.Area: ' + LSearchOpenToken.Area.ToString + #13#10
+            + 'OpenToken.Area: ' + FCurrentMatchingPair.OpenTokenArea.ToString + #13#10
             + 'CloseToken.Area: ' + FCurrentMatchingPair.CloseTokenArea.ToString + #13#10
+            + 'LSearchOpenToken.Area: ' + LSearchOpenToken.Area.ToString() + #13#10
             + 'Length: ' + IntToStr(Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line])));
 
           LPosition := LSearchOpenToken.Area.EndPosition;
@@ -10158,8 +10161,10 @@ procedure TCustomBCEditor.ScanMatchingPair();
             Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char <= Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
               'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
               + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
-              + 'OpenToken.Area: ' + LSearchOpenToken.Area.ToString + #13#10
+              + 'OpenToken.Area: ' + FCurrentMatchingPair.OpenTokenArea.ToString + #13#10
               + 'CloseToken.Area: ' + FCurrentMatchingPair.CloseTokenArea.ToString + #13#10
+              + 'LSearchOpenToken.Area: ' + LSearchOpenToken.Area.ToString() + #13#10
+              + 'LSearchCloseToken.Area: ' + LSearchCloseToken.Area.ToString() + #13#10
               + 'Length: ' + IntToStr(Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line])));
           end;
           LSearchOpenToken.Free();
@@ -11381,7 +11386,7 @@ begin
     else if Action is TEditCopy then
       TEditCopy(Action).Enabled := SelectionAvailable
     else if Action is TEditPaste then
-      TEditPaste(Action).Enabled := CanPaste
+      TEditPaste(Action).Enabled := Focused() and CanPaste
     else if Action is TEditDelete then
       TEditDelete(Action).Enabled := not ReadOnly and SelectionAvailable
     else if Action is TEditSelectAll then

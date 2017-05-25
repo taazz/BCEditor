@@ -9,7 +9,6 @@ uses
   BCEditor.Consts, BCEditor.Editor.CodeFolding, BCEditor.Types;
 
 type
-  TAbstractParserArray = array [AnsiChar] of Pointer;
   TBCEditorHighlighter = class(TObject)
   type
     TAttribute = class;
@@ -19,6 +18,8 @@ type
     TDelimitersParser = class;
     TTokenNodeList = class;
     TBaseParser = class;
+    TParser = class;
+    TSymbolParsers = array [AnsiChar] of TBaseParser;
 
     TMatchingPairToken = record
       OpenToken: string;
@@ -252,7 +253,7 @@ type
       FSets: TList;
       FSkipWhitespace: Boolean;
       FStringCaseFunct: TStringCaseFunction;
-      FSymbolList: TAbstractParserArray;
+      FSymbolParsers: TSymbolParsers;
       FTokens: TList;
       FUseDelimitersForText: Boolean;
       function GetKeyList(const AIndex: Integer): TKeyList;
@@ -300,7 +301,7 @@ type
       property Sets[const AIndex: Integer]: TSet read GetSet;
       property SkipWhitespace: Boolean read FSkipWhitespace write FSkipWhitespace;
       property StringCaseFunct: TStringCaseFunction read FStringCaseFunct;
-      property SymbolList: TAbstractParserArray read FSymbolList;
+      property SymbolParsers: TSymbolParsers read FSymbolParsers;
       property Tokens[const AIndex: Integer]: TToken read GetToken;
       property UseDelimitersForText: Boolean read FUseDelimitersForText write FUseDelimitersForText;
     end;
@@ -332,8 +333,8 @@ type
       FHeadNode: TTokenNode;
       FSets: TList;
     public
-      procedure AddSet(ASet: TSet);
-      procedure AddTokenNode(const AString: string; AToken: TToken; ABreakType: TBCEditorBreakType);
+      procedure AddSet(ASet: TSet); virtual;
+      procedure AddTokenNode(const AString: string; AToken: TToken; ABreakType: TBCEditorBreakType); virtual;
       constructor Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType); reintroduce; overload; virtual;
       constructor Create(ASet: TSet); reintroduce; overload; virtual;
       destructor Destroy; override;
@@ -1011,6 +1012,7 @@ end;
 
 procedure TBCEditorHighlighter.TRange.Clear;
 var
+  LAnsiChar: AnsiChar;
   LIndex: Integer;
 begin
   OpenToken.Clear;
@@ -1020,9 +1022,13 @@ begin
   CloseParent := False;
   Reset;
 
+  for LAnsiChar := Low(FSymbolParsers) to High(FSymbolParsers) do
+    if (Assigned(FSymbolParsers[LAnsiChar])) then
+      FSymbolParsers[LAnsiChar] := nil;
+
   if Assigned(FRanges) then
-  for LIndex := 0 to FRanges.Count - 1 do
-    TRange(FRanges[LIndex]).Clear;
+    for LIndex := 0 to FRanges.Count - 1 do
+      TRange(FRanges[LIndex]).Clear;
 
   ClearList(FRanges);
   ClearList(FTokens);
@@ -1250,18 +1256,21 @@ begin
     if Ord(LChar) < 256 then
     begin
       LAnsiChar := AnsiChar(LChar);
-      if not Assigned(SymbolList[LAnsiChar]) then
+      if not Assigned(SymbolParsers[LAnsiChar]) then
       begin
         if LLength = 1 then
-          FSymbolList[LAnsiChar] := TParser.Create(LFirstChar, LTempToken, LBreakType)
+          FSymbolParsers[LAnsiChar] := TParser.Create(LFirstChar, LTempToken, LBreakType)
         else
-          FSymbolList[LAnsiChar] := TParser.Create(LFirstChar, FDefaultToken, LBreakType);
+          FSymbolParsers[LAnsiChar] := TParser.Create(LFirstChar, FDefaultToken, LBreakType);
       end;
       if CharInSet(LSymbol[LLength], FDelimiters) then
         LBreakType := btAny;
       if LLength <> 1 then
-        TParser(SymbolList[LAnsiChar]).AddTokenNode(StringCaseFunct(Copy(LSymbol, 2, LLength - 1)), LTempToken,
+      begin
+        Assert(SymbolParsers[LAnsiChar] is TParser);
+        TParser(SymbolParsers[LAnsiChar]).AddTokenNode(StringCaseFunct(Copy(LSymbol, 2, LLength - 1)), LTempToken,
           LBreakType);
+      end;
     end;
   end;
 
@@ -1274,22 +1283,25 @@ begin
       begin
         LSet := TSet(FSets.List[LIndex2]);
         if CharInSet(LAnsiChar, LSet.CharSet) then
-          if not Assigned(SymbolList[LAnsiChar]) then
-            FSymbolList[LAnsiChar] := TParser.Create(LSet)
+          if not Assigned(SymbolParsers[LAnsiChar]) then
+            FSymbolParsers[LAnsiChar] := TParser.Create(LSet)
           else
-            TParser(SymbolList[LAnsiChar]).AddSet(LSet);
+          begin
+            Assert(SymbolParsers[LAnsiChar] is TParser);
+            TParser(SymbolParsers[LAnsiChar]).AddSet(LSet);
+          end;
       end;
     end;
 
   for LIndex := 0 to 255 do
   begin
     LAnsiChar := AnsiChar(LIndex);
-    if not Assigned(SymbolList[LAnsiChar]) then
+    if not Assigned(SymbolParsers[LAnsiChar]) then
     begin
       if CharInSet(LAnsiChar, FDelimiters) then
-        FSymbolList[LAnsiChar] := FDefaultTermSymbol
+        FSymbolParsers[LAnsiChar] := FDefaultTermSymbol
       else
-        FSymbolList[LAnsiChar] := FDefaultSymbols;
+        FSymbolParsers[LAnsiChar] := FDefaultSymbols;
     end;
   end;
 
@@ -1308,7 +1320,7 @@ begin
   for LIndex := 0 to 255 do
   begin
     LAnsiChar := AnsiChar(LIndex);
-    LParser := SymbolList[LAnsiChar];
+    LParser := SymbolParsers[LAnsiChar];
     if Assigned(LParser) and (LParser <> FDefaultTermSymbol) and (LParser <> FDefaultSymbols) then
       LParser.Free;
   end;
@@ -2705,9 +2717,9 @@ begin
     if ((FCurrentLine = '') or (FCurrentLineIndex = Length(FCurrentLine))) then
       LParser := nil
     else if (Ord(FCurrentLine[1 + FCurrentLineIndex]) < 256) then
-      LParser := FCurrentRange.SymbolList[AnsiChar(FCurrentRange.CaseFunct(FCurrentLine[1 + FCurrentLineIndex]))]
+      LParser := FCurrentRange.SymbolParsers[AnsiChar(FCurrentRange.CaseFunct(FCurrentLine[1 + FCurrentLineIndex]))]
     else
-      LParser := FCurrentRange.SymbolList['a'];
+      LParser := FCurrentRange.SymbolParsers['a'];
 
     if (not Assigned(LParser)) then
       Inc(FCurrentLineIndex)
