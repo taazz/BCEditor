@@ -324,10 +324,7 @@ end;
 function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
   out AFoundLength: Integer): Boolean;
 begin
-  Assert((0 <= APosition.Line) and (APosition.Line < FLines.Count));
-  Assert((0 <= APosition.Char) and (APosition.Char <= Length(FLines[APosition.Line])),
-    'APosition: ' + APosition.ToString() + #13#10
-    + 'Length: ' + IntToStr(Length(FLines[APosition.Line])));
+  Assert((FArea.BeginPosition <= APosition) and (APosition <= FArea.EndPosition));
 
   case (FEngine) of
     eNormal: Result := FindNormal(APosition, AFoundLength);
@@ -423,16 +420,9 @@ begin
     FFoundPosition := APosition;
 
     while (not Result
-      and (FBackwards and (FFoundPosition > FLines.BOFPosition)
+      and (FBackwards and (FFoundPosition >= FLines.BOFPosition)
         or not FBackwards and (FFoundPosition <= FLines.EOFPosition))) do
     begin
-      if FBackwards then
-      begin
-        if (FFoundPosition.Char < 0) then
-          FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1];
-        Dec(FFoundPosition.Char);
-      end;
-
       LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
 
       if (LLineLength > 0) then
@@ -474,9 +464,14 @@ begin
         end;
       end;
 
-      if (not Result
-        and not FBackwards) then
-        FFoundPosition := FLines.BOLPosition[FFoundPosition.Line + 1];
+      if (not Result) then
+        if (FBackwards) then
+          if (FFoundPosition.Line = 0) then
+            FFoundPosition := InvalidLinesPosition
+          else
+            FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1]
+        else
+          FFoundPosition := FLines.BOLPosition[FFoundPosition.Line + 1];
     end;
 
     if (Result) then
@@ -1901,7 +1896,7 @@ begin
       Inc(LLength, Result.Char + LLineBreakLength);
       Dec(Result.Line);
 
-      if ((0 < LLength) and (LLength < LLineBreakLength)) then
+      if ((0 <= LLength) and (LLength < LLineBreakLength)) then
         LLength := 0
       else
         while ((Result.Line >= 0) and (LLength < LLineBreakLength)) do

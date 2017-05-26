@@ -10089,11 +10089,11 @@ end;
 
 procedure TCustomBCEditor.ScanMatchingPair();
 
-  procedure ScanAtPosition(const APosition: TBCEditorLinesPosition);
+  procedure ScanAt(const APosition: TBCEditorLinesPosition);
   var
     LDeep: Integer;
-    LFoundLengthClose: Integer;
-    LFoundLengthOpen: Integer;
+    LFoundLengthCloseToken: Integer;
+    LFoundLengthOpenToken: Integer;
     LMatchingPair: Integer;
     LPosition: TBCEditorLinesPosition;
     LSearchCloseToken: TBCEditorLines.TSearch;
@@ -10107,10 +10107,10 @@ procedure TCustomBCEditor.ScanMatchingPair();
             LinesPosition(Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line)),
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
         FCurrentMatchingPair.CloseTokenArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
-        if (LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthClose)
+        if (LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthCloseToken)
           and (FCurrentMatchingPair.CloseTokenArea.BeginPosition > Lines.BOFPosition)) then
         begin
-          FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthClose, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
+          FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthCloseToken, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
 
           LDeep := 0;
 
@@ -10120,25 +10120,16 @@ procedure TCustomBCEditor.ScanMatchingPair();
             False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
           FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.EndPosition;
 
-          // Debug 2017-05-24
-          Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char <= Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
-            'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
-            + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
-            + 'OpenToken.Area: ' + FCurrentMatchingPair.OpenTokenArea.ToString + #13#10
-            + 'CloseToken.Area: ' + FCurrentMatchingPair.CloseTokenArea.ToString + #13#10
-            + 'LSearchOpenToken.Area: ' + LSearchOpenToken.Area.ToString() + #13#10
-            + 'Length: ' + IntToStr(Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line])));
-
           LPosition := LSearchOpenToken.Area.EndPosition;
           while ((FCurrentMatchingPair.State = mpsClear)
-            and LSearchOpenToken.Find(FCurrentMatchingPair.OpenTokenArea.BeginPosition, LFoundLengthOpen)) do
+            and LSearchOpenToken.Find(FCurrentMatchingPair.OpenTokenArea.BeginPosition, LFoundLengthOpenToken)) do
           begin
             LSearchCloseToken.Free();
             LSearchCloseToken := TBCEditorLines.TSearch.Create(Lines,
               LinesArea(LSearchOpenToken.Area.BeginPosition,
                 FCurrentMatchingPair.CloseTokenArea.BeginPosition),
               False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-            if (LSearchCloseToken.Find(LPosition, LFoundLengthClose)
+            if (LSearchCloseToken.Find(LPosition, LFoundLengthCloseToken)
               and (LPosition > FCurrentMatchingPair.OpenTokenArea.BeginPosition)) then
             begin
               Inc(LDeep);
@@ -10154,18 +10145,8 @@ procedure TCustomBCEditor.ScanMatchingPair();
             else
             begin
               FCurrentMatchingPair.State := mpsFound;
-              FCurrentMatchingPair.OpenTokenArea.EndPosition := Lines.PositionOf(LFoundLengthOpen, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
+              FCurrentMatchingPair.OpenTokenArea.EndPosition := Lines.PositionOf(LFoundLengthOpenToken, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
             end;
-
-            // Debug 2017-05-24
-            Assert(FCurrentMatchingPair.OpenTokenArea.BeginPosition.Char <= Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line]),
-              'OpenToken: ' + FHighlighter.MatchingPairs[LMatchingPair].OpenToken + #13#10
-              + 'CloseToken: ' + FHighlighter.MatchingPairs[LMatchingPair].CloseToken + #13#10
-              + 'OpenToken.Area: ' + FCurrentMatchingPair.OpenTokenArea.ToString + #13#10
-              + 'CloseToken.Area: ' + FCurrentMatchingPair.CloseTokenArea.ToString + #13#10
-              + 'LSearchOpenToken.Area: ' + LSearchOpenToken.Area.ToString() + #13#10
-              + 'LSearchCloseToken.Area: ' + LSearchCloseToken.Area.ToString() + #13#10
-              + 'Length: ' + IntToStr(Length(Lines[FCurrentMatchingPair.OpenTokenArea.BeginPosition.Line])));
           end;
           LSearchOpenToken.Free();
         end;
@@ -10180,7 +10161,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
             LinesPosition(Min(Length(Lines[APosition.Line]), Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken))), APosition.Line)),
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
         FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.BeginPosition;
-        if (LSearchOpenToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthOpen)
+        if (LSearchOpenToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthOpenToken)
           and (FCurrentMatchingPair.CloseTokenArea.BeginPosition < Lines.PositionOf(-1, Lines.EOFPosition))) then
         begin
           FCurrentMatchingPair.OpenTokenArea.EndPosition := Lines.PositionOf(1, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
@@ -10194,14 +10175,14 @@ procedure TCustomBCEditor.ScanMatchingPair();
           FCurrentMatchingPair.CloseTokenArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
           LPosition := LSearchCloseToken.Area.BeginPosition;
           while ((FCurrentMatchingPair.State = mpsClear)
-            and LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthClose)) do
+            and LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthCloseToken)) do
           begin
             LSearchOpenToken.Free();
             LSearchOpenToken := TBCEditorLines.TSearch.Create(Lines,
               LinesArea(LSearchCloseToken.Area.BeginPosition,
                 FCurrentMatchingPair.CloseTokenArea.BeginPosition),
               False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-            if (LSearchOpenToken.Find(LPosition, LFoundLengthOpen)
+            if (LSearchOpenToken.Find(LPosition, LFoundLengthOpenToken)
               and (LPosition < FCurrentMatchingPair.CloseTokenArea.BeginPosition)) then
             begin
               Inc(LDeep);
@@ -10217,7 +10198,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
             else
             begin
               FCurrentMatchingPair.State := mpsFound;
-              FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthClose, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
+              FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthCloseToken, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
             end;
           end;
           LSearchCloseToken.Free();
@@ -10227,15 +10208,17 @@ procedure TCustomBCEditor.ScanMatchingPair();
   end;
 
 begin
+  Assert(FCurrentMatchingPair.State = mpsClear);
+
   if (FMatchingPair.Enabled) then
   begin
     if (Lines.ValidPosition(Lines.CaretPosition)) then
-      ScanAtPosition(Lines.CaretPosition);
+      ScanAt(Lines.CaretPosition);
 
     if ((FCurrentMatchingPair.State = mpsClear)
       and (Lines.CaretPosition.Line < Lines.Count)
       and (0 < Lines.CaretPosition.Char) and (Lines.CaretPosition.Char <= Length(Lines[Lines.CaretPosition.Line]))) then
-      ScanAtPosition(LinesPosition(Lines.CaretPosition.Char - 1, Lines.CaretPosition.Line));
+      ScanAt(LinesPosition(Lines.CaretPosition.Char - 1, Lines.CaretPosition.Line));
   end;
 
   if (FCurrentMatchingPair.State = mpsClear) then
@@ -11415,7 +11398,9 @@ begin
     and not FCaret.NonBlinking.Enabled
     and Visible) then
   begin
-    if (not FCaretClientPos.Valid) then
+    if (FCaretClientPos.Valid) then
+      LCaretClientPos := Point(FCaretClientPos.X, FCaretClientPos.Y)
+    else
     begin
       LCaretClientPos := RowsToClient(Rows.CaretPosition);
       FCaretClientPos.X := LCaretClientPos.X;
@@ -11430,11 +11415,10 @@ begin
       if ((esCaretVisible in FState) and HideCaret(Handle)) then
         Exclude(FState, esCaretVisible);
 
-      Windows.SetCaretPos(FCaretClientPos.X, FCaretClientPos.Y);
+      Windows.SetCaretPos(LCaretClientPos.X, LCaretClientPos.Y);
 
       LCompositionForm.dwStyle := CFS_POINT;
-      LCompositionForm.ptCurrentPos.X := FCaretClientPos.X;
-      LCompositionForm.ptCurrentPos.Y := FCaretClientPos.Y;
+      LCompositionForm.ptCurrentPos := LCaretClientPos;
       ImmSetCompositionWindow(ImmGetContext(Handle), @LCompositionForm);
 
       if (not (esCaretVisible in FState)
