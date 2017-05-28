@@ -30,7 +30,7 @@ type
 
     TState = set of (esRowsChanged, esCaretMoved, esScrolled, esResized,
       esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated,
-      esIgnoreNextChar, esCaretVisible, esDblClicked, esWaitForDragging,
+      esIgnoreNextChar, esDblClicked, esWaitForDragging,
       esCodeFoldingInfoClicked, esInSelection, esDragging, esFind, esReplace,
       esUpdating, esUpdatingScrollBars, esBuildingRows);
 
@@ -665,7 +665,7 @@ type
     property WordWrap: TBCEditorWordWrap read FWordWrap write SetWordWrap;
   public
     constructor Create(AOwner: TComponent); override;
-    destructor Destroy; override;
+    destructor Destroy(); override;
     procedure AddHighlighterKeywords(AStringList: TStrings);
     procedure AddKeyCommand(ACommand: TBCEditorCommand; AShift: TShiftState; AKey: Word;
       ASecondaryShift: TShiftState = []; ASecondaryKey: Word = 0);
@@ -1324,7 +1324,7 @@ begin
     FWheelScrollLines := 3;
 end;
 
-destructor TCustomBCEditor.Destroy;
+destructor TCustomBCEditor.Destroy();
 begin
   ClearCodeFolding;
   FCodeFolding.Free;
@@ -1374,7 +1374,7 @@ begin
     FCodeFoldingHintForm.Release;
   FRows.Free();
 
-  inherited Destroy;
+  inherited;
 end;
 
 procedure TCustomBCEditor.ActiveLineChanged(Sender: TObject);
@@ -2324,7 +2324,7 @@ function TCustomBCEditor.ComputeTokenWidth(const AText: PChar;
 begin
   Result := PaintToken(Rect(0, 0, MaxInt, MaxInt),
     InvalidLinesPosition, RowsPosition(AColumn, -1),
-    AText, ALength, nil);
+    AText, ALength, AAttribute);
 end;
 
 procedure TCustomBCEditor.CopyToClipboard();
@@ -8658,8 +8658,7 @@ begin
             LFontStyles := LFontStyles + [fsBold];
         end;
     end;
-  if (not FFontPitchFixed or Assigned(APaintData)) then
-    FPaintHelper.SetStyle(LFontStyles);
+  FPaintHelper.SetStyle(LFontStyles);
 
   LRect := ARect;
   if (LIsLineBreakToken or not Assigned(AText)) then
@@ -9146,7 +9145,6 @@ begin
   else
     LWidth := 0;
   LHeight := LineHeight;
-  Exclude(FState, esCaretVisible);
 
   if (HandleAllocated) then
   begin
@@ -10104,11 +10102,10 @@ procedure TCustomBCEditor.ScanMatchingPair();
       begin
         LSearchCloseToken := TBCEditorLines.TSearch.Create(Lines,
           LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
-            LinesPosition(Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line)),
+            LinesPosition(Min(Length(Lines[APosition.Line]), APosition.Char + Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken) - 1), APosition.Line)),
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
         FCurrentMatchingPair.CloseTokenArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
-        if (LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthCloseToken)
-          and (FCurrentMatchingPair.CloseTokenArea.BeginPosition > Lines.BOFPosition)) then
+        if (LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthCloseToken)) then
         begin
           FCurrentMatchingPair.CloseTokenArea.EndPosition := Lines.PositionOf(LFoundLengthCloseToken, FCurrentMatchingPair.CloseTokenArea.BeginPosition);
 
@@ -10116,7 +10113,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
 
           LSearchOpenToken := TBCEditorLines.TSearch.Create(Lines,
             LinesArea(Lines.BOFPosition,
-              Lines.PositionOf(- Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken), FCurrentMatchingPair.CloseTokenArea.BeginPosition)),
+              Lines.PositionOf(- 1, FCurrentMatchingPair.CloseTokenArea.BeginPosition)),
             False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
           FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.EndPosition;
 
@@ -10129,6 +10126,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
               LinesArea(LSearchOpenToken.Area.BeginPosition,
                 FCurrentMatchingPair.CloseTokenArea.BeginPosition),
               False, False, False, True, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
+
             if (LSearchCloseToken.Find(LPosition, LFoundLengthCloseToken)
               and (LPosition > FCurrentMatchingPair.OpenTokenArea.BeginPosition)) then
             begin
@@ -10158,11 +10156,10 @@ procedure TCustomBCEditor.ScanMatchingPair();
       begin
         LSearchOpenToken := TBCEditorLines.TSearch.Create(Lines,
           LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(FHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
-            LinesPosition(Min(Length(Lines[APosition.Line]), Min(Length(Lines[APosition.Line]), APosition.Char - 1 + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken))), APosition.Line)),
+            LinesPosition(Min(Length(Lines[APosition.Line]), Min(Length(Lines[APosition.Line]), APosition.Char + Length(FHighlighter.MatchingPairs[LMatchingPair].OpenToken) - 1)), APosition.Line)),
           False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
         FCurrentMatchingPair.OpenTokenArea.BeginPosition := LSearchOpenToken.Area.BeginPosition;
-        if (LSearchOpenToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthOpenToken)
-          and (FCurrentMatchingPair.CloseTokenArea.BeginPosition < Lines.PositionOf(-1, Lines.EOFPosition))) then
+        if (LSearchOpenToken.Find(FCurrentMatchingPair.OpenTokenArea.BeginPosition, LFoundLengthOpenToken)) then
         begin
           FCurrentMatchingPair.OpenTokenArea.EndPosition := Lines.PositionOf(1, FCurrentMatchingPair.OpenTokenArea.BeginPosition);
 
@@ -10173,6 +10170,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
               Lines.EOFPosition),
             False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].CloseToken);
           FCurrentMatchingPair.CloseTokenArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
+
           LPosition := LSearchCloseToken.Area.BeginPosition;
           while ((FCurrentMatchingPair.State = mpsClear)
             and LSearchCloseToken.Find(FCurrentMatchingPair.CloseTokenArea.BeginPosition, LFoundLengthCloseToken)) do
@@ -10182,6 +10180,7 @@ procedure TCustomBCEditor.ScanMatchingPair();
               LinesArea(LSearchCloseToken.Area.BeginPosition,
                 FCurrentMatchingPair.CloseTokenArea.BeginPosition),
               False, False, False, False, FHighlighter.MatchingPairs[LMatchingPair].OpenToken);
+
             if (LSearchOpenToken.Find(LPosition, LFoundLengthOpenToken)
               and (LPosition < FCurrentMatchingPair.CloseTokenArea.BeginPosition)) then
             begin
@@ -10345,12 +10344,7 @@ begin
   if (AValue <> FAlwaysShowCaret) then
   begin
     FAlwaysShowCaret := AValue;
-    if (not Focused() and not (csDestroying in ComponentState)) then
-      if (AValue) then
-        ResetCaret()
-      else if ((esCaretVisible in FState)
-        and HideCaret(Handle)) then
-        Exclude(FState, esCaretVisible);
+    UpdateCaret();
   end;
 end;
 
@@ -11396,7 +11390,7 @@ var
 begin
   if ((FUpdateCount = 0)
     and not FCaret.NonBlinking.Enabled
-    and Visible) then
+    and HandleAllocated) then
   begin
     if (FCaretClientPos.Valid) then
       LCaretClientPos := Point(FCaretClientPos.X, FCaretClientPos.Y)
@@ -11410,24 +11404,18 @@ begin
 
     LRect := ClientRect;
     Inc(LRect.Left, FLeftMarginWidth);
-    if (LRect.Contains(LCaretClientPos)) then
+    if (not LRect.Contains(LCaretClientPos)
+      or (not Focused() and not AlwaysShowCaret)) then
+      HideCaret(Handle)
+    else
     begin
-      if ((esCaretVisible in FState) and HideCaret(Handle)) then
-        Exclude(FState, esCaretVisible);
-
       Windows.SetCaretPos(LCaretClientPos.X, LCaretClientPos.Y);
 
       LCompositionForm.dwStyle := CFS_POINT;
       LCompositionForm.ptCurrentPos := LCaretClientPos;
       ImmSetCompositionWindow(ImmGetContext(Handle), @LCompositionForm);
 
-      if (not (esCaretVisible in FState)
-        and (Focused() or AlwaysShowCaret)
-        and ShowCaret(Handle)) then
-      begin
-        Include(FState, esCaretVisible);
-        Invalidate();
-      end;
+      ShowCaret(Handle);
     end;
   end;
 end;
@@ -11867,10 +11855,8 @@ procedure TCustomBCEditor.WMKillFocus(var AMessage: TWMKillFocus);
 begin
   inherited;
 
-  if (not AlwaysShowCaret
-    and (esCaretVisible in FState)
-    and Windows.HideCaret(Handle)) then
-    Exclude(FState, esCaretVisible);
+  if (not AlwaysShowCaret) then
+    HideCaret(Handle);
 
   if (HideSelection and SelectionAvailable) then
     Invalidate();

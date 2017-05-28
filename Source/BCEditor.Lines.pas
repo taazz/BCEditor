@@ -291,6 +291,8 @@ begin
     FPattern := APattern
   else
   begin
+    // Since we modify FPattern with CharLowerBuff, we need a copy of the
+    // string - not only a copy of the pointer to the string...
     FPattern := Copy(APattern, 1, Length(APattern));
     CharLowerBuff(PChar(FPattern), Length(FPattern));
   end;
@@ -431,11 +433,14 @@ begin
           LLineText := FLines.Items[FFoundPosition.Line].Text
         else
         begin
-          // Since we modify the text with CharLowerBuff, we need a copy of the
-          // text - not only a copy of the pointer to the text...
+          // Since we modify LLineText with CharLowerBuff, we need a copy of the
+          // string - not only a copy of the pointer to the string...
           LLineText := Copy(FLines.Items[FFoundPosition.Line].Text, 1, LLineLength);
           CharLowerBuff(PChar(LLineText), Length(LLineText));
         end;
+
+        if (FBackwards and (FFoundPosition.Char = Length(LLineText))) then
+          Dec(FFoundPosition.Char);
 
         while (not Result
           and (FBackwards and (FFoundPosition.Char >= 0)
@@ -466,10 +471,12 @@ begin
 
       if (not Result) then
         if (FBackwards) then
+        begin
           if (FFoundPosition.Line = 0) then
-            FFoundPosition := InvalidLinesPosition
+            FFoundPosition := LinesPosition(0, -1)
           else
-            FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1]
+            FFoundPosition := FLines.EOLPosition[FFoundPosition.Line - 1];
+        end
         else
           FFoundPosition := FLines.BOLPosition[FFoundPosition.Line + 1];
     end;
