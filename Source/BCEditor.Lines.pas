@@ -17,7 +17,7 @@ type
     TOptions = set of TOption;
 
     TState = set of (lsLoading, lsSaving, lsDontTrim, lsUndo, lsRedo,
-      lsCaretMoved, lsSelChanged, lsTextChanged, lsInsert);
+      lsCaretMoved, lsSelChanged, lsTextChanged, lsInserting);
 
     TLine = packed record
     type
@@ -1100,32 +1100,37 @@ var
 begin
   Assert((0 <= ALine) and (ALine <= Count));
 
-  LLine.Background := clNone;
-  LLine.Flags := [];
-  LLine.FirstRow := -1;
-  LLine.Foreground := clNone;
-  LLine.Range := nil;
-  LLine.State := lsModified;
-  LLine.Text := '';
-  Items.Insert(ALine, LLine);
-
-  Include(FState, lsInsert);
+  BeginUpdate();
   try
-    DoPut(ALine, AText);
+    LLine.Background := clNone;
+    LLine.Flags := [];
+    LLine.FirstRow := -1;
+    LLine.Foreground := clNone;
+    LLine.Range := nil;
+    LLine.State := lsModified;
+    LLine.Text := '';
+    Items.Insert(ALine, LLine);
+
+    Include(FState, lsInserting);
+    try
+      DoPut(ALine, AText);
+    finally
+      Exclude(FState, lsInserting);
+    end;
+
+    if (ALine < Count - 1) then
+      CaretPosition := BOLPosition[ALine + 1]
+    else
+      CaretPosition := EOLPosition[ALine];
+    SelArea := LinesArea(CaretPosition, CaretPosition);
+
+    if (UpdateCount > 0) then
+      Include(FState, lsTextChanged);
+    if (Assigned(OnInserted)) then
+      OnInserted(Self, ALine);
   finally
-    Exclude(FState, lsInsert);
+    EndUpdate();
   end;
-
-  if (ALine < Count - 1) then
-    CaretPosition := BOLPosition[ALine + 1]
-  else
-    CaretPosition := EOLPosition[ALine];
-  SelArea := LinesArea(CaretPosition, CaretPosition);
-
-  if (UpdateCount > 0) then
-    Include(FState, lsTextChanged);
-  if (Assigned(OnInserted)) then
-    OnInserted(Self, ALine);
 end;
 
 function TBCEditorLines.DoInsertText(APosition: TBCEditorLinesPosition;
@@ -1289,7 +1294,7 @@ begin
 
   CaretPosition := EOLPosition[ALine];
 
-  if (LModified and not (lsInsert in State)) then
+  if (LModified and not (lsInserting in State)) then
   begin
     if (UpdateCount > 0) then
       Include(FState, lsTextChanged);
