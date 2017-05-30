@@ -146,7 +146,7 @@ type
     FCodeFolding: TBCEditorCodeFolding;
     FCodeFoldingDelayTimer: TTimer;
     FCodeFoldingHintForm: TBCEditorCodeFoldingHintForm;
-    FCodeFoldingRangeFromLine: array of TBCEditorCodeFolding.TRanges.TRange;
+    FCodeFoldingRangeFirstLine: array of TBCEditorCodeFolding.TRanges.TRange;
     FCodeFoldingRangeToLine: array of TBCEditorCodeFolding.TRanges.TRange;
     FCodeFoldingTreeLine: array of Boolean;
     FCommandDrop: Boolean;
@@ -158,7 +158,6 @@ type
     FDragBeginLinesCaretPosition: TBCEditorLinesPosition;
     FDrawMultiCarets: Boolean;
     FFontDummy: TFont;
-    FFontItalicOverhang: Integer;
     FFontPitchFixed: Boolean;
     FForegroundColor: TColor;
     FHideSelection: Boolean;
@@ -187,7 +186,6 @@ type
     FLineBreakSignWidth: Integer;
     FLineHeight: Integer;
     FLines: TBCEditorLines;
-    FLineSpacing: Integer;
     FMarkList: TBCEditorMarkList;
     FMatchingPair: TBCEditorMatchingPair;
     FMouseDownLinesPosition: TBCEditorLinesPosition;
@@ -225,7 +223,6 @@ type
     FOnCompletionProposalCanceled: TNotifyEvent;
     FOnCompletionProposalSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent;
     FOnContextHelp: TBCEditorContextHelpEvent;
-    FOnCustomLineColors: TBCEditorCustomLineColorsEvent;
     FOnDropFiles: TBCEditorDropFilesEvent;
     FOnKeyPressW: TBCEditorKeyPressWEvent;
     FOnLeftMarginClick: TBCEditorMarginClickEvent;
@@ -412,11 +409,7 @@ type
     procedure OnTokenInfoTimer(ASender: TObject);
     procedure OpenLink(const AURI: string; ARangeType: TBCEditorRangeType);
     procedure PaintCaretBlock(ARowsPosition: TBCEditorRowsPosition);
-    procedure PaintCodeFolding(AClipRect: TRect; AFirstRow, ALastRow: Integer);
-    procedure PaintCodeFoldingCollapsedLine(AFoldRange: TBCEditorCodeFolding.TRanges.TRange; const ALineRect: TRect);
-    procedure PaintCodeFoldingCollapseMark(AFoldRange: TBCEditorCodeFolding.TRanges.TRange;
-      const ATokenPosition, ATokenLength, ALine: Integer; ALineRect: TRect);
-    procedure PaintCodeFoldingLine(AClipRect: TRect; ALine: Integer);
+    procedure PaintCodeFolding(const AClipRect: TRect; const AFirstRow, ALastRow: Integer);
     procedure PaintGuides(const AFirstRow, ALastRow: Integer);
     procedure PaintLeftMargin(const AClipRect: TRect; const AFirstRow, ALastTextRow, ALastRow: Integer);
     procedure PaintLines(AClipRect: TRect; const AFirstRow, ALastRow: Integer);
@@ -643,7 +636,6 @@ type
     property OnCompletionProposalCanceled: TNotifyEvent read FOnCompletionProposalCanceled write FOnCompletionProposalCanceled;
     property OnCompletionProposalSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent read FOnCompletionProposalSelected write FOnCompletionProposalSelected;
     property OnContextHelp: TBCEditorContextHelpEvent read FOnContextHelp write FOnContextHelp;
-    property OnCustomLineColors: TBCEditorCustomLineColorsEvent read FOnCustomLineColors write FOnCustomLineColors;
     property OnDropFiles: TBCEditorDropFilesEvent read FOnDropFiles write FOnDropFiles;
     property OnKeyPress: TBCEditorKeyPressWEvent read FOnKeyPressW write FOnKeyPressW;
     property OnLeftMarginClick: TBCEditorMarginClickEvent read FOnLeftMarginClick write FOnLeftMarginClick;
@@ -753,7 +745,6 @@ type
     property KeyCommands: TBCEditorKeyCommands read FKeyCommands write SetKeyCommands stored False;
     property LeftMargin: TBCEditorLeftMargin read FLeftMargin write SetLeftMargin;
     property Lines: TBCEditorLines read FLines;
-    property LineSpacing: Integer read FLineSpacing write FLineSpacing default 0;
     property Marks: TBCEditorMarkList read FMarkList;
     property MatchingPair: TBCEditorMatchingPair read FMatchingPair write FMatchingPair;
     property Modified: Boolean read GetModified write SetModified;
@@ -814,7 +805,6 @@ type
     property KeyCommands;
     property LeftMargin;
     property Lines;
-    property LineSpacing;
     property MatchingPair;
     property Name;
     property OnAfterBookmarkPlaced;
@@ -836,7 +826,6 @@ type
     property OnCompletionProposalSelected;
     property OnContextHelp;
     property OnContextPopup;
-    property OnCustomLineColors;
     property OnDblClick;
     property OnDragDrop;
     property OnDragOver;
@@ -1205,8 +1194,6 @@ begin
   FCodeFoldingDelayTimer.OnTimer := OnCodeFoldingDelayTimer;
   { Matching pair }
   FMatchingPair := TBCEditorMatchingPair.Create;
-  { Line spacing }
-  FLineSpacing := 0;
   { Special chars }
   FSpecialChars := TBCEditorSpecialChars.Create;
   FSpecialChars.OnChange := SpecialCharsChanged;
@@ -1608,6 +1595,8 @@ begin
     Exclude(FState, esBuildingRows);
     FPaintHelper.EndDrawing();
   end;
+
+  InitCodeFolding();
 end;
 
 procedure TCustomBCEditor.CaretChanged(ASender: TObject);
@@ -1745,7 +1734,7 @@ begin
   ExpandCodeFoldingLines();
   FAllCodeFoldingRanges.ClearAll;
   SetLength(FCodeFoldingTreeLine, 0);
-  SetLength(FCodeFoldingRangeFromLine, 0);
+  SetLength(FCodeFoldingRangeFirstLine, 0);
   SetLength(FCodeFoldingRangeToLine, 0);
 end;
 
@@ -1795,9 +1784,22 @@ begin
   LTokenWidth := 0;
   LItemWidth := 0;
 
-  if ((X <= FLeftMarginWidth)
-    or (Rows.Count = 0)) then
+  if (X <= FLeftMarginWidth) then
     Result := RowsPosition(0, LRow)
+  else if (Rows.Count = 0) then
+  begin
+    LX := X - FLeftMarginWidth + HorzTextPos;
+    if (AForCaret) then
+      Inc(LX, FPaintHelper.SpaceWidth div 2);
+    Result := RowsPosition(LX div FPaintHelper.SpaceWidth, LRow - Rows.Count);
+  end
+  else if (LRow >= Rows.Count) then
+  begin
+    LX := X - FLeftMarginWidth + HorzTextPos;
+    if (AForCaret) then
+      Inc(LX, FPaintHelper.SpaceWidth div 2);
+    Result := RowsPosition(LX div FPaintHelper.SpaceWidth, LRow - Rows.Count + Lines.Count);
+  end
   else
   begin
     FPaintHelper.BeginDrawing(Canvas.Handle);
@@ -1970,8 +1972,8 @@ end;
 function TCustomBCEditor.CodeFoldingRangeForLine(const ALine: Integer): TBCEditorCodeFolding.TRanges.TRange;
 begin
   Result := nil;
-  if (ALine < Length(FCodeFoldingRangeFromLine)) then
-    Result := FCodeFoldingRangeFromLine[ALine]
+  if (ALine < Length(FCodeFoldingRangeFirstLine)) then
+    Result := FCodeFoldingRangeFirstLine[ALine]
 end;
 
 procedure TCustomBCEditor.CodeFoldingResetCaches;
@@ -1986,8 +1988,8 @@ begin
     LLength := Lines.Count;
     SetLength(FCodeFoldingTreeLine, 0);
     SetLength(FCodeFoldingTreeLine, LLength);
-    SetLength(FCodeFoldingRangeFromLine, 0);
-    SetLength(FCodeFoldingRangeFromLine, LLength);
+    SetLength(FCodeFoldingRangeFirstLine, 0);
+    SetLength(FCodeFoldingRangeFirstLine, LLength);
     SetLength(FCodeFoldingRangeToLine, 0);
     SetLength(FCodeFoldingRangeToLine, LLength);
     for LIndex := FAllCodeFoldingRanges.AllCount - 1 downto 0 do
@@ -1998,7 +2000,7 @@ begin
           and ((LCodeFoldingRange.FirstLine <> LCodeFoldingRange.LastLine)
             or LCodeFoldingRange.RegionItem.TokenEndIsPreviousLine and (LCodeFoldingRange.FirstLine = LCodeFoldingRange.LastLine))) then
           begin
-            FCodeFoldingRangeFromLine[LCodeFoldingRange.FirstLine] := LCodeFoldingRange;
+            FCodeFoldingRangeFirstLine[LCodeFoldingRange.FirstLine] := LCodeFoldingRange;
 
             if LCodeFoldingRange.Collapsable then
             begin
@@ -2047,7 +2049,7 @@ begin
   LLevel := -1;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := FCodeFoldingRangeFromLine[LLine];
+    LRange := FCodeFoldingRangeFirstLine[LLine];
     if (Assigned(LRange)) then
     begin
       if (LLevel = -1) then
@@ -2087,7 +2089,7 @@ begin
   Result := 0;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := FCodeFoldingRangeFromLine[LLine];
+    LRange := FCodeFoldingRangeFirstLine[LLine];
     if (Assigned(LRange) and not LRange.Collapsed and LRange.Collapsable) then
     begin
       CollapseCodeFoldingRange(LRange);
@@ -2520,7 +2522,7 @@ begin
       for LRow := LLastRow downto FLines.Items[ALine].FirstRow do
         FRows.Delete(LRow);
 
-      for LLine := ALine + 1 to Lines.Count - 1 do
+      for LLine := ALine to Lines.Count - 1 do
         Lines.SetFirstRow(LLine, Lines.Items[LLine].FirstRow - LDeletedRows);
 
       if (UpdateCount > 0) then
@@ -3362,7 +3364,7 @@ procedure TCustomBCEditor.DoOnCommandProcessed(ACommand: TBCEditorCommand; const
     LIndex := ALine;
     while (LIndex > 0) and not Assigned(FCodeFoldingRangeToLine[LIndex]) do
     begin
-      if Assigned(FCodeFoldingRangeFromLine[LIndex]) then
+      if Assigned(FCodeFoldingRangeFirstLine[LIndex]) then
         Exit(False);
       Dec(LIndex);
     end;
@@ -4561,7 +4563,7 @@ begin
   LLevel := -1;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := FCodeFoldingRangeFromLine[LLine];
+    LRange := FCodeFoldingRangeFirstLine[LLine];
     if (Assigned(LRange)) then
     begin
       if LLevel = -1 then
@@ -4597,7 +4599,7 @@ begin
   Result := 0;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := FCodeFoldingRangeFromLine[LLine];
+    LRange := FCodeFoldingRangeFirstLine[LLine];
     if (Assigned(LRange) and LRange.Collapsed) then
     begin
       ExpandCodeFoldingRange(LRange);
@@ -5069,7 +5071,6 @@ procedure TCustomBCEditor.FontChanged(ASender: TObject);
   end;
 
 var
-  LItalicSize: TSize;
   LSize: TSize;
 begin
   ClearRows();
@@ -5083,19 +5084,8 @@ begin
       FFontPitchFixed := EnumFontFamilies(Canvas.Handle, PChar(Font.Name),
         @EnumFontsFamiliesProc, 0);
 
-      Canvas.Font.Style := [fsItalic];
-      if (not GetTextExtentPoint32(Canvas.Handle, 'I', 1, LItalicSize)) then
-        FFontItalicOverhang := - Canvas.Font.Height
-      else
-      begin
-        Canvas.Font.Style := [];
-        if (not GetTextExtentPoint32(Canvas.Handle, 'I', 1, LSize)) then
-          FFontItalicOverhang := - Canvas.Font.Height
-        else
-          FFontItalicOverhang := LItalicSize.cx - LSize.cx;
-      end;
-
-      FLineHeight := FPaintHelper.CharHeight + FLineSpacing;
+      FPaintHelper.SetBaseFont(Font);
+      FLineHeight := FPaintHelper.CharHeight;
       FPaintHelper.SetStyle([]);
       GetTextExtentPoint32(Canvas.Handle, #187, 1, LSize);
       FTabSignWidth := LSize.cx;
@@ -5132,6 +5122,8 @@ begin
     end;
 
     SizeOrFontChanged(True);
+
+    UpdateCaret();
   end;
 end;
 
@@ -5680,7 +5672,8 @@ end;
 procedure TCustomBCEditor.InitCodeFolding;
 begin
   ClearCodeFolding;
-  if FCodeFolding.Visible then
+  if (FCodeFolding.Visible
+    and (FRows.Count > 0)) then
   begin
     ScanCodeFoldingRanges;
     CodeFoldingResetCaches;
@@ -6524,7 +6517,7 @@ begin
   if (Lines.Count = 0) then
     Result := RowsPosition(ALinesPosition.Char, ALinesPosition.Line)
   else if (ALinesPosition.Line >= Lines.Count) then
-    Result := RowsPosition(ALinesPosition.Char, Rows.Count + ALinesPosition.Line - Rows.Items[Rows.Count - 1].Line - 1)
+    Result := RowsPosition(ALinesPosition.Char, Rows.Count + ALinesPosition.Line - Lines.Count)
   else if ((Rows.Count >= 0) and (Lines.Items[ALinesPosition.Line].FirstRow < 0)) then
     // Rows.Count >= 0 is not needed, but GetRows must be called to initialize Lines.FirstRow
     raise ERangeError.CreateFmt(SBCEditorLineIsNotVisible, [ALinesPosition.Line])
@@ -6615,13 +6608,13 @@ begin
   begin
     FMouseDownX := X;
     FMouseDownY := Y;
-    FMouseDownLinesPosition := ClientToLines(X, Y);
+    FMouseDownLinesPosition := ClientToLines(X, Y, True);
 
     if FCaret.MultiEdit.Enabled and not FMouseOverURI then
     begin
       if ssCtrl in AShift then
       begin
-        LRowsPosition := ClientToRows(X, Y);
+        LRowsPosition := ClientToRows(X, Y, True);
         if ssShift in AShift then
           AddMultipleCarets(LRowsPosition)
         else
@@ -6659,16 +6652,16 @@ begin
   end;
 
   if FSyncEdit.Enabled and FSyncEdit.BlockSelected then
-    if not FSyncEdit.BlockArea.Containts(ClientToLines(X, Y)) then
+    if not FSyncEdit.BlockArea.Containts(ClientToLines(X, Y, True)) then
       FSyncEdit.Active := False;
 
   if FSyncEdit.Enabled and FSyncEdit.Active then
   begin
-    if not FSyncEdit.EditArea.Containts(ClientToLines(X, Y)) then
+    if not FSyncEdit.EditArea.Containts(ClientToLines(X, Y, True)) then
       FSyncEdit.Active := False
     else
     begin
-      Lines.CaretPosition := ClientToLines(X, Y);
+      Lines.CaretPosition := ClientToLines(X, Y, True);
       Exit;
     end;
   end;
@@ -6718,7 +6711,7 @@ begin
     if (AButton = mbLeft) then
       LLinesCaretPosition := FMouseDownLinesPosition
     else
-      LLinesCaretPosition := ClientToLines(X, Y);
+      LLinesCaretPosition := ClientToLines(X, Y, True);
     if (AButton = mbLeft) then
     begin
       MoveCaretAndSelection(Lines.SelArea.BeginPosition, LLinesCaretPosition,
@@ -6782,7 +6775,7 @@ begin
     if (AShift = [ssCtrl, ssShift]) or (AShift = [ssCtrl]) then
       if (not ShortCutPressed and (meoShowGhost in FCaret.MultiEdit.Options)) then
       begin
-        LMultiCaretPosition := ClientToRows(X, Y);
+        LMultiCaretPosition := ClientToRows(X, Y, True);
 
         if (FMultiCaretPosition <> LMultiCaretPosition) then
         begin
@@ -6917,7 +6910,7 @@ begin
   begin
     FOldMouseMovePoint := Point(X, Y);
     ComputeScroll(FOldMouseMovePoint);
-    LRowsPosition := ClientToRows(X, Y);
+    LRowsPosition := ClientToRows(X, Y, True);
     if (not (soBeyondEndOfFile in Scroll.Options)) then
       LRowsPosition.Row := Min(LRowsPosition.Row, Max(0, Rows.Count - 1));
     if FScrollDeltaX <> 0 then
@@ -6985,7 +6978,7 @@ begin
   begin
     GetCursorPos(LCursorPoint);
     LCursorPoint := ScreenToClient(LCursorPoint);
-    LTextPosition := ClientToLines(LCursorPoint.X, LCursorPoint.Y);
+    LTextPosition := ClientToLines(LCursorPoint.X, LCursorPoint.Y, True);
     GetHighlighterAttributeAtRowColumn(LTextPosition, LToken, LRangeType, LStart, LHighlighterAttribute);
     OpenLink(LToken, LRangeType);
     Exit;
@@ -7014,7 +7007,7 @@ begin
 
   if FState * [esDblClicked, esWaitForDragging] = [esWaitForDragging] then
   begin
-    Lines.CaretPosition := ClientToLines(X, Y);
+    Lines.CaretPosition := ClientToLines(X, Y, True);
 
     if (not (ssShift in AShift)) then
       Lines.SelArea := LinesArea(Lines.CaretPosition, Lines.CaretPosition)
@@ -7409,14 +7402,22 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.PaintCodeFolding(AClipRect: TRect; AFirstRow, ALastRow: Integer);
+procedure TCustomBCEditor.PaintCodeFolding(const AClipRect: TRect; const AFirstRow, ALastRow: Integer);
 var
   LBackground: TColor;
   LLine: Integer;
   LOldBrushColor: TColor;
   LOldPenColor: TColor;
   LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRect: TRect;
   LRow: Integer;
+
+  LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
+  LHeight: Integer;
+  LPoints: array [0..2] of TPoint;
+  LTemp: Integer;
+  X: Integer;
+  Y: Integer;
 begin
   LOldBrushColor := Canvas.Brush.Color;
   LOldPenColor := Canvas.Pen.Color;
@@ -7429,26 +7430,27 @@ begin
   LRange := nil;
   if (cfoHighlightFoldingLine in FCodeFolding.Options) then
   begin
-    LLine := Max(RowsToLines(Rows.CaretPosition).Line, Length(FCodeFoldingRangeFromLine) - 1);
-    while ((LLine > 0) and not Assigned(FCodeFoldingRangeFromLine[LLine])) do
+    LLine := Max(RowsToLines(Rows.CaretPosition).Line, Length(FCodeFoldingRangeFirstLine) - 1);
+    while ((LLine > 0) and not Assigned(FCodeFoldingRangeFirstLine[LLine])) do
       Dec(LLine);
-    if (Assigned(FCodeFoldingRangeFromLine[LLine])) then
-      LRange := FCodeFoldingRangeFromLine[LLine]
+    if (Assigned(FCodeFoldingRangeFirstLine[LLine])) then
+      LRange := FCodeFoldingRangeFirstLine[LLine]
   end;
 
   for LRow := AFirstRow to ALastRow do
   begin
     LLine := Rows.Items[LRow].Line;
 
-    AClipRect.Top := (LRow - TopRow) * LineHeight;
-    AClipRect.Bottom := AClipRect.Top + LineHeight;
+    LRect := Rect(
+      AClipRect.Left, (LRow - TopRow) * LineHeight,
+      AClipRect.Right, (LRow - TopRow + 1) * LineHeight);
     LBackground := GetMarkBackgroundColor(LRow);
     if LBackground <> clNone then
     begin
       Canvas.Brush.Color := LBackground;
-      FillRect(AClipRect);
+      FillRect(LRect);
     end;
-    if Assigned(LRange) and (LLine >= LRange.FirstLine) and (LLine <= LRange.LastLine) then
+    if (Assigned(LRange) and (LRange.FirstLine <= LLine) and (LLine <= LRange.LastLine)) then
     begin
       Canvas.Brush.Color := CodeFolding.Colors.FoldingLineHighlight;
       Canvas.Pen.Color := CodeFolding.Colors.FoldingLineHighlight;
@@ -7458,200 +7460,83 @@ begin
       Canvas.Brush.Color := CodeFolding.Colors.FoldingLine;
       Canvas.Pen.Color := CodeFolding.Colors.FoldingLine;
     end;
-    PaintCodeFoldingLine(AClipRect, LLine);
-  end;
-  Canvas.Brush.Color := LOldBrushColor;
-  Canvas.Pen.Color := LOldPenColor;
-end;
 
-procedure TCustomBCEditor.PaintCodeFoldingCollapsedLine(AFoldRange: TBCEditorCodeFolding.TRanges.TRange; const ALineRect: TRect);
-var
-  LOldPenColor: TColor;
-begin
-  if FCodeFolding.Visible and (cfoShowCollapsedLine in CodeFolding.Options) and Assigned(AFoldRange) and
-    AFoldRange.Collapsed and not AFoldRange.ParentCollapsed then
-  begin
-    LOldPenColor := Canvas.Pen.Color;
-    Canvas.Pen.Color := CodeFolding.Colors.CollapsedLine;
-    Canvas.MoveTo(ALineRect.Left, ALineRect.Bottom - 1);
-    Canvas.LineTo(Width, ALineRect.Bottom - 1);
-    Canvas.Pen.Color := LOldPenColor;
-  end;
-end;
+    if CodeFolding.Padding > 0 then
+      InflateRect(LRect, -CodeFolding.Padding, 0);
 
-procedure TCustomBCEditor.PaintCodeFoldingCollapseMark(AFoldRange: TBCEditorCodeFolding.TRanges.TRange;
-  const ATokenPosition, ATokenLength, ALine: Integer; ALineRect: TRect);
-var
-  LBrush: TBrush;
-  LCollapseMarkRect: TRect;
-  LDotSpace: Integer;
-  LIndex: Integer;
-  LOldBrushColor: TColor;
-  LOldPenColor: TColor;
-  LPoints: array [0..2] of TPoint;
-  LRowsPosition: TBCEditorRowsPosition;
-  X: Integer;
-  Y: Integer;
-begin
-  LOldPenColor := Canvas.Pen.Color;
-  LOldBrushColor  := Canvas.Brush.Color;
-  if FCodeFolding.Visible and FCodeFolding.Hint.Indicator.Visible and Assigned(AFoldRange) and
-    AFoldRange.Collapsed and not AFoldRange.ParentCollapsed then
-  begin
-    LRowsPosition.Row := Lines.Items[ALine].FirstRow;
-    LRowsPosition.Column := ATokenPosition + ATokenLength + 1;
-    if FSpecialChars.Visible and (ALine < Lines.Count) then
-      Inc(LRowsPosition.Column);
-    LCollapseMarkRect.Left := RowsToClient(LRowsPosition).X -
-      FCodeFolding.Hint.Indicator.Padding.Left;
-    LCollapseMarkRect.Right := FCodeFolding.Hint.Indicator.Padding.Right + LCollapseMarkRect.Left +
-      FCodeFolding.Hint.Indicator.Width;
-    LCollapseMarkRect.Top := FCodeFolding.Hint.Indicator.Padding.Top + ALineRect.Top;
-    LCollapseMarkRect.Bottom := ALineRect.Bottom - FCodeFolding.Hint.Indicator.Padding.Bottom;
+    LFoldRange := CodeFoldingCollapsableFoldRangeForLine(LLine);
 
-    if LCollapseMarkRect.Right > FLeftMarginWidth then
+    if (not Assigned(LFoldRange)) then
     begin
-      if FCodeFolding.Hint.Indicator.Glyph.Visible then
-        FCodeFolding.Hint.Indicator.Glyph.Draw(Canvas, LCollapseMarkRect.Left, ALineRect.Top, ALineRect.Height)
-      else
+      if (cfoShowTreeLine in FCodeFolding.Options) then
       begin
-        if BackgroundColor <> FCodeFolding.Hint.Indicator.Colors.Background then
+        if CodeFoldingTreeLineForLine(LLine) then
         begin
-          Canvas.Brush.Color := FCodeFolding.Hint.Indicator.Colors.Background;
-          FillRect(LCollapseMarkRect);
+          X := LRect.Left + ((LRect.Right - LRect.Left) div 2) - 1;
+          Canvas.MoveTo(X, LRect.Top);
+          Canvas.LineTo(X, LRect.Bottom);
         end;
-
-        if hioShowBorder in FCodeFolding.Hint.Indicator.Options then
+        if CodeFoldingTreeEndForLine(LLine) then
         begin
-          LBrush := TBrush.Create;
-          try
-            LBrush.Color := FCodeFolding.Hint.Indicator.Colors.Border;
-            FrameRect(Canvas.Handle, LCollapseMarkRect, LBrush.Handle);
-          finally
-            LBrush.Free;
-          end;
-        end;
-
-        if hioShowMark in FCodeFolding.Hint.Indicator.Options then
-        begin
-          Canvas.Pen.Color := FCodeFolding.Hint.Indicator.Colors.Mark;
-          Canvas.Brush.Color := FCodeFolding.Hint.Indicator.Colors.Mark;
-          case FCodeFolding.Hint.Indicator.MarkStyle of
-            imsThreeDots:
-              begin
-                { [...] }
-                LDotSpace := (LCollapseMarkRect.Width - 8) div 4;
-                Y := LCollapseMarkRect.Top + (LCollapseMarkRect.Bottom - LCollapseMarkRect.Top) div 2;
-                X := LCollapseMarkRect.Left + LDotSpace + (LCollapseMarkRect.Width - LDotSpace * 4 - 6) div 2;
-                for LIndex := 1 to 3 do
-                begin
-                  Canvas.Rectangle(X, Y, X + 2, Y + 2);
-                  X := X + LDotSpace + 2;
-                end;
-              end;
-            imsTriangle:
-              begin
-                LPoints[0] := Point(LCollapseMarkRect.Left + (LCollapseMarkRect.Width - LCollapseMarkRect.Height) div 2 + 2, LCollapseMarkRect.Top + 2);
-                LPoints[1] := Point(LCollapseMarkRect.Right - (LCollapseMarkRect.Width - LCollapseMarkRect.Height) div 2 - 3 - (LCollapseMarkRect.Width + 1) mod 2, LCollapseMarkRect.Top + 2);
-                LPoints[2] := Point(LCollapseMarkRect.Left + LCollapseMarkRect.Width div 2 - (LCollapseMarkRect.Width + 1) mod 2, LCollapseMarkRect.Bottom - 3);
-                Canvas.Polygon(LPoints);
-              end;
-          end;
-        end;
-      end;
-    end;
-    Inc(LCollapseMarkRect.Left, FLeftMarginWidth);
-    LCollapseMarkRect.Right := LCollapseMarkRect.Left + FCodeFolding.Hint.Indicator.Width;
-    AFoldRange.CollapseMarkRect := LCollapseMarkRect;
-  end;
-  Canvas.Pen.Color := LOldPenColor;
-  Canvas.Brush.Color := LOldBrushColor;
-end;
-
-procedure TCustomBCEditor.PaintCodeFoldingLine(AClipRect: TRect; ALine: Integer);
-var
-  LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
-  LHeight: Integer;
-  LPoints: array [0..2] of TPoint;
-  LTemp: Integer;
-  X: Integer;
-  Y: Integer;
-begin
-  if CodeFolding.Padding > 0 then
-    InflateRect(AClipRect, -CodeFolding.Padding, 0);
-
-  LFoldRange := CodeFoldingCollapsableFoldRangeForLine(ALine);
-
-  if not Assigned(LFoldRange) then
-  begin
-    if cfoShowTreeLine in FCodeFolding.Options then
-    begin
-      if CodeFoldingTreeLineForLine(ALine) then
-      begin
-        X := AClipRect.Left + ((AClipRect.Right - AClipRect.Left) div 2) - 1;
-        Canvas.MoveTo(X, AClipRect.Top);
-        Canvas.LineTo(X, AClipRect.Bottom);
-      end;
-      if CodeFoldingTreeEndForLine(ALine) then
-      begin
-        X := AClipRect.Left + ((AClipRect.Right - AClipRect.Left) div 2) - 1;
-        Canvas.MoveTo(X, AClipRect.Top);
-        Y := AClipRect.Top + ((AClipRect.Bottom - AClipRect.Top) - 4);
-        Canvas.LineTo(X, Y);
-        Canvas.LineTo(AClipRect.Right - 1, Y);
-      end
-    end;
-  end
-  else
-  if LFoldRange.Collapsable then
-  begin
-    LHeight := AClipRect.Right - AClipRect.Left;
-    AClipRect.Top := AClipRect.Top + ((LineHeight - LHeight) div 2) + 1;
-    AClipRect.Bottom := AClipRect.Top + LHeight - 1;
-    AClipRect.Right := AClipRect.Right - 1;
-
-    if CodeFolding.MarkStyle = msTriangle then
-    begin
-      if LFoldRange.Collapsed then
-      begin
-        LPoints[0] := Point(AClipRect.Left, AClipRect.Top);
-        LPoints[1] := Point(AClipRect.Left, AClipRect.Bottom - 1);
-        LPoints[2] := Point(AClipRect.Right - (FCodeFolding.Width + 1) mod 2, AClipRect.Top + AClipRect.Height div 2);
-        Canvas.Polygon(LPoints);
-      end
-      else
-      begin
-        LPoints[0] := Point(AClipRect.Left, AClipRect.Top + 1);
-        LPoints[1] := Point(AClipRect.Right - (FCodeFolding.Width + 1) mod 2, AClipRect.Top + 1);
-        LPoints[2] := Point(AClipRect.Left + AClipRect.Width div 2, AClipRect.Bottom - 1);
-        Canvas.Polygon(LPoints);
+          X := LRect.Left + ((LRect.Right - LRect.Left) div 2) - 1;
+          Canvas.MoveTo(X, LRect.Top);
+          Y := LRect.Top + ((LRect.Bottom - LRect.Top) - 4);
+          Canvas.LineTo(X, Y);
+          Canvas.LineTo(LRect.Right - 1, Y);
+        end
       end;
     end
-    else
+    else if (LFoldRange.Collapsable) then
     begin
-      if CodeFolding.MarkStyle = msSquare then
-        Canvas.FrameRect(AClipRect)
+      LHeight := LRect.Right - LRect.Left;
+      LRect.Top := LRect.Top + ((LineHeight - LHeight) div 2) + 1;
+      LRect.Bottom := LRect.Top + LHeight - 1;
+      LRect.Right := LRect.Right - 1;
+
+      if (CodeFolding.MarkStyle = msTriangle) then
+      begin
+        if LFoldRange.Collapsed then
+        begin
+          LPoints[0] := Point(LRect.Left, LRect.Top);
+          LPoints[1] := Point(LRect.Left, LRect.Bottom - 1);
+          LPoints[2] := Point(LRect.Right - (FCodeFolding.Width + 1) mod 2, LRect.Top + LRect.Height div 2);
+          Canvas.Polygon(LPoints);
+        end
+        else
+        begin
+          LPoints[0] := Point(LRect.Left, LRect.Top + 1);
+          LPoints[1] := Point(LRect.Right - (FCodeFolding.Width + 1) mod 2, LRect.Top + 1);
+          LPoints[2] := Point(LRect.Left + LRect.Width div 2, LRect.Bottom - 1);
+          Canvas.Polygon(LPoints);
+        end;
+      end
       else
-      if CodeFolding.MarkStyle = msCircle then
       begin
-        Canvas.Brush.Color := FCodeFolding.Colors.Background;
-        Canvas.Ellipse(AClipRect);
-      end;
+        if (CodeFolding.MarkStyle = msSquare) then
+          Canvas.FrameRect(LRect)
+        else if (CodeFolding.MarkStyle = msCircle) then
+        begin
+          Canvas.Brush.Color := FCodeFolding.Colors.Background;
+          Canvas.Ellipse(LRect);
+        end;
 
-      { - }
-      LTemp := AClipRect.Top + ((AClipRect.Bottom - AClipRect.Top) div 2);
-      Canvas.MoveTo(AClipRect.Left + AClipRect.Width div 4, LTemp);
-      Canvas.LineTo(AClipRect.Right - AClipRect.Width div 4, LTemp);
+        { - }
+        LTemp := LRect.Top + ((LRect.Bottom - LRect.Top) div 2);
+        Canvas.MoveTo(LRect.Left + LRect.Width div 4, LTemp);
+        Canvas.LineTo(LRect.Right - LRect.Width div 4, LTemp);
 
-      if LFoldRange.Collapsed then
-      begin
-        { + }
-        LTemp := (AClipRect.Right - AClipRect.Left) div 2;
-        Canvas.MoveTo(AClipRect.Left + LTemp, AClipRect.Top + AClipRect.Width div 4);
-        Canvas.LineTo(AClipRect.Left + LTemp, AClipRect.Bottom - AClipRect.Width div 4);
+        if LFoldRange.Collapsed then
+        begin
+          { + }
+          LTemp := (LRect.Right - LRect.Left) div 2;
+          Canvas.MoveTo(LRect.Left + LTemp, LRect.Top + LRect.Width div 4);
+          Canvas.LineTo(LRect.Left + LTemp, LRect.Bottom - LRect.Width div 4);
+        end;
       end;
     end;
   end;
+  Canvas.Brush.Color := LOldBrushColor;
+  Canvas.Pen.Color := LOldPenColor;
 end;
 
 procedure TCustomBCEditor.PaintGuides(const AFirstRow, ALastRow: Integer);
@@ -7679,11 +7564,11 @@ var
   begin
     Result := 0;
     LTempLine := LCurrentLine;
-    if LTempLine < Length(FCodeFoldingRangeFromLine) then
+    if LTempLine < Length(FCodeFoldingRangeFirstLine) then
     begin
       while LTempLine > 0 do
       begin
-        LCodeFoldingRange := FCodeFoldingRangeFromLine[LTempLine];
+        LCodeFoldingRange := FCodeFoldingRangeFirstLine[LTempLine];
         LCodeFoldingRangeTo := FCodeFoldingRangeToLine[LTempLine];
         if not Assigned(LCodeFoldingRange) and not Assigned(LCodeFoldingRangeTo) then
           Dec(LTempLine)
@@ -8154,6 +8039,101 @@ begin
 end;
 
 procedure TCustomBCEditor.PaintLines(AClipRect: TRect; const AFirstRow, ALastRow: Integer);
+
+  procedure PaintCodeFoldingCollapseMark(AFoldRange: TBCEditorCodeFolding.TRanges.TRange;
+    const ARect: TRect);
+  var
+    LBrush: TBrush;
+    LDotSpace: Integer;
+    LIndex: Integer;
+    LOldBrushColor: TColor;
+    LOldPenColor: TColor;
+    LPoints: array [0..2] of TPoint;
+    LRect: TRect;
+    X: Integer;
+    Y: Integer;
+  begin
+    LOldPenColor := Canvas.Pen.Color;
+    LOldBrushColor  := Canvas.Brush.Color;
+
+    if (FCodeFolding.Visible
+      and Assigned(AFoldRange) and AFoldRange.Collapsed and not AFoldRange.ParentCollapsed) then
+    begin
+      if (FCodeFolding.Hint.Indicator.Visible) then
+      begin
+        LRect := Rect(
+          FPaintHelper.SpaceWidth + ARect.Left + FCodeFolding.Hint.Indicator.Padding.Left,
+          ARect.Top + FCodeFolding.Hint.Indicator.Padding.Top,
+          FPaintHelper.SpaceWidth + ARect.Left + FCodeFolding.Hint.Indicator.Padding.Left + FCodeFolding.Hint.Indicator.Width + FCodeFolding.Hint.Indicator.Padding.Right,
+          ARect.Bottom - FCodeFolding.Hint.Indicator.Padding.Bottom);
+
+        if LRect.Right > FLeftMarginWidth then
+        begin
+          if FCodeFolding.Hint.Indicator.Glyph.Visible then
+            FCodeFolding.Hint.Indicator.Glyph.Draw(Canvas, LRect.Left, ARect.Top, ARect.Height)
+          else
+          begin
+            if BackgroundColor <> FCodeFolding.Hint.Indicator.Colors.Background then
+            begin
+              Canvas.Brush.Color := FCodeFolding.Hint.Indicator.Colors.Background;
+              FillRect(LRect);
+            end;
+
+            if hioShowBorder in FCodeFolding.Hint.Indicator.Options then
+            begin
+              LBrush := TBrush.Create;
+              try
+                LBrush.Color := FCodeFolding.Hint.Indicator.Colors.Border;
+                FrameRect(Canvas.Handle, LRect, LBrush.Handle);
+              finally
+                LBrush.Free;
+              end;
+            end;
+
+            if hioShowMark in FCodeFolding.Hint.Indicator.Options then
+            begin
+              Canvas.Pen.Color := FCodeFolding.Hint.Indicator.Colors.Mark;
+              Canvas.Brush.Color := FCodeFolding.Hint.Indicator.Colors.Mark;
+              case FCodeFolding.Hint.Indicator.MarkStyle of
+                imsThreeDots:
+                  begin
+                    { [...] }
+                    LDotSpace := (LRect.Width - 8) div 4;
+                    Y := LRect.Top + (LRect.Bottom - LRect.Top) div 2;
+                    X := LRect.Left + LDotSpace + (LRect.Width - LDotSpace * 4 - 6) div 2;
+                    for LIndex := 1 to 3 do
+                    begin
+                      Canvas.Rectangle(X, Y, X + 2, Y + 2);
+                      X := X + LDotSpace + 2;
+                    end;
+                  end;
+                imsTriangle:
+                  begin
+                    LPoints[0] := Point(LRect.Left + (LRect.Width - LRect.Height) div 2 + 2, LRect.Top + 2);
+                    LPoints[1] := Point(LRect.Right - (LRect.Width - LRect.Height) div 2 - 3 - (LRect.Width + 1) mod 2, LRect.Top + 2);
+                    LPoints[2] := Point(LRect.Left + LRect.Width div 2 - (LRect.Width + 1) mod 2, LRect.Bottom - 3);
+                    Canvas.Polygon(LPoints);
+                  end;
+              end;
+            end;
+          end;
+        end;
+        Inc(LRect.Left, FLeftMarginWidth);
+        LRect.Right := LRect.Left + FCodeFolding.Hint.Indicator.Width;
+        AFoldRange.CollapseMarkRect := LRect;
+      end;
+
+      if (cfoShowCollapsedLine in CodeFolding.Options) then
+      begin
+        Canvas.Pen.Color := CodeFolding.Colors.CollapsedLine;
+        Canvas.MoveTo(ARect.Left, ARect.Bottom - 1);
+        Canvas.LineTo(ClientWidth, ARect.Bottom - 1);
+      end;
+    end;
+    Canvas.Pen.Color := LOldPenColor;
+    Canvas.Brush.Color := LOldBrushColor;
+  end;
+
 var
   LBeginLineText: string;
   LColumn: Integer;
@@ -8203,7 +8183,9 @@ begin
   begin
     LPaintData.Previous.FontStyles := [];
 
-    LTokenRect := Rect(AClipRect.Left, (LRow - AFirstRow) * LineHeight, AClipRect.Right, (LRow - AFirstRow + 1) * LineHeight);
+    LTokenRect := Rect(
+      AClipRect.Left, (LRow - AFirstRow) * LineHeight,
+      AClipRect.Right, (LRow - AFirstRow + 1) * LineHeight);
 
     if (LRow < Rows.Count) then
     begin
@@ -8219,7 +8201,7 @@ begin
       LFoldRange := nil;
       if FCodeFolding.Visible then
       begin
-        LFoldRange := CodeFoldingCollapsableFoldRangeForLine(LLine + 1);
+        LFoldRange := CodeFoldingCollapsableFoldRangeForLine(LLine);
         if Assigned(LFoldRange) and LFoldRange.Collapsed then
         begin
           LBeginLineText := Lines.Items[LFoldRange.FirstLine].Text;
@@ -8258,10 +8240,14 @@ begin
         end;
       end;
 
-      if (Assigned(FOnCustomLineColors)
-        and ((LRow = AFirstRow) or (rfFirstRowOfLine in Rows.Items[LRow].Flags))) then
-        FOnCustomLineColors(Self, LLine,
-          LPaintData.LineForegroundColor, LPaintData.LineBackgroundColor);
+      if ((LLine >= Lines.Count) or (Lines.Items[LLine].Foreground = clNone)) then
+        LPaintData.LineForegroundColor := clNone
+      else
+        LPaintData.LineForegroundColor := Lines.Items[LLine].Foreground;
+      if ((LLine >= Lines.Count) or (Lines.Items[LLine].Background = clNone)) then
+        LPaintData.LineBackgroundColor := clNone
+      else
+        LPaintData.LineBackgroundColor := Lines.Items[LLine].Background;
 
       LColumn := 0;
       while (not FHighlighter.GetEndOfLine()) do
@@ -8285,15 +8271,14 @@ begin
         FHighlighter.Next();
       end;
 
-      PaintCodeFoldingCollapseMark(LFoldRange, FHighlighter.GetTokenIndex(), FHighlighter.GetTokenLength(), LLine, LTokenRect);
-      PaintCodeFoldingCollapsedLine(LFoldRange, LTokenRect);
-
       if ((LTokenRect.Left <= ClientWidth)) then
         Inc(LTokenRect.Left,
           PaintToken(LTokenRect,
             Rows.EORPosition[LRow], RowsPosition(Rows.Items[LRow].Length, LRow),
             nil, 0, nil,
             @LPaintData));
+
+      PaintCodeFoldingCollapseMark(LFoldRange, LTokenRect);
     end
     else
       PaintToken(LTokenRect,
@@ -8677,8 +8662,6 @@ begin
         LForegroundColor := FSpecialChars.Color
       else
         LForegroundColor := clSpecialChar
-    else if ((ALinesPosition.Line < Lines.Count) and (Lines.Items[ALinesPosition.Line].Foreground <> clNone)) then
-      LForegroundColor := Lines.Items[ALinesPosition.Line].Foreground
     else if (LIsLineBreakToken) then
       LForegroundColor := clNone
     else if (Assigned(AAttribute) and (AAttribute.Foreground <> clNone)) then
@@ -8698,8 +8681,6 @@ begin
       and (Assigned(FMultiCarets) and IsMultiEditCaretFound(ALinesPosition.Line + 1)
         or (not Assigned(FMultiCarets) and (ALinesPosition.Line = Lines.CaretPosition.Line)))) then
       LBackgroundColor := ActiveLine.Color
-    else if ((ALinesPosition.Line < Lines.Count) and (Lines.Items[ALinesPosition.Line].Background <> clNone)) then
-      LBackgroundColor := Lines.Items[ALinesPosition.Line].Background
     else if (LIsLineBreakToken) then
       LBackgroundColor := clWindow
     else if (Assigned(AAttribute) and (AAttribute.Background <> clNone)) then
@@ -8917,7 +8898,12 @@ begin
 //    end;
   end;
 
-  Result := LRect.Right - ARect.Left;
+  if (not LIsLineBreakToken) then
+    Result := LRect.Right - ARect.Left
+  else if (FSpecialChars.Visible) then
+    Result := FLineBreakSignWidth
+  else
+    Result := 0;
 
 //  if (not FCaretClientPos.Valid
 //    and (Lines.CaretPosition.Line = ATextPosition.Line)
@@ -9086,7 +9072,7 @@ begin
     begin
       if not LCodeFoldingRange.Collapsed and not LCodeFoldingRange.ParentCollapsed then
       begin
-        FCodeFoldingRangeFromLine[LCodeFoldingRange.FirstLine] := nil;
+        FCodeFoldingRangeFirstLine[LCodeFoldingRange.FirstLine] := nil;
         FCodeFoldingRangeToLine[LCodeFoldingRange.LastLine] := nil;
         FreeAndNil(LCodeFoldingRange);
         FAllCodeFoldingRanges.List.Delete(LIndex);
@@ -9185,10 +9171,9 @@ var
 begin
   if ((Rows.Count = 0)
     or (ARowsPosition.Column = 0)
-    or (ARowsPosition.Row < Rows.Count) and (Rows.Items[ARowsPosition.Row].Length = 0)) then
+    or (ARowsPosition.Row >= Rows.Count)
+    or (Rows.Items[ARowsPosition.Row].Length = 0)) then
     Result := Point(FLeftMarginWidth + ARowsPosition.Column * FPaintHelper.SpaceWidth - HorzTextPos, (ARowsPosition.Row - TopRow) * LineHeight)
-  else if (ARowsPosition.Row >= Rows.Count) then
-    Result := Point(FLeftMarginWidth + ARowsPosition.Column * FPaintHelper.SpaceWidth - HorzTextPos, (Lines.Count - Rows.Items[Rows.Count - 1].Line - 1 + ARowsPosition.Row - TopRow) * LineHeight)
   else
   begin
     FPaintHelper.BeginDrawing(Canvas.Handle);
@@ -9260,7 +9245,7 @@ begin
   if (Rows.Count = 0) then
     Result := LinesPosition(ARowsPosition.Column, ARowsPosition.Row)
   else if (ARowsPosition.Row >= Rows.Count) then
-    Result := LinesPosition(ARowsPosition.Column, Rows.Items[Rows.Count - 1].Line + ARowsPosition.Row - Rows.Count + 1)
+    Result := LinesPosition(ARowsPosition.Column, ARowsPosition.Row - Rows.Count + Lines.Count)
   else
   begin
     LLine := Rows.Items[ARowsPosition.Row].Line;
@@ -9996,10 +9981,10 @@ begin
     for LRow := 0 to Rows.Count - 1 do
     begin
       LLine := Rows.Items[LRow].Line;
-      if (LLine >= Length(FCodeFoldingRangeFromLine)) then
+      if (LLine >= Length(FCodeFoldingRangeFirstLine)) then
         LCodeFoldingRange := nil
       else
-        LCodeFoldingRange := FCodeFoldingRangeFromLine[LLine];
+        LCodeFoldingRange := FCodeFoldingRangeFirstLine[LLine];
       if Assigned(LCodeFoldingRange) and LCodeFoldingRange.Collapsed then
       begin
         LPreviousLine := LLine;

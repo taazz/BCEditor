@@ -25,9 +25,6 @@ type
 
   TBCEditorLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
 
-  TBCEditorCustomLineColorsEvent = procedure(ASender: TObject;
-    const ALine: Integer; var AForeground, ABackground: TColor) of object;
-
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
 
   TBCEditorCreateFileStreamEvent = procedure(ASender: TObject; const AFileName: string; var AStream: TStream) of object;

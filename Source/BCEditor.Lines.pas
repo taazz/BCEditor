@@ -1393,9 +1393,10 @@ begin
                 LEndPosition := DoInsertText(LUndoItem.Area.BeginPosition, LUndoItem.Text);
               except
                 on E: Exception do
-                  E.RaiseOuterException(Exception(E.ClassType).Create(E.Message + #13#10
-                    + LUndoItem.ToString() + #13#10
-                    + 'Progress: ' + Progress + #13#10));
+                  E.RaiseOuterException(EAssertionFailed.Create(LUndoItem.ToString() + #13#10
+                    + 'Progress: ' + Progress + #13#10#13#10
+                    + E.ClassName + ':' + #13#10
+                    + E.Message));
               end;
               LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
                 LinesArea(LUndoItem.Area.BeginPosition, LEndPosition), LText, LUndoItem.BlockNumber);
