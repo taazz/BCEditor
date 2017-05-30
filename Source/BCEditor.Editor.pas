@@ -5766,32 +5766,23 @@ begin
   try
     if (not WordWrap.Enabled) then
     begin
-      if (FFontPitchFixed and not (lfHasTabs in Lines.Items[ALine].Flags)) then
-      begin
-        LRowWidth := ComputeTokenWidth(PChar(Lines.Items[ALine].Text),
-          Length(Lines.Items[ALine].Text), 0, nil);
-        LColumn := Length(Lines.Items[ALine].Text);
-      end
+      if (ALine = 0) then
+        FHighlighter.ResetCurrentRange()
       else
+        FHighlighter.SetCurrentRange(Lines.Items[ALine - 1].Range);
+      FHighlighter.SetCurrentLine(Lines.Items[ALine].Text);
+
+      LColumn := 0;
+      LRowWidth := 0;
+      while (not FHighlighter.GetEndOfLine()) do
       begin
-        if (ALine = 0) then
-          FHighlighter.ResetCurrentRange()
-        else
-          FHighlighter.SetCurrentRange(Lines.Items[ALine - 1].Range);
-        FHighlighter.SetCurrentLine(Lines.Items[ALine].Text);
+        Inc(LRowWidth, ComputeTokenWidth(FHighlighter.GetTokenText(),
+          FHighlighter.GetTokenLength(), LColumn, FHighlighter.GetTokenAttribute()));
 
-        LColumn := 0;
-        LRowWidth := 0;
-        while (not FHighlighter.GetEndOfLine()) do
-        begin
-          Inc(LRowWidth, ComputeTokenWidth(FHighlighter.GetTokenText(),
-            FHighlighter.GetTokenLength(), LColumn, FHighlighter.GetTokenAttribute()));
+        Inc(LColumn, ComputeTextColumns(FHighlighter.GetTokenText(),
+          FHighlighter.GetTokenLength(), LColumn));
 
-          Inc(LColumn, ComputeTextColumns(FHighlighter.GetTokenText(),
-            FHighlighter.GetTokenLength(), LColumn));
-
-          FHighlighter.Next();
-        end;
+        FHighlighter.Next();
       end;
 
       FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,

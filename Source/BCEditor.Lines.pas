@@ -178,7 +178,6 @@ type
     procedure InsertIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
       const AIndentText: string);
     function CharIndexOf(const APosition: TBCEditorLinesPosition): Integer;
-    procedure InsertText(AArea: TBCEditorLinesArea; const AText: string); overload;
     function InsertText(APosition: TBCEditorLinesPosition;
       const AText: string): TBCEditorLinesPosition; overload;
     function IsWordBreakChar(const AChar: Char): Boolean; inline;
@@ -1394,10 +1393,9 @@ begin
                 LEndPosition := DoInsertText(LUndoItem.Area.BeginPosition, LUndoItem.Text);
               except
                 on E: Exception do
-                  E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
-                    + 'Progress: ' + #13#10#13#10
-                    + E.ClassName + ':' + #13#10
-                    + E.Message));
+                  E.RaiseOuterException(Exception(E.ClassType).Create(E.Message + #13#10
+                    + LUndoItem.ToString() + #13#10
+                    + 'Progress: ' + Progress + #13#10));
               end;
               LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
                 LinesArea(LUndoItem.Area.BeginPosition, LEndPosition), LText, LUndoItem.BlockNumber);
@@ -1696,105 +1694,6 @@ begin
     LArea, AIndentText);
 
   RedoList.Clear();
-end;
-
-procedure TBCEditorLines.InsertText(AArea: TBCEditorLinesArea; const AText: string);
-var
-  LCaretPosition: TBCEditorLinesPosition;
-  LDeleteText: string;
-  LEndPos: PChar;
-  LInsertArea: TBCEditorLinesArea;
-  LInsertText: string;
-  LLine: Integer;
-  LLineBeginPos: PChar;
-  LLineLength: Integer;
-  LPos: PChar;
-  LSelArea: TBCEditorLinesArea;
-begin
-  Assert(AArea.BeginPosition.Char < AArea.EndPosition.Char);
-  Assert(AArea.BeginPosition.Line <= AArea.EndPosition.Line);
-
-  LCaretPosition := CaretPosition;
-  LSelArea := SelArea;
-
-  BeginUpdate();
-
-  try
-    LPos := PChar(AText);
-    LEndPos := @LPos[Length(AText)];
-    LLine := AArea.BeginPosition.Line;
-
-    while ((LPos <= LEndPos) or (LLine <= AArea.EndPosition.Line)) do
-    begin
-      LLineBeginPos := LPos;
-      while ((LPos <= LEndPos) and not CharInSet(LPos^, [BCEDITOR_LINEFEED, BCEDITOR_CARRIAGE_RETURN])) do
-        Inc(LPos);
-
-      LLineLength := Length(Items[LLine].Text);
-      SetString(LInsertText, LLineBeginPos, LPos - LLineBeginPos);
-      if (LLineLength < AArea.BeginPosition.Char) then
-      begin
-        LInsertText := StringOfChar(BCEDITOR_SPACE_CHAR, AArea.BeginPosition.Char - LLineLength) + LInsertText;
-
-        LInsertArea := LinesArea(LinesPosition(LLineLength, LLine), InsertText(LInsertArea.BeginPosition, LInsertText));
-
-        UndoList.Push(utInsert, LCaretPosition, LSelArea,
-          LInsertArea);
-      end
-      else if (LLineLength < AArea.EndPosition.Char) then
-      begin
-        LInsertArea.BeginPosition := LinesPosition(AArea.BeginPosition.Char, LLine);
-
-        LDeleteText := TextIn[LinesArea(LInsertArea.BeginPosition, LinesPosition(LLineLength, LLine))];
-        DeleteText(LInsertArea);
-
-        UndoList.Push(utDelete, LCaretPosition, LSelArea,
-          LinesArea(LInsertArea.BeginPosition, InvalidLinesPosition), LDeleteText);
-
-        if (LPos > LLineBeginPos) then
-        begin
-          LInsertArea.EndPosition := InsertText(LInsertArea.BeginPosition, LInsertText);
-
-          UndoList.Push(utInsert, InvalidLinesPosition, InvalidLinesArea,
-            LInsertArea);
-        end;
-      end
-      else
-      begin
-        LInsertArea.BeginPosition := LinesPosition(AArea.BeginPosition.Char, LLine);
-        LInsertArea.EndPosition := LinesPosition(AArea.EndPosition.Char, LLine);
-
-        LDeleteText := TextIn[LInsertArea];
-        DeleteText(LInsertArea);
-
-        UndoList.Push(utDelete, LCaretPosition, LSelArea,
-          LinesArea(LInsertArea.BeginPosition, InvalidLinesPosition), LDeleteText);
-
-        if (LPos > LLineBeginPos) then
-        begin
-          LInsertArea.EndPosition := InsertText(LInsertArea.BeginPosition, LeftStr(LInsertText, AArea.EndPosition.Char - AArea.BeginPosition.Char));
-
-          UndoList.Push(utInsert, LCaretPosition, InvalidLinesArea,
-            LInsertArea);
-        end;
-      end;
-
-      if ((LPos <= LEndPos) and (LPos^ = BCEDITOR_LINEFEED)) then
-        Inc(LPos)
-      else if ((LPos <= LEndPos) and (LPos^ = BCEDITOR_CARRIAGE_RETURN)) then
-      begin
-        Inc(LPos);
-        if ((LPos <= LEndPos) and (LPos^ = BCEDITOR_LINEFEED)) then
-          Inc(LPos);
-      end;
-
-      Inc(LLine);
-    end;
-
-  finally
-    RedoList.Clear();
-    EndUpdate();
-  end;
 end;
 
 function TBCEditorLines.InsertText(APosition: TBCEditorLinesPosition;
