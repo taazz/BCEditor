@@ -7392,16 +7392,14 @@ end;
 procedure TCustomBCEditor.PaintCodeFolding(const AClipRect: TRect; const AFirstRow, ALastRow: Integer);
 var
   LBackground: TColor;
+  LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
+  LHeight: Integer;
   LLine: Integer;
   LOldBrushColor: TColor;
   LOldPenColor: TColor;
   LRange: TBCEditorCodeFolding.TRanges.TRange;
   LRect: TRect;
   LRow: Integer;
-
-  LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
-  LHeight: Integer;
-  LPoints: array [0..2] of TPoint;
   LTemp: Integer;
   X: Integer;
   Y: Integer;
@@ -8005,7 +8003,6 @@ procedure TCustomBCEditor.PaintLines(AClipRect: TRect; const AFirstRow, ALastRow
     const ARect: TRect);
   var
     LBrush: TBrush;
-    LOldBrushColor: TColor;
     LOldPenColor: TColor;
     LOldPenWidth: Integer;
     LRect: TRect;
@@ -8021,7 +8018,6 @@ procedure TCustomBCEditor.PaintLines(AClipRect: TRect; const AFirstRow, ALastRow
     begin
       LOldPenColor := Canvas.Pen.Color;
       LOldPenWidth := Canvas.Pen.Width;
-      LOldBrushColor := Canvas.Brush.Color;
 
       LBrush := TBrush.Create();
       LBrush.Color := FCodeFolding.Colors.FoldingLine;
@@ -8042,7 +8038,6 @@ procedure TCustomBCEditor.PaintLines(AClipRect: TRect; const AFirstRow, ALastRow
 
       Canvas.Pen.Color := LOldPenColor;
       Canvas.Pen.Width := LOldPenWidth;
-      Canvas.Brush.Color := LOldBrushColor;
     end;
   end;
 
@@ -12005,6 +12000,6 @@ begin
 end;
 
 begin
-  GLineWidth := Round(Screen.PixelsPerInch / USER_DEFAULT_SCREEN_DPI);
+  GLineWidth := 1; // Round(Screen.PixelsPerInch / USER_DEFAULT_SCREEN_DPI);
 end.
 
