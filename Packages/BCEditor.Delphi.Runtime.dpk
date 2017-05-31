@@ -50,7 +50,6 @@ contains
   BCEditor.Editor.MatchingPair in '..\Source\BCEditor.Editor.MatchingPair.pas',
   BCEditor.Editor.PopupWindow in '..\Source\BCEditor.Editor.PopupWindow.pas',
   BCEditor.Editor.Replace in '..\Source\BCEditor.Editor.Replace.pas',
-  BCEditor.Editor.RightMargin in '..\Source\BCEditor.Editor.RightMargin.pas',
   BCEditor.Editor.Scroll in '..\Source\BCEditor.Editor.Scroll.pas',
   BCEditor.Editor.Search in '..\Source\BCEditor.Editor.Search.pas',
   BCEditor.Editor.Selection in '..\Source\BCEditor.Editor.Selection.pas',

@@ -36,8 +36,6 @@
         "MatchingPairMatched": "clWhite",
         "MatchingPairUnderline": "clTeal",
         "MatchingPairUnmatched": "clYellow",
-        "RightMargin": "clSilver",
-        "RightMovingEdge": "clSilver",
         "SearchHighlighterBackground": "$00FCFDCD",
         "SearchHighlighterBorder": "clNone",
         "SearchHighlighterForeground": "clBlack",

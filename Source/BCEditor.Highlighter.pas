@@ -2006,8 +2006,6 @@ begin
         MatchingPair.Colors.Matched := StringToColorDef(LColorsObject['MatchingPairMatched'].Value, MatchingPair.Colors.Matched);
         MatchingPair.Colors.Underline := StringToColorDef(LColorsObject['MatchingPairUnderline'].Value, MatchingPair.Colors.Underline);
         MatchingPair.Colors.Unmatched := StringToColorDef(LColorsObject['MatchingPairUnmatched'].Value, MatchingPair.Colors.Unmatched);
-        RightMargin.Colors.Edge := StringToColorDef(LColorsObject['RightEdge'].Value, RightMargin.Colors.Edge);
-        RightMargin.Colors.MovingEdge := StringToColorDef(LColorsObject['RightMovingEdge'].Value, RightMargin.Colors.MovingEdge);
         Search.Highlighter.Colors.Background := StringToColorDef(LColorsObject['SearchHighlighterBackground'].Value, Search.Highlighter.Colors.Background);
         Search.Highlighter.Colors.Border := StringToColorDef(LColorsObject['SearchHighlighterBorder'].Value, Search.Highlighter.Colors.Border);
         Search.Highlighter.Colors.Foreground := StringToColorDef(LColorsObject['SearchHighlighterForeground'].Value, Search.Highlighter.Colors.Foreground);

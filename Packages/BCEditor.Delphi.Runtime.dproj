@@ -142,7 +142,6 @@
         <DCCReference Include="..\Source\BCEditor.Editor.MatchingPair.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.PopupWindow.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Replace.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.RightMargin.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Scroll.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Search.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Selection.pas"/>

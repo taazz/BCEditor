@@ -127,11 +127,6 @@ type
     bpoToggleMarkByClick
   );
 
-  TBCEditorRightMarginOption = (
-    rmoMouseMove,
-    rmoShowMovingHint
-  );
-
   PBCEditorTextPosition = ^TBCEditorLinesPosition;
   TBCEditorLinesPosition = packed record
     Char: Integer;
@@ -221,8 +216,6 @@ type
 
   TBCEditorSortOrder = (soAsc, soDesc);
 
-  TBCEditorWordWrapWidth = (wwwPage, wwwRightMargin);
-
   TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
 
   TBCEditorCodeFoldingOption = (
@@ -255,7 +248,6 @@ type
   TBCEditorSearchMapOptions = set of TBCEditorSearchMapOption;
   TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
   TBCEditorReplaceOptions = set of TBCEditorReplaceOption;
-  TBCEditorRightMarginOptions = set of TBCEditorRightMarginOption;
   TBCEditorScrollOptions = set of TBCEditorScrollOption;
   TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
   TBCEditorTabOptions = set of TBCEditorTabOption;

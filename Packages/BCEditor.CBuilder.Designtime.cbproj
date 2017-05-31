@@ -175,9 +175,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.Replace.pas">
             <BuildOrder>24</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.RightMargin.pas">
-            <BuildOrder>25</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Scroll.pas">
             <BuildOrder>26</BuildOrder>
         </DelphiCompile>

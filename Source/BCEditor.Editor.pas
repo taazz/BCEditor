@@ -11,7 +11,7 @@ uses
   BCEditor.Types, BCEditor.Editor.CompletionProposal,
   BCEditor.Editor.CompletionProposal.PopupWindow, BCEditor.Editor.Glyph, BCEditor.Editor.InternalImage,
   BCEditor.Editor.KeyCommands, BCEditor.Editor.LeftMargin, BCEditor.Editor.MatchingPair,
-  BCEditor.Editor.Replace, BCEditor.Editor.RightMargin, BCEditor.Editor.Scroll, BCEditor.Editor.Search,
+  BCEditor.Editor.Replace, BCEditor.Editor.Scroll, BCEditor.Editor.Search,
   BCEditor.Editor.Selection, BCEditor.Editor.SpecialChars,
   BCEditor.Editor.Tabs, BCEditor.Editor.WordWrap,
   BCEditor.Editor.CodeFolding.Hint.Form, BCEditor.Highlighter,
@@ -239,8 +239,6 @@ type
     FPaintHelper: TBCEditorPaintHelper;
     FReplace: TBCEditorReplace;
     FRescanCodeFolding: Boolean;
-    FRightMargin: TBCEditorRightMargin;
-    FRightMarginMovePosition: Integer;
     FRows: TCustomBCEditor.TRows;
     FScroll: TBCEditorScroll;
     FScrollDeltaX: Integer;
@@ -414,8 +412,6 @@ type
     procedure PaintLeftMargin(const AClipRect: TRect; const AFirstRow, ALastTextRow, ALastRow: Integer);
     procedure PaintLines(AClipRect: TRect; const AFirstRow, ALastRow: Integer);
     procedure PaintMouseMoveScrollPoint;
-    procedure PaintRightMargin(AClipRect: TRect);
-    procedure PaintRightMarginMove;
     procedure PaintSearchMap(AClipRect: TRect);
     procedure PaintSyncItems;
     function PaintToken(const ARect: TRect; const ALinesPosition: TBCEditorLinesPosition;
@@ -428,7 +424,6 @@ type
     procedure ReplaceChanged(AEvent: TBCEditorReplaceChanges);
     function RescanHighlighterRangesFrom(const ALine: Integer): Integer;
     procedure ResetCaret();
-    procedure RightMarginChanged(ASender: TObject);
     function RowsToClient(ARowsPosition: TBCEditorRowsPosition): TPoint;
     function RowsToLines(const ARowsPosition: TBCEditorRowsPosition): TBCEditorLinesPosition;
     procedure ScrollChanged(ASender: TObject);
@@ -448,7 +443,6 @@ type
     procedure SetModified(const AValue: Boolean);
     procedure SetMouseMoveScrollCursors(const AIndex: Integer; const AValue: HCursor);
     procedure SetOptions(const AValue: TBCEditorOptions);
-    procedure SetRightMargin(const AValue: TBCEditorRightMargin);
     procedure SetScroll(const AValue: TBCEditorScroll);
     procedure SetSearch(const AValue: TBCEditorSearch);
     procedure SetSelectedWord;
@@ -506,7 +500,6 @@ type
     procedure WMUndo(var AMessage: TMessage); message WM_UNDO;
     procedure WMVScroll(var AMessage: TWMScroll); message WM_VSCROLL;
     procedure WordWrapChanged(ASender: TObject);
-    function WordWrapWidth: Integer;
   protected
     procedure AddCaret(const ARowsPosition: TBCEditorRowsPosition);
     function CaretInView: Boolean;
@@ -752,7 +745,6 @@ type
     property ParentFont default False;
     property ReadOnly: Boolean read GetReadOnly write SetReadOnly default False;
     property Replace: TBCEditorReplace read FReplace write FReplace;
-    property RightMargin: TBCEditorRightMargin read FRightMargin write SetRightMargin;
     property Scroll: TBCEditorScroll read FScroll write SetScroll;
     property Search: TBCEditorSearch read FSearch write SetSearch;
     property SearchResultCount: Integer read GetSearchResultCount;
@@ -860,7 +852,6 @@ type
     property PopupMenu;
     property ReadOnly;
     property Replace;
-    property RightMargin;
     property Scroll;
     property Search;
     property Selection;
@@ -1237,9 +1228,6 @@ begin
   { Marks }
   FMarkList := TBCEditorMarkList.Create(Self);
   FMarkList.OnChange := MarkListChange;
-  { Right edge }
-  FRightMargin := TBCEditorRightMargin.Create;
-  FRightMargin.OnChange := RightMarginChanged;
   { Tabs }
   TabStop := True;
   FTabs := TBCEditorTabs.Create;
@@ -1342,7 +1330,6 @@ begin
   FFontDummy.Free;
   FOriginalLines.Free;
   FActiveLine.Free;
-  FRightMargin.Free;
   FScroll.Free;
   FSearch.Free;
   FSearchResults.Free();
@@ -1527,7 +1514,6 @@ begin
       Self.LeftMargin.Assign(LeftMargin);
       Self.FMatchingPair.Assign(FMatchingPair);
       Self.FReplace.Assign(FReplace);
-      Self.FRightMargin.Assign(FRightMargin);
       Self.FScroll.Assign(FScroll);
       Self.FSearch.Assign(FSearch);
       Self.FSelection.Assign(FSelection);
@@ -5773,7 +5759,7 @@ begin
     begin
       LRow := ARow;
       LFlags := [rfFirstRowOfLine];
-      LMaxRowWidth := WordWrapWidth();
+      LMaxRowWidth := FTextWidth;
       if (ALine = 0) then
         FHighlighter.ResetCurrentRange()
       else
@@ -6655,14 +6641,6 @@ begin
 
   inherited;
 
-  if (rmoMouseMove in FRightMargin.Options) and FRightMargin.Visible then
-    if (AButton = mbLeft) and (Abs(FRightMargin.Position * FPaintHelper.SpaceWidth + FLeftMarginWidth - X - HorzTextPos) < 3) then
-    begin
-      FRightMargin.Moving := True;
-      FRightMarginMovePosition := FRightMargin.Position * FPaintHelper.SpaceWidth + FLeftMarginWidth;
-      Exit;
-    end;
-
   if (AButton = mbLeft) and FCodeFolding.Visible and
     (cfoUncollapseByHintClick in FCodeFolding.Options) then
     if DoOnCodeFoldingHintClick(Point(X, Y)) then
@@ -6746,13 +6724,11 @@ end;
 procedure TCustomBCEditor.MouseMove(AShift: TShiftState; X, Y: Integer);
 var
   LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
-  LHintWindow: THintWindow;
   LIndex: Integer;
   LLine: Integer;
   LLinesPosition: TBCEditorLinesPosition;
   LMultiCaretPosition: TBCEditorRowsPosition;
   LPoint: TPoint;
-  LPositionText: string;
   LRect: TRect;
   LRow: Integer;
   LRowsPosition: TBCEditorRowsPosition;
@@ -6793,33 +6769,6 @@ begin
 
   if FMouseOverURI and not (ssCtrl in AShift) then
     FMouseOverURI := False;
-
-  if (rmoMouseMove in FRightMargin.Options) and FRightMargin.Visible then
-  begin
-    FRightMargin.MouseOver := Abs(FRightMargin.Position * FPaintHelper.SpaceWidth + FLeftMarginWidth - X - HorzTextPos) < 3;
-
-    if FRightMargin.Moving then
-    begin
-      if X > FLeftMarginWidth then
-        FRightMarginMovePosition := X;
-      if rmoShowMovingHint in FRightMargin.Options then
-      begin
-        LHintWindow := GetRightMarginHint;
-
-        LPositionText := Format(SBCEditorRightMarginPosition,
-          [(FRightMarginMovePosition - FLeftMarginWidth + HorzTextPos) div FPaintHelper.SpaceWidth]);
-
-        LRect := LHintWindow.CalcHintRect(200, LPositionText, nil);
-        LPoint := ClientToScreen(Point(ClientWidth - LRect.Right - 4, 4));
-
-        OffsetRect(LRect, LPoint.X, LPoint.Y);
-        LHintWindow.ActivateHint(LRect, LPositionText);
-        LHintWindow.Invalidate;
-      end;
-      Invalidate;
-      Exit;
-    end;
-  end;
 
   if FCodeFolding.Visible and FCodeFolding.Hint.Visible then
   begin
@@ -6970,20 +6919,6 @@ begin
     OpenLink(LToken, LRangeType);
     Exit;
   end;
-
-  if (rmoMouseMove in FRightMargin.Options) and FRightMargin.Visible then
-    if FRightMargin.Moving then
-    begin
-      FRightMargin.Moving := False;
-      if rmoShowMovingHint in FRightMargin.Options then
-        ShowWindow(GetRightMarginHint.Handle, SW_HIDE);
-      FRightMargin.Position := (FRightMarginMovePosition - FLeftMarginWidth + HorzTextPos)
-        div FPaintHelper.SpaceWidth;
-      if Assigned(FOnRightMarginMouseUp) then
-        FOnRightMarginMouseUp(Self);
-      Invalidate;
-      Exit;
-    end;
 
   FMouseMoveScrollTimer.Enabled := False;
 
@@ -7255,8 +7190,6 @@ begin
 
         PaintLines(LDrawRect, LFirstRow, LLastRow);
 
-        PaintRightMargin(LDrawRect);
-
         if (FCodeFolding.Visible and (cfoShowIndentGuides in CodeFolding.Options)) then
           PaintGuides(TopRow, Min(TopRow + VisibleRows, Rows.Count) - 1);
 
@@ -7270,9 +7203,6 @@ begin
           and FCaret.MultiEdit.Enabled
           and (FMultiCaretPosition.Row >= 0)) then
           PaintCaretBlock(FMultiCaretPosition);
-
-        if FRightMargin.Moving then
-          PaintRightMarginMove;
 
         if FMouseMoveScrolling then
           PaintMouseMoveScrollPoint;
@@ -8209,42 +8139,6 @@ begin
   FScroll.Indicator.Draw(Canvas, FMouseMoveScrollingPoint.X - LHalfWidth, FMouseMoveScrollingPoint.Y - LHalfWidth);
 end;
 
-procedure TCustomBCEditor.PaintRightMargin(AClipRect: TRect);
-var
-  LRightMarginPosition: Integer;
-begin
-  if FRightMargin.Visible then
-  begin
-    LRightMarginPosition := FLeftMarginWidth + FRightMargin.Position * FPaintHelper.SpaceWidth - HorzTextPos;
-    if (LRightMarginPosition >= AClipRect.Left) and (LRightMarginPosition <= AClipRect.Right) then
-    begin
-      Canvas.Pen.Color := FRightMargin.Colors.Edge;
-      Canvas.MoveTo(LRightMarginPosition, 0);
-      Canvas.LineTo(LRightMarginPosition, Height);
-    end;
-  end;
-end;
-
-procedure TCustomBCEditor.PaintRightMarginMove;
-var
-  LOldPenStyle: TPenStyle;
-  LOldStyle: TBrushStyle;
-begin
-  with Canvas do
-  begin
-    Pen.Width := 1;
-    LOldPenStyle := Pen.Style;
-    Pen.Style := psDot;
-    Pen.Color := FRightMargin.Colors.MovingEdge;
-    LOldStyle := Brush.Style;
-    Brush.Style := bsClear;
-    MoveTo(FRightMarginMovePosition, 0);
-    LineTo(FRightMarginMovePosition, ClientHeight);
-    Brush.Style := LOldStyle;
-    Pen.Style := LOldPenStyle;
-  end;
-end;
-
 procedure TCustomBCEditor.PaintSearchMap(AClipRect: TRect);
 var
   LHeight: Double;
@@ -9051,14 +8945,6 @@ begin
       if (not (esUpdating in FState)) then
         UpdateScrollBars();
     end;
-end;
-
-procedure TCustomBCEditor.RightMarginChanged(ASender: TObject);
-begin
-  if (WordWrap.Enabled and (FWordWrap.Width = wwwRightMargin)) then
-    ClearRows();
-
-  Invalidate();
 end;
 
 function TCustomBCEditor.RowsToClient(ARowsPosition: TBCEditorRowsPosition): TPoint;
@@ -10472,11 +10358,6 @@ begin
   Lines.ReadOnly := AValue;
 end;
 
-procedure TCustomBCEditor.SetRightMargin(const AValue: TBCEditorRightMargin);
-begin
-  FRightMargin.Assign(AValue);
-end;
-
 procedure TCustomBCEditor.SetScroll(const AValue: TBCEditorScroll);
 begin
   FScroll.Assign(AValue);
@@ -11389,9 +11270,6 @@ begin
       Lines.SelArea.Containts(LTextPosition) then
       LNewCursor := crArrow
     else
-    if FRightMargin.Moving or FRightMargin.MouseOver then
-      LNewCursor := FRightMargin.Cursor
-    else
     if FMouseOverURI then
       LNewCursor := crHandPoint
     else
@@ -11489,11 +11367,7 @@ begin
     LShowCaret := CaretInView;
     LOldTopRow := TopRow;
     if AValue then
-    begin
       HorzTextPos := 0;
-      if FWordWrap.Width = wwwRightMargin then
-        FRightMargin.Visible := True;
-    end;
     TopRow := LOldTopRow;
     UpdateScrollBars;
 
@@ -11986,17 +11860,6 @@ begin
   ClearRows();
 
   Invalidate();
-end;
-
-function TCustomBCEditor.WordWrapWidth: Integer;
-begin
-  case (FWordWrap.Width) of
-    wwwPage:
-      Result := FTextWidth;
-    wwwRightMargin:
-      Result := FRightMargin.Position * FPaintHelper.SpaceWidth;
-    else raise ERangeError.Create('Width: ' + IntToStr(Ord(FWordWrap.Width)));
-  end;
 end;
 
 begin

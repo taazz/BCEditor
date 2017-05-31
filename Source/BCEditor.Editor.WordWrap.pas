@@ -47,13 +47,11 @@ type
     FEnabled: Boolean;
     FIndicator: TIndicator;
     FOnChange: TNotifyEvent;
-    FWidth: TBCEditorWordWrapWidth;
     procedure DoChange;
     procedure OnColorsChange(ASender: TObject);
     procedure SetColors(const AValue: TBCEditorWordWrap.TColors);
     procedure SetEnabled(const AValue: Boolean);
     procedure SetOnChange(AValue: TNotifyEvent);
-    procedure SetWidth(const AValue: TBCEditorWordWrapWidth);
   public
     constructor Create;
     destructor Destroy; override;
@@ -62,7 +60,6 @@ type
     property Colors: TBCEditorWordWrap.TColors read FColors write SetColors;
     property Enabled: Boolean read FEnabled write SetEnabled default False;
     property Indicator: TIndicator read FIndicator;
-    property Width: TBCEditorWordWrapWidth read FWidth write SetWidth default wwwPage;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   end;
 
@@ -159,7 +156,6 @@ begin
 
   FEnabled := False;
   FIndicator := TIndicator.Create();
-  FWidth := wwwPage;
 end;
 
 destructor TBCEditorWordWrap.Destroy;
@@ -178,7 +174,6 @@ begin
   begin
     Self.FColors.Assign(FColors);
     Self.FEnabled := FEnabled;
-    Self.FWidth := FWidth;
     Self.FIndicator.Assign(FIndicator);
     Self.DoChange;
   end
@@ -215,15 +210,6 @@ begin
   FOnChange := AValue;
   FIndicator.OnChange := AValue;
   FColors.OnChange := OnColorsChange;
-end;
-
-procedure TBCEditorWordWrap.SetWidth(const AValue: TBCEditorWordWrapWidth);
-begin
-  if FWidth <> AValue then
-  begin
-    FWidth := AValue;
-    DoChange;
-  end;
 end;
 
 end.
