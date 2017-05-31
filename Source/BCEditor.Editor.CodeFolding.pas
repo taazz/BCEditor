@@ -258,7 +258,6 @@ type
   strict private
     FColors: TColors;
     FDelayInterval: Cardinal;
-    FHint: THint;
     FMouseOverHint: Boolean;
     FOnChange: TBCEditorCodeFoldingChangeEvent;
     FOptions: TBCEditorCodeFoldingOptions;
@@ -267,7 +266,6 @@ type
     FWidth: Integer;
     procedure DoChange;
     procedure SetColors(const AValue: TColors);
-    procedure SetHint(AValue: THint);
     procedure SetOnChange(AValue: TBCEditorCodeFoldingChangeEvent);
     procedure SetOptions(AValue: TBCEditorCodeFoldingOptions);
     procedure SetPadding(const AValue: Integer);
@@ -281,11 +279,9 @@ type
     procedure Assign(ASource: TPersistent); override;
     function GetWidth: Integer;
     procedure SetOption(const AOption: TBCEditorCodeFoldingOption; const AEnabled: Boolean);
-    property MouseOverHint: Boolean read FMouseOverHint write FMouseOverHint;
   published
     property Colors: TColors read FColors write SetColors;
     property DelayInterval: Cardinal read FDelayInterval write FDelayInterval default 300;
-    property Hint: THint read FHint write SetHint;
     property Options: TBCEditorCodeFoldingOptions read FOptions write SetOptions default DefaultOptions;
     property Padding: Integer read FPadding write SetPadding default 2;
     property Visible: Boolean read FVisible write SetVisible default False;
@@ -789,7 +785,6 @@ begin
   FVisible := False;
   FOptions := DefaultOptions;
   FColors := TColors.Create;
-  FHint := THint.Create;
   FPadding := 2;
   FWidth := 14;
   FDelayInterval := 300;
@@ -800,7 +795,6 @@ end;
 destructor TBCEditorCodeFolding.Destroy;
 begin
   FColors.Free;
-  FHint.Free;
 
   inherited;
 end;
@@ -813,7 +807,6 @@ begin
     Self.FVisible := FVisible;
     Self.FOptions := FOptions;
     Self.FColors.Assign(FColors);
-    Self.FHint.Assign(FHint);
     Self.FWidth := FWidth;
     if Assigned(Self.OnChange) then
       Self.OnChange(fcRescan);
@@ -839,11 +832,6 @@ end;
 procedure TBCEditorCodeFolding.SetColors(const AValue: TColors);
 begin
   FColors.Assign(AValue);
-end;
-
-procedure TBCEditorCodeFolding.SetHint(AValue: THint);
-begin
-  FHint.Assign(AValue);
 end;
 
 procedure TBCEditorCodeFolding.SetOnChange(AValue: TBCEditorCodeFoldingChangeEvent);

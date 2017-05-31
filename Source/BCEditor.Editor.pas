@@ -14,7 +14,7 @@ uses
   BCEditor.Editor.Replace, BCEditor.Editor.Scroll, BCEditor.Editor.Search,
   BCEditor.Editor.Selection, BCEditor.Editor.SpecialChars,
   BCEditor.Editor.Tabs, BCEditor.Editor.WordWrap,
-  BCEditor.Editor.CodeFolding.Hint.Form, BCEditor.Highlighter,
+  BCEditor.Highlighter,
   BCEditor.KeyboardHandler, BCEditor.Lines, BCEditor.PaintHelper, BCEditor.Editor.SyncEdit,
   BCEditor.Editor.TokenInfo, BCEditor.Utils, BCEditor.Editor.TokenInfo.PopupWindow;
 
@@ -146,7 +146,6 @@ type
     FChainedEditor: TCustomBCEditor;
     FCodeFolding: TBCEditorCodeFolding;
     FCodeFoldingDelayTimer: TTimer;
-    FCodeFoldingHintForm: TBCEditorCodeFoldingHintForm;
     FCodeFoldingRangeFirstLine: array of TBCEditorCodeFolding.TRanges.TRange;
     FCodeFoldingRangeLastLine: array of TBCEditorCodeFolding.TRanges.TRange;
     FCodeFoldingTreeLine: array of Boolean;
@@ -548,7 +547,6 @@ type
     function FindFirst(): Boolean;
     function FindNext(const AHandleNotFound: Boolean = True): Boolean;
     function FindPrevious(const AHandleNotFound: Boolean = True): Boolean;
-    procedure FreeHintForm(var AForm: TBCEditorCodeFoldingHintForm);
     procedure FreeTokenInfoPopupWindow;
     function GetBookmark(const AIndex: Integer; var ALinesPosition: TBCEditorLinesPosition): Boolean;
     function GetReadOnly: Boolean; virtual;
@@ -1343,8 +1341,6 @@ begin
   FSyncEdit.Free;
   FTokenInfoTimer.Free;
   FTokenInfo.Free;
-  if Assigned(FCodeFoldingHintForm) then
-    FCodeFoldingHintForm.Release;
   FRows.Free();
 
   inherited;
@@ -3332,7 +3328,6 @@ begin
       if LCollapseMarkRect.Right > FLeftMarginWidth then
         if PtInRect(LCollapseMarkRect, AClient) then
         begin
-          FreeHintForm(FCodeFoldingHintForm);
           ExpandCodeFoldingRange(LFoldRange);
           Exit(True);
         end;
@@ -5100,19 +5095,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.FreeHintForm(var AForm: TBCEditorCodeFoldingHintForm);
-begin
-  if Assigned(AForm) then
-  begin
-    AForm.Hide;
-    AForm.ItemList.Clear;
-    AForm.Free;
-    AForm := nil;
-  end;
-  FCodeFolding.MouseOverHint := False;
-  UpdateMouseCursor;
-end;
-
 procedure TCustomBCEditor.FreeMultiCarets;
 begin
   if Assigned(FMultiCarets) then
@@ -6646,7 +6628,6 @@ begin
     if DoOnCodeFoldingHintClick(Point(X, Y)) then
     begin
       Include(FState, esCodeFoldingInfoClicked);
-      FCodeFolding.MouseOverHint := False;
       UpdateMouseCursor;
       Exit;
     end;
@@ -6723,14 +6704,8 @@ end;
 
 procedure TCustomBCEditor.MouseMove(AShift: TShiftState; X, Y: Integer);
 var
-  LFoldRange: TBCEditorCodeFolding.TRanges.TRange;
-  LIndex: Integer;
-  LLine: Integer;
   LLinesPosition: TBCEditorLinesPosition;
   LMultiCaretPosition: TBCEditorRowsPosition;
-  LPoint: TPoint;
-  LRect: TRect;
-  LRow: Integer;
   LRowsPosition: TBCEditorRowsPosition;
 begin
   if FCaret.MultiEdit.Enabled and Focused then
@@ -6769,65 +6744,6 @@ begin
 
   if FMouseOverURI and not (ssCtrl in AShift) then
     FMouseOverURI := False;
-
-  if FCodeFolding.Visible and FCodeFolding.Hint.Visible then
-  begin
-    LRow := TopRow + Y div LineHeight;
-
-    if (LRow < Rows.Count) then
-    begin
-      LLine := Rows.Items[LRow].Line;
-
-      LFoldRange := CodeFoldingCollapsableFoldRangeForLine(LLine);
-
-      if Assigned(LFoldRange) and LFoldRange.Collapsed and not LFoldRange.ParentCollapsed then
-      begin
-        LPoint := Point(X, Y);
-        LRect := LFoldRange.CollapsedMarkRect;
-        OffsetRect(LRect, -FLeftMarginWidth, 0);
-
-        if LRect.Right > FLeftMarginWidth then
-        begin
-          FCodeFolding.MouseOverHint := False;
-          if PtInRect(LRect, LPoint) then
-          begin
-            FCodeFolding.MouseOverHint := True;
-
-            if not Assigned(FCodeFoldingHintForm) then
-            begin
-              FCodeFoldingHintForm := TBCEditorCodeFoldingHintForm.Create(Self);
-              with FCodeFoldingHintForm do
-              begin
-                BackgroundColor := FCodeFolding.Hint.Colors.Background;
-                BorderColor := FCodeFolding.Hint.Colors.Border;
-                Font := FCodeFolding.Hint.Font;
-              end;
-
-              LLine := LFoldRange.LastLine - LFoldRange.FirstLine;
-              if LLine > FCodeFolding.Hint.RowCount then
-                LLine := FCodeFolding.Hint.RowCount;
-              for LIndex := LFoldRange.FirstLine to LFoldRange.FirstLine + LLine - 1 do
-                FCodeFoldingHintForm.ItemList.Add(Lines[LIndex]);
-              if LLine = FCodeFolding.Hint.RowCount then
-                FCodeFoldingHintForm.ItemList.Add('...');
-
-              LPoint.X := FLeftMarginWidth;
-              LPoint.Y := LRect.Bottom + 2;
-              LPoint := ClientToScreen(LPoint);
-
-              FCodeFoldingHintForm.Execute('', LPoint.X, LPoint.Y);
-            end;
-          end
-          else
-            FreeHintForm(FCodeFoldingHintForm);
-        end
-        else
-          FreeHintForm(FCodeFoldingHintForm);
-      end
-      else
-        FreeHintForm(FCodeFoldingHintForm);
-    end;
-  end;
 
   { Drag & Drop }
   if MouseCapture and (esWaitForDragging in FState) then
@@ -11010,12 +10926,6 @@ begin
       LCommand := ecUpperCase;
     cLower: { lowercase }
       LCommand := ecLowerCase;
-    cAlternating: { aLtErNaTiNg cAsE }
-      LCommand := ecAlternatingCase;
-    cSentence: { Sentence case }
-      LCommand := ecSentenceCase;
-    cTitle: { Title Case }
-      LCommand := ecTitleCase;
     cOriginal: { Original text }
       SelText := FSelectedCaseText;
   end;
@@ -11272,9 +11182,6 @@ begin
     else
     if FMouseOverURI then
       LNewCursor := crHandPoint
-    else
-    if FCodeFolding.MouseOverHint then
-      LNewCursor := FCodeFolding.Hint.Cursor
     else
       LNewCursor := Cursor;
     FKeyboardHandler.ExecuteMouseCursor(Self, LTextPosition, LNewCursor);
@@ -11688,15 +11595,7 @@ end;
 procedure TCustomBCEditor.WMSetText(var AMessage: TWMSetText);
 begin
   AMessage.Result := 1;
-  try
-    if HandleAllocated and IsWindowUnicode(Handle) then
-      Text := PChar(AMessage.Text)
-    else
-      Text := string(PAnsiChar(AMessage.Text));
-  except
-    AMessage.Result := 0;
-    raise
-  end
+  Text := StrPas(AMessage.Text);
 end;
 
 procedure TCustomBCEditor.WMSettingChange(var AMessage: TWMSettingChange);
@@ -11807,7 +11706,7 @@ begin
     WM_GETTEXT,
     WM_GETTEXTLENGTH:
       { Handle direct WndProc calls that could happen through VCL-methods like Perform }
-      if (HandleAllocated and IsWindowUnicode(Handle)) then
+      if (HandleAllocated) then
         if (FWindowProducedMessage) then
           FWindowProducedMessage := False
         else
@@ -11858,11 +11757,10 @@ end;
 procedure TCustomBCEditor.WordWrapChanged(ASender: TObject);
 begin
   ClearRows();
-
   Invalidate();
 end;
 
-begin
+initialization
   GLineWidth := 1; // Round(Screen.PixelsPerInch / USER_DEFAULT_SCREEN_DPI);
 end.
 

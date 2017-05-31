@@ -20,9 +20,6 @@
         "CodeFoldingFoldingLineHighlight": "$00CC9999",
         "CodeFoldingIndent": "$00CC9999",
         "CodeFoldingIndentHighlight": "$00CC9999",
-        "CodeFoldingHintBackground": "clWhite",
-        "CodeFoldingHintBorder": "$00CC9999",
-        "CodeFoldingHintText": "clNone",
         "CompletionProposalBackground": "clWhite",
         "CompletionProposalForeground": "clBlack",
         "CompletionProposalSelectedBackground": "clHighlight",
@@ -55,13 +52,11 @@
       "Fonts": {
         "LineNumbers": "Consolas",
         "Text": "Consolas",
-        "CodeFoldingHint": "Consolas",
         "CompletionProposal": "Consolas"
       },
       "FontSizes": {
         "LineNumbers": "8",
         "Text": "9",
-        "CodeFoldingHint": "8",
         "CompletionProposal": "8"
       }
     },

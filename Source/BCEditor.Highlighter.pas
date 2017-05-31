@@ -1990,9 +1990,6 @@ begin
         CodeFolding.Colors.FoldingLineHighlight := StringToColorDef(LColorsObject['CodeFoldingFoldingLineHighlight'].Value, CodeFolding.Colors.FoldingLineHighlight);
         CodeFolding.Colors.Indent := StringToColorDef(LColorsObject['CodeFoldingIndent'].Value, CodeFolding.Colors.Indent);
         CodeFolding.Colors.IndentHighlight := StringToColorDef(LColorsObject['CodeFoldingIndentHighlight'].Value, CodeFolding.Colors.IndentHighlight);
-        CodeFolding.Hint.Colors.Background := StringToColorDef(LColorsObject['CodeFoldingHintBackground'].Value, CodeFolding.Hint.Colors.Background);
-        CodeFolding.Hint.Colors.Border := StringToColorDef(LColorsObject['CodeFoldingHintBorder'].Value, CodeFolding.Hint.Colors.Border);
-        CodeFolding.Hint.Font.Color := StringToColorDef(LColorsObject['CodeFoldingHintText'].Value, CodeFolding.Hint.Font.Color);
         CompletionProposal.Colors.Background := StringToColorDef(LColorsObject['CompletionProposalBackground'].Value, CompletionProposal.Colors.Background);
         CompletionProposal.Colors.Foreground := StringToColorDef(LColorsObject['CompletionProposalForeground'].Value, CompletionProposal.Colors.Foreground);
         CompletionProposal.Colors.SelectedBackground := StringToColorDef(LColorsObject['CompletionProposalSelectedBackground'].Value, CompletionProposal.Colors.SelectedBackground);
@@ -2027,7 +2024,6 @@ begin
       begin
         LeftMargin.Font.Name := StrToStrDef(LFontsObject['LineNumbers'].Value, LeftMargin.Font.Name);
         Font.Name := StrToStrDef(LFontsObject['Text'].Value, Font.Name);
-        CodeFolding.Hint.Font.Name := StrToStrDef(LFontsObject['CodeFoldingHint'].Value, CodeFolding.Hint.Font.Name);
         if cpoUseHighlighterColumnFont in CompletionProposal.Options then
           for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
             CompletionProposal.Columns[LIndex].Font.Name := StrToStrDef(LFontsObject['CompletionProposal'].Value, CompletionProposal.Columns[0].Font.Name);
@@ -2037,7 +2033,6 @@ begin
       begin
         LeftMargin.Font.Size := StrToIntDef(LFontSizesObject['LineNumbers'].Value, LeftMargin.Font.Size);
         Font.Size := StrToIntDef(LFontSizesObject['Text'].Value, Font.Size);
-        CodeFolding.Hint.Font.Size := StrToIntDef(LFontSizesObject['CodeFoldingHint'].Value, CodeFolding.Hint.Font.Size);
         if cpoUseHighlighterColumnFont in CompletionProposal.Options then
           for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
             CompletionProposal.Columns[LIndex].Font.Size := StrToIntDef(LFontSizesObject['CompletionProposal'].Value, CompletionProposal.Columns[0].Font.Size);

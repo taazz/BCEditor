@@ -136,9 +136,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.Caret.pas">
             <BuildOrder>11</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.Hint.Form.pas">
-            <BuildOrder>12</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.pas">
             <BuildOrder>13</BuildOrder>
         </DelphiCompile>

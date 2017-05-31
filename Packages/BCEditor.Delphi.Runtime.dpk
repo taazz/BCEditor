@@ -39,7 +39,6 @@ contains
   BCEditor.Editor.ActiveLine in '..\Source\BCEditor.Editor.ActiveLine.pas',
   BCEditor.Editor.Caret in '..\Source\BCEditor.Editor.Caret.pas',
   BCEditor.Editor.CodeFolding in '..\Source\BCEditor.Editor.CodeFolding.pas',
-  BCEditor.Editor.CodeFolding.Hint.Form in '..\Source\BCEditor.Editor.CodeFolding.Hint.Form.pas',
   BCEditor.Editor.CompletionProposal in '..\Source\BCEditor.Editor.CompletionProposal.pas',
   BCEditor.Editor.CompletionProposal.PopupWindow in '..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas',
   BCEditor.Editor.Glyph in '..\Source\BCEditor.Editor.Glyph.pas',

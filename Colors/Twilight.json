@@ -20,9 +20,6 @@
         "CodeFoldingFoldingLineHighlight": "clLime",
         "CodeFoldingIndent": "clLime",
         "CodeFoldingIndentHighlight": "clLime",
-        "CodeFoldingHintBackground": "clBlack",
-        "CodeFoldingHintBorder": "clLime",
-        "CodeFoldingHintText": "clWhite",
         "CompletionProposalBackground": "clBlack",
         "CompletionProposalForeground": "clWhite",
         "CompletionProposalSelectedBackground": "clBlue",
@@ -55,13 +52,11 @@
       "Fonts": {
         "LineNumbers": "Courier New",
         "Text": "Courier New",
-        "CodeFoldingHint": "Courier New",
         "CompletionProposal": "Courier New"
       },
       "FontSizes": {
         "LineNumbers": "8",
         "Text": "9",
-        "CodeFoldingHint": "8",
         "CompletionProposal": "8"
       }
     },
