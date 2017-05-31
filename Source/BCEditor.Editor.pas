@@ -7480,45 +7480,19 @@ begin
       LRect.Bottom := LRect.Top + LHeight - 1;
       LRect.Right := LRect.Right - 1;
 
-      if (CodeFolding.MarkStyle = msTriangle) then
-      begin
-        if LFoldRange.Collapsed then
-        begin
-          LPoints[0] := Point(LRect.Left, LRect.Top);
-          LPoints[1] := Point(LRect.Left, LRect.Bottom - 1);
-          LPoints[2] := Point(LRect.Right - (FCodeFolding.Width + 1) mod 2, LRect.Top + LRect.Height div 2);
-          Canvas.Polygon(LPoints);
-        end
-        else
-        begin
-          LPoints[0] := Point(LRect.Left, LRect.Top + 1);
-          LPoints[1] := Point(LRect.Right - (FCodeFolding.Width + 1) mod 2, LRect.Top + 1);
-          LPoints[2] := Point(LRect.Left + LRect.Width div 2, LRect.Bottom - 1);
-          Canvas.Polygon(LPoints);
-        end;
-      end
-      else
-      begin
-        if (CodeFolding.MarkStyle = msSquare) then
-          Canvas.FrameRect(LRect)
-        else if (CodeFolding.MarkStyle = msCircle) then
-        begin
-          Canvas.Brush.Color := FCodeFolding.Colors.Background;
-          Canvas.Ellipse(LRect);
-        end;
+      Canvas.FrameRect(LRect);
 
-        { - }
-        LTemp := LRect.Top + ((LRect.Bottom - LRect.Top) div 2);
-        Canvas.MoveTo(LRect.Left + LRect.Width div 4, LTemp);
-        Canvas.LineTo(LRect.Right - LRect.Width div 4, LTemp);
+      { - }
+      LTemp := LRect.Top + ((LRect.Bottom - LRect.Top) div 2);
+      Canvas.MoveTo(LRect.Left + LRect.Width div 4, LTemp);
+      Canvas.LineTo(LRect.Right - LRect.Width div 4, LTemp);
 
-        if LFoldRange.Collapsed then
-        begin
-          { + }
-          LTemp := (LRect.Right - LRect.Left) div 2;
-          Canvas.MoveTo(LRect.Left + LTemp, LRect.Top + LRect.Width div 4);
-          Canvas.LineTo(LRect.Left + LTemp, LRect.Bottom - LRect.Width div 4);
-        end;
+      if LFoldRange.Collapsed then
+      begin
+        { + }
+        LTemp := (LRect.Right - LRect.Left) div 2;
+        Canvas.MoveTo(LRect.Left + LTemp, LRect.Top + LRect.Width div 4);
+        Canvas.LineTo(LRect.Left + LTemp, LRect.Bottom - LRect.Width div 4);
       end;
     end;
   end;

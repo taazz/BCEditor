@@ -223,7 +223,6 @@ type
 
   TBCEditorWordWrapWidth = (wwwPage, wwwRightMargin);
 
-  TBCEditorCodeFoldingMarkStyle = (msCircle, msSquare, msTriangle);
   TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
 
   TBCEditorCodeFoldingOption = (
