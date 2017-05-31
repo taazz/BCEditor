@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Classes, SysUtils, Types,
   Graphics, Controls,
-  BCEditor.Types, BCEditor.Consts, BCEditor.Editor.Glyph;
+  BCEditor.Types, BCEditor.Consts;
 
 type
   TBCEditorCodeFoldingChangeEvent = procedure(Event: TBCEditorCodeFoldingChanges) of object;
@@ -152,7 +152,7 @@ type
         FAllCodeFoldingRanges: TAllRanges;
         FCollapsed: Boolean;
         FCollapsedBy: Integer;
-        FCollapseMarkRect: TRect;
+        FCollapsedMarkRect: TRect;
         FFirstLine: Integer;
         FFoldRangeLevel: Integer;
         FIndentLevel: Integer;
@@ -173,7 +173,7 @@ type
         property AllCodeFoldingRanges: TAllRanges read FAllCodeFoldingRanges write FAllCodeFoldingRanges;
         property Collapsed: Boolean read FCollapsed write FCollapsed default False;
         property CollapsedBy: Integer read FCollapsedBy write FCollapsedBy;
-        property CollapseMarkRect: TRect read FCollapseMarkRect write FCollapseMarkRect;
+        property CollapsedMarkRect: TRect read FCollapsedMarkRect write FCollapsedMarkRect;
         property FirstLine: Integer read FFirstLine write FFirstLine;
         property FoldRangeLevel: Integer read FFoldRangeLevel write FFoldRangeLevel;
         property IndentLevel: Integer read FIndentLevel write FIndentLevel;
@@ -233,62 +233,10 @@ type
         property Border: TColor read FBorder write FBorder default clBtnFace;
       end;
 
-      TIndicator = class(TPersistent)
-      type
-        TColors = class(TPersistent)
-        strict private
-          FBackground: TColor;
-          FBorder: TColor;
-          FMark: TColor;
-        public
-          constructor Create;
-          procedure Assign(ASource: TPersistent); override;
-        published
-          property Background: TColor read FBackground write FBackground default clLeftMarginBackground;
-          property Border: TColor read FBorder write FBorder default clLeftMarginFontForeground;
-          property Mark: TColor read FMark write FMark default clLeftMarginFontForeground;
-        end;
-
-        TPadding = class(Controls.TPadding)
-        protected
-          class procedure InitDefaults(Margins: TMargins); override;
-        published
-          property Left default 0;
-          property Top default 1;
-          property Right default 0;
-          property Bottom default 1;
-        end;
-
-      strict private const
-        DefaultOptions = [hioShowBorder, hioShowMark];
-      strict private
-        FColors: TIndicator.TColors;
-        FGlyph: TBCEditorGlyph;
-        FMarkStyle: TBCEditorCodeFoldingHintIndicatorMarkStyle;
-        FOptions: TBCEditorCodeFoldingHintIndicatorOptions;
-        FPadding: TPadding;
-        FVisible: Boolean;
-        FWidth: Integer;
-        procedure SetGlyph(const AValue: TBCEditorGlyph);
-      public
-        constructor Create;
-        destructor Destroy; override;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property Colors: TIndicator.TColors read FColors write FColors;
-        property Glyph: TBCEditorGlyph read FGlyph write SetGlyph;
-        property MarkStyle: TBCEditorCodeFoldingHintIndicatorMarkStyle read FMarkStyle write FMarkStyle default imsThreeDots;
-        property Options: TBCEditorCodeFoldingHintIndicatorOptions read FOptions write FOptions default DefaultOptions;
-        property Padding: TPadding read FPadding write FPadding;
-        property Visible: Boolean read FVisible write FVisible default True;
-        property Width: Integer read FWidth write FWidth default 26;
-      end;
-
     strict private
       FColors: THint.TColors;
       FCursor: TCursor;
       FFont: TFont;
-      FIndicator: TIndicator;
       FRowCount: Integer;
       FVisible: Boolean;
       procedure SetFont(const AValue: TFont);
@@ -300,7 +248,6 @@ type
       property Colors: THint.TColors read FColors write FColors;
       property Cursor: TCursor read FCursor write FCursor default crHelp;
       property Font: TFont read FFont write SetFont;
-      property Indicator: TIndicator read FIndicator write FIndicator;
       property RowCount: Integer read FRowCount write FRowCount default 40;
       property Visible: Boolean read FVisible write FVisible default True;
     end;
@@ -328,6 +275,8 @@ type
     procedure SetPadding(const AValue: Integer);
     procedure SetVisible(const AValue: Boolean);
     procedure SetWidth(AValue: Integer);
+  protected
+    property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write SetOnChange;
   public
     constructor Create;
     destructor Destroy; override;
@@ -344,7 +293,6 @@ type
     property Padding: Integer read FPadding write SetPadding default 2;
     property Visible: Boolean read FVisible write SetVisible default False;
     property Width: Integer read FWidth write SetWidth default 14;
-    property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write SetOnChange;
   end;
 
 implementation {***************************************************************}
@@ -794,89 +742,6 @@ begin
     inherited Assign(ASource);
 end;
 
-{ TBCEditorCodeFolding.THint.TIndicator.TColors *******************************}
-
-constructor TBCEditorCodeFolding.THint.TIndicator.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clLeftMarginBackground;
-  FBorder := clLeftMarginFontForeground;
-  FMark := clLeftMarginFontForeground;
-end;
-
-procedure TBCEditorCodeFolding.THint.TIndicator.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TColors then
-  with ASource as TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FBorder := FBorder;
-    Self.FMark := FMark;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorCodeFolding.THint.TIndicator.TPadding ******************************}
-
-class procedure TBCEditorCodeFolding.THint.TIndicator.TPadding.InitDefaults(Margins: TMargins);
-begin
-  with Margins do
-  begin
-    Left := 0;
-    Right := 0;
-    Top := 1;
-    Bottom := 1;
-  end;
-end;
-
-{ TBCEditorCodeFolding.THint.TIndicator ***************************************}
-
-constructor TBCEditorCodeFolding.THint.TIndicator.Create;
-begin
-  inherited;
-
-  FColors := TIndicator.TColors.Create;
-  FGlyph := TBCEditorGlyph.Create;
-  FPadding := TPadding.Create(nil);
-  FGlyph.Visible := False;
-  FMarkStyle := imsThreeDots;
-  FVisible := True;
-  FOptions := DefaultOptions;
-  FWidth := 26;
-end;
-
-destructor TBCEditorCodeFolding.THint.TIndicator.Destroy;
-begin
-  FColors.Free;
-  FGlyph.Free;
-  FPadding.Free;
-
-  inherited;
-end;
-
-procedure TBCEditorCodeFolding.THint.TIndicator.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TIndicator) then
-  with ASource as TIndicator do
-  begin
-    Self.FVisible := FVisible;
-    Self.FMarkStyle := FMarkStyle;
-    Self.FWidth := FWidth;
-    Self.FColors.Assign(FColors);
-    Self.FGlyph.Assign(FGlyph);
-    Self.FPadding.Assign(FPadding);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorCodeFolding.THint.TIndicator.SetGlyph(const AValue: TBCEditorGlyph);
-begin
-  FGlyph.Assign(AValue);
-end;
-
 { TBCEditorCodeFolding.THint **************************************************}
 
 constructor TBCEditorCodeFolding.THint.Create;
@@ -884,7 +749,6 @@ begin
   inherited;
 
   FColors := THint.TColors.Create;
-  FIndicator := TIndicator.Create;
   FCursor := crHelp;
   FRowCount := 40;
   FVisible := True;
@@ -896,7 +760,6 @@ end;
 destructor TBCEditorCodeFolding.THint.Destroy;
 begin
   FColors.Free;
-  FIndicator.Free;
   FFont.Free;
 
   inherited;
@@ -908,7 +771,6 @@ begin
   with ASource as THint do
   begin
     Self.FColors.Assign(FColors);
-    Self.FIndicator.Assign(FIndicator);
     Self.FCursor := FCursor;
     Self.FFont.Assign(FFont);
   end

@@ -21,6 +21,7 @@ uses
 type
   TCustomBCEditor = class(TCustomControl)
   strict private type
+    TBCEditorCodeFolding = class(BCEditor.Editor.CodeFolding.TBCEditorCodeFolding);
     TBCEditorHighlighter = class(BCEditor.Highlighter.TBCEditorHighlighter);
     TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
     TBCEditorReplace = class(BCEditor.Editor.Replace.TBCEditorReplace);
@@ -206,7 +207,6 @@ type
     FOnAfterDeleteMark: TNotifyEvent;
     FOnAfterMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
     FOnAfterMarkPlaced: TNotifyEvent;
-    FOnAfterPaintRow: TBCEditorLinePaintEvent;
     FOnBeforeCompletionProposalExecute: TBCEditorCompletionProposalEvent;
     FOnBeforeDeleteMark: TBCEditorMarkEvent;
     FOnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
@@ -624,7 +624,6 @@ type
     property OnAfterDeleteMark: TNotifyEvent read FOnAfterDeleteMark write FOnAfterDeleteMark;
     property OnAfterMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnAfterMarkPanelPaint write FOnAfterMarkPanelPaint;
     property OnAfterMarkPlaced: TNotifyEvent read FOnAfterMarkPlaced write FOnAfterMarkPlaced;
-    property OnAfterPaintRow: TBCEditorLinePaintEvent read FOnAfterPaintRow write FOnAfterPaintRow;
     property OnBeforeCompletionProposalExecute: TBCEditorCompletionProposalEvent read FOnBeforeCompletionProposalExecute write FOnBeforeCompletionProposalExecute;
     property OnBeforeDeleteMark: TBCEditorMarkEvent read FOnBeforeDeleteMark write FOnBeforeDeleteMark;
     property OnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnBeforeMarkPanelPaint write FOnBeforeMarkPanelPaint;
@@ -812,7 +811,6 @@ type
     property OnAfterDeleteMark;
     property OnAfterMarkPanelPaint;
     property OnAfterMarkPlaced;
-    property OnAfterPaintRow;
     property OnBeforeCompletionProposalExecute;
     property OnBeforeDeleteMark;
     property OnBeforeMarkPanelPaint;
@@ -901,8 +899,9 @@ type
   TBCEditorAccessWinControl = class(TWinControl);
 
 var
-  GScrollHintWindow: THintWindow;
+  GLineWidth: Integer;
   GRightMarginHintWindow: THintWindow;
+  GScrollHintWindow: THintWindow;
 
 function GetScrollHint: THintWindow;
 begin
@@ -3341,7 +3340,7 @@ begin
 
     if Assigned(LFoldRange) and LFoldRange.Collapsed then
     begin
-      LCollapseMarkRect := LFoldRange.CollapseMarkRect;
+      LCollapseMarkRect := LFoldRange.CollapsedMarkRect;
       OffsetRect(LCollapseMarkRect, -FLeftMarginWidth, 0);
 
       if LCollapseMarkRect.Right > FLeftMarginWidth then
@@ -5981,7 +5980,7 @@ begin
     and (Lines.CaretPosition.Char > 0)) then
   begin
     LLineBeginPos := @Lines.Items[Lines.CaretPosition.Line].Text[1];
-    LLinePos := @Lines.Items[Lines.CaretPosition.Line].Text[Lines.CaretPosition.Char];
+    LLinePos := @Lines.Items[Lines.CaretPosition.Line].Text[Min(Lines.CaretPosition.Char, Length(Lines.Items[Lines.CaretPosition.Line].Text))];
     LLineEndPos := @Lines.Items[Lines.CaretPosition.Line].Text[Length(Lines.Items[Lines.CaretPosition.Line].Text)];
 
     if (not IsWordBreakChar(LLinePos^)) then
@@ -6664,7 +6663,7 @@ begin
       Exit;
     end;
 
-  if (AButton = mbLeft) and FCodeFolding.Visible and FCodeFolding.Hint.Indicator.Visible and
+  if (AButton = mbLeft) and FCodeFolding.Visible and
     (cfoUncollapseByHintClick in FCodeFolding.Options) then
     if DoOnCodeFoldingHintClick(Point(X, Y)) then
     begin
@@ -6822,7 +6821,7 @@ begin
     end;
   end;
 
-  if FCodeFolding.Visible and FCodeFolding.Hint.Indicator.Visible and FCodeFolding.Hint.Visible then
+  if FCodeFolding.Visible and FCodeFolding.Hint.Visible then
   begin
     LRow := TopRow + Y div LineHeight;
 
@@ -6835,7 +6834,7 @@ begin
       if Assigned(LFoldRange) and LFoldRange.Collapsed and not LFoldRange.ParentCollapsed then
       begin
         LPoint := Point(X, Y);
-        LRect := LFoldRange.CollapseMarkRect;
+        LRect := LFoldRange.CollapsedMarkRect;
         OffsetRect(LRect, -FLeftMarginWidth, 0);
 
         if LRect.Right > FLeftMarginWidth then
@@ -8028,88 +8027,37 @@ end;
 
 procedure TCustomBCEditor.PaintLines(AClipRect: TRect; const AFirstRow, ALastRow: Integer);
 
-  procedure PaintCodeFoldingCollapseMark(AFoldRange: TBCEditorCodeFolding.TRanges.TRange;
+  procedure PaintCodeFoldingCollapsedMark(AFoldRange: TBCEditorCodeFolding.TRanges.TRange;
     const ARect: TRect);
   var
     LBrush: TBrush;
-    LDotSpace: Integer;
-    LIndex: Integer;
     LOldBrushColor: TColor;
     LOldPenColor: TColor;
-    LPoints: array [0..2] of TPoint;
+    LOldPenWidth: Integer;
     LRect: TRect;
-    X: Integer;
-    Y: Integer;
   begin
-    LOldPenColor := Canvas.Pen.Color;
-    LOldBrushColor  := Canvas.Brush.Color;
+    LRect := Rect(
+      ARect.Left + FPaintHelper.SpaceWidth,
+      ARect.Top + GLineWidth,
+      ARect.Left + FPaintHelper.SpaceWidth + 2 * GLineWidth + ComputeTokenWidth('...', 3, 0, nil) + 2 * GLineWidth,
+      ARect.Bottom - GLineWidth);
+    AFoldRange.CollapsedMarkRect := LRect;
 
-    if (FCodeFolding.Visible
-      and Assigned(AFoldRange) and AFoldRange.Collapsed and not AFoldRange.ParentCollapsed) then
+    if (LRect.Left < ClientWidth) then
     begin
-      if (FCodeFolding.Hint.Indicator.Visible) then
-      begin
-        LRect := Rect(
-          FPaintHelper.SpaceWidth + ARect.Left + FCodeFolding.Hint.Indicator.Padding.Left,
-          ARect.Top + FCodeFolding.Hint.Indicator.Padding.Top,
-          FPaintHelper.SpaceWidth + ARect.Left + FCodeFolding.Hint.Indicator.Padding.Left + FCodeFolding.Hint.Indicator.Width + FCodeFolding.Hint.Indicator.Padding.Right,
-          ARect.Bottom - FCodeFolding.Hint.Indicator.Padding.Bottom);
+      LOldPenColor := Canvas.Pen.Color;
+      LOldPenWidth := Canvas.Pen.Width;
+      LOldBrushColor := Canvas.Brush.Color;
 
-        if LRect.Right > FLeftMarginWidth then
-        begin
-          if FCodeFolding.Hint.Indicator.Glyph.Visible then
-            FCodeFolding.Hint.Indicator.Glyph.Draw(Canvas, LRect.Left, ARect.Top, ARect.Height)
-          else
-          begin
-            if BackgroundColor <> FCodeFolding.Hint.Indicator.Colors.Background then
-            begin
-              Canvas.Brush.Color := FCodeFolding.Hint.Indicator.Colors.Background;
-              FillRect(LRect);
-            end;
+      LBrush := TBrush.Create();
+      LBrush.Color := FCodeFolding.Colors.FoldingLine;
+      FrameRect(Canvas.Handle, LRect, LBrush.Handle);
+      LBrush.Free();
 
-            if hioShowBorder in FCodeFolding.Hint.Indicator.Options then
-            begin
-              LBrush := TBrush.Create;
-              try
-                LBrush.Color := FCodeFolding.Hint.Indicator.Colors.Border;
-                FrameRect(Canvas.Handle, LRect, LBrush.Handle);
-              finally
-                LBrush.Free;
-              end;
-            end;
-
-            if hioShowMark in FCodeFolding.Hint.Indicator.Options then
-            begin
-              Canvas.Pen.Color := FCodeFolding.Hint.Indicator.Colors.Mark;
-              Canvas.Brush.Color := FCodeFolding.Hint.Indicator.Colors.Mark;
-              case FCodeFolding.Hint.Indicator.MarkStyle of
-                imsThreeDots:
-                  begin
-                    { [...] }
-                    LDotSpace := (LRect.Width - 8) div 4;
-                    Y := LRect.Top + (LRect.Bottom - LRect.Top) div 2;
-                    X := LRect.Left + LDotSpace + (LRect.Width - LDotSpace * 4 - 6) div 2;
-                    for LIndex := 1 to 3 do
-                    begin
-                      Canvas.Rectangle(X, Y, X + 2, Y + 2);
-                      X := X + LDotSpace + 2;
-                    end;
-                  end;
-                imsTriangle:
-                  begin
-                    LPoints[0] := Point(LRect.Left + (LRect.Width - LRect.Height) div 2 + 2, LRect.Top + 2);
-                    LPoints[1] := Point(LRect.Right - (LRect.Width - LRect.Height) div 2 - 3 - (LRect.Width + 1) mod 2, LRect.Top + 2);
-                    LPoints[2] := Point(LRect.Left + LRect.Width div 2 - (LRect.Width + 1) mod 2, LRect.Bottom - 3);
-                    Canvas.Polygon(LPoints);
-                  end;
-              end;
-            end;
-          end;
-        end;
-        Inc(LRect.Left, FLeftMarginWidth);
-        LRect.Right := LRect.Left + FCodeFolding.Hint.Indicator.Width;
-        AFoldRange.CollapseMarkRect := LRect;
-      end;
+      LRect.Inflate(- 2 * GLineWidth, 0);
+      FPaintHelper.SetForegroundColor(FCodeFolding.Colors.FoldingLine);
+      ExtTextOut(FPaintHelper.Handle, LRect.Left, LRect.Top,
+        0, LRect, '...', 3, nil);
 
       if (cfoShowCollapsedLine in CodeFolding.Options) then
       begin
@@ -8117,9 +8065,11 @@ procedure TCustomBCEditor.PaintLines(AClipRect: TRect; const AFirstRow, ALastRow
         Canvas.MoveTo(ARect.Left, ARect.Bottom - 1);
         Canvas.LineTo(ClientWidth, ARect.Bottom - 1);
       end;
+
+      Canvas.Pen.Color := LOldPenColor;
+      Canvas.Pen.Width := LOldPenWidth;
+      Canvas.Brush.Color := LOldBrushColor;
     end;
-    Canvas.Pen.Color := LOldPenColor;
-    Canvas.Brush.Color := LOldBrushColor;
   end;
 
 var
@@ -8131,9 +8081,9 @@ var
   LLine: Integer;
   LOpenTokenEndPos: Integer;
   LPaintData: TPaintTokenData;
+  LRect: TRect;
   LRow: Integer;
   LRowText: string;
-  LTokenRect: TRect;
 begin
   LPaintData.LineForegroundColor := clNone;
   LPaintData.LineBackgroundColor := clNone;
@@ -8171,7 +8121,7 @@ begin
   begin
     LPaintData.Previous.FontStyles := [];
 
-    LTokenRect := Rect(
+    LRect := Rect(
       AClipRect.Left, (LRow - AFirstRow) * LineHeight,
       AClipRect.Right, (LRow - AFirstRow + 1) * LineHeight);
 
@@ -8240,8 +8190,8 @@ begin
       LColumn := 0;
       while (not FHighlighter.GetEndOfLine()) do
       begin
-        Inc(LTokenRect.Left,
-          PaintToken(LTokenRect,
+        Inc(LRect.Left,
+          PaintToken(LRect,
             LinesPosition(Rows.Items[LRow].Char + FHighlighter.GetTokenIndex(), LLine),
             RowsPosition(LColumn, LRow),
             FHighlighter.GetTokenText(), FHighlighter.GetTokenLength(),
@@ -8253,32 +8203,28 @@ begin
         else
           LColumn := FTabs.Width - LColumn mod FTabs.Width;
 
-        if (LTokenRect.Left > ClientWidth) then
+        if (LRect.Left > ClientWidth) then
           break;
 
         FHighlighter.Next();
       end;
 
-      if ((LTokenRect.Left <= ClientWidth)) then
-        Inc(LTokenRect.Left,
-          PaintToken(LTokenRect,
+      if ((LRect.Left <= ClientWidth)) then
+        Inc(LRect.Left,
+          PaintToken(LRect,
             Rows.EORPosition[LRow], RowsPosition(Rows.Items[LRow].Length, LRow),
             nil, 0, nil,
             @LPaintData));
 
-      PaintCodeFoldingCollapseMark(LFoldRange, LTokenRect);
+      if (FCodeFolding.Visible
+        and Assigned(LFoldRange) and LFoldRange.Collapsed and not LFoldRange.ParentCollapsed) then
+        PaintCodeFoldingCollapsedMark(LFoldRange, LRect);
     end
     else
-      PaintToken(LTokenRect,
+      PaintToken(LRect,
         Rows.BORPosition[LRow], RowsPosition(0, LRow),
         nil, 0, nil,
         @LPaintData);
-
-    if (Assigned(FOnAfterPaintRow)) then
-    begin
-      LTokenRect := Rect(AClipRect.Left, (LRow - AFirstRow) * LineHeight, AClipRect.Right, (LRow - AFirstRow + 1) * LineHeight);
-      FOnAfterPaintRow(Self, Canvas, LTokenRect, LRow);
-    end;
   end;
 
   LPaintData.Parts.Free();
@@ -12084,5 +12030,7 @@ begin
   end;
 end;
 
+begin
+  GLineWidth := Round(Screen.PixelsPerInch / USER_DEFAULT_SCREEN_DPI);
 end.
 

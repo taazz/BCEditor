@@ -1993,9 +1993,6 @@ begin
         CodeFolding.Hint.Colors.Background := StringToColorDef(LColorsObject['CodeFoldingHintBackground'].Value, CodeFolding.Hint.Colors.Background);
         CodeFolding.Hint.Colors.Border := StringToColorDef(LColorsObject['CodeFoldingHintBorder'].Value, CodeFolding.Hint.Colors.Border);
         CodeFolding.Hint.Font.Color := StringToColorDef(LColorsObject['CodeFoldingHintText'].Value, CodeFolding.Hint.Font.Color);
-        CodeFolding.Hint.Indicator.Colors.Background := StringToColorDef(LColorsObject['CodeFoldingHintIndicatorBackground'].Value, CodeFolding.Hint.Indicator.Colors.Background);
-        CodeFolding.Hint.Indicator.Colors.Border := StringToColorDef(LColorsObject['CodeFoldingHintIndicatorBorder'].Value, CodeFolding.Hint.Indicator.Colors.Border);
-        CodeFolding.Hint.Indicator.Colors.Mark := StringToColorDef(LColorsObject['CodeFoldingHintIndicatorMark'].Value, CodeFolding.Hint.Indicator.Colors.Mark);
         CompletionProposal.Colors.Background := StringToColorDef(LColorsObject['CompletionProposalBackground'].Value, CompletionProposal.Colors.Background);
         CompletionProposal.Colors.Foreground := StringToColorDef(LColorsObject['CompletionProposalForeground'].Value, CompletionProposal.Colors.Foreground);
         CompletionProposal.Colors.SelectedBackground := StringToColorDef(LColorsObject['CompletionProposalSelectedBackground'].Value, CompletionProposal.Colors.SelectedBackground);

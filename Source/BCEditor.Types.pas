@@ -23,8 +23,6 @@ type
   TBCEditorMarkPanelPaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const AFirstLine: Integer; const ALastLine: Integer) of object;
   TBCEditorMarkPanelLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
 
-  TBCEditorLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
-
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
 
   TBCEditorCreateFileStreamEvent = procedure(ASender: TObject; const AFileName: string; var AStream: TStream) of object;
@@ -226,7 +224,6 @@ type
   TBCEditorWordWrapWidth = (wwwPage, wwwRightMargin);
 
   TBCEditorCodeFoldingMarkStyle = (msCircle, msSquare, msTriangle);
-  TBCEditorCodeFoldingHintIndicatorMarkStyle = (imsThreeDots, imsTriangle);
   TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
 
   TBCEditorCodeFoldingOption = (
@@ -250,12 +247,9 @@ type
 
   TBCEditorScrollHintFormat = (shfTopLineOnly, shfTopToBottom);
 
-  TBCEditorCodeFoldingHintIndicatorOption = (hioShowBorder, hioShowMark);
-
   TBCEditorCaretOptions = set of TBCEditorCaretOption;
   TBCEditorCaretMultiEditOptions = set of TBCEditorCaretMultiEditOption;
   TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
-  TBCEditorCodeFoldingHintIndicatorOptions = set of TBCEditorCodeFoldingHintIndicatorOption;
   TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
   TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
   TBCEditorSearchOptions = set of TBCEditorSearchOption;
