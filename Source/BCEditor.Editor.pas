@@ -147,7 +147,7 @@ type
     FCodeFoldingDelayTimer: TTimer;
     FCodeFoldingHintForm: TBCEditorCodeFoldingHintForm;
     FCodeFoldingRangeFirstLine: array of TBCEditorCodeFolding.TRanges.TRange;
-    FCodeFoldingRangeToLine: array of TBCEditorCodeFolding.TRanges.TRange;
+    FCodeFoldingRangeLastLine: array of TBCEditorCodeFolding.TRanges.TRange;
     FCodeFoldingTreeLine: array of Boolean;
     FCommandDrop: Boolean;
     FCompletionProposal: TBCEditorCompletionProposal;
@@ -1735,7 +1735,7 @@ begin
   FAllCodeFoldingRanges.ClearAll;
   SetLength(FCodeFoldingTreeLine, 0);
   SetLength(FCodeFoldingRangeFirstLine, 0);
-  SetLength(FCodeFoldingRangeToLine, 0);
+  SetLength(FCodeFoldingRangeLastLine, 0);
 end;
 
 procedure TCustomBCEditor.ClearMarks();
@@ -1927,9 +1927,9 @@ var
 begin
   Result := nil;
 
-  if (ALine < Length(FCodeFoldingRangeToLine)) then
+  if (ALine < Length(FCodeFoldingRangeLastLine)) then
   begin
-    LCodeFoldingRange := FCodeFoldingRangeToLine[ALine];
+    LCodeFoldingRange := FCodeFoldingRangeLastLine[ALine];
     if Assigned(LCodeFoldingRange) then
       if (LCodeFoldingRange.LastLine = ALine) and not LCodeFoldingRange.ParentCollapsed then
         Result := LCodeFoldingRange;
@@ -1990,33 +1990,33 @@ begin
     SetLength(FCodeFoldingTreeLine, LLength);
     SetLength(FCodeFoldingRangeFirstLine, 0);
     SetLength(FCodeFoldingRangeFirstLine, LLength);
-    SetLength(FCodeFoldingRangeToLine, 0);
-    SetLength(FCodeFoldingRangeToLine, LLength);
+    SetLength(FCodeFoldingRangeLastLine, 0);
+    SetLength(FCodeFoldingRangeLastLine, LLength);
     for LIndex := FAllCodeFoldingRanges.AllCount - 1 downto 0 do
     begin
       LCodeFoldingRange := FAllCodeFoldingRanges[LIndex];
-      if Assigned(LCodeFoldingRange) then
-        if (not LCodeFoldingRange.ParentCollapsed
-          and ((LCodeFoldingRange.FirstLine <> LCodeFoldingRange.LastLine)
-            or LCodeFoldingRange.RegionItem.TokenEndIsPreviousLine and (LCodeFoldingRange.FirstLine = LCodeFoldingRange.LastLine))) then
-          begin
-            FCodeFoldingRangeFirstLine[LCodeFoldingRange.FirstLine] := LCodeFoldingRange;
+      if (Assigned(LCodeFoldingRange)
+        and not LCodeFoldingRange.ParentCollapsed
+        and ((LCodeFoldingRange.FirstLine <> LCodeFoldingRange.LastLine)
+          or LCodeFoldingRange.RegionItem.TokenEndIsPreviousLine)) then
+      begin
+        FCodeFoldingRangeFirstLine[LCodeFoldingRange.FirstLine] := LCodeFoldingRange;
 
-            if LCodeFoldingRange.Collapsable then
-            begin
-              for LIndexRange := LCodeFoldingRange.FirstLine + 1 to LCodeFoldingRange.LastLine - 1 do
-                FCodeFoldingTreeLine[LIndexRange] := True;
+        if LCodeFoldingRange.Collapsable then
+        begin
+          for LIndexRange := LCodeFoldingRange.FirstLine + 1 to LCodeFoldingRange.LastLine - 1 do
+            FCodeFoldingTreeLine[LIndexRange] := True;
 
-              FCodeFoldingRangeToLine[LCodeFoldingRange.LastLine] := LCodeFoldingRange;
-            end;
-          end;
+          FCodeFoldingRangeLastLine[LCodeFoldingRange.LastLine] := LCodeFoldingRange;
+        end;
+      end;
     end;
   end;
 end;
 
 function TCustomBCEditor.CodeFoldingTreeEndForLine(const ALine: Integer): Boolean;
 begin
-  Result := Assigned(FCodeFoldingRangeToLine[ALine]);
+  Result := Assigned(FCodeFoldingRangeLastLine[ALine]);
 end;
 
 function TCustomBCEditor.CodeFoldingTreeLineForLine(const ALine: Integer): Boolean;
@@ -3362,13 +3362,13 @@ procedure TCustomBCEditor.DoOnCommandProcessed(ACommand: TBCEditorCommand; const
     LIndex: Integer;
   begin
     LIndex := ALine;
-    while (LIndex > 0) and not Assigned(FCodeFoldingRangeToLine[LIndex]) do
+    while (LIndex > 0) and not Assigned(FCodeFoldingRangeLastLine[LIndex]) do
     begin
       if Assigned(FCodeFoldingRangeFirstLine[LIndex]) then
         Exit(False);
       Dec(LIndex);
     end;
-    Result := Assigned(FCodeFoldingRangeToLine[LIndex]) and FCodeFoldingRangeToLine[LIndex].RegionItem.TokenEndIsPreviousLine
+    Result := Assigned(FCodeFoldingRangeLastLine[LIndex]) and FCodeFoldingRangeLastLine[LIndex].RegionItem.TokenEndIsPreviousLine
   end;
 
 begin
@@ -3647,8 +3647,8 @@ begin
       else
       begin
         LSearchPosition := Lines.CaretPosition;
-        LSearchPosition.Line := Min(LSearchPosition.Line, Lines.Count - 1);
-        LSearchPosition.Char := Min(LSearchPosition.Char, Length(Lines[LSearchPosition.Line]));
+        LSearchPosition.Line := Max(LSearchPosition.Line, Lines.Count - 1);
+        LSearchPosition.Char := Max(LSearchPosition.Char, Length(Lines[LSearchPosition.Line]));
       end;
 
       if (roReplaceAll in Replace.Options) then
@@ -3657,19 +3657,7 @@ begin
         LActionReplace := raReplace;
 
       repeat
-        LSuccess := False; // Debug 2017-04-06
-
-        try
-          LSuccess := LSearch.Find(LSearchPosition, LFindLength);
-        except
-          // Debug 2017-04-06
-          on E: Exception do
-            E.RaiseOuterException(EAssertionFailed.Create(
-              'Backwards: ' + BoolToStr(roBackwards in FReplace.Options, True) + #13#10
-              + 'Area: ' + Replace.Area.ToString() + #13#10
-              + 'LSearchPosition: ' + LSearchPosition.ToString() + #13#10
-              + 'Lines.Count: ' + IntToStr(Lines.Count)));
-        end;
+        LSuccess := LSearch.Find(LSearchPosition, LFindLength);
         if (not LSuccess) then
           LActionReplace := raCancel;
 
@@ -7569,7 +7557,7 @@ var
       while LTempLine > 0 do
       begin
         LCodeFoldingRange := FCodeFoldingRangeFirstLine[LTempLine];
-        LCodeFoldingRangeTo := FCodeFoldingRangeToLine[LTempLine];
+        LCodeFoldingRangeTo := FCodeFoldingRangeLastLine[LTempLine];
         if not Assigned(LCodeFoldingRange) and not Assigned(LCodeFoldingRangeTo) then
           Dec(LTempLine)
         else
@@ -9073,7 +9061,7 @@ begin
       if not LCodeFoldingRange.Collapsed and not LCodeFoldingRange.ParentCollapsed then
       begin
         FCodeFoldingRangeFirstLine[LCodeFoldingRange.FirstLine] := nil;
-        FCodeFoldingRangeToLine[LCodeFoldingRange.LastLine] := nil;
+        FCodeFoldingRangeLastLine[LCodeFoldingRange.LastLine] := nil;
         FreeAndNil(LCodeFoldingRange);
         FAllCodeFoldingRanges.List.Delete(LIndex);
       end
