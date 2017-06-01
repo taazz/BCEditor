@@ -25,6 +25,11 @@ type
       TState = (lsLoaded, lsModified, lsSaved);
     public
       Background: TColor;
+      CodeFolding: packed record
+        BeginRange: Pointer;
+        EndRange: Pointer;
+        TreeLine: Boolean;
+      end;
       FirstRow: Integer;
       Flags: TFlags;
       Foreground: TColor;
@@ -188,6 +193,9 @@ type
     procedure Redo(); inline;
     function ReplaceText(const AArea: TBCEditorLinesArea; const AText: string): TBCEditorLinesPosition;
     procedure SetBackground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
+    procedure SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
+    procedure SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
     procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
     procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
     procedure SetRange(const ALine: Integer; const AValue: Pointer); inline;
@@ -1102,6 +1110,9 @@ begin
   BeginUpdate();
   try
     LLine.Background := clNone;
+    LLine.CodeFolding.BeginRange := nil;
+    LLine.CodeFolding.EndRange := nil;
+    LLine.CodeFolding.TreeLine := False;
     LLine.Flags := [];
     LLine.FirstRow := -1;
     LLine.Foreground := clNone;
@@ -1965,6 +1976,27 @@ begin
   end
   else
     SelArea := LinesArea(AValue, AValue);
+end;
+
+procedure TBCEditorLines.SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Items.List[ALine].CodeFolding.BeginRange := AValue;
+end;
+
+procedure TBCEditorLines.SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Items.List[ALine].CodeFolding.EndRange := AValue;
+end;
+
+procedure TBCEditorLines.SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Items.List[ALine].CodeFolding.TreeLine := AValue;
 end;
 
 procedure TBCEditorLines.SetFirstRow(const ALine: Integer; const AValue: Integer);

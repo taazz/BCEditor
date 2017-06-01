@@ -162,7 +162,6 @@ type
     FBookMarks: TBCEditorLeftMargin.TBookmarks;
     FBorder: TBCEditorLeftMargin.TBorder;
     FColors: TBCEditorLeftMargin.TColors;
-    FCursor: TCursor;
     FFont: TFont;
     FLineNumbers: TBCEditorLeftMargin.TLineNumbers;
     FLineState: TBCEditorLeftMargin.TLineState;
@@ -194,7 +193,6 @@ type
     property Bookmarks: TBCEditorLeftMargin.TBookmarks read FBookMarks write SetBookMarks;
     property Border: TBCEditorLeftMargin.TBorder read FBorder write FBorder;
     property Colors: TBCEditorLeftMargin.TColors read FColors write SetColors;
-    property Cursor: TCursor read FCursor write FCursor default crDefault;
     property Font: TFont read FFont write SetFont;
     property LineNumbers: TBCEditorLeftMargin.TLineNumbers read FLineNumbers write FLineNumbers;
     property LineState: TBCEditorLeftMargin.TLineState read FLineState write FLineState;
@@ -581,7 +579,6 @@ begin
 
   FAutosize := True;
   FColors := TColors.Create;
-  FCursor := crDefault;
   FBorder := TBorder.Create;
   FFont := TFont.Create;
   FFont.Name := 'Courier New';
@@ -622,7 +619,6 @@ begin
     Self.FMarks.Assign(FMarks);
     Self.FColors.Assign(FColors);
     Self.FBorder.Assign(FBorder);
-    Self.FCursor := FCursor;
     Self.FFont.Assign(FFont);
     Self.FLineNumbers.Assign(FLineNumbers);
     Self.FMarksPanel.Assign(FMarksPanel);

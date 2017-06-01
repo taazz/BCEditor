@@ -150,14 +150,14 @@ type
       TRange = class
       strict private
         FAllCodeFoldingRanges: TAllRanges;
+        FBeginLine: Integer;
         FCollapsed: Boolean;
         FCollapsedBy: Integer;
         FCollapsedMarkRect: TRect;
-        FFirstLine: Integer;
+        FEndLine: Integer;
         FFoldRangeLevel: Integer;
         FIndentLevel: Integer;
         FIsExtraTokenFound: Boolean;
-        FLastLine: Integer;
         FParentCollapsed: Boolean;
         FRegionItem: TBCEditorCodeFoldingRegionItem;
         FSubCodeFoldingRanges: TRanges;
@@ -171,14 +171,14 @@ type
         procedure SetParentCollapsedOfSubCodeFoldingRanges(AParentCollapsed: Boolean; ACollapsedBy: Integer);
         procedure Widen(LineCount: Integer);
         property AllCodeFoldingRanges: TAllRanges read FAllCodeFoldingRanges write FAllCodeFoldingRanges;
+        property BeginLine: Integer read FBeginLine write FBeginLine;
         property Collapsed: Boolean read FCollapsed write FCollapsed default False;
         property CollapsedBy: Integer read FCollapsedBy write FCollapsedBy;
         property CollapsedMarkRect: TRect read FCollapsedMarkRect write FCollapsedMarkRect;
-        property FirstLine: Integer read FFirstLine write FFirstLine;
+        property EndLine: Integer read FEndLine write FEndLine;
         property FoldRangeLevel: Integer read FFoldRangeLevel write FFoldRangeLevel;
         property IndentLevel: Integer read FIndentLevel write FIndentLevel;
         property IsExtraTokenFound: Boolean read FIsExtraTokenFound write FIsExtraTokenFound default False;
-        property LastLine: Integer read FLastLine write FLastLine;
         property ParentCollapsed: Boolean read FParentCollapsed write FParentCollapsed;
         property RegionItem: TBCEditorCodeFoldingRegionItem read FRegionItem write FRegionItem;
         property SubCodeFoldingRanges: TRanges read FSubCodeFoldingRanges;
@@ -253,8 +253,8 @@ type
     end;
 
   strict private const
-    DefaultOptions = [cfoAutoPadding, cfoAutoWidth, cfoHighlightIndentGuides,
-      cfoHighlightMatchingPair, cfoShowIndentGuides, cfoShowTreeLine, cfoUncollapseByHintClick];
+    DefaultOptions = [cfoAutoPadding, cfoHighlightIndentGuides,
+      cfoShowIndentGuides, cfoShowTreeLine, cfoUncollapseByHintClick];
   strict private
     FColors: TColors;
     FDelayInterval: Cardinal;
@@ -263,21 +263,18 @@ type
     FOptions: TBCEditorCodeFoldingOptions;
     FPadding: Integer;
     FVisible: Boolean;
-    FWidth: Integer;
     procedure DoChange;
     procedure SetColors(const AValue: TColors);
     procedure SetOnChange(AValue: TBCEditorCodeFoldingChangeEvent);
     procedure SetOptions(AValue: TBCEditorCodeFoldingOptions);
     procedure SetPadding(const AValue: Integer);
     procedure SetVisible(const AValue: Boolean);
-    procedure SetWidth(AValue: Integer);
   protected
     property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write SetOnChange;
   public
     constructor Create;
     destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
-    function GetWidth: Integer;
     procedure SetOption(const AOption: TBCEditorCodeFoldingOption; const AEnabled: Boolean);
   published
     property Colors: TColors read FColors write SetColors;
@@ -285,7 +282,6 @@ type
     property Options: TBCEditorCodeFoldingOptions read FOptions write SetOptions default DefaultOptions;
     property Padding: Integer read FPadding write SetPadding default 2;
     property Visible: Boolean read FVisible write SetVisible default False;
-    property Width: Integer read FWidth write SetWidth default 14;
   end;
 
 implementation {***************************************************************}
@@ -492,7 +488,7 @@ end;
 
 function TBCEditorCodeFolding.TRanges.TRange.Collapsable: Boolean;
 begin
-  Result := (FFirstLine < FLastLine) or RegionItem.TokenEndIsPreviousLine and (FFirstLine = FLastLine);
+  Result := (FBeginLine < FEndLine) or RegionItem.TokenEndIsPreviousLine and (FBeginLine = FEndLine);
 end;
 
 constructor TBCEditorCodeFolding.TRanges.TRange.Create;
@@ -517,8 +513,8 @@ end;
 
 procedure TBCEditorCodeFolding.TRanges.TRange.MoveBy(LineCount: Integer);
 begin
-  Inc(FFirstLine, LineCount);
-  Inc(FLastLine, LineCount);
+  Inc(FBeginLine, LineCount);
+  Inc(FEndLine, LineCount);
 end;
 
 procedure TBCEditorCodeFolding.TRanges.TRange.MoveChildren(By: Integer);
@@ -565,7 +561,7 @@ end;
 
 procedure TBCEditorCodeFolding.TRanges.TRange.Widen(LineCount: Integer);
 begin
-  Inc(FLastLine, LineCount);
+  Inc(FEndLine, LineCount);
 end;
 
 { TBCEditorCodeFolding.TRanges ************************************************}
@@ -592,8 +588,8 @@ begin
   Result := TRange.Create;
   with Result do
   begin
-    FirstLine := ABeginLine;
-    LastLine := AEndLine;
+    BeginLine := ABeginLine;
+    EndLine := AEndLine;
     IndentLevel := AIndentLevel;
     FoldRangeLevel := AFoldRangeLevel;
     AllCodeFoldingRanges := AAllCodeFoldingRanges;
@@ -687,9 +683,9 @@ begin
     LFoldRange := GetItem(LIndex);
     if LFoldRange = AFoldRange then
       Continue;
-    if LFoldRange.FirstLine > AFoldRange.LastLine then
+    if LFoldRange.BeginLine > AFoldRange.EndLine then
       Break;
-    if (LFoldRange.LastLine > AFoldRange.LastLine) and (LFoldRange.LastLine <> AFoldRange.LastLine) then
+    if (LFoldRange.EndLine > AFoldRange.EndLine) and (LFoldRange.EndLine <> AFoldRange.EndLine) then
       LFoldRange.ParentCollapsed := True;
   end;
 end;
@@ -786,7 +782,6 @@ begin
   FOptions := DefaultOptions;
   FColors := TColors.Create;
   FPadding := 2;
-  FWidth := 14;
   FDelayInterval := 300;
 
   FMouseOverHint := False;
@@ -807,7 +802,6 @@ begin
     Self.FVisible := FVisible;
     Self.FOptions := FOptions;
     Self.FColors.Assign(FColors);
-    Self.FWidth := FWidth;
     if Assigned(Self.OnChange) then
       Self.OnChange(fcRescan);
   end
@@ -819,14 +813,6 @@ procedure TBCEditorCodeFolding.DoChange;
 begin
   if Assigned(FOnChange) then
     FOnChange(fcRefresh);
-end;
-
-function TBCEditorCodeFolding.GetWidth: Integer;
-begin
-  if FVisible then
-    Result := FWidth
-  else
-    Result := 0;
 end;
 
 procedure TBCEditorCodeFolding.SetColors(const AValue: TColors);
@@ -878,16 +864,6 @@ begin
     FVisible := AValue;
     if Assigned(FOnChange) then
       FOnChange(fcEnabled);
-  end;
-end;
-
-procedure TBCEditorCodeFolding.SetWidth(AValue: Integer);
-begin
-  AValue := Max(0, AValue);
-  if FWidth <> AValue then
-  begin
-    FWidth := AValue;
-    DoChange;
   end;
 end;
 

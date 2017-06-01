@@ -220,11 +220,9 @@ type
 
   TBCEditorCodeFoldingOption = (
     cfoAutoPadding,
-    cfoAutoWidth,
     cfoFoldMultilineComments,
     cfoHighlightFoldingLine,
     cfoHighlightIndentGuides,
-    cfoHighlightMatchingPair,
     cfoShowCollapsedLine,
     cfoShowIndentGuides,
     cfoShowTreeLine,
