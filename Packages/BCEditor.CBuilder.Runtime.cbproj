@@ -161,9 +161,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.pas">
             <BuildOrder>17</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.PopupWindow.pas">
-            <BuildOrder>18</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Replace.pas">
             <BuildOrder>19</BuildOrder>
         </DelphiCompile>
@@ -184,12 +181,6 @@
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Tabs.pas">
             <BuildOrder>26</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.TokenInfo.pas">
-            <BuildOrder>27</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.TokenInfo.PopupWindow.pas">
-            <BuildOrder>28</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.WordWrap.pas">
             <BuildOrder>29</BuildOrder>

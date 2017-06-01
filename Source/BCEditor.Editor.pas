@@ -14,9 +14,8 @@ uses
   BCEditor.Editor.Replace, BCEditor.Editor.Scroll, BCEditor.Editor.Search,
   BCEditor.Editor.Selection, BCEditor.Editor.SpecialChars,
   BCEditor.Editor.Tabs, BCEditor.Editor.WordWrap,
-  BCEditor.Highlighter,
-  BCEditor.KeyboardHandler, BCEditor.Lines, BCEditor.PaintHelper, BCEditor.Editor.SyncEdit,
-  BCEditor.Editor.TokenInfo, BCEditor.Utils, BCEditor.Editor.TokenInfo.PopupWindow;
+  BCEditor.Highlighter, BCEditor.KeyboardHandler, BCEditor.Lines,
+  BCEditor.PaintHelper, BCEditor.Editor.SyncEdit, BCEditor.Utils;
 
 type
   TCustomBCEditor = class(TCustomControl)
@@ -210,7 +209,6 @@ type
     FOnBeforeDeleteMark: TBCEditorMarkEvent;
     FOnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent;
     FOnBeforeMarkPlaced: TBCEditorMarkEvent;
-    FOnBeforeTokenInfoExecute: TBCEditorTokenInfoEvent;
     FOnCaretChanged: TBCEditorCaretChangedEvent;
     FOnChainCaretMoved: TNotifyEvent;
     FOnChainLinesCleared: TNotifyEvent;
@@ -260,10 +258,6 @@ type
     FTabs: TBCEditorTabs;
     FTextEntryMode: TBCEditorTextEntryMode;
     FTextWidth: Integer;
-    FTokenInfo: TBCEditorTokenInfo;
-    FTokenInfoPopupWindow: TBCEditorTokenInfoPopupWindow;
-    FTokenInfoTimer: TTimer;
-    FTokenInfoTokenRect: TRect;
     FTopRow: Integer;
     FUpdateCount: Integer;
     FURIOpener: Boolean;
@@ -343,7 +337,6 @@ type
     procedure DoToggleBookmark;
     procedure DoToggleMark;
     procedure DoToggleSelectedCase(const ACommand: TBCEditorCommand);
-    procedure DoTokenInfo;
     procedure DoWordLeft(const ACommand: TBCEditorCommand);
     procedure DoWordRight(const ACommand: TBCEditorCommand);
     procedure DrawCaret;
@@ -403,7 +396,6 @@ type
     procedure MultiCaretTimerHandler(ASender: TObject);
     function NextWordPosition(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     procedure OnCodeFoldingDelayTimer(ASender: TObject);
-    procedure OnTokenInfoTimer(ASender: TObject);
     procedure OpenLink(const AURI: string; ARangeType: TBCEditorRangeType);
     procedure PaintCaretBlock(ARowsPosition: TBCEditorRowsPosition);
     procedure PaintCodeFolding(const AClipRect: TRect; const AFirstRow, ALastRow: Integer);
@@ -456,7 +448,6 @@ type
     procedure SetTabs(const AValue: TBCEditorTabs);
     procedure SetText(const AValue: string); inline;
     procedure SetTextEntryMode(const AValue: TBCEditorTextEntryMode);
-    procedure SetTokenInfo(const AValue: TBCEditorTokenInfo);
     procedure SetTopRow(const AValue: Integer);
     procedure SetUndoOptions(AOptions: TBCEditorUndoOptions);
     procedure SetWordBlock(const ALinesPosition: TBCEditorLinesPosition);
@@ -547,7 +538,6 @@ type
     function FindFirst(): Boolean;
     function FindNext(const AHandleNotFound: Boolean = True): Boolean;
     function FindPrevious(const AHandleNotFound: Boolean = True): Boolean;
-    procedure FreeTokenInfoPopupWindow;
     function GetBookmark(const AIndex: Integer; var ALinesPosition: TBCEditorLinesPosition): Boolean;
     function GetReadOnly: Boolean; virtual;
     function GetRows(): TCustomBCEditor.TRows; inline;
@@ -619,7 +609,6 @@ type
     property OnBeforeDeleteMark: TBCEditorMarkEvent read FOnBeforeDeleteMark write FOnBeforeDeleteMark;
     property OnBeforeMarkPanelPaint: TBCEditorMarkPanelPaintEvent read FOnBeforeMarkPanelPaint write FOnBeforeMarkPanelPaint;
     property OnBeforeMarkPlaced: TBCEditorMarkEvent read FOnBeforeMarkPlaced write FOnBeforeMarkPlaced;
-    property OnBeforeTokenInfoExecute: TBCEditorTokenInfoEvent read FOnBeforeTokenInfoExecute write FOnBeforeTokenInfoExecute;
     property OnCaretChanged: TBCEditorCaretChangedEvent read FOnCaretChanged write FOnCaretChanged;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnCommandProcessed: TBCEditorProcessCommandEvent read FOnCommandProcessed write FOnCommandProcessed;
@@ -761,7 +750,6 @@ type
     property Text: string read GetText write SetText;
     property TextBetween[ALinesBeginPosition, ALinesEndPosition: TBCEditorLinesPosition]: string read GetTextBetween;
     property TextEntryMode: TBCEditorTextEntryMode read FTextEntryMode write SetTextEntryMode default temInsert;
-    property TokenInfo: TBCEditorTokenInfo read FTokenInfo write SetTokenInfo;
     property URIOpener: Boolean read FURIOpener write FURIOpener;
     property WantReturns: Boolean read FWantReturns write SetWantReturns default True;
     property WordAt[ATextPos: TPoint]: string read GetWordAt;
@@ -805,7 +793,6 @@ type
     property OnBeforeDeleteMark;
     property OnBeforeMarkPanelPaint;
     property OnBeforeMarkPlaced;
-    property OnBeforeTokenInfoExecute;
     property OnCaretChanged;
     property OnChange;
     property OnClick;
@@ -861,7 +848,6 @@ type
     property TabStop;
     property Tag;
     property TextEntryMode;
-    property TokenInfo;
     property UndoOptions;
     property Visible;
     property WantReturns;
@@ -1273,11 +1259,6 @@ begin
   { Sync edit }
   FSyncEdit := TBCEditorSyncEdit.Create;
   FSyncEdit.OnChange := SyncEditChanged;
-  { Token info }
-  FTokenInfo := TBCEditorTokenInfo.Create;
-  FTokenInfoTimer := TTimer.Create(Self);
-  FTokenInfoTimer.Enabled := False;
-  FTokenInfoTimer.OnTimer := OnTokenInfoTimer;
   { LeftMargin }
   FLeftMargin := TBCEditorLeftMargin.Create(Self);
   FLeftMargin.OnChange := LeftMarginChanged;
@@ -1308,7 +1289,6 @@ begin
     RemoveChainedEditor;
   if Assigned(FCompletionProposalPopupWindow) then
     FCompletionProposalPopupWindow.Free;
-  FreeTokenInfoPopupWindow;
   { Do not use FreeAndNil, it first nil and then frees causing problems with code accessing FHookedCommandHandlers
     while destruction }
   FHookedCommandHandlers.Free;
@@ -1339,8 +1319,6 @@ begin
   FMatchingPair.Free;
   FCompletionProposal.Free;
   FSyncEdit.Free;
-  FTokenInfoTimer.Free;
-  FTokenInfo.Free;
   FRows.Free();
 
   inherited;
@@ -3618,17 +3596,13 @@ begin
         roCaseSensitive in Replace.Options, roWholeWordsOnly in Replace.Options, Replace.Engine = seRegularExpression, roBackwards in Replace.Options,
         Replace.Pattern, Replace.ReplaceText);
 
-      if (roBackwards in FReplace.Options) then
-        LSearchPosition := LSearch.Area.EndPosition
-      else
-        LSearchPosition := LSearch.Area.BeginPosition;
       if (Lines.Count = 0) then
         LSearchPosition := Lines.BOFPosition
       else
       begin
         LSearchPosition := Lines.CaretPosition;
-        LSearchPosition.Line := Max(LSearchPosition.Line, Lines.Count - 1);
-        LSearchPosition.Char := Max(LSearchPosition.Char, Length(Lines[LSearchPosition.Line]));
+        LSearchPosition.Line := Min(LSearchPosition.Line, Lines.Count - 1);
+        LSearchPosition.Char := Min(LSearchPosition.Char, Length(Lines[LSearchPosition.Line]));
       end;
 
       if (roReplaceAll in Replace.Options) then
@@ -4258,50 +4232,6 @@ begin
         SelText := TitleCase(LSelectedText);
       else ERangeError.Create('ACommand: ' + IntToStr(Ord(ACommand)));
     end;
-  end;
-end;
-
-procedure TCustomBCEditor.DoTokenInfo;
-
-  function MouseInTokenInfoRect: Boolean;
-  var
-    LPoint: TPoint;
-    LPointLeftTop: TPoint;
-    LPointRightBottom: TPoint;
-    LRect: TRect;
-  begin
-    GetCursorPos(LPoint);
-    LRect := FTokenInfoTokenRect;
-    Result := PtInRect(LRect, LPoint);
-    if not Result then
-    begin
-      with FTokenInfoPopupWindow.ClientRect do
-      begin
-        LPointLeftTop := Point(Left, Top);
-        LPointRightBottom := Point(Left + Width, Top + Height);
-      end;
-      with FTokenInfoPopupWindow do
-      begin
-        LPointLeftTop := ClientToScreen(LPointLeftTop);
-        LPointRightBottom := ClientToScreen(LPointRightBottom);
-      end;
-      LRect := Rect(LPointLeftTop.X, LPointLeftTop.Y, LPointRightBottom.X, LPointRightBottom.Y);
-      Result := PtInRect(LRect, LPoint);
-    end;
-  end;
-
-begin
-  if Assigned(FTokenInfoPopupWindow) then
-  begin
-    if not MouseInTokenInfoRect then
-      FreeTokenInfoPopupWindow;
-  end
-  else
-  with FTokenInfoTimer do
-  begin
-    Enabled := False;
-    Interval := FTokenInfo.DelayInterval;
-    Enabled := True;
   end;
 end;
 
@@ -5104,20 +5034,6 @@ begin
     FMultiCaretTimer := nil;
     FMultiCarets.Free();
     FMultiCarets := nil;
-  end;
-end;
-
-procedure TCustomBCEditor.FreeTokenInfoPopupWindow;
-var
-  LTokenInfoPopupWindow: TBCEditorTokenInfoPopupWindow;
-begin
-  if Assigned(FTokenInfoPopupWindow) then
-  begin
-    LTokenInfoPopupWindow := FTokenInfoPopupWindow;
-    FTokenInfoPopupWindow := nil; { Prevent WMKillFocus to free it again }
-    LTokenInfoPopupWindow.Hide();
-    LTokenInfoPopupWindow.Free();
-    FTokenInfoTokenRect.Empty();
   end;
 end;
 
@@ -6726,9 +6642,6 @@ begin
       Exit;
   end;
 
-  if FTokenInfo.Enabled then
-    DoTokenInfo;
-
   if FMouseMoveScrolling then
   begin
     ComputeScroll(Point(X, Y));
@@ -7004,58 +6917,6 @@ begin
 
   if (FRescanCodeFolding and FCodeFolding.Visible) then
     RescanCodeFoldingRanges;
-end;
-
-procedure TCustomBCEditor.OnTokenInfoTimer(ASender: TObject);
-var
-  LControl: TWinControl;
-  LPoint: TPoint;
-  LPreviousTextPosition: TBCEditorLinesPosition;
-  LShowInfo: Boolean;
-  LSize: TSize;
-  LTextPosition: TBCEditorLinesPosition;
-  LToken: string;
-begin
-  FTokenInfoTimer.Enabled := False;
-
-  if GetLinesPositionOfMouse(LTextPosition) then
-  begin
-    LPreviousTextPosition := PreviousWordPosition(LTextPosition);
-    if LPreviousTextPosition.Line = LTextPosition.Line then
-      LTextPosition := LPreviousTextPosition
-    else
-      LTextPosition.Char := 0;
-    LToken := GetWordAtLinesPosition(LTextPosition);
-    if LToken <> '' then
-    begin
-      FTokenInfoPopupWindow := TBCEditorTokenInfoPopupWindow.Create(Self);
-      with FTokenInfoPopupWindow do
-      begin
-        LControl := Self;
-        while Assigned(LControl) and not (LControl is TCustomForm) do
-          LControl := LControl.Parent;
-        if LControl is TCustomForm then
-          PopupParent := TCustomForm(LControl);
-        Assign(FTokenInfo);
-
-        LShowInfo := False;
-        if Assigned(FOnBeforeTokenInfoExecute) then
-          FOnBeforeTokenInfoExecute(Self, LTextPosition, LToken, Content, TitleContent, LShowInfo);
-
-        if LShowInfo then
-        begin
-          LPoint := Self.ClientToScreen(RowsToClient(LinesToRows(LTextPosition)));
-          FTokenInfoTokenRect.Left := LPoint.X;
-          FTokenInfoTokenRect.Top := LPoint.Y;
-          Inc(LPoint.Y, LineHeight);
-          FTokenInfoTokenRect.Bottom := LPoint.Y;
-          GetTextExtentPoint32(FPaintHelper.StockBitmap.Canvas.Handle, LToken, Length(LToken), LSize);
-          FTokenInfoTokenRect.Right := FTokenInfoTokenRect.Left + LSize.cx;
-          Execute(LPoint);
-        end;
-      end;
-    end;
-  end
 end;
 
 procedure TCustomBCEditor.OpenLink(const AURI: string; ARangeType: TBCEditorRangeType);
@@ -10367,11 +10228,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.SetTokenInfo(const AValue: TBCEditorTokenInfo);
-begin
-  FTokenInfo.Assign(AValue);
-end;
-
 procedure TCustomBCEditor.SetTopRow(const AValue: Integer);
 var
   LValue: Integer;
@@ -11377,8 +11233,6 @@ procedure TCustomBCEditor.WMHScroll(var AMessage: TWMScroll);
 begin
   AMessage.Result := 0;
 
-  FreeTokenInfoPopupWindow;
-
   inherited;
 
   case AMessage.ScrollCode of
@@ -11623,8 +11477,6 @@ var
 begin
   Invalidate;
   AMessage.Result := 0;
-
-  FreeTokenInfoPopupWindow;
 
   case AMessage.ScrollCode of
     SB_TOP:

@@ -1,19 +1,19 @@
 unit BCEditor.Editor.CompletionProposal.PopupWindow;
 
-interface
+interface {********************************************************************}
 
 uses
   Messages,
   Classes, Types,
   Forms, Controls, Graphics,
-  BCEditor.Utils, BCEditor.Types, BCEditor.Editor.PopupWindow,
+  BCEditor.Utils, BCEditor.Types,
   BCEditor.Editor.CompletionProposal;
 
 type
   TBCEditorCompletionProposalPopupWindowSelectedEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
   TBCEditorCompletionProposalPopupWindowValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
 
-  TBCEditorCompletionProposalPopupWindow = class(TBCEditorPopupWindow)
+  TBCEditorCompletionProposalPopupWindow = class(TCustomControl)
   strict private
     FAdjustCompletionStart: Boolean;
     FBitmapBuffer: Graphics.TBitmap;
@@ -21,6 +21,7 @@ type
     FCompletionProposal: TBCEditorCompletionProposal;
     FCompletionStartChar: Integer;
     FCurrentString: string;
+    FEditor: TCustomControl;
     FFiltered: Boolean;
     FItemHeight: Integer;
     FItemIndexArray: array of Integer;
@@ -29,42 +30,56 @@ type
     FOnCanceled: TNotifyEvent;
     FOnSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent;
     FOnValidate: TBCEditorCompletionProposalPopupWindowValidateEvent;
+    FOriginalHeight: Integer;
+    FOriginalWidth: Integer;
+    FPopupParent: TCustomForm;
     FSelectedLine: Integer;
     FSendToEditor: Boolean;
     FTitleHeight: Integer;
     FTitleVisible: Boolean;
     FTopLine: Integer;
     FValueSet: Boolean;
-    function GetItemHeight: Integer;
-    function GetItems: TBCEditorCompletionProposalItems;
-    function GetTitleHeight: Integer;
-    function GetVisibleLines: Integer;
+    function GetItemHeight(): Integer;
+    function GetItems(): TBCEditorCompletionProposalItems;
+    function GetTitleHeight(): Integer;
+    function GetVisibleLines(): Integer;
     procedure HandleDblClick(ASender: TObject);
     procedure HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
     procedure MoveSelectedLine(ALineCount: Integer);
     procedure SetCurrentString(const AValue: string);
+    procedure SetPopupParent(Value: TCustomForm);
     procedure SetTopLine(const AValue: Integer);
-    procedure UpdateScrollBar;
+    procedure UpdateScrollBar();
+    procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
+    procedure WMEraseBkgnd(var AMessage: TMessage); message WM_ERASEBKGND;
     procedure WMVScroll(var AMessage: TWMScroll); message WM_VSCROLL;
   protected
+    FActiveControl: TWinControl;
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure Hide; virtual;
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
     procedure MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer); override;
     procedure Paint; override;
+    procedure Show(Origin: TPoint); virtual;
   public
-    constructor Create(const AEditor: TCustomControl);
+    constructor Create(const AEditor: TCustomControl); reintroduce;
     destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
     procedure Execute(const ACurrentString: string; const APoint: TPoint);
     function GetCurrentInput(): string;
+    procedure IncSize(const AWidth: Integer; const AHeight: Integer);
     procedure MouseWheel(AShift: TShiftState; AWheelDelta: Integer; AMousePos: TPoint);
+    procedure SetOriginalSize;
     procedure WndProc(var Msg: TMessage); override;
+    property ActiveControl: TWinControl read FActiveControl;
     property CurrentString: string read FCurrentString write SetCurrentString;
+    property Editor: TCustomControl read FEditor;
     property Items: TBCEditorCompletionProposalItems read GetItems;
     property TopLine: Integer read FTopLine write SetTopLine;
     property OnCanceled: TNotifyEvent read FOnCanceled write FOnCanceled;
     property OnSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent read FOnSelected write FOnSelected;
+    property PopupParent: TCustomForm read FPopupParent write SetPopupParent;
   end;
 
 implementation {***************************************************************}
@@ -79,42 +94,6 @@ type
   TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
 
 { TBCEditorCompletionProposalPopupWindow **************************************}
-
-constructor TBCEditorCompletionProposalPopupWindow.Create(const AEditor: TCustomControl);
-begin
-  inherited Create(AEditor);
-
-  FCaseSensitive := False;
-  FFiltered := False;
-  FItemHeight := 0;
-  FMargin := 2;
-  FOnCanceled := nil;
-  FOnSelected := nil;
-  FValueSet := False;
-  Visible := False;
-
-  FItems := TStringList.Create;
-  FBitmapBuffer := Graphics.TBitmap.Create;
-
-  FOnValidate := HandleOnValidate;
-  OnDblClick := HandleDblClick;
-end;
-
-destructor TBCEditorCompletionProposalPopupWindow.Destroy;
-begin
-  if FItemHeight <> 0 then
-    FCompletionProposal.VisibleLines := ClientHeight div FItemHeight;
-  FCompletionProposal.Width := Width;
-
-  if not FValueSet and Assigned(FOnCanceled) then
-    FOnCanceled(FCompletionProposal);
-
-  FBitmapBuffer.Free;
-  SetLength(FItemIndexArray, 0);
-  FItems.Free;
-
-  inherited Destroy;
-end;
 
 procedure TBCEditorCompletionProposalPopupWindow.Assign(ASource: TPersistent);
 begin
@@ -133,12 +112,60 @@ begin
     inherited Assign(ASource);
 end;
 
+constructor TBCEditorCompletionProposalPopupWindow.Create(const AEditor: TCustomControl);
+begin
+  inherited Create(AEditor);
+
+  ControlStyle := ControlStyle + [csNoDesignVisible, csReplicatable];
+
+  FEditor := AEditor;
+
+  Ctl3D := False;
+  FCaseSensitive := False;
+  FFiltered := False;
+  FItemHeight := 0;
+  FMargin := 2;
+  FOnCanceled := nil;
+  FOnSelected := nil;
+  FPopupParent := nil;
+  FValueSet := False;
+  ParentCtl3D := False;
+  Visible := False;
+
+  FItems := TStringList.Create;
+  FBitmapBuffer := Graphics.TBitmap.Create;
+
+  FOnValidate := HandleOnValidate;
+  OnDblClick := HandleDblClick;
+end;
+
 procedure TBCEditorCompletionProposalPopupWindow.CreateParams(var Params: TCreateParams);
 begin
   inherited;
 
+  Params.Style := WS_POPUP or WS_BORDER;
   if cpoResizeable in FCompletionProposal.Options then
     Params.Style := Params.Style or WS_SIZEBOX;
+  Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW;
+
+  if (Assigned(PopupParent)) then
+    Params.WndParent := PopupParent.Handle;
+end;
+
+destructor TBCEditorCompletionProposalPopupWindow.Destroy();
+begin
+  if FItemHeight <> 0 then
+    FCompletionProposal.VisibleLines := ClientHeight div FItemHeight;
+  FCompletionProposal.Width := Width;
+
+  if not FValueSet and Assigned(FOnCanceled) then
+    FOnCanceled(FCompletionProposal);
+
+  FBitmapBuffer.Free;
+  SetLength(FItemIndexArray, 0);
+  FItems.Free;
+
+  inherited Destroy;
 end;
 
 procedure TBCEditorCompletionProposalPopupWindow.Execute(const ACurrentString: string; const APoint: TPoint);
@@ -167,7 +194,7 @@ var
     end;
   end;
 
-  procedure CalculateColumnWidths;
+  procedure CalculateColumnWidths();
   var
     LAutoWidthCount: Integer;
     LColumnIndex: Integer;
@@ -305,7 +332,7 @@ begin
   end;
 end;
 
-function TBCEditorCompletionProposalPopupWindow.GetItemHeight: Integer;
+function TBCEditorCompletionProposalPopupWindow.GetItemHeight(): Integer;
 var
   LColumn: TBCEditorCompletionProposalColumns.TColumn;
   LColumnIndex: Integer;
@@ -322,14 +349,14 @@ begin
   end;
 end;
 
-function TBCEditorCompletionProposalPopupWindow.GetItems: TBCEditorCompletionProposalItems;
+function TBCEditorCompletionProposalPopupWindow.GetItems(): TBCEditorCompletionProposalItems;
 begin
   Result := nil;
   if FCompletionProposal.CompletionColumnIndex <  FCompletionProposal.Columns.Count then
     Result := FCompletionProposal.Columns[FCompletionProposal.CompletionColumnIndex].Items;
 end;
 
-function TBCEditorCompletionProposalPopupWindow.GetTitleHeight: Integer;
+function TBCEditorCompletionProposalPopupWindow.GetTitleHeight(): Integer;
 var
   LColumn: TBCEditorCompletionProposalColumns.TColumn;
   LColumnIndex: Integer;
@@ -347,7 +374,7 @@ begin
   end;
 end;
 
-function TBCEditorCompletionProposalPopupWindow.GetVisibleLines: Integer;
+function TBCEditorCompletionProposalPopupWindow.GetVisibleLines(): Integer;
 begin
   Result := (ClientHeight - FTitleHeight) div FItemHeight;
 end;
@@ -410,6 +437,33 @@ begin
       EndUpdate;
     end;
   end;
+end;
+
+procedure TBCEditorCompletionProposalPopupWindow.Hide();
+begin
+  SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_HIDEWINDOW or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER);
+  Visible := False;
+end;
+
+procedure TBCEditorCompletionProposalPopupWindow.IncSize(const AWidth: Integer; const AHeight: Integer);
+var
+  LHeight: Integer;
+  LWidth: Integer;
+begin
+  LHeight := FOriginalHeight + AHeight;
+  LWidth := FOriginalWidth + AWidth;
+
+  if LHeight < Constraints.MinHeight then
+    LHeight := Constraints.MinHeight;
+  if (Constraints.MaxHeight > 0) and (LHeight > Constraints.MaxHeight) then
+    LHeight := Constraints.MaxHeight;
+
+  if LWidth < Constraints.MinWidth then
+    LWidth := Constraints.MinWidth;
+  if (Constraints.MaxWidth > 0) and (LWidth > Constraints.MaxWidth) then
+    LWidth := Constraints.MaxWidth;
+
+  SetBounds(Left, Top, LWidth, LHeight);
 end;
 
 procedure TBCEditorCompletionProposalPopupWindow.KeyDown(var Key: Word; Shift: TShiftState);
@@ -586,7 +640,7 @@ begin
     TopLine := FSelectedLine;
 end;
 
-procedure TBCEditorCompletionProposalPopupWindow.Paint;
+procedure TBCEditorCompletionProposalPopupWindow.Paint();
 var
   LColumn: TBCEditorCompletionProposalColumns.TColumn;
   LColumnIndex: Integer;
@@ -701,7 +755,7 @@ procedure TBCEditorCompletionProposalPopupWindow.SetCurrentString(const AValue: 
       Result := AnsiCompareText(LCompareString, AValue) = 0;
   end;
 
-  procedure RecalcList;
+  procedure RecalcList();
   var
     LIndex: Integer;
     LIndex2: Integer;
@@ -744,6 +798,26 @@ begin
   end;
 end;
 
+procedure TBCEditorCompletionProposalPopupWindow.SetOriginalSize();
+begin
+  FOriginalHeight := Height;
+  FOriginalWidth := Width;
+end;
+
+procedure TBCEditorCompletionProposalPopupWindow.SetPopupParent(Value: TCustomForm);
+begin
+  if (Value <> FPopupParent) then
+  begin
+    if FPopupParent <> nil then
+      FPopupParent.RemoveFreeNotification(Self);
+    FPopupParent := Value;
+    if Value <> nil then
+      Value.FreeNotification(Self);
+    if HandleAllocated and not (csDesigning in ComponentState) then
+      RecreateWnd;
+  end;
+end;
+
 procedure TBCEditorCompletionProposalPopupWindow.SetTopLine(const AValue: Integer);
 begin
   if TopLine <> AValue then
@@ -754,7 +828,16 @@ begin
   end;
 end;
 
-procedure TBCEditorCompletionProposalPopupWindow.UpdateScrollBar;
+procedure TBCEditorCompletionProposalPopupWindow.Show(Origin: TPoint);
+begin
+  SetBounds(Origin.X, Origin.Y, Width, Height);
+
+  SetWindowPos(Handle, HWND_TOP, 0, 0, 0, 0, SWP_SHOWWINDOW or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER);
+
+  Visible := True;
+end;
+
+procedure TBCEditorCompletionProposalPopupWindow.UpdateScrollBar();
 var
   LScrollInfo: TScrollInfo;
 begin
@@ -787,6 +870,22 @@ begin
 
   if Visible then
     SendMessage(Handle, WM_SETREDRAW, -1, 0);
+end;
+
+procedure TBCEditorCompletionProposalPopupWindow.WMActivate(var Msg: TWMActivate);
+begin
+  if ((Msg.Active <> WA_INACTIVE) and Assigned(PopupParent)) then
+    SendMessage(PopupParent.Handle, WM_NCACTIVATE, WPARAM(TRUE), 0);
+
+  inherited;
+
+  if Msg.Active = WA_INACTIVE then
+    Hide();
+end;
+
+procedure TBCEditorCompletionProposalPopupWindow.WMEraseBkgnd(var AMessage: TMessage);
+begin
+  AMessage.Result := 1;
 end;
 
 procedure TBCEditorCompletionProposalPopupWindow.WMVScroll(var AMessage: TWMScroll);

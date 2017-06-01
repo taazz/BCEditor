@@ -139,7 +139,6 @@
         <DCCReference Include="..\Source\BCEditor.Editor.LeftMargin.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Marks.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.MatchingPair.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.PopupWindow.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Replace.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Scroll.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Search.pas"/>
@@ -147,8 +146,6 @@
         <DCCReference Include="..\Source\BCEditor.Editor.SpecialChars.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.SyncEdit.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Tabs.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.TokenInfo.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.TokenInfo.PopupWindow.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.WordWrap.pas"/>
         <DCCReference Include="..\Source\BCEditor.Export.HTML.pas"/>
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
