@@ -1139,7 +1139,7 @@ begin
   Cursor := crIBeam;
   Color := clWindow;
   DoubleBuffered := False;
-  ControlStyle := ControlStyle + [csOpaque, csSetCaption, csNeedsBorderPaint];
+  ControlStyle := ControlStyle + [csSetCaption, csOpaque, csNeedsBorderPaint];
 
   FBackgroundColor := clWindow;
   FForegroundColor := clWindowText;
@@ -7126,6 +7126,9 @@ begin
     LRect := Rect(
       AClipRect.Left, (LRow - TopRow) * LineHeight,
       AClipRect.Right, (LRow - TopRow + 1) * LineHeight);
+    if (CodeFolding.Padding > 0) then
+      InflateRect(LRect, -CodeFolding.Padding, 0);
+
     if (Assigned(LHighlightRange) and (LHighlightRange.BeginLine <= LLine) and (LLine <= LHighlightRange.EndLine)) then
     begin
       Canvas.Brush.Color := CodeFolding.Colors.FoldingLineHighlight;
@@ -7136,9 +7139,6 @@ begin
       Canvas.Brush.Color := CodeFolding.Colors.FoldingLine;
       Canvas.Pen.Color := CodeFolding.Colors.FoldingLine;
     end;
-
-    if CodeFolding.Padding > 0 then
-      InflateRect(LRect, -CodeFolding.Padding, 0);
 
     LRange := CodeFoldingCollapsableFoldRangeForLine(LLine);
 
