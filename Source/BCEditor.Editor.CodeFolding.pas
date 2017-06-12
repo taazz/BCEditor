@@ -85,7 +85,7 @@ type
       procedure Assign(ASource: TPersistent); override;
     published
       property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
-      property Foreground: TColor read FForeground write SetForeground default clLeftMarginFontForeground;
+      property Foreground: TColor read FForeground write SetForeground default clLeftMarginForeground;
       property Indent: TColor read FIndent write SetIndent default clIndent;
       property IndentHighlight: TColor read FIndentHighlight write SetIndentHighlight default clIndentHighlight;
     end;
@@ -213,40 +213,6 @@ type
       property List: TList read FList;
     end;
 
-    THint = class(TPersistent)
-    type
-
-      TColors = class(TPersistent)
-      strict private
-        FBackground: TColor;
-        FBorder: TColor;
-      public
-        constructor Create;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property Background: TColor read FBackground write FBackground default clWindow;
-        property Border: TColor read FBorder write FBorder default clBtnFace;
-      end;
-
-    strict private
-      FColors: THint.TColors;
-      FCursor: TCursor;
-      FFont: TFont;
-      FRowCount: Integer;
-      FVisible: Boolean;
-      procedure SetFont(const AValue: TFont);
-    public
-      constructor Create;
-      destructor Destroy; override;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Colors: THint.TColors read FColors write FColors;
-      property Cursor: TCursor read FCursor write FCursor default crHelp;
-      property Font: TFont read FFont write SetFont;
-      property RowCount: Integer read FRowCount write FRowCount default 40;
-      property Visible: Boolean read FVisible write FVisible default True;
-    end;
-
   strict private const
     DefaultOptions = [cfoAutoPadding, cfoHighlightIndentGuides,
       cfoShowIndentGuides, cfoShowTreeLine, cfoUncollapseByHintClick];
@@ -292,7 +258,7 @@ begin
   inherited;
 
   FBackground := clLeftMarginBackground;
-  FForeground := clLeftMarginFontForeground;
+  FForeground := clLeftMarginForeground;
   FIndent := clIndent;
   FIndentHighlight := clIndentHighlight;
 end;
@@ -681,69 +647,6 @@ begin
     if Assigned(LFoldRange) and not LFoldRange.ParentCollapsed then
       SetParentCollapsedOfSubCodeFoldingRanges(LFoldRange);
   end;
-end;
-
-{ TBCEditorCodeFolding.THint.TColors ******************************************}
-
-constructor TBCEditorCodeFolding.THint.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clWindow;
-  FBorder := clBtnFace;
-end;
-
-procedure TBCEditorCodeFolding.THint.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TColors then
-  with ASource as TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FBorder := FBorder;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorCodeFolding.THint **************************************************}
-
-constructor TBCEditorCodeFolding.THint.Create;
-begin
-  inherited;
-
-  FColors := THint.TColors.Create;
-  FCursor := crHelp;
-  FRowCount := 40;
-  FVisible := True;
-  FFont := TFont.Create;
-  FFont.Name := 'Courier New';
-  FFont.Size := 8;
-end;
-
-destructor TBCEditorCodeFolding.THint.Destroy;
-begin
-  FColors.Free;
-  FFont.Free;
-
-  inherited;
-end;
-
-procedure TBCEditorCodeFolding.THint.Assign(ASource: TPersistent);
-begin
-  if ASource is THint then
-  with ASource as THint do
-  begin
-    Self.FColors.Assign(FColors);
-    Self.FCursor := FCursor;
-    Self.FFont.Assign(FFont);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorCodeFolding.THint.SetFont(const AValue: TFont);
-begin
-  FFont.Assign(AValue);
 end;
 
 { TBCEditorCodeFolding ********************************************************}

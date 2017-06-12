@@ -153,7 +153,6 @@ type
     FDoubleClickTime: Cardinal;
     FDragBeginLinesCaretPosition: TBCEditorLinesPosition;
     FDrawMultiCarets: Boolean;
-    FFontDummy: TFont;
     FFontPitchFixed: Boolean;
     FForegroundColor: TColor;
     FHideSelection: Boolean;
@@ -495,7 +494,7 @@ type
     function CollapseCodeFoldingLines(const AFirstLine: Integer = -1; const ALastLine: Integer = -1): Integer;
     function CreateLines(): BCEditor.Lines.TBCEditorLines;
     procedure CreateParams(var AParams: TCreateParams); override;
-    procedure CreateWnd; override;
+    procedure CreateWnd(); override;
     procedure DblClick; override;
     function DeleteBookmark(const ALine: Integer; const AIndex: Integer): Boolean; overload;
     procedure DeleteBookmark(ABookmark: TBCEditorMark); overload;
@@ -862,7 +861,6 @@ const
   iiCodeFoldingCollapsed = 1;
   iiCodeFoldingLine = 2;
   iiCodeFoldingEndLine = 3;
-  iiWordWrap = 4;
 
   tiCodeFolding = 0;
 
@@ -1131,6 +1129,8 @@ end;
 constructor TCustomBCEditor.Create(AOwner: TComponent);
 var
   LIndex: Integer;
+  LLogFont: TLogFont;
+  LNonClientMetrics: TNonClientMetrics;
 begin
   inherited Create(AOwner);
 
@@ -1181,17 +1181,21 @@ begin
   FLines.OnSelChange := SelectionChanged;
   FRows := TCustomBCEditor.TRows.Create(Self);
   { Font }
-  FFontDummy := TFont.Create;
-  FFontDummy.Name := 'Courier New';
-  FFontDummy.Size := 9;
-  FFontPitchFixed := False;
-  Font.Assign(FFontDummy);
+  LNonClientMetrics.cbSize := SizeOf(LNonClientMetrics);
+  if (SystemParametersInfo(SPI_GETNONCLIENTMETRICS, SizeOf(LNonClientMetrics), @LNonClientMetrics, 0)
+    and (GetObject(Font.Handle, SizeOf(LLogFont), @LLogFont) <> 0)) then
+  begin
+    LLogFont.lfQuality  := LNonClientMetrics.lfMessageFont.lfQuality;
+    Font.Handle := CreateFontIndirect(LLogFont);
+  end;
+  Font.Name := 'Courier New';
+  Font.Size := Font.Size + 1;
   Font.OnChange := FontChanged;
   { Painting }
   FLineHeight := 0;
   FTextWidth := MaxInt;
   FVisibleRows := MaxInt;
-  FPaintHelper := TBCEditorPaintHelper.Create([], FFontDummy);
+  FPaintHelper := TBCEditorPaintHelper.Create([], Font);
   ParentFont := False;
   ParentColor := False;
   FCommandDrop := False;
@@ -1297,7 +1301,6 @@ begin
   if (Assigned(FImages)) then
     FImages.Free();
   FInternalBookmarkImage.Free;
-  FFontDummy.Free;
   FOriginalLines.Free;
   FActiveLine.Free;
   FScroll.Free;
@@ -2251,8 +2254,7 @@ begin
   EnableScrollBar(Handle, SB_HORZ, ESB_ENABLE_BOTH);
 
   FCaretCreated := True;
-  if (FTextWidth = MaxInt) then
-    FontChanged(nil);
+  FontChanged(nil);
   Include(FState, esScrolled);
   EndUpdate();
 end;
@@ -3053,7 +3055,6 @@ begin
     if FLeftMargin.LineNumbers.Visible then
       FLeftMargin.AutosizeDigitCount(FLines.Count);
 
-    FPaintHelper.SetBaseFont(FLeftMargin.Font);
     FLeftMarginCharWidth := FPaintHelper.SpaceWidth;
     LWidth := FLeftMargin.RealLeftMarginWidth(FLeftMarginCharWidth);
     FPaintHelper.SetBaseFont(Font);
@@ -4952,8 +4953,8 @@ begin
 
       LBitmap := TBitmap.Create();
       LBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, FImages.Width, FImages.Height);
-      LBitmap.Canvas.Brush.Color := FCodeFolding.Colors.Background;
-      LBitmap.Canvas.Pen.Color := FCodeFolding.Colors.Foreground;
+      LBitmap.Canvas.Brush.Color := FLeftMargin.Colors.Background;
+      LBitmap.Canvas.Pen.Color := FLeftMargin.Colors.Foreground;
       LBitmap.Canvas.Pen.Width := GLineWidth;
       LBitmap.Canvas.Rectangle(GPadding + 2 * GLineWidth, GPadding + 2 * GLineWidth, FImages.Width - GPadding - 2 * GLineWidth - 1, FImages.Height - GPadding - 2 * GLineWidth - 1);
       LBitmap.Canvas.MoveTo(GPadding + 4 * GLineWidth, (2 * FImages.Height - GLineWidth) div 4);
@@ -4966,37 +4967,13 @@ begin
 
       LBitmap := TBitmap.Create();
       LBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, FImages.Width, FImages.Height);
-      LBitmap.Canvas.Pen.Color := FCodeFolding.Colors.Foreground;
+      LBitmap.Canvas.Pen.Color := FLeftMargin.Colors.Foreground;
       LBitmap.Canvas.Pen.Width := GLineWidth;
       LBitmap.Canvas.MoveTo((2 * FImages.Width - GLineWidth) div 4, 0);
       LBitmap.Canvas.LineTo((2 * FImages.Width - GLineWidth) div 4, FImages.Height);
       ImageList_Add(FImages.Handle, LBitmap.Handle, LBitmap.MaskHandle);
       LBitmap.Canvas.MoveTo((2 * FImages.Width - GLineWidth) div 4, FImages.Height - 1);
       LBitmap.Canvas.LineTo(FImages.Width - GPadding, FImages.Height - 1);
-      ImageList_Add(FImages.Handle, LBitmap.Handle, LBitmap.MaskHandle);
-      LBitmap.Free();
-
-      LBitmap := TBitmap.Create();
-      LBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, FImages.Width, FImages.Height);
-      LBitmap.Canvas.Pen.Color := FLeftMargin.Font.Color;
-      LBitmap.Canvas.MoveTo(6, 4);
-      LBitmap.Canvas.LineTo(13, 4);
-      LBitmap.Canvas.MoveTo(13, 5);
-      LBitmap.Canvas.LineTo(13, 9);
-      LBitmap.Canvas.MoveTo(12, 9);
-      LBitmap.Canvas.LineTo(7, 9);
-      LBitmap.Canvas.MoveTo(10, 7);
-      LBitmap.Canvas.LineTo(10, 12);
-      LBitmap.Canvas.MoveTo(9, 8);
-      LBitmap.Canvas.LineTo(9, 11);
-      LBitmap.Canvas.MoveTo(2, 6);
-      LBitmap.Canvas.LineTo(7, 6);
-      LBitmap.Canvas.MoveTo(2, 8);
-      LBitmap.Canvas.LineTo(5, 8);
-      LBitmap.Canvas.MoveTo(2, 10);
-      LBitmap.Canvas.LineTo(5, 10);
-      LBitmap.Canvas.MoveTo(2, 12);
-      LBitmap.Canvas.LineTo(7, 12);
       ImageList_Add(FImages.Handle, LBitmap.Handle, LBitmap.MaskHandle);
       LBitmap.Free();
     finally
@@ -5476,9 +5453,12 @@ procedure TCustomBCEditor.InitCodeFolding();
 begin
   ClearCodeFolding();
 
-  Include(FState, esWantedScanCodeFolding);
-  KillTimer(Handle, tiCodeFolding);
-  SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+  if (HandleAllocated) then
+  begin
+    Include(FState, esWantedScanCodeFolding);
+    KillTimer(Handle, tiCodeFolding);
+    SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+  end;
 end;
 
 procedure TCustomBCEditor.InsertLine();
@@ -6023,9 +6003,12 @@ begin
     if (Assigned(OnChange)) then
       OnChange(Self);
 
-    Include(FState, esWantedScanCodeFolding);
-    KillTimer(Handle, tiCodeFolding);
-    SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    if (HandleAllocated) then
+    begin
+      Include(FState, esWantedScanCodeFolding);
+      KillTimer(Handle, tiCodeFolding);
+      SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    end;
   end;
 end;
 
@@ -6073,9 +6056,12 @@ begin
     if (Assigned(OnChange)) then
       OnChange(Self);
 
-    Include(FState, esWantedScanCodeFolding);
-    KillTimer(Handle, tiCodeFolding);
-    SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    if (HandleAllocated) then
+    begin
+      Include(FState, esWantedScanCodeFolding);
+      KillTimer(Handle, tiCodeFolding);
+      SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    end;
   end;
 end;
 
@@ -6104,9 +6090,12 @@ begin
     if (Assigned(OnChange)) then
       OnChange(Self);
 
-    Include(FState, esWantedScanCodeFolding);
-    KillTimer(Handle, tiCodeFolding);
-    SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    if (HandleAllocated) then
+    begin
+      Include(FState, esWantedScanCodeFolding);
+      KillTimer(Handle, tiCodeFolding);
+      SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    end;
   end;
 end;
 
@@ -6178,9 +6167,12 @@ begin
     if (Assigned(OnChange)) then
       OnChange(Self);
 
-    Include(FState, esWantedScanCodeFolding);
-    KillTimer(Handle, tiCodeFolding);
-    SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    if (HandleAllocated) then
+    begin
+      Include(FState, esWantedScanCodeFolding);
+      KillTimer(Handle, tiCodeFolding);
+      SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    end;
   end;
 end;
 
@@ -7014,7 +7006,6 @@ end;
 procedure TCustomBCEditor.PaintLeftMargin(const AClipRect: TRect; const AFirstRow, ALastTextRow, ALastRow: Integer);
 var
   LLine: Integer;
-  LLineHeight: Integer;
   LLineRect: TRect;
 
   procedure DrawBookmark(ABookmark: TBCEditorMark; var AOverlappingOffset: Integer; AMarkRow: Integer);
@@ -7023,7 +7014,7 @@ var
       FInternalBookmarkImage := TBCEditorInternalImage.Create(HInstance, BCEDITOR_BOOKMARK_IMAGES,
         BCEDITOR_BOOKMARK_IMAGE_COUNT);
     FInternalBookmarkImage.Draw(Canvas, ABookmark.ImageIndex, AClipRect.Left + FLeftMargin.Bookmarks.LeftMargin,
-      (AMarkRow - TopRow) * LLineHeight, LLineHeight, clFuchsia);
+      (AMarkRow - TopRow) * LineHeight, LineHeight, clFuchsia);
     Inc(AOverlappingOffset, FLeftMargin.Marks.OverlappingOffset);
   end;
 
@@ -7034,12 +7025,12 @@ var
     if Assigned(FLeftMargin.Marks.Images) then
       if AMark.ImageIndex <= FLeftMargin.Marks.Images.Count then
       begin
-        if LLineHeight > FLeftMargin.Marks.Images.Height then
-          Y := LLineHeight shr 1 - FLeftMargin.Marks.Images.Height shr 1
+        if LineHeight > FLeftMargin.Marks.Images.Height then
+          Y := LineHeight shr 1 - FLeftMargin.Marks.Images.Height shr 1
         else
           Y := 0;
         FLeftMargin.Marks.Images.Draw(Canvas, AClipRect.Left + FLeftMargin.Marks.LeftMargin + AOverlappingOffset,
-          (AMarkRow - TopRow) * LLineHeight + Y, AMark.ImageIndex);
+          (AMarkRow - TopRow) * LineHeight + Y, AMark.ImageIndex);
       end;
   end;
 
@@ -7054,97 +7045,85 @@ var
     LTextSize: TSize;
     LTop: Integer;
   begin
-    FPaintHelper.SetBaseFont(FLeftMargin.Font);
-    try
-      FPaintHelper.SetForegroundColor(FLeftMargin.Font.Color);
+    FPaintHelper.SetForegroundColor(FLeftMargin.Colors.Foreground);
 
-      LLineRect := AClipRect;
+    LLineRect := AClipRect;
 
-      if (lnoAfterLastLine in FLeftMargin.LineNumbers.Options) then
-        LLastRow := ALastRow
-      else
-        LLastRow := ALastTextRow;
+    if (lnoAfterLastLine in FLeftMargin.LineNumbers.Options) then
+      LLastRow := ALastRow
+    else
+      LLastRow := ALastTextRow;
 
-      for LRow := AFirstRow to LLastRow + 1 do
+    for LRow := AFirstRow to LLastRow + 1 do
+    begin
+      LLineRect.Top := (LRow - TopRow) * LineHeight;
+      LLineRect.Bottom := LLineRect.Top + LineHeight;
+
+      if (FLeftMargin.LineNumbers.Visible
+        and ((LRow = 0)
+          or (LRow < Rows.Count))) then
       begin
-        LLineRect.Top := (LRow - TopRow) * LLineHeight;
-        LLineRect.Bottom := LLineRect.Top + LLineHeight;
+        if (LRow < Rows.Count) then
+          LLine := Rows.Items[LRow].Line
+        else
+          LLine := LRow - Rows.Count;
 
-        if (FLeftMargin.LineNumbers.Visible
-          and ((LRow = 0)
-            or (LRow < Rows.Count))) then
+        FPaintHelper.SetBackgroundColor(FLeftMargin.Colors.Background);
+
+        if (not Assigned(FMultiCarets) and (LLine = FLines.CaretPosition.Line)) then
         begin
-          if (LRow < Rows.Count) then
-            LLine := Rows.Items[LRow].Line
-          else
-            LLine := LRow - Rows.Count;
-
           FPaintHelper.SetBackgroundColor(FLeftMargin.Colors.Background);
-
-          if (not Assigned(FMultiCarets) and (LLine = FLines.CaretPosition.Line)) then
+          Canvas.Brush.Color := FLeftMargin.Colors.Background;
+          if Assigned(FMultiCarets) then
+            FillRect(LLineRect);
+        end
+        else
+        begin
+          LBackground := GetMarkBackgroundColor(LRow);
+          if LBackground <> clNone then
           begin
-            FPaintHelper.SetBackgroundColor(FLeftMargin.Colors.Background);
-            Canvas.Brush.Color := FLeftMargin.Colors.Background;
-            if Assigned(FMultiCarets) then
-              FillRect(LLineRect);
+            FPaintHelper.SetBackgroundColor(LBackground);
+            Canvas.Brush.Color := LBackground;
+            FillRect(LLineRect);
           end
+        end;
+
+        if (((Rows.Count = 0) or (rfFirstRowOfLine in Rows.Items[LRow].Flags))
+          and ((LLine = 0)
+            or (LLine = FLines.CaretPosition.Line)
+            or ((LLine + 1) mod 10 = 0)
+            or not (lnoIntens in FLeftMargin.LineNumbers.Options))) then
+        begin
+          LLineNumber := FLeftMargin.FormatLineNumber(LLine + 1);
+          GetTextExtentPoint32(Canvas.Handle, PChar(LLineNumber), Length(LLineNumber), LTextSize);
+          ExtTextOut(Canvas.Handle,
+            LLineRect.Left + (FLeftMargin.Width - FLeftMargin.LineState.Width - 2) - LTextSize.cx,
+            LLineRect.Top + ((LineHeight - Integer(LTextSize.cy)) div 2),
+            ETO_OPAQUE, @LLineRect, PChar(LLineNumber), Length(LLineNumber), nil);
+        end
+        else if (rfFirstRowOfLine in Rows.Items[LRow].Flags) then
+        begin
+          LLeftMarginWidth := LLineRect.Left + FLeftMargin.Width - FLeftMargin.LineState.Width - 1;
+          LOldColor := Canvas.Pen.Color;
+          Canvas.Pen.Color := Font.Color;
+          LTop := LLineRect.Top + ((LineHeight - 1) div 2);
+          if (LLine + 1) mod 5 = 0 then
+            Canvas.MoveTo(LLeftMarginWidth - FLeftMarginCharWidth + ((FLeftMarginCharWidth - 9) div 2), LTop)
           else
-          begin
-            LBackground := GetMarkBackgroundColor(LRow);
-            if LBackground <> clNone then
-            begin
-              FPaintHelper.SetBackgroundColor(LBackground);
-              Canvas.Brush.Color := LBackground;
-              FillRect(LLineRect);
-            end
-          end;
-
-          if (((Rows.Count = 0) or (rfFirstRowOfLine in Rows.Items[LRow].Flags))
-            and ((LLine = 0)
-              or (LLine = FLines.CaretPosition.Line)
-              or ((LLine + 1) mod 10 = 0)
-              or not (lnoIntens in FLeftMargin.LineNumbers.Options))) then
-          begin
-            LLineNumber := FLeftMargin.FormatLineNumber(LLine + 1);
-            GetTextExtentPoint32(Canvas.Handle, PChar(LLineNumber), Length(LLineNumber), LTextSize);
-            ExtTextOut(Canvas.Handle,
-              LLineRect.Left + (FLeftMargin.Width - FLeftMargin.LineState.Width - 2) - LTextSize.cx,
-              LLineRect.Top + ((LLineHeight - Integer(LTextSize.cy)) div 2),
-              ETO_OPAQUE, @LLineRect, PChar(LLineNumber), Length(LLineNumber), nil);
-          end
-          else if (rfFirstRowOfLine in Rows.Items[LRow].Flags) then
-          begin
-            LLeftMarginWidth := LLineRect.Left + FLeftMargin.Width - FLeftMargin.LineState.Width - 1;
-            LOldColor := Canvas.Pen.Color;
-            Canvas.Pen.Color := FLeftMargin.Font.Color;
-            LTop := LLineRect.Top + ((LLineHeight - 1) div 2);
-            if (LLine + 1) mod 5 = 0 then
-              Canvas.MoveTo(LLeftMarginWidth - FLeftMarginCharWidth + ((FLeftMarginCharWidth - 9) div 2), LTop)
-            else
-              Canvas.MoveTo(LLeftMarginWidth - FLeftMarginCharWidth + ((FLeftMarginCharWidth - 2) div 2), LTop);
-            Canvas.LineTo(LLeftMarginWidth - ((FLeftMarginCharWidth - 1) div 2), LTop);
-            Canvas.Pen.Color := LOldColor;
-          end
-          else if (WordWrap.Enabled and WordWrap.Indicator.Visible) then
-          begin
-            FImages.Draw(Canvas,
-              FLeftMargin.Width - FLeftMargin.LineState.Width - 2 - FImages.Width,
-              LLineRect.Top,
-              iiWordWrap);
-          end;
+            Canvas.MoveTo(LLeftMarginWidth - FLeftMarginCharWidth + ((FLeftMarginCharWidth - 2) div 2), LTop);
+          Canvas.LineTo(LLeftMarginWidth - ((FLeftMarginCharWidth - 1) div 2), LTop);
+          Canvas.Pen.Color := LOldColor;
         end;
       end;
+    end;
 
-      FPaintHelper.SetBackgroundColor(FLeftMargin.Colors.Background);
-      { Erase the remaining area }
-      if (AClipRect.Bottom > LLineRect.Bottom) then
-      begin
-        LLineRect.Top := LLineRect.Bottom;
-        LLineRect.Bottom := AClipRect.Bottom;
-        FillRect(LLineRect);
-      end;
-    finally
-      FPaintHelper.SetBaseFont(Font);
+    FPaintHelper.SetBackgroundColor(FLeftMargin.Colors.Background);
+    { Erase the remaining area }
+    if (AClipRect.Bottom > LLineRect.Bottom) then
+    begin
+      LLineRect.Top := LLineRect.Bottom;
+      LLineRect.Bottom := AClipRect.Bottom;
+      FillRect(LLineRect);
     end;
   end;
 
@@ -7158,8 +7137,8 @@ var
 
     procedure SetPanelActiveLineRect;
     begin
-      LPanelActiveLineRect := System.Types.Rect(AClipRect.Left, (LRow - TopRow) * LLineHeight,
-        AClipRect.Left + FLeftMargin.MarksPanel.Width, (LRow - TopRow + 1) * LLineHeight);
+      LPanelActiveLineRect := System.Types.Rect(AClipRect.Left, (LRow - TopRow) * LineHeight,
+        AClipRect.Left + FLeftMargin.MarksPanel.Width, (LRow - TopRow + 1) * LineHeight);
     end;
 
   begin
@@ -7265,13 +7244,6 @@ var
     end;
   end;
 
-  procedure PaintActiveLineIndicator;
-  begin
-    if FActiveLine.Visible and FActiveLine.Indicator.Visible then
-      FActiveLine.Indicator.Draw(Canvas, AClipRect.Left + FActiveLine.Indicator.Left, (Rows.CaretPosition.Row - TopRow) * LLineHeight,
-        LLineHeight);
-  end;
-
   procedure PaintSyncEditIndicator;
   var
     LRowsPosition: TBCEditorRowsPosition;
@@ -7280,8 +7252,8 @@ var
       if (FLines.SelArea.BeginPosition.Line <> FLines.SelArea.EndPosition.Line) or FSyncEdit.BlockSelected then
       begin
         LRowsPosition := LinesToRows(SelectionEndPosition);
-        FSyncEdit.Activator.Draw(Canvas, AClipRect.Left + FActiveLine.Indicator.Left,
-          (LRowsPosition.Row - TopRow) * LLineHeight, LLineHeight);
+        FSyncEdit.Activator.Draw(Canvas, AClipRect.Left + FSyncEdit.Activator.Left,
+          (LRowsPosition.Row - TopRow) * LineHeight, LineHeight);
       end;
   end;
 
@@ -7303,8 +7275,8 @@ var
 
         if (FLines.Items[LLine].State <> lsLoaded) then
         begin
-          LLineStateRect.Top := (LRow - TopRow) * LLineHeight;
-          LLineStateRect.Bottom := LLineStateRect.Top + LLineHeight;
+          LLineStateRect.Top := (LRow - TopRow) * LineHeight;
+          LLineStateRect.Bottom := LLineStateRect.Top + LineHeight;
           if (FLines.Items[LLine].State = lsSaved) then
             Canvas.Brush.Color := FLeftMargin.Colors.LineStateNormal
           else
@@ -7335,8 +7307,8 @@ var
           LLine := Rows.Items[LRow].Line;
           LLineRect.Left := LPanelRect.Left;
           LLineRect.Right := LPanelRect.Right;
-          LLineRect.Top := (LRow - TopRow) * LLineHeight;
-          LLineRect.Bottom := LLineRect.Top + LLineHeight;
+          LLineRect.Top := (LRow - TopRow) * LineHeight;
+          LLineRect.Bottom := LLineRect.Top + LineHeight;
           FOnMarkPanelLinePaint(Self, Canvas, LLineRect, LLine);
         end;
       end;
@@ -7347,14 +7319,12 @@ var
 
 begin
   FPaintHelper.SetBackgroundColor(FLeftMargin.Colors.Background);
-  Canvas.Brush.Color := FLeftMargin.Colors.Background;
   FillRect(AClipRect);
-  LLineHeight := LineHeight;
-  PaintLineNumbers;
+
+  PaintLineNumbers();
   PaintBookmarkPanel;
   PaintBorder;
   PaintMarks;
-  PaintActiveLineIndicator;
   PaintSyncEditIndicator;
   PaintLineState;
   PaintBookmarkPanelLine;
@@ -9890,7 +9860,8 @@ begin
         FState := FState - [esResized, esScrolled];
       end;
 
-      if (State * [esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> []) then
+      if ((State * [esLinesCleared, esLinesDeleted, esLinesInserted, esLinesUpdated] <> [])
+        and HandleAllocated) then
       begin
         Include(FState, esWantedScanCodeFolding);
         KillTimer(Handle, tiCodeFolding);
@@ -10054,9 +10025,12 @@ begin
   FLines.SortOrder := ASortOrder;
   FLines.Sort(LBeginLine, LEndLine);
 
-  Include(FState, esWantedScanCodeFolding);
-  KillTimer(Handle, tiCodeFolding);
-  SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+  if (HandleAllocated) then
+  begin
+    Include(FState, esWantedScanCodeFolding);
+    KillTimer(Handle, tiCodeFolding);
+    SetTimer(Handle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+  end;
 end;
 
 procedure TCustomBCEditor.SpecialCharsChanged(ASender: TObject);

@@ -1991,7 +1991,7 @@ begin
         CompletionProposal.Colors.SelectedText := StringToColorDef(LColorsObject['CompletionProposalSelectedText'].Value, CompletionProposal.Colors.SelectedText);
         LeftMargin.Colors.Background := StringToColorDef(LColorsObject['LeftMarginBackground'].Value, LeftMargin.Colors.Background);
         LeftMargin.Colors.Border := StringToColorDef(LColorsObject['LeftMarginBorder'].Value, LeftMargin.Colors.Border);
-        LeftMargin.Font.Color := StringToColorDef(LColorsObject['LeftMarginLineNumbers'].Value, LeftMargin.Font.Color);
+        LeftMargin.Colors.Foreground := StringToColorDef(LColorsObject['LeftMarginLineNumbers'].Value, LeftMargin.Colors.Foreground);
         LeftMargin.Colors.BookmarkPanelBackground := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, LeftMargin.Colors.BookmarkPanelBackground);
         LeftMargin.Colors.LineStateModified := StringToColorDef(LColorsObject['LeftMarginLineStateModified'].Value, LeftMargin.Colors.LineStateModified);
         LeftMargin.Colors.LineStateNormal := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, LeftMargin.Colors.LineStateNormal);
@@ -2017,7 +2017,6 @@ begin
       LFontsObject := AEditorObject['Fonts'].ObjectValue;
       if Assigned(LFontsObject) then
       begin
-        LeftMargin.Font.Name := StrToStrDef(LFontsObject['LineNumbers'].Value, LeftMargin.Font.Name);
         Font.Name := StrToStrDef(LFontsObject['Text'].Value, Font.Name);
         if cpoUseHighlighterColumnFont in CompletionProposal.Options then
           for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
@@ -2026,7 +2025,6 @@ begin
       LFontSizesObject := AEditorObject['FontSizes'].ObjectValue;
       if Assigned(LFontSizesObject) then
       begin
-        LeftMargin.Font.Size := StrToIntDef(LFontSizesObject['LineNumbers'].Value, LeftMargin.Font.Size);
         Font.Size := StrToIntDef(LFontSizesObject['Text'].Value, Font.Size);
         if cpoUseHighlighterColumnFont in CompletionProposal.Options then
           for LIndex := 0 to CompletionProposal.Columns.Count - 1 do

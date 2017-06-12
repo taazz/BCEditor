@@ -53,7 +53,7 @@ const
   clSpecialChar = clGrayText;
   clActiveLineBackground = $00E6FFFA;
   clLeftMarginBackground = $00F4F4F4;
-  clLeftMarginFontForeground = $00CC9999;
+  clLeftMarginForeground = $00CC9999;
   clSearchMapActiveLine = $00F4F4F4;
   clIndentHighlight = $00CC9999;
   clIndent = $00CC9999;
@@ -62,7 +62,6 @@ const
   clWordWrapIndicatorLines = clBlack;
   clSyncEditBackground = $00FCFDCD;
   { Resource file bitmaps }
-  BCEDITOR_ACTIVE_LINE = 'BCEDITORACTIVELINE';
   BCEDITOR_BOOKMARK_IMAGES = 'BCEDITORBOOKMARKIMAGES';
   BCEDITOR_MOUSE_MOVE_SCROLL = 'BCEDITORMOUSEMOVESCROLL';
   BCEDITOR_SYNCEDIT = 'BCEDITORSYNCEDIT';

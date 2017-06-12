@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Classes,
   Graphics,
-  BCEditor.Editor.Glyph, BCEditor.Types, BCEditor.Consts;
+  BCEditor.Types, BCEditor.Consts;
 
 type
   TBCEditorWordWrap = class(TPersistent)
@@ -28,24 +28,9 @@ type
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     end;
 
-    TIndicator = class(TPersistent)
-      strict private
-        FOnChange: TNotifyEvent;
-        FVisible: Boolean;
-        procedure SetVisible(AValue: Boolean);
-      public
-        constructor Create();
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property Visible: Boolean read FVisible write SetVisible default True;
-        property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    end;
-
   strict private
-    FBitmap: Graphics.TBitmap;
     FColors: TBCEditorWordWrap.TColors;
     FEnabled: Boolean;
-    FIndicator: TIndicator;
     FOnChange: TNotifyEvent;
     procedure DoChange;
     procedure OnColorsChange(ASender: TObject);
@@ -59,7 +44,6 @@ type
   published
     property Colors: TBCEditorWordWrap.TColors read FColors write SetColors;
     property Enabled: Boolean read FEnabled write SetEnabled default False;
-    property Indicator: TIndicator read FIndicator;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   end;
 
@@ -112,40 +96,6 @@ begin
   end;
 end;
 
-{ TBCEditorWordWrap.TIndicator ************************************************}
-
-procedure TBCEditorWordWrap.TIndicator.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TIndicator) then
-  with ASource as TIndicator do
-  begin
-    Self.FVisible := FVisible;
-    if Assigned(Self.FOnChange) then
-      Self.FOnChange(Self);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorWordWrap.TIndicator.Create();
-begin
-  inherited;
-
-  FOnChange := nil;
-  FVisible := True;
-end;
-
-procedure TBCEditorWordWrap.TIndicator.SetVisible(AValue: Boolean);
-begin
-  if (AValue <> FVisible) then
-  begin
-    FVisible := AValue;
-
-    if (Assigned(OnChange)) then
-      OnChange(Self);
-  end;
-end;
-
 { TBCEditorWordWrap ***********************************************************}
 
 constructor TBCEditorWordWrap.Create;
@@ -155,13 +105,10 @@ begin
   FColors := TBCEditorWordWrap.TColors.Create;
 
   FEnabled := False;
-  FIndicator := TIndicator.Create();
 end;
 
 destructor TBCEditorWordWrap.Destroy;
 begin
-  FBitmap.Free;
-  FIndicator.Free;
   FColors.Free;
 
   inherited;
@@ -174,7 +121,6 @@ begin
   begin
     Self.FColors.Assign(FColors);
     Self.FEnabled := FEnabled;
-    Self.FIndicator.Assign(FIndicator);
     Self.DoChange;
   end
   else
@@ -208,7 +154,6 @@ end;
 procedure TBCEditorWordWrap.SetOnChange(AValue: TNotifyEvent);
 begin
   FOnChange := AValue;
-  FIndicator.OnChange := AValue;
   FColors.OnChange := OnColorsChange;
 end;
 

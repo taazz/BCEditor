@@ -1,52 +1,40 @@
 unit BCEditor.Editor.ActiveLine;
 
-interface
+interface {********************************************************************}
 
 uses
   Classes,
   Graphics,
-  BCEditor.Editor.Glyph, BCEditor.Consts;
+  BCEditor.Consts;
 
 type
   TBCEditorActiveLine = class(TPersistent)
   strict private
     FColor: TColor;
-    FIndicator: TBCEditorGlyph;
     FOnChange: TNotifyEvent;
     FVisible: Boolean;
     procedure DoChange(ASender: TObject);
     procedure SetColor(const AValue: TColor);
-    procedure SetIndicator(const AValue: TBCEditorGlyph);
-    procedure SetOnChange(AValue: TNotifyEvent);
     procedure SetVisible(const AValue: Boolean);
   public
-    constructor Create;
-    destructor Destroy; override;
+    constructor Create();
     procedure Assign(ASource: TPersistent); override;
   published
     property Color: TColor read FColor write SetColor default clActiveLineBackground;
-    property Indicator: TBCEditorGlyph read FIndicator write SetIndicator;
     property Visible: Boolean read FVisible write SetVisible default True;
-    property OnChange: TNotifyEvent read FOnChange write SetOnChange;
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
-implementation
+implementation {***************************************************************}
 
-constructor TBCEditorActiveLine.Create;
+{ TBCEditorActiveLine.Create **************************************************}
+
+constructor TBCEditorActiveLine.Create();
 begin
   inherited;
 
   FColor := clActiveLineBackground;
-  FIndicator := TBCEditorGlyph.Create(HInstance, BCEDITOR_ACTIVE_LINE, clFuchsia);
-  FIndicator.Visible := False;
   FVisible := True;
-end;
-
-destructor TBCEditorActiveLine.Destroy;
-begin
-  FIndicator.Free;
-
-  inherited;
 end;
 
 procedure TBCEditorActiveLine.Assign(ASource: TPersistent);
@@ -56,7 +44,6 @@ begin
   begin
     Self.FColor := FColor;
     Self.FVisible := FVisible;
-    Self.FIndicator.Assign(FIndicator);
     Self.DoChange(Self);
   end
   else
@@ -76,17 +63,6 @@ begin
     FColor := AValue;
     DoChange(Self);
   end;
-end;
-
-procedure TBCEditorActiveLine.SetIndicator(const AValue: TBCEditorGlyph);
-begin
-  FIndicator.Assign(AValue);
-end;
-
-procedure TBCEditorActiveLine.SetOnChange(AValue: TNotifyEvent);
-begin
-  FOnChange := AValue;
-  FIndicator.OnChange := AValue;
 end;
 
 procedure TBCEditorActiveLine.SetVisible(const AValue: Boolean);

@@ -48,12 +48,10 @@
         "WordWrapIndicatorLines": "$007226F9"
       },
       "Fonts": {
-        "LineNumbers": "Consolas",
         "Text": "Consolas",
         "CompletionProposal": "Consolas"
       },
       "FontSizes": {
-        "LineNumbers": "9",
         "Text": "9",
         "CompletionProposal": "8"
       }

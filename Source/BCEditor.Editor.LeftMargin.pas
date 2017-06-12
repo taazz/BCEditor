@@ -16,6 +16,7 @@ type
       FBookmarkBackground: TColor;
       FBookmarkPanelBackground: TColor;
       FBorder: TColor;
+      FForeground: TColor;
       FLineStateModified: TColor;
       FLineStateNormal: TColor;
       FMarkDefaultBackground: TColor;
@@ -27,6 +28,7 @@ type
       property BookmarkBackground: TColor read FBookmarkBackground write FBookmarkBackground default clNone;
       property BookmarkPanelBackground: TColor read FBookmarkPanelBackground write FBookmarkPanelBackground default clBtnFace;
       property Border: TColor read FBorder write FBorder default clLeftMarginBackground;
+      property Foreground: TColor read FForeground write FForeground default clLeftMarginForeground;
       property LineStateModified: TColor read FLineStateModified write FLineStateModified default clYellow;
       property LineStateNormal: TColor read FLineStateNormal write FLineStateNormal default clLime;
       property MarkDefaultBackground: TColor read FMarkDefaultBackground write FMarkDefaultBackground default clNone;
@@ -162,7 +164,6 @@ type
     FBookMarks: TBCEditorLeftMargin.TBookmarks;
     FBorder: TBCEditorLeftMargin.TBorder;
     FColors: TBCEditorLeftMargin.TColors;
-    FFont: TFont;
     FLineNumbers: TBCEditorLeftMargin.TLineNumbers;
     FLineState: TBCEditorLeftMargin.TLineState;
     FMarks: TBCEditorLeftMargin.TMarks;
@@ -174,7 +175,6 @@ type
     procedure SetAutosize(const AValue: Boolean);
     procedure SetBookMarks(const AValue: TBCEditorLeftMargin.TBookmarks);
     procedure SetColors(const AValue: TBCEditorLeftMargin.TColors);
-    procedure SetFont(AValue: TFont);
     procedure SetMarks(const AValue: TBCEditorLeftMargin.TMarks);
     procedure SetOnChange(AValue: TNotifyEvent);
     procedure SetVisible(const AValue: Boolean);
@@ -193,7 +193,6 @@ type
     property Bookmarks: TBCEditorLeftMargin.TBookmarks read FBookMarks write SetBookMarks;
     property Border: TBCEditorLeftMargin.TBorder read FBorder write FBorder;
     property Colors: TBCEditorLeftMargin.TColors read FColors write SetColors;
-    property Font: TFont read FFont write SetFont;
     property LineNumbers: TBCEditorLeftMargin.TLineNumbers read FLineNumbers write FLineNumbers;
     property LineState: TBCEditorLeftMargin.TLineState read FLineState write FLineState;
     property Marks: TBCEditorLeftMargin.TMarks read FMarks write SetMarks;
@@ -580,11 +579,6 @@ begin
   FAutosize := True;
   FColors := TColors.Create;
   FBorder := TBorder.Create;
-  FFont := TFont.Create;
-  FFont.Name := 'Courier New';
-  FFont.Size := 8;
-  FFont.Style := [];
-  FFont.Color := clLeftMarginFontForeground;
   FWidth := 55;
   FVisible := True;
 
@@ -601,7 +595,6 @@ begin
   FMarks.Free;
   FBorder.Free;
   FColors.Free;
-  FFont.Free;
   FLineState.Free;
   FLineNumbers.Free;
   FMarksPanel.Free;
@@ -619,7 +612,6 @@ begin
     Self.FMarks.Assign(FMarks);
     Self.FColors.Assign(FColors);
     Self.FBorder.Assign(FBorder);
-    Self.FFont.Assign(FFont);
     Self.FLineNumbers.Assign(FLineNumbers);
     Self.FMarksPanel.Assign(FMarksPanel);
     Self.FWidth := FWidth;
@@ -729,11 +721,6 @@ begin
   FColors.Assign(AValue);
 end;
 
-procedure TBCEditorLeftMargin.SetFont(AValue: TFont);
-begin
-  FFont.Assign(AValue);
-end;
-
 procedure TBCEditorLeftMargin.SetMarks(const AValue: TMarks);
 begin
   FMarks.Assign(AValue);
@@ -745,7 +732,6 @@ begin
 
   FBookmarks.OnChange := AValue;
   FBorder.OnChange := AValue;
-  FFont.OnChange := AValue;
   FLineState.OnChange := AValue;
   FLineNumbers.OnChange := AValue;
   FMarksPanel.OnChange := AValue;

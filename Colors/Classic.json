@@ -48,12 +48,10 @@
         "WordWrapIndicatorLines": "clWhite"
       },
       "Fonts": {
-        "LineNumbers": "Courier New",
         "Text": "Courier New",
         "CompletionProposal": "Courier New"
       },
       "FontSizes": {
-        "LineNumbers": "8",
         "Text": "9",
         "CompletionProposal": "8"
       }
