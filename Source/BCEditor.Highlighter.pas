@@ -324,8 +324,8 @@ type
 
     TBaseParser = class abstract
     public
-      function GetToken(ACurrentRule: TRange; const ALine: string; var AIndex: Integer; var AToken: TToken): Boolean;
-        virtual; abstract;
+      function GetToken(const ARange: TRange; const ALineText: string;
+        var AChar: Integer; out AToken: TToken): Boolean; virtual; abstract;
     end;
 
     TParser = class(TBaseParser)
@@ -338,7 +338,8 @@ type
       constructor Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType); reintroduce; overload; virtual;
       constructor Create(ASet: TSet); reintroduce; overload; virtual;
       destructor Destroy; override;
-      function GetToken(ACurrentRange: TRange; const ALine: string; var AIndex: Integer; var AToken: TToken): Boolean; override;
+      function GetToken(const ARange: TRange; const ALineText: string;
+        var AChar: Integer; out AToken: TToken): Boolean; override;
       property HeadNode: TTokenNode read FHeadNode;
       property Sets: TList read FSets;
     end;
@@ -349,8 +350,8 @@ type
     public
       constructor Create(AToken: TToken); reintroduce; virtual;
       destructor Destroy; override;
-      function GetToken(ACurrentRange: TRange; const ALine: string; var AIndex: Integer; var AToken: TToken): Boolean; override;
-      property Token: TToken read FToken;
+      function GetToken(const ARange: TRange; const ALineText: string;
+        var AChar: Integer; out AToken: TToken): Boolean; override;
     end;
 
     TDelimitersParser = class(TBaseParser)
@@ -359,8 +360,8 @@ type
     public
       constructor Create(AToken: TToken); virtual;
       destructor Destroy; override;
-      function GetToken(ACurrentRange: TRange; const ALine: string; var AIndex: Integer; var AToken: TToken): Boolean; override;
-      property Token: TToken read FToken;
+      function GetToken(const ARange: TRange; const ALineText: string;
+        var AChar: Integer; out AToken: TToken): Boolean; override;
     end;
 
     TImportJSON = class(TObject)
@@ -395,78 +396,73 @@ type
       procedure ImportFromStream(AStream: TStream);
     end;
 
+    TFind = record
+    private
+      FAttribute: TAttribute;
+      FChar: Integer;
+      FLength: Integer;
+      FLineText: string;
+      FRange: TRange;
+      FText: PChar;
+      FToken: TToken;
+    public
+      property Attribute: TAttribute read FAttribute;
+      property Char: Integer read FChar;
+      property Length: Integer read FLength;
+      property Range: TRange read FRange;
+      property Text: PChar read FText;
+    end;
+
   strict private
     FAllDelimiters: TBCEditorCharSet;
     FAttributes: TStringList;
-    FBeginningOfLine: Boolean;
     FCodeFoldingRangeCount: Integer;
     FCodeFoldingRegions: TBCEditorCodeFoldingRegions;
     FColors: TColors;
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions;
-    FCurrentLine: string;
-    FCurrentLineIndex: LongInt;
-    FCurrentRange: TRange;
-    FCurrentToken: TToken;
     FEditor: TCustomControl;
-    FEndOfLine: Boolean;
     FFileName: string;
     FFilePath: string;
     FFoldCloseKeyChars: TBCEditorCharSet;
     FFoldOpenKeyChars: TBCEditorCharSet;
-    FLoading: Boolean;
     FMainRules: TRange;
     FMatchingPairHighlight: Boolean;
     FMatchingPairs: TList<TMatchingPairToken>;
     FMultiHighlighter: Boolean;
     FName: string;
     FOnChange: TNotifyEvent;
-    FPreviousEndOfLine: Boolean;
     FSample: string;
     FSkipCloseKeyChars: TBCEditorCharSet;
     FSkipOpenKeyChars: TBCEditorCharSet;
-    FTemporaryCurrentTokens: TList;
-    FTokenPosition: Integer;
+    FTemporaryCurrentTokens: TList<TToken>;
     FWordBreakChars: TBCEditorCharSet;
     procedure AddAllAttributes(ARange: TRange);
     procedure SetFileName(AValue: string);
     procedure UpdateAttributes(ARange: TRange; AParentRange: TRange);
-  private
+  strict private
     procedure DoChange();
-  protected
     function GetAttribute(AIndex: Integer): TAttribute;
     procedure AddAttribute(AHighlighterAttribute: TAttribute);
-    procedure Prepare;
-    procedure Reset;
-    procedure SetAttributesOnChange(AEvent: TNotifyEvent);
     procedure SetCodeFoldingRangeCount(AValue: Integer);
     procedure SetWordBreakChars(AChars: TBCEditorCharSet);
+  protected
+    function TokenType(const AFind: TFind): TBCEditorRangeType;
     property Editor: TCustomControl read FEditor;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     constructor Create(AEditor: TCustomControl);
-    destructor Destroy; override;
-    function GetCurrentRange: TRange;
-    function GetCurrentRangeAttribute: TAttribute;
-    function GetEndOfLine: Boolean; inline;
-    function GetTokenAttribute(): TAttribute; inline;
-    function GetTokenIndex: Integer; inline;
-    function GetTokenKind: TBCEditorRangeType;
-    function GetTokenLength: Integer; inline;
-    function GetTokenText(): PChar; overload; inline;
-    procedure GetTokenText(out AResult: string); overload;
+    destructor Destroy(); override;
+    function FindFirstToken(const ABeginRange: TRange; const ALineText: string;
+      out AFind: TFind): Boolean;
+    function FindNextToken(var AFind: TFind): Boolean;
     procedure AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
     procedure AddKeywords(var AStringList: TStringList);
-    procedure Clear;
+    procedure Clear();
     procedure LoadFromFile(const AFileName: string);
     procedure LoadFromResource(const ResName: string; const ResType: PChar);
     procedure LoadFromStream(AStream: TStream);
-    procedure Next;
-    procedure NextToEndOfLine;
-    procedure ResetCurrentRange;
-    procedure SetCurrentLine(const ANewValue: string);
-    procedure SetCurrentRange(AValue: Pointer);
-    procedure UpdateColors;
+    procedure UpdateColors();
     property Attribute[AIndex: Integer]: TAttribute read GetAttribute;
     property Attributes: TStringList read FAttributes;
     property CodeFoldingRangeCount: Integer read FCodeFoldingRangeCount write SetCodeFoldingRangeCount;
@@ -1465,77 +1461,77 @@ begin
   LTokenNode.Token := AToken;
 end;
 
-function TBCEditorHighlighter.TParser.GetToken(ACurrentRange: TRange;
-  const ALine: string; var AIndex: Integer; var AToken: TToken): Boolean;
+function TBCEditorHighlighter.TParser.GetToken(const ARange: TRange;
+  const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
 var
   LAllowedDelimiters: TBCEditorCharSet;
+  LBeginChar: Integer;
   LCurrentTokenNode: TTokenNode;
   LFindTokenNode: TTokenNode;
   LIndex: Integer;
   LLinePos: PChar;
   LLineEndPos: PChar;
-  LNextPosition: Integer;
-  LPreviousPosition: Integer;
+  LNextChar: Integer;
+  LPreviousChar: Integer;
   LSet: TSet;
-  LStartPosition: Integer;
   LStartTokenNode: TTokenNode;
 begin
   Result := False;
 
-  LStartPosition := AIndex;
+  LBeginChar := AChar;
   if Assigned(HeadNode) then
   begin
     LCurrentTokenNode := HeadNode;
-    LNextPosition := LStartPosition;
+    LNextChar := LBeginChar;
     LStartTokenNode := nil;
     repeat
       if Assigned(LStartTokenNode) then
       begin
         LCurrentTokenNode := LStartTokenNode;
-        AIndex := LNextPosition;
+        AChar := LNextChar;
         LStartTokenNode := nil;
       end;
       if Assigned(LCurrentTokenNode.Token) then
         LFindTokenNode := LCurrentTokenNode
       else
         LFindTokenNode := nil;
-      LPreviousPosition := AIndex;
-      while ((LCurrentTokenNode.NextNodes.Count > 0) and (AIndex + 1 < Length(ALine))) do
+      LPreviousChar := AChar;
+      while ((LCurrentTokenNode.NextNodes.Count > 0) and (AChar + 1 < Length(ALineText))) do
       begin
-        Inc(AIndex);
-        LCurrentTokenNode := LCurrentTokenNode.NextNodes.FindNode(ACurrentRange.CaseFunct(ALine[1 + AIndex]));
+        Inc(AChar);
+        LCurrentTokenNode := LCurrentTokenNode.NextNodes.FindNode(ARange.CaseFunct(ALineText[1 + AChar]));
         if not Assigned(LCurrentTokenNode) then
         begin
-          Dec(AIndex);
+          Dec(AChar);
           Break;
         end;
 
         if Assigned(LCurrentTokenNode.Token) then
         begin
           LFindTokenNode := LCurrentTokenNode;
-          LPreviousPosition := AIndex;
+          LPreviousChar := AChar;
         end;
 
         if not Assigned(LStartTokenNode) then
-          if CharInSet(LCurrentTokenNode.Char, ACurrentRange.Delimiters) then
+          if CharInSet(LCurrentTokenNode.Char, ARange.Delimiters) then
           begin
             LStartTokenNode := LCurrentTokenNode;
-            lNextPosition := AIndex;
+            LNextChar := AChar;
           end;
       end;
 
-      AIndex := LPreviousPosition;
+      AChar := LPreviousChar;
 
       if (not Assigned(LFindTokenNode) or not Assigned(LFindTokenNode.Token)
         or ((LFindTokenNode.Token.Attribute.EscapeChar <> BCEDITOR_NONE_CHAR)
-          and (LStartPosition > 0)
-          and (ALine[1 + LStartPosition - 1] = LFindTokenNode.Token.Attribute.EscapeChar))) then
+          and (LBeginChar > 0)
+          and (ALineText[1 + LBeginChar - 1] = LFindTokenNode.Token.Attribute.EscapeChar))) then
         Continue;
 
-      if (AIndex <= Length(ALine)) then
-        Inc(AIndex);
+      if (AChar <= Length(ALineText)) then
+        Inc(AChar);
 
-      if ((LFindTokenNode.BreakType = btAny) or (AIndex = Length(ALine)) or CharInSet(ALine[1 + AIndex], ACurrentRange.Delimiters)) then
+      if ((LFindTokenNode.BreakType = btAny) or (AChar = Length(ALineText)) or CharInSet(ALineText[1 + AChar], ARange.Delimiters)) then
       begin
         AToken := LFindTokenNode.Token;
         Exit(True);
@@ -1543,19 +1539,19 @@ begin
     until not Assigned(LStartTokenNode);
   end;
 
-  LAllowedDelimiters := ACurrentRange.Delimiters;
+  LAllowedDelimiters := ARange.Delimiters;
   for LIndex := 0 to Sets.Count - 1 do
     LAllowedDelimiters := LAllowedDelimiters - TSet(Sets.List[LIndex]).CharSet;
 
-  if (AIndex < Length(ALine)) then
+  if (AChar < Length(ALineText)) then
     for LIndex := 0 to Sets.Count - 1 do
     begin
-      AIndex := LStartPosition;
+      AChar := LBeginChar;
       LSet := TSet(Sets.List[LIndex]);
-      LLinePos := @ALine[1 + AIndex];
-      LLineEndPos := @ALine[Length(ALine)];
+      LLinePos := @ALineText[1 + AChar];
+      LLineEndPos := @ALineText[Length(ALineText)];
       repeat
-        Inc(AIndex);
+        Inc(AChar);
         Inc(LLinePos);
       until (not CharInSet(LLinePos^, LSet.CharSet) or (LLinePos = LLineEndPos));
 
@@ -1566,7 +1562,7 @@ begin
         Exit(True);
       end;
     end;
-  AIndex := LStartPosition + 1;
+  AChar := LBeginChar + 1;
 end;
 
 constructor TBCEditorHighlighter.TParser.Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType);
@@ -1612,10 +1608,10 @@ begin
   inherited;
 end;
 
-function TBCEditorHighlighter.TDefaultParser.GetToken(ACurrentRange: TRange; const ALine: string; var AIndex: Integer;
-  var AToken: TToken): Boolean;
+function TBCEditorHighlighter.TDefaultParser.GetToken(const ARange: TRange;
+  const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
 begin
-  Inc(AIndex);
+  Inc(AChar);
   Result := False;
 end;
 
@@ -1634,11 +1630,12 @@ begin
   inherited;
 end;
 
-function TBCEditorHighlighter.TDelimitersParser.GetToken(ACurrentRange: TRange; const ALine: string; var AIndex: Integer; var AToken: TToken): Boolean;
+function TBCEditorHighlighter.TDelimitersParser.GetToken(const ARange: TRange;
+  const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
 begin
-  if (AIndex < Length(ALine)) then
-    Inc(AIndex);
-  AToken := Self.Token;
+  if (AChar < Length(ALineText)) then
+    Inc(AChar);
+  AToken := FToken;
   Result := True;
 end;
 
@@ -2506,20 +2503,13 @@ begin
   FMainRules := TRange.Create;
   FMainRules.Parent := FMainRules;
 
-  FEndOfLine := False;
-  FBeginningOfLine := True;
-  FPreviousEndOfLine := False;
-  FCurrentRange := MainRules;
-
   FColors := TColors.Create(Self);
   FMatchingPairs := TList<TMatchingPairToken>.Create();
   FMatchingPairHighlight := True;
 
-  FTemporaryCurrentTokens := TList.Create;
+  FTemporaryCurrentTokens := TList<TToken>.Create();
 
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
-
-  FLoading := False;
 end;
 
 procedure TBCEditorHighlighter.DoChange();
@@ -2543,75 +2533,137 @@ begin
   inherited;
 end;
 
+function TBCEditorHighlighter.FindFirstToken(const ABeginRange: TRange;
+  const ALineText: string; out AFind: TFind): Boolean;
+begin
+  AFind.FChar := 0;
+  AFind.FLineText := ALineText;
+  if (not Assigned(ABeginRange)) then
+    AFind.FRange := MainRules
+  else
+    AFind.FRange := ABeginRange;
+  AFind.FLength := 0;
+  AFind.FToken := nil;
+
+  if (Assigned(AFind.FRange) and not AFind.FRange.Prepared) then
+  begin
+    FAttributes.Clear();
+    AddAllAttributes(MainRules);
+    FMainRules.Prepare(FMainRules);
+  end;
+
+  Result := FindNextToken(AFind);
+end;
+
+function TBCEditorHighlighter.FindNextToken(var AFind: TFind): Boolean;
+var
+  LChar: Integer;
+  LCloseParent: Boolean;
+  LDelimiters: TBCEditorCharSet;
+  LIndex: Integer;
+  LKeywordText: string;
+  LParser: TBaseParser;
+begin
+  Result := AFind.FChar + AFind.FLength < Length(AFind.FLineText);
+
+  if (Result) then
+  begin
+    LChar := AFind.FChar + AFind.FLength;
+
+    AFind.FChar := LChar;
+    AFind.FText := @AFind.FLineText[1 + LChar];
+
+    if (FTemporaryCurrentTokens.Count > 0) then
+    begin
+      while (FTemporaryCurrentTokens.Count > 0) do
+      begin
+        FTemporaryCurrentTokens[0].Free();
+        FTemporaryCurrentTokens.Delete(0);
+      end;
+      AFind.FToken := nil;
+    end;
+
+    if (Assigned(AFind.FRange) and (AFind.FRange.AlternativeCloseArrayCount > 0)) then
+      for LIndex := 0 to AFind.FRange.AlternativeCloseArrayCount - 1 do
+      begin
+        LKeywordText := AFind.FRange.AlternativeCloseArray[LIndex];
+        if ((Length(AFind.FLineText) - LChar >= Length(LKeywordText))
+          and (StrLComp(@AFind.FLineText[1 + LChar], PChar(LKeywordText), Length(LKeywordText)) = 0)) then
+        begin
+          AFind.FRange := AFind.FRange.Parent;
+          Break;
+        end;
+      end;
+
+    if Assigned(AFind.FRange) then
+    begin
+      LCloseParent := AFind.FRange.CloseParent;
+      if (AFind.FRange.CloseOnTerm and CharInSet(AFind.FLineText[1 + LChar], AFind.FRange.Delimiters) and
+        not (AFind.FRange.SkipWhitespace and CharInSet(AFind.FLineText[1 + LChar], BCEDITOR_ABSOLUTE_DELIMITERS))) then
+      begin
+        AFind.FRange := AFind.FRange.Parent;
+        if Assigned(AFind.FRange) then
+          if LCloseParent then
+            AFind.FRange := AFind.FRange.Parent;
+      end;
+
+      if (Ord(AFind.FLineText[1 + LChar]) < 256) then
+        LParser := AFind.FRange.SymbolParsers[AnsiChar(AFind.FRange.CaseFunct(AFind.FLineText[1 + LChar]))]
+      else
+        LParser := AFind.FRange.SymbolParsers['a'];
+
+      if (not Assigned(LParser)) then
+        Inc(LChar)
+      else if (not LParser.GetToken(AFind.FRange, AFind.FLineText, LChar, AFind.FToken)) then
+      begin
+        AFind.FToken := AFind.FRange.DefaultToken;
+
+        if (AFind.FRange.UseDelimitersForText) then
+          LDelimiters := AFind.FRange.Delimiters
+        else
+          LDelimiters := FAllDelimiters;
+
+        if (Ord(AFind.FLineText[1 + LChar - 1]) < 256) then
+          while ((LChar < Length(AFind.FLineText))
+            and (Ord(AFind.FLineText[1 + LChar]) < 256)
+            and not CharInSet(AFind.FLineText[1 + LChar], LDelimiters)) do
+            Inc(LChar)
+        else
+          while ((LChar < Length(AFind.FLineText))
+            and (Ord(AFind.FLineText[1 + LChar]) >= 256)
+            and not CharInSet(AFind.FLineText[1 + LChar], LDelimiters)) do
+            Inc(LChar)
+      end
+      else if (AFind.FRange.ClosingToken = AFind.FToken) then
+        AFind.FRange := AFind.FRange.Parent
+      else if (Assigned(AFind.FToken) and Assigned(AFind.FToken.OpenRule) and (AFind.FToken.OpenRule is TRange)) then
+      begin
+        AFind.FRange := TRange(AFind.FToken.OpenRule);
+        AFind.FRange.ClosingToken := AFind.FToken.ClosingToken;
+        if (AFind.FRange.OpenBeginningOfLine and (LChar > 0)) then
+        begin
+          AFind.FRange := AFind.FRange.Parent;
+          AFind.FToken := AFind.FRange.DefaultToken;
+        end;
+      end;
+
+      if (Assigned(AFind.FToken) and AFind.FToken.Temporary) then
+        FTemporaryCurrentTokens.Add(AFind.FToken);
+    end;
+
+    AFind.FLength := LChar - AFind.FChar;
+    if (not Assigned(AFind.FToken)) then
+      AFind.FAttribute := nil
+    else
+      AFind.FAttribute := AFind.FToken.Attribute;
+  end;
+end;
+
 function TBCEditorHighlighter.GetAttribute(AIndex: Integer): TAttribute;
 begin
   Result := nil;
   if (AIndex >= 0) and (AIndex < FAttributes.Count) then
     Result := TAttribute(FAttributes.Objects[AIndex]);
-end;
-
-function TBCEditorHighlighter.GetCurrentRangeAttribute: TAttribute;
-begin
-  Result := nil;
-  if Assigned(FCurrentRange) then
-    Result := FCurrentRange.Attribute;
-end;
-
-function TBCEditorHighlighter.GetEndOfLine: Boolean;
-begin
-  Result := FEndOfLine;
-end;
-
-function TBCEditorHighlighter.GetCurrentRange: TRange;
-begin
-  Result := FCurrentRange;
-end;
-
-function TBCEditorHighlighter.GetTokenAttribute: TAttribute;
-begin
-  if Assigned(FCurrentToken) then
-    Result := FCurrentToken.Attribute
-  else
-    Result := nil;
-end;
-
-function TBCEditorHighlighter.GetTokenKind: TBCEditorRangeType;
-var
-  LCurrentRangeKeyList: TKeyList;
-  LIndex: Integer;
-  LToken: string;
-  LTokenType: TBCEditorRangeType;
-begin
-  LTokenType := FCurrentRange.TokenType;
-  if LTokenType <> ttUnspecified then
-    Result := LTokenType
-  else
-  { keyword token type }
-  begin
-    GetTokenText(LToken);
-    for LIndex := 0 to FCurrentRange.KeyListCount - 1 do
-    begin
-      LCurrentRangeKeyList := FCurrentRange.KeyList[LIndex];
-      if LCurrentRangeKeyList.KeyList.IndexOf(LToken) <> -1 then
-        Exit(LCurrentRangeKeyList.TokenType);
-    end;
-    Result := ttUnspecified
-  end;
-end;
-
-function TBCEditorHighlighter.GetTokenLength: Integer;
-begin
-  Result := FCurrentLineIndex - FTokenPosition;
-end;
-
-procedure TBCEditorHighlighter.GetTokenText(out AResult: string);
-begin
-  AResult := Copy(FCurrentLine, 1 + FTokenPosition, FCurrentLineIndex - FTokenPosition);
-end;
-
-function TBCEditorHighlighter.GetTokenIndex: Integer;
-begin
-  Result := FTokenPosition;
 end;
 
 procedure TBCEditorHighlighter.LoadFromFile(const AFileName: string);
@@ -2642,7 +2694,6 @@ var
   ImportJSON: TImportJSON;
 begin
   Clear;
-  FLoading := True;
   ImportJSON := TImportJSON.Create(Self);
   try
     ImportJSON.ImportFromStream(AStream);
@@ -2650,168 +2701,6 @@ begin
     ImportJSON.Free();
   end;
   UpdateColors;
-  FLoading := False;
-end;
-
-procedure TBCEditorHighlighter.Next;
-var
-  LCloseParent: Boolean;
-  LDelimiters: TBCEditorCharSet;
-  LIndex: Integer;
-  LKeywordText: string;
-  LParser: TBaseParser;
-begin
-  while FTemporaryCurrentTokens.Count > 0 do
-  begin
-    FCurrentToken := TToken(FTemporaryCurrentTokens[0]);
-    FCurrentToken.Free;
-    FCurrentToken := nil;
-    FTemporaryCurrentTokens.Delete(0);
-  end;
-
-  if FPreviousEndOfLine then
-  begin
-    if Assigned(FCurrentRange) then
-      if FCurrentRange.CloseOnEndOfLine or FCurrentRange.CloseOnTerm then
-        FCurrentRange := FCurrentRange.Parent;
-    FEndOfLine := True;
-    Exit;
-  end;
-
-  if (Assigned(FCurrentRange) and (FCurrentRange.AlternativeCloseArrayCount > 0)) then
-    for LIndex := 0 to FCurrentRange.AlternativeCloseArrayCount - 1 do
-    begin
-      LKeywordText := FCurrentRange.AlternativeCloseArray[LIndex];
-      if ((Length(FCurrentLine) - FCurrentLineIndex >= Length(LKeywordText))
-        and (StrLComp(@FCurrentLine[1 + FCurrentLineIndex], PChar(LKeywordText), Length(LKeywordText)) = 0)) then
-      begin
-        FCurrentRange := FCurrentRange.Parent;
-        Break;
-      end;
-    end;
-
-  FTokenPosition := FCurrentLineIndex;
-
-  if Assigned(FCurrentRange) then
-  begin
-    LCloseParent := FCurrentRange.CloseParent;
-    if (FCurrentRange.CloseOnTerm and CharInSet(FCurrentLine[1 + FCurrentLineIndex], FCurrentRange.Delimiters) and
-      not (FCurrentRange.SkipWhitespace and CharInSet(FCurrentLine[1 + FCurrentLineIndex], BCEDITOR_ABSOLUTE_DELIMITERS))) then
-    begin
-      FCurrentRange := FCurrentRange.Parent;
-      if Assigned(FCurrentRange) then
-        if LCloseParent then
-          FCurrentRange := FCurrentRange.Parent;
-    end;
-
-    if ((FCurrentLine = '') or (FCurrentLineIndex = Length(FCurrentLine))) then
-      LParser := nil
-    else if (Ord(FCurrentLine[1 + FCurrentLineIndex]) < 256) then
-      LParser := FCurrentRange.SymbolParsers[AnsiChar(FCurrentRange.CaseFunct(FCurrentLine[1 + FCurrentLineIndex]))]
-    else
-      LParser := FCurrentRange.SymbolParsers['a'];
-
-    if (not Assigned(LParser)) then
-      Inc(FCurrentLineIndex)
-    else if (not LParser.GetToken(FCurrentRange, FCurrentLine, FCurrentLineIndex, FCurrentToken)) then
-    begin
-      FCurrentToken := FCurrentRange.DefaultToken;
-
-      if (FCurrentRange.UseDelimitersForText) then
-        LDelimiters := FCurrentRange.Delimiters
-      else
-        LDelimiters := FAllDelimiters;
-
-      if (Ord(FCurrentLine[1 + FCurrentLineIndex - 1]) < 256) then
-        while ((FCurrentLineIndex < Length(FCurrentLine))
-          and (Ord(FCurrentLine[1 + FCurrentLineIndex]) < 256)
-          and not CharInSet(FCurrentLine[1 + FCurrentLineIndex], LDelimiters)) do
-          Inc(FCurrentLineIndex)
-      else
-        while ((FCurrentLineIndex < Length(FCurrentLine))
-          and (Ord(FCurrentLine[1 + FCurrentLineIndex]) >= 256)
-          and not CharInSet(FCurrentLine[1 + FCurrentLineIndex], LDelimiters)) do
-          Inc(FCurrentLineIndex)
-    end
-    else if (FCurrentRange.ClosingToken = FCurrentToken) then
-      FCurrentRange := FCurrentRange.Parent
-    else if (Assigned(FCurrentToken) and Assigned(FCurrentToken.OpenRule) and (FCurrentToken.OpenRule is TRange)) then
-    begin
-      FCurrentRange := TRange(FCurrentToken.OpenRule);
-      FCurrentRange.ClosingToken := FCurrentToken.ClosingToken;
-      if (FCurrentRange.OpenBeginningOfLine and not FBeginningOfLine) then
-      begin
-        FCurrentRange := FCurrentRange.Parent;
-        FCurrentToken := FCurrentRange.DefaultToken;
-      end;
-    end;
-
-    if (Assigned(FCurrentToken) and FCurrentToken.Temporary) then
-      FTemporaryCurrentTokens.Add(FCurrentToken);
-  end;
-
-  if (FBeginningOfLine
-    and (FCurrentLineIndex > 0)
-    and ((FCurrentLineIndex > Length(FCurrentLine)) or not CharInset(FCurrentLine[1 + FCurrentLineIndex - 1], BCEDITOR_ABSOLUTE_DELIMITERS))) then
-    FBeginningOfLine := False;
-
-  if (FCurrentLineIndex >= Length(FCurrentLine)) then
-    FPreviousEndOfLine := True;
-end;
-
-procedure TBCEditorHighlighter.NextToEndOfLine;
-begin
-  while not GetEndOfLine do
-    Next;
-end;
-
-procedure TBCEditorHighlighter.ResetCurrentRange;
-begin
-  FCurrentRange := MainRules;
-end;
-
-procedure TBCEditorHighlighter.Prepare;
-begin
-  FAttributes.Clear;
-  AddAllAttributes(MainRules);
-  FMainRules.Prepare(FMainRules);
-end;
-
-procedure TBCEditorHighlighter.Reset;
-begin
-  MainRules.Reset;
-end;
-
-procedure TBCEditorHighlighter.SetAttributesOnChange(AEvent: TNotifyEvent);
-var
-  LHighlighterAttribute: TAttribute;
-  LIndex: Integer;
-begin
-  for LIndex := FAttributes.Count - 1 downto 0 do
-  begin
-    LHighlighterAttribute := TAttribute(FAttributes.Objects[LIndex]);
-    if Assigned(LHighlighterAttribute) then
-    begin
-      LHighlighterAttribute.OnChange := AEvent;
-      LHighlighterAttribute.InternalSaveDefaultValues;
-    end;
-  end;
-end;
-
-procedure TBCEditorHighlighter.SetCurrentLine(const ANewValue: string);
-begin
-  if Assigned(FCurrentRange) then
-    if not FCurrentRange.Prepared then
-      Prepare;
-
-  FCurrentLine := ANewValue;
-  FCurrentLineIndex := 0;
-  FTokenPosition := 0;
-  FEndOfLine := ANewValue = '';
-  FBeginningOfLine := True;
-  FPreviousEndOfLine := False;
-  FCurrentToken := nil;
-  Next;
 end;
 
 procedure TBCEditorHighlighter.SetCodeFoldingRangeCount(AValue: Integer);
@@ -2821,16 +2710,6 @@ begin
     SetLength(FCodeFoldingRegions, AValue);
     FCodeFoldingRangeCount := AValue;
   end;
-end;
-
-procedure TBCEditorHighlighter.SetCurrentRange(AValue: Pointer);
-begin
-  FCurrentRange := TRange(AValue);
-end;
-
-function TBCEditorHighlighter.GetTokenText(): PChar;
-begin
-  Result := @FCurrentLine[1 + FTokenPosition];
 end;
 
 procedure TBCEditorHighlighter.SetFileName(AValue: string);
@@ -2845,6 +2724,29 @@ end;
 procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);
 begin
   FWordBreakChars := AChars;
+end;
+
+function TBCEditorHighlighter.TokenType(const AFind: TFind): TBCEditorRangeType;
+var
+  LCurrentRangeKeyList: TKeyList;
+  LIndex: Integer;
+  LTokenText: string;
+  LTokenType: TBCEditorRangeType;
+begin
+  LTokenType := AFind.FRange.TokenType;
+  if (LTokenType <> ttUnspecified) then
+    Result := LTokenType
+  else
+  begin
+    SetString(LTokenText, AFind.Text, AFind.Length);
+    for LIndex := 0 to AFind.FRange.KeyListCount - 1 do
+    begin
+      LCurrentRangeKeyList := AFind.FRange.KeyList[LIndex];
+      if (LCurrentRangeKeyList.KeyList.IndexOf(LTokenText) >= 0) then
+        Exit(LCurrentRangeKeyList.TokenType);
+    end;
+    Result := ttUnspecified
+  end;
 end;
 
 procedure TBCEditorHighlighter.UpdateAttributes(ARange: TRange; AParentRange: TRange);

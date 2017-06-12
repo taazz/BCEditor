@@ -266,12 +266,12 @@ type
     FHighlight: Boolean;
     FHighlighter: TBCEditorHighlighter;
     FHighlighterRangesSet: Boolean;
+    FLine: Integer;
     FLineHeight: Integer;
-    FLineNumber: Integer;
     FLineNumbers: Boolean;
     FLineNumbersInMargin: Boolean;
     FLineOffset: Integer;
-    FLines: TStrings;
+    FLines: TStringList;
     FMargins: TMargins;
     FMaxColumn: Integer;
     FMaxLeftChar: Integer;
@@ -1699,19 +1699,22 @@ end;
 
 procedure TBCEditorPrint.InitHighlighterRanges;
 var
-  LIndex: Integer;
+  LLine: Integer;
+  LRange: TBCEditorHighlighter.TRange;
+  LToken: TBCEditorHighlighter.TFind;
 begin
   if not FHighlighterRangesSet and Assigned(FHighlighter) and (FLines.Count > 0) then
   begin
-    FHighlighter.ResetCurrentRange;
-    FLines.Objects[0] := FHighlighter.GetCurrentRange;
-    LIndex := 1;
-    while LIndex < FLines.Count do
+    LRange := nil;
+    LLine := 1;
+    while LLine < FLines.Count do
     begin
-      FHighlighter.SetCurrentLine(FLines[LIndex - 1]);
-      FHighlighter.NextToEndOfLine;
-      FLines.Objects[LIndex] := FHighlighter.GetCurrentRange;
-      Inc(LIndex);
+      FLines.Objects[LLine] := LRange;
+      if (FHighlighter.FindFirstToken(LRange, FLines[LLine], LToken)) then
+        repeat
+          LRange := LToken.Range;
+        until (not FHighlighter.FindNextToken(LToken));
+      Inc(LLine);
     end;
     FHighlighterRangesSet := True;
   end;
@@ -1825,7 +1828,7 @@ var
   LLineNumber: string;
 begin
   SaveCurrentFont;
-  LLineNumber := (FLineNumber + FLineOffset).ToString + ': ';
+  LLineNumber := (FLine + FLineOffset).ToString + ': ';
   FCanvas.Brush.Color := FDefaultBackground;
   FCanvas.Font.Style := [];
   FCanvas.Font.Color := clBlack;
@@ -1907,12 +1910,10 @@ var
   LColor: TColor;
   LCount: Integer;
   LHandled: Boolean;
-  LHighlighterAttribute: TBCEditorHighlighter.TAttribute;
   LIndex: Integer;
   LLines: TStringList;
   LOldWrapPosition: Integer;
-  LToken: string;
-  LTokenPosition: Integer;
+  LToken: TBCEditorHighlighter.TFind;
   LTokenStart: Integer;
   LWrapPosition: Integer;
 
@@ -1936,9 +1937,9 @@ var
     LTempText: string;
     LTokenEnd: Integer;
   begin
-    LLast := LTokenPosition;
-    LFirstPosition := LTokenPosition;
-    LTokenEnd := LTokenPosition + Length(LToken);
+    LLast := LToken.Char;
+    LFirstPosition := LToken.Char;
+    LTokenEnd := LToken.Char + LToken.Length;
     while (LCount < AList.Count) and (LTokenEnd > TBCEditorWrapPosition(AList[LCount]).Index) do
     begin
       LTempText := Copy(AText, LLast + 1, TBCEditorWrapPosition(AList[LCount]).Index - LLast);
@@ -1950,12 +1951,13 @@ var
     end;
     LTempText := Copy(AText, LLast + 1, LTokenEnd - LLast);
     ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.SpaceWidth, FYPos, LTempText);
-    LTokenStart := LTokenPosition + Length(LToken) - Length(LTempText);
+    LTokenStart := LToken.Char + LToken.Length - Length(LTempText);
   end;
 
 var
   LLeft: Integer;
   LTempText: string;
+  LTokenText: string;
 begin
   FPaintHelper.BeginDrawing(FCanvas.Handle);
   with FMargins do
@@ -1964,65 +1966,55 @@ begin
   if Highlight and Assigned(FHighlighter) and (FLines.Count > 0) then
   begin
     SaveCurrentFont;
-     if FLineNumber = 0 then
-      FHighlighter.ResetCurrentRange
-    else
-      FHighlighter.SetCurrentRange(FLines.Objects[FLineNumber - 1]);
-    FHighlighter.SetCurrentLine(AText);
-    LToken := '';
     LTokenStart := 0;
     LCount := 0;
     LLeft := FMargins.PixelLeft;
-    while not FHighlighter.GetEndOfLine do
-    begin
-      FHighlighter.GetTokenText(LToken);
-      LTokenPosition := FHighlighter.GetTokenIndex;
-      LHighlighterAttribute := FHighlighter.GetTokenAttribute;
+    if (FHighlighter.FindFirstToken(TBCEditorHighlighter.TRange(FLines.Objects[FLine]), AText, LToken)) then
+      repeat
+        FCanvas.Font.Color := FFontColor;
+        FCanvas.Brush.Color := FDefaultBackground;
 
-      FCanvas.Font.Color := FFontColor;
-      FCanvas.Brush.Color := FDefaultBackground;
-
-      if Assigned(LHighlighterAttribute) then
-      begin
-        FCanvas.Font.Style := LHighlighterAttribute.FontStyles;
-        if FColors then
+        if Assigned(LToken.Attribute) then
         begin
-          LColor := LHighlighterAttribute.Foreground;
-          if LColor = clNone then
-            LColor := FFont.Color;
-          FCanvas.Font.Color := LColor;
-          LColor := LHighlighterAttribute.Background;
-          if LColor = clNone then
-            LColor := FDefaultBackground;
-          FCanvas.Brush.Color := LColor;
-        end;
-      end;
-
-      LHandled := False;
-      if Assigned(AList) then
-        if LCount < AList.Count then
-        begin
-          if LTokenPosition >= TBCEditorWrapPosition(AList[LCount]).Index then
+          FCanvas.Font.Style := LToken.Attribute.FontStyles;
+          if FColors then
           begin
-            LLeft := FMargins.PixelLeft;
-            LCount := LCount + 1;
-            LTokenStart := LTokenPosition;
-            FYPos := FYPos + FLineHeight;
-          end
-          else
-          if LTokenPosition + Length(LToken) > TBCEditorWrapPosition(AList[LCount]).Index then
-          begin
-            LHandled := True;
-            SplitToken;
+            LColor := LToken.Attribute.Foreground;
+            if LColor = clNone then
+              LColor := FFont.Color;
+            FCanvas.Font.Color := LColor;
+            LColor := LToken.Attribute.Background;
+            if LColor = clNone then
+              LColor := FDefaultBackground;
+            FCanvas.Brush.Color := LColor;
           end;
         end;
-      if not LHandled then
-      begin
-        ClippedTextOut(LLeft, FYPos, LToken);
-        Inc(LLeft, TextWidth(FCanvas, LToken));
-      end;
-      FHighlighter.Next;
-    end;
+
+        LHandled := False;
+        if Assigned(AList) then
+          if LCount < AList.Count then
+          begin
+            if LToken.Char >= TBCEditorWrapPosition(AList[LCount]).Index then
+            begin
+              LLeft := FMargins.PixelLeft;
+              LCount := LCount + 1;
+              LTokenStart := LToken.Char;
+              FYPos := FYPos + FLineHeight;
+            end
+            else
+            if LToken.Char + LToken.Length > TBCEditorWrapPosition(AList[LCount]).Index then
+            begin
+              LHandled := True;
+              SplitToken;
+            end;
+          end;
+        if not LHandled then
+        begin
+          SetString(LTokenText, LToken.Text, LToken.Length);
+          ClippedTextOut(LLeft, FYPos, LTokenText);
+          Inc(LLeft, TextWidth(FCanvas, LTokenText));
+        end;
+      until (not FHighlighter.FindNextToken(LToken));
     RestoreCurrentFont;
   end
   else
@@ -2096,7 +2088,7 @@ begin
         LEndLine := TBCEditorPageLine(FPages[APageNumber]).FirstLine - 1;
       for i := TBCEditorPageLine(FPages[APageNumber - 1]).FirstLine to LEndLine do
       begin
-        FLineNumber := i + 1;
+        FLine := i + 1;
         if (not FSelectedOnly or ((i >= FBlockBeginPosition.Line - 1) and (i <= FBlockEndPosition.Line - 1))) then
         begin
           if not FSelectedOnly then

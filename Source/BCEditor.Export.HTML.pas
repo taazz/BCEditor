@@ -144,64 +144,57 @@ end;
 procedure TBCEditorExportHTML.CreateLines;
 var
   LColumn: Integer;
-  LHighlighterAttribute: TBCEditorHighlighter.TAttribute;
-  LIndex: Integer;
+  LLine: Integer;
   LPreviousElement: string;
   LTextLine: string;
-  LToken: string;
+  LTokenText: string;
+  LToken: TBCEditorHighlighter.TFind;
 begin
   LPreviousElement := '';
-  for LIndex := 0 to FLines.Count - 1 do
+  for LLine := 0 to FLines.Count - 1 do
   begin
-    if LIndex = 0 then
-      FHighlighter.ResetCurrentRange
-    else
-      FHighlighter.SetCurrentRange(FLines.Items[LIndex - 1].Range);
-    FHighlighter.SetCurrentLine(FLines[LIndex]);
     LTextLine := '';
     LColumn := 0;
-    while not FHighlighter.GetEndOfLine do
-    begin
-      LHighlighterAttribute := FHighlighter.GetTokenAttribute;
-      FHighlighter.GetTokenText(LToken);
-      if LToken = BCEDITOR_TAB_CHAR then
-      begin
-        LTextLine := LTextLine + ReplaceStr(StringOfChar(BCEDITOR_SPACE_CHAR, FTabWidth - LColumn mod FTabWidth), BCEDITOR_SPACE_CHAR, '&nbsp;');
-        Inc(LColumn, FTabWidth - LColumn mod FTabWidth);
-      end
-      else
-        Inc(LColumn, FHighlighter.GetTokenLength());
-      if LToken = BCEDITOR_TAB_CHAR then
-        // Added before
-      else
-      if LToken = BCEDITOR_SPACE_CHAR then
-        LTextLine := LTextLine + '&nbsp;'
-      else
-      if LToken = '&' then
-        LTextLine := LTextLine + '&amp;'
-      else
-      if LToken = '<' then
-        LTextLine := LTextLine + '&lt;'
-      else
-      if LToken = '>' then
-        LTextLine := LTextLine + '&gt;'
-      else
-      if LToken = '"' then
-        LTextLine := LTextLine + '&quot;'
-      else
-      if Assigned(LHighlighterAttribute) then
-      begin
-        if (LPreviousElement <> '') and (LPreviousElement <> LHighlighterAttribute.Element) then
-          LTextLine := LTextLine + '</span>';
-        if LPreviousElement <> LHighlighterAttribute.Element then
-          LTextLine := LTextLine + '<span class="' + LHighlighterAttribute.Element + '">';
-        LTextLine := LTextLine + LToken;
-        LPreviousElement := LHighlighterAttribute.Element;
-      end
-      else
-        LTextLine := LTextLine + LToken;
-      FHighlighter.Next;
-    end;
+    if (FHighlighter.FindFirstToken(FLines.Items[LLine].BeginRange, FLines.Items[LLine].Text, LToken)) then
+      repeat
+        SetString(LTokenText, LToken.Text, LToken.Length);
+        if LTokenText = BCEDITOR_TAB_CHAR then
+        begin
+          LTextLine := LTextLine + ReplaceStr(StringOfChar(BCEDITOR_SPACE_CHAR, FTabWidth - LColumn mod FTabWidth), BCEDITOR_SPACE_CHAR, '&nbsp;');
+          Inc(LColumn, FTabWidth - LColumn mod FTabWidth);
+        end
+        else
+          Inc(LColumn, LToken.Length);
+        if LTokenText = BCEDITOR_TAB_CHAR then
+          // Added before
+        else
+        if LTokenText = BCEDITOR_SPACE_CHAR then
+          LTextLine := LTextLine + '&nbsp;'
+        else
+        if LTokenText = '&' then
+          LTextLine := LTextLine + '&amp;'
+        else
+        if LTokenText = '<' then
+          LTextLine := LTextLine + '&lt;'
+        else
+        if LTokenText = '>' then
+          LTextLine := LTextLine + '&gt;'
+        else
+        if LTokenText = '"' then
+          LTextLine := LTextLine + '&quot;'
+        else
+        if Assigned(LToken.Attribute) then
+        begin
+          if (LPreviousElement <> '') and (LPreviousElement <> LToken.Attribute.Element) then
+            LTextLine := LTextLine + '</span>';
+          if LPreviousElement <> LToken.Attribute.Element then
+            LTextLine := LTextLine + '<span class="' + LToken.Attribute.Element + '">';
+          LTextLine := LTextLine + LTokenText;
+          LPreviousElement := LToken.Attribute.Element;
+        end
+        else
+          LTextLine := LTextLine + LTokenText;
+      until (not FHighlighter.FindNextToken(LToken));
     FStringList.Add(LTextLine + '<br>');
   end;
   if LPreviousElement <> '' then

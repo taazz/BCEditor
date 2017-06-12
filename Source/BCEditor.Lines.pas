@@ -25,6 +25,7 @@ type
       TState = (lsLoaded, lsModified, lsSaved);
     public
       Background: TColor;
+      BeginRange: Pointer;
       CodeFolding: packed record
         BeginRange: Pointer;
         EndRange: Pointer;
@@ -33,7 +34,6 @@ type
       FirstRow: Integer;
       Flags: TFlags;
       Foreground: TColor;
-      Range: Pointer;
       State: TLine.TState;
       Text: string;
     end;
@@ -193,12 +193,12 @@ type
     procedure Redo(); inline;
     function ReplaceText(const AArea: TBCEditorLinesArea; const AText: string): TBCEditorLinesPosition;
     procedure SetBackground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetBeginRange(const ALine: Integer; const AValue: Pointer); inline;
     procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
     procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
     procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
-    procedure SetRange(const ALine: Integer; const AValue: Pointer); inline;
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
@@ -1110,13 +1110,13 @@ begin
   BeginUpdate();
   try
     LLine.Background := clNone;
+    LLine.BeginRange := nil;
     LLine.CodeFolding.BeginRange := nil;
     LLine.CodeFolding.EndRange := nil;
     LLine.CodeFolding.TreeLine := False;
     LLine.Flags := [];
     LLine.FirstRow := -1;
     LLine.Foreground := clNone;
-    LLine.Range := nil;
     LLine.State := lsModified;
     LLine.Text := '';
     Items.Insert(ALine, LLine);
@@ -1959,6 +1959,13 @@ begin
   Items.List[ALine].Background := AValue;
 end;
 
+procedure TBCEditorLines.SetBeginRange(const ALine: Integer; const AValue: Pointer);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Items.List[ALine].BeginRange := AValue;
+end;
+
 procedure TBCEditorLines.SetCaretPosition(const AValue: TBCEditorLinesPosition);
 begin
   Assert(BOFPosition <= AValue);
@@ -2033,13 +2040,6 @@ begin
       Editor.Invalidate();
     end;
   end;
-end;
-
-procedure TBCEditorLines.SetRange(const ALine: Integer; const AValue: Pointer);
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Items.List[ALine].Range := AValue;
 end;
 
 procedure TBCEditorLines.SetSelArea(AValue: TBCEditorLinesArea);
