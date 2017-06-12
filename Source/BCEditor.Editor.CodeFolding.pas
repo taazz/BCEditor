@@ -69,30 +69,25 @@ type
     TColors = class(TPersistent)
     strict private
       FBackground: TColor;
-      FCollapsedLine: TColor;
-      FFoldingLine: TColor;
-      FFoldingLineHighlight: TColor;
+      FForeground: TColor;
       FIndent: TColor;
       FIndentHighlight: TColor;
       FOnChange: TBCEditorCodeFoldingChangeEvent;
       procedure DoChange;
       procedure SetBackground(const AValue: TColor);
-      procedure SetCollapsedLine(const AValue: TColor);
-      procedure SetFoldingLine(const AValue: TColor);
-      procedure SetFoldingLineHighlight(const AValue: TColor);
+      procedure SetForeground(const AValue: TColor);
       procedure SetIndent(const AValue: TColor);
       procedure SetIndentHighlight(const AValue: TColor);
+    protected
+      property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write FOnChange;
     public
       constructor Create;
       procedure Assign(ASource: TPersistent); override;
     published
       property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
-      property CollapsedLine: TColor read FCollapsedLine write SetCollapsedLine default clLeftMarginFontForeground;
-      property FoldingLine: TColor read FFoldingLine write SetFoldingLine default clLeftMarginFontForeground;
-      property FoldingLineHighlight: TColor read FFoldingLineHighlight write SetFoldingLineHighlight default clLeftMarginFontForeground;
+      property Foreground: TColor read FForeground write SetForeground default clLeftMarginFontForeground;
       property Indent: TColor read FIndent write SetIndent default clIndent;
       property IndentHighlight: TColor read FIndentHighlight write SetIndentHighlight default clIndentHighlight;
-      property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write FOnChange;
     end;
 
     TRegion = class(TCollection)
@@ -296,10 +291,8 @@ constructor TBCEditorCodeFolding.TColors.Create;
 begin
   inherited;
 
-  FCollapsedLine := clLeftMarginFontForeground;
   FBackground := clLeftMarginBackground;
-  FFoldingLine := clLeftMarginFontForeground;
-  FFoldingLineHighlight := clLeftMarginFontForeground;
+  FForeground := clLeftMarginFontForeground;
   FIndent := clIndent;
   FIndentHighlight := clIndentHighlight;
 end;
@@ -309,10 +302,9 @@ begin
   if ASource is TColors then
   with ASource as TColors do
   begin
-    Self.FCollapsedLine := FCollapsedLine;
     Self.FBackground := FBackground;
-    Self.FFoldingLine := FFoldingLine;
-    Self.FFoldingLineHighlight := FFoldingLineHighlight;
+    Self.FForeground := FForeground;
+    Self.FIndent := FIndent;
     Self.FIndentHighlight := FIndentHighlight;
     Self.DoChange;
   end
@@ -335,29 +327,11 @@ begin
   end;
 end;
 
-procedure TBCEditorCodeFolding.TColors.SetCollapsedLine(const AValue: TColor);
+procedure TBCEditorCodeFolding.TColors.SetForeground(const AValue: TColor);
 begin
-  if FCollapsedLine <> AValue then
+  if FForeground <> AValue then
   begin
-    FCollapsedLine := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorCodeFolding.TColors.SetFoldingLine(const AValue: TColor);
-begin
-  if FFoldingLine <> AValue then
-  begin
-    FFoldingLine := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorCodeFolding.TColors.SetFoldingLineHighlight(const AValue: TColor);
-begin
-  if FFoldingLineHighlight <> AValue then
-  begin
-    FFoldingLineHighlight := AValue;
+    FForeground := AValue;
     DoChange;
   end;
 end;

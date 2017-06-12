@@ -15,8 +15,6 @@
         "Background": "clWindow",
         "ActiveLineBackground": "$00E6FAFF",
         "CodeFoldingBackground": "$00F4F4F4",
-        "CodeFoldingCollapsedLine": "$00CC9999",
-        "CodeFoldingFoldingLineHighlight": "$00CC9999",
         "CodeFoldingFoldingLine": "$00CC9999",
         "CodeFoldingIndent": "$00CC9999",
         "CodeFoldingIndentHighlight": "$00CC9999",
