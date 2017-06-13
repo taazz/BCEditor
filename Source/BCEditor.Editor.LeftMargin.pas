@@ -13,25 +13,21 @@ type
     TColors = class(TPersistent)
     strict private
       FBackground: TColor;
-      FBookmarkBackground: TColor;
       FBookmarkPanelBackground: TColor;
       FBorder: TColor;
       FForeground: TColor;
       FLineStateModified: TColor;
       FLineStateNormal: TColor;
-      FMarkDefaultBackground: TColor;
     public
       constructor Create;
       procedure Assign(ASource: TPersistent); override;
     published
       property Background: TColor read FBackground write FBackground default clLeftMarginBackground;
-      property BookmarkBackground: TColor read FBookmarkBackground write FBookmarkBackground default clNone;
       property BookmarkPanelBackground: TColor read FBookmarkPanelBackground write FBookmarkPanelBackground default clBtnFace;
       property Border: TColor read FBorder write FBorder default clLeftMarginBackground;
       property Foreground: TColor read FForeground write FForeground default clLeftMarginForeground;
       property LineStateModified: TColor read FLineStateModified write FLineStateModified default clYellow;
       property LineStateNormal: TColor read FLineStateNormal write FLineStateNormal default clLime;
-      property MarkDefaultBackground: TColor read FMarkDefaultBackground write FMarkDefaultBackground default clNone;
     end;
 
     TBookMarks = class(TPersistent)
@@ -215,12 +211,10 @@ begin
   inherited;
 
   FBackground := clLeftMarginBackground;
-  FBookmarkBackground := clNone;
   FBookmarkPanelBackground := clBtnFace;
   FBorder := clLeftMarginBackground;
   FLineStateModified := clYellow;
   FLineStateNormal := clLime;
-  FMarkDefaultBackground := clNone;
 end;
 
 procedure TBCEditorLeftMargin.TColors.Assign(ASource: TPersistent);
@@ -233,7 +227,6 @@ begin
     Self.FBorder := FBorder;
     Self.FLineStateModified := FLineStateModified;
     Self.FLineStateNormal := FLineStateNormal;
-    Self.FMarkDefaultBackground := FMarkDefaultBackground;
   end
   else
     inherited Assign(ASource);

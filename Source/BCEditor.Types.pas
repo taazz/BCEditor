@@ -20,9 +20,6 @@ type
 
   TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
 
-  TBCEditorMarkPanelPaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const AFirstLine: Integer; const ALastLine: Integer) of object;
-  TBCEditorMarkPanelLinePaintEvent = procedure(ASender: TObject; ACanvas: TCanvas; const ARect: TRect; const ALineNumber: Integer) of object;
-
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
 
   TBCEditorCreateFileStreamEvent = procedure(ASender: TObject; const AFileName: string; var AStream: TStream) of object;

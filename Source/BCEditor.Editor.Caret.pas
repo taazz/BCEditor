@@ -29,38 +29,6 @@ type
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     end;
 
-    TNonBlinking = class(TPersistent)
-    type
-
-      TColors = class(TPersistent)
-      strict private
-        FBackground: TColor;
-        FForeground: TColor;
-      public
-        constructor Create;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property Background: TColor read FBackground write FBackground default clBlack;
-        property Foreground: TColor read FForeground write FForeground default clWhite;
-      end;
-
-    strict private
-      FColors: TBCEditorCaret.TNonBlinking.TColors;
-      FEnabled: Boolean;
-      FOnChange: TNotifyEvent;
-      procedure DoChange;
-      procedure SetColors(AValue: TBCEditorCaret.TNonBlinking.TColors);
-      procedure SetEnabled(AValue: Boolean);
-    public
-      constructor Create;
-      destructor Destroy; override;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Colors: TBCEditorCaret.TNonBlinking.TColors read FColors write SetColors;
-      property Enabled: Boolean read FEnabled write SetEnabled default False;
-      property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    end;
-
     TMultiEdit = class(TPersistent)
     type
       TColors = class(TPersistent)
@@ -101,13 +69,11 @@ type
     DefaultOptions = [];
   strict private
     FMultiEdit: TBCEditorCaret.TMultiEdit;
-    FNonBlinking: TBCEditorCaret.TNonBlinking;
     FOffsets: TBCEditorCaret.TOffsets;
     FOnChange: TNotifyEvent;
     FOptions: TBCEditorCaretOptions;
     procedure DoChange(ASender: TObject);
     procedure SetMultiEdit(AValue: TBCEditorCaret.TMultiEdit);
-    procedure SetNonBlinking(AValue: TBCEditorCaret.TNonBlinking);
     procedure SetOffsets(AValue: TBCEditorCaret.TOffsets);
     procedure SetOnChange(AValue: TNotifyEvent);
     procedure SetOptions(const AValue: TBCEditorCaretOptions);
@@ -118,7 +84,6 @@ type
     procedure SetOption(const AOption: TBCEditorCaretOption; const AEnabled: Boolean);
   published
     property MultiEdit: TBCEditorCaret.TMultiEdit read FMultiEdit write SetMultiEdit;
-    property NonBlinking: TBCEditorCaret.TNonBlinking read FNonBlinking write SetNonBlinking;
     property Offsets: TBCEditorCaret.TOffsets read FOffsets write SetOffsets;
     property Options: TBCEditorCaretOptions read FOptions write SetOptions default DefaultOptions;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
@@ -170,78 +135,6 @@ begin
   begin
     FTop := AValue;
     DoChange(Self);
-  end;
-end;
-
-{ TBCEditorCaret.TNonBlinking.TColors *****************************************}
-
-constructor TBCEditorCaret.TNonBlinking.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clBlack;
-  FForeground := clWhite;
-end;
-
-procedure TBCEditorCaret.TNonBlinking.TColors.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorCaret.TNonBlinking.TColors) then
-  with ASource as TBCEditorCaret.TNonBlinking.TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FForeground := FForeground;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorCaret.TNonBlinking *************************************************}
-
-constructor TBCEditorCaret.TNonBlinking.Create;
-begin
-  inherited;
-
-  FColors := TBCEditorCaret.TNonBlinking.TColors.Create;
-  FEnabled := False;
-end;
-
-destructor TBCEditorCaret.TNonBlinking.Destroy;
-begin
-  FColors.Free;
-
-  inherited;
-end;
-
-procedure TBCEditorCaret.TNonBlinking.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TNonBlinking) then
-  with ASource as TBCEditorCaret.TNonBlinking do
-  begin
-    Self.FColors.Assign(FColors);
-    Self.FEnabled := FEnabled;
-    Self.DoChange;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorCaret.TNonBlinking.DoChange;
-begin
-  if Assigned(FOnChange) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorCaret.TNonBlinking.SetColors(AValue: TColors);
-begin
-  FColors.Assign(AValue);
-end;
-
-procedure TBCEditorCaret.TNonBlinking.SetEnabled(AValue: Boolean);
-begin
-  if FEnabled <> AValue then
-  begin
-    FEnabled := AValue;
-    DoChange;
   end;
 end;
 
@@ -335,7 +228,6 @@ begin
   inherited;
 
   FMultiEdit := TBCEditorCaret.TMultiEdit.Create;
-  FNonBlinking := TBCEditorCaret.TNonBlinking.Create;
   FOffsets := TBCEditorCaret.TOffsets.Create;
   FOptions := DefaultOptions;
 end;
@@ -343,7 +235,6 @@ end;
 destructor TBCEditorCaret.Destroy;
 begin
   FMultiEdit.Free;
-  FNonBlinking.Free;
   FOffsets.Free;
 
   inherited;
@@ -355,7 +246,6 @@ begin
   with ASource as TBCEditorCaret do
   begin
     Self.FMultiEdit.Assign(FMultiEdit);
-    Self.FNonBlinking.Assign(FNonBlinking);
     Self.FOffsets.Assign(FOffsets);
     Self.FOptions := FOptions;
     Self.DoChange(Self);
@@ -375,11 +265,6 @@ begin
   FMultiEdit.Assign(AValue);
 end;
 
-procedure TBCEditorCaret.SetNonBlinking(AValue: TBCEditorCaret.TNonBlinking);
-begin
-  FNonBlinking.Assign(AValue);
-end;
-
 procedure TBCEditorCaret.SetOffsets(AValue: TBCEditorCaret.TOffsets);
 begin
   FOffsets.Assign(AValue);
@@ -390,7 +275,6 @@ begin
   FOnChange := AValue;
   FOffsets.OnChange := AValue;
   FMultiEdit.OnChange := AValue;
-  FNonBlinking.OnChange := AValue;
 end;
 
 procedure TBCEditorCaret.SetOption(const AOption: TBCEditorCaretOption; const AEnabled: Boolean);
