@@ -50,59 +50,6 @@ type
       property OnChange: TChangeEvent read FOnChange write SetOnChange;
     end;
 
-    TMap = class(TPersistent)
-    type
-      TColors = class(TPersistent)
-      strict private
-        FActiveLine: TColor;
-        FBackground: TColor;
-        FForeground: TColor;
-        FOnChange: TChangeEvent;
-        procedure SetActiveLine(AValue: TColor);
-        procedure SetBackground(AValue: TColor);
-        procedure SetForeground(AValue: TColor);
-      public
-        constructor Create;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property ActiveLine: TColor read FActiveLine write SetActiveLine default clSearchMapActiveLine;
-        property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
-        property Foreground: TColor read FForeground write SetForeground default clSearchHighlighter;
-        property OnChange: TChangeEvent read FOnChange write FOnChange;
-      end;
-
-    strict private const
-      DefaultOptions = [moShowActiveLine];
-    strict private
-      FAlign: TBCEditorSearchMapAlign;
-      FColors: TColors;
-      FCursor: TCursor;
-      FOnChange: TChangeEvent;
-      FOptions: TBCEditorSearchMapOptions;
-      FVisible: Boolean;
-      FWidth: Integer;
-      procedure DoChange;
-      procedure SetAlign(const AValue: TBCEditorSearchMapAlign);
-      procedure SetColors(const AValue: TColors);
-      procedure SetOnChange(AValue: TChangeEvent);
-      procedure SetOptions(const AValue: TBCEditorSearchMapOptions);
-      procedure SetVisible(AValue: Boolean);
-      procedure SetWidth(AValue: Integer);
-    public
-      constructor Create;
-      destructor Destroy; override;
-      procedure Assign(ASource: TPersistent); override;
-      function GetWidth: Integer;
-    published
-      property Align: TBCEditorSearchMapAlign read FAlign write SetAlign default saRight;
-      property Colors: TColors read FColors write SetColors;
-      property Cursor: TCursor read FCursor write FCursor default crArrow;
-      property Options: TBCEditorSearchMapOptions read FOptions write SetOptions default DefaultOptions;
-      property Visible: Boolean read FVisible write SetVisible default False;
-      property Width: Integer read FWidth write SetWidth default 5;
-      property OnChange: TChangeEvent read FOnChange write SetOnChange;
-    end;
-
     TInSelection = class(TPersistent)
     strict private
       FActive: Boolean;
@@ -131,7 +78,6 @@ type
     FEngineType: TBCEditorSearchEngine;
     FHighlighter: THighlighter;
     FInSelection: TInSelection;
-    FMap: TMap;
     FOnChange: TChangeEvent;
     FOptions: TBCEditorSearchOptions;
     FPattern: string;
@@ -142,7 +88,6 @@ type
     procedure SetEngineType(const AValue: TBCEditorSearchEngine);
     procedure SetHighlighter(const AValue: THighlighter);
     procedure SetInSelection(const AValue: TInSelection);
-    procedure SetMap(const AValue: TMap);
     procedure SetOnChange(const AValue: TChangeEvent);
     procedure SetPattern(const AValue: string);
     procedure SetWholeWordsOnly(const AValue: Boolean);
@@ -160,7 +105,6 @@ type
     property Engine: TBCEditorSearchEngine read FEngineType write SetEngineType default seNormal;
     property Highlighter: THighlighter read FHighlighter write SetHighlighter;
     property InSelection: TInSelection read FInSelection write SetInSelection;
-    property Map: TMap read FMap write SetMap;
     property Options: TBCEditorSearchOptions read FOptions write FOptions default DefaultOptions;
     property WholeWordsOnly: Boolean read FWholeWordsOnly write SetWholeWordsOnly default False;
   end;
@@ -274,159 +218,6 @@ begin
   FColors.OnChange := FOnChange;
 end;
 
-{ TBCEditorSearch.TMap.TColors ************************************************}
-
-constructor TBCEditorSearch.TMap.TColors.Create;
-begin
-  inherited;
-
-  FActiveLine := clSearchMapActiveLine;
-  FBackground := clLeftMarginBackground;
-  FForeground := clSearchHighlighter;
-end;
-
-procedure TBCEditorSearch.TMap.TColors.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TColors) then
-  with ASource as TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FForeground := FForeground;
-    Self.FActiveLine := FActiveLine;
-    if Assigned(Self.FOnChange) then
-      Self.FOnChange(seInvalidate);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorSearch.TMap.TColors.SetActiveLine(AValue: TColor);
-begin
-  if FActiveLine <> AValue then
-  begin
-    FActiveLine := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(seInvalidate);
-  end;
-end;
-
-procedure TBCEditorSearch.TMap.TColors.SetBackground(AValue: TColor);
-begin
-  if FBackground <> AValue then
-  begin
-    FBackground := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(seInvalidate);
-  end;
-end;
-
-procedure TBCEditorSearch.TMap.TColors.SetForeground(AValue: TColor);
-begin
-  if FForeground <> AValue then
-  begin
-    FForeground := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(seInvalidate);
-  end;
-end;
-
-{ TBCEditorSearch.TMap ********************************************************}
-
-constructor TBCEditorSearch.TMap.Create;
-begin
-  inherited;
-
-  FAlign := saRight;
-  FColors := TColors.Create;
-  FOptions := [moShowActiveLine];
-  FVisible := False;
-  FWidth := 5;
-  FCursor := crArrow;
-end;
-
-destructor TBCEditorSearch.TMap.Destroy;
-begin
-  FColors.Free;
-  inherited;
-end;
-
-procedure TBCEditorSearch.TMap.Assign(ASource: TPersistent);
-begin
-  if ASource is TMap then
-  with ASource as TMap do
-  begin
-    Self.FAlign := FAlign;
-    Self.FVisible := FVisible;
-    Self.FOptions := Options;
-    Self.FWidth := FWidth;
-    Self.FColors.Assign(FColors);
-    Self.FCursor := FCursor;
-    Self.DoChange;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorSearch.TMap.DoChange;
-begin
-  if Assigned(FOnChange) then
-    FOnChange(seInvalidate);
-end;
-
-function TBCEditorSearch.TMap.GetWidth: Integer;
-begin
-  if FVisible then
-    Result := FWidth
-  else
-    Result := 0;
-end;
-
-procedure TBCEditorSearch.TMap.SetAlign(const AValue: TBCEditorSearchMapAlign);
-begin
-  if FAlign <> AValue then
-  begin
-    FAlign := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorSearch.TMap.SetColors(const AValue: TColors);
-begin
-  FColors.Assign(AValue);
-end;
-
-procedure TBCEditorSearch.TMap.SetOnChange(AValue: TChangeEvent);
-begin
-  FOnChange := AValue;
-  FColors.OnChange := FOnChange;
-end;
-
-procedure TBCEditorSearch.TMap.SetOptions(const AValue: TBCEditorSearchMapOptions);
-begin
-  if FOptions <> AValue then
-  begin
-    FOptions := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorSearch.TMap.SetVisible(AValue: Boolean);
-begin
-  if FVisible <> AValue then
-  begin
-    FVisible := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorSearch.TMap.SetWidth(AValue: Integer);
-begin
-  AValue := Max(0, AValue);
-  if FWidth <> AValue then
-    FWidth := AValue;
-  DoChange;
-end;
-
 { TBCEditorSearch.TInSelection ************************************************}
 
 constructor TBCEditorSearch.TInSelection.Create;
@@ -483,7 +274,6 @@ begin
   FEngineType := seNormal;
   FHighlighter := THighlighter.Create;
   FInSelection := TInSelection.Create;
-  FMap := TBCEditorSearch.TMap.Create;
   FOptions := DefaultOptions;
   FWholeWordsOnly := False;
 end;
@@ -492,7 +282,6 @@ destructor TBCEditorSearch.Destroy();
 begin
   FHighlighter.Free();
   FInSelection.Free();
-  FMap.Free();
 
   inherited;
 end;
@@ -507,7 +296,6 @@ begin
     Self.FEngineType := FEngineType;
     Self.FHighlighter.Assign(FHighlighter);
     Self.FInSelection.Assign(FInSelection);
-    Self.FMap.Assign(FMap);
     Self.FOptions := FOptions;
     Self.FWholeWordsOnly := FWholeWordsOnly;
     if (Assigned(FOnChange)) then
@@ -557,15 +345,9 @@ begin
   FInSelection.Assign(AValue);
 end;
 
-procedure TBCEditorSearch.SetMap(const AValue: TMap);
-begin
-  FMap.Assign(AValue);
-end;
-
 procedure TBCEditorSearch.SetOnChange(const AValue: TChangeEvent);
 begin
   FOnChange := AValue;
-  FMap.OnChange := FOnChange;
   FHighlighter.OnChange := FOnChange;
   FInSelection.OnChange := FOnChange;
 end;

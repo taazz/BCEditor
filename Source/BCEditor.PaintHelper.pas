@@ -141,7 +141,7 @@ resourcestring
 var
   GFontsInfoManager: TBCEditorFontsInfoManager;
 
-function GetFontsInfoManager: TBCEditorFontsInfoManager;
+function GetFontsInfoManager(): TBCEditorFontsInfoManager;
 begin
   if not Assigned(GFontsInfoManager) then
     GFontsInfoManager := TBCEditorFontsInfoManager.Create;
@@ -389,11 +389,13 @@ procedure TBCEditorFontStock.SetBaseFont(AValue: TFont);
 var
   LSharedFontsInfo: PBCEditorSharedFontsInfo;
 begin
-  if Assigned(AValue) then
+  if (not Assigned(AValue)) then
+    raise EBCEditorFontStockException.Create(SBCEditorValueMustBeSpecified)
+  else
   begin
-    LSharedFontsInfo := GetFontsInfoManager.GetFontsInfo(AValue);
-    if LSharedFontsInfo = FPSharedFontsInfo then
-      GetFontsInfoManager.ReleaseFontsInfo(LSharedFontsInfo)
+    LSharedFontsInfo := GetFontsInfoManager().GetFontsInfo(AValue);
+    if (LSharedFontsInfo = FPSharedFontsInfo) then
+      GetFontsInfoManager().ReleaseFontsInfo(LSharedFontsInfo)
     else
     begin
       ReleaseFontsInfo;
@@ -401,9 +403,7 @@ begin
       FBaseLogFont := FPSharedFontsInfo^.BaseLogFont;
       SetStyle(AValue.Style);
     end;
-  end
-  else
-    raise EBCEditorFontStockException.Create(SBCEditorValueMustBeSpecified);
+  end;
 end;
 
 procedure TBCEditorFontStock.SetStyle(const AValue: TFontStyles);
@@ -534,7 +534,9 @@ end;
 
 procedure TBCEditorPaintHelper.SetBaseFont(AValue: TFont);
 begin
-  if Assigned(AValue) then
+  if (not Assigned(AValue)) then
+    raise EBCEditorPaintHelperException.Create(SBCEditorValueMustBeSpecified)
+  else
   begin
     FStockBitmap.Canvas.Font.Assign(AValue);
     FStockBitmap.Canvas.Font.Style := [];
@@ -546,9 +548,7 @@ begin
       FSpaceWidth := GetCharWidth;
     end;
     SetStyle(AValue.Style);
-  end
-  else
-    raise EBCEditorPaintHelperException.Create(SBCEditorValueMustBeSpecified);
+  end;
 end;
 
 procedure TBCEditorPaintHelper.SetBaseStyle(const AValue: TFontStyles);

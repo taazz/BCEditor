@@ -215,7 +215,7 @@ type
 
   strict private const
     DefaultOptions = [cfoAutoPadding, cfoHighlightIndentGuides,
-      cfoShowIndentGuides, cfoShowTreeLine, cfoUncollapseByHintClick];
+      cfoShowTreeLine, cfoUncollapseByHintClick];
   strict private
     FColors: TColors;
     FDelayInterval: Cardinal;

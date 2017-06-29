@@ -1,6 +1,20 @@
 <h3>Description</h3>
 
-A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VCL) completion proposal, matching pair, synchron edit, multi-caret editing, word wrap, support for non-fixed-width fonts, etc. External highlighter and color scheme files are in JSON format and can be loaded at runtime.
+A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VCL):
+* Predefined highlighter definitions for 70 programming languages
+* User defined highlighter definions
+* Multi highglighter support (for example: HTTP and PHP)
+* Matching pair highlighting
+* Search with regular expressions, forwards, backwards, whole words, case sensitive, selection only
+* Search result highlighting
+* Bookmarks
+* User defined marks
+* Word wrap
+* Code folding
+* Synchron edit
+* Completion proposal
+* Undo, redo
+* Fonts with variable character width
 
 <h3>Build requirements</h3>
 

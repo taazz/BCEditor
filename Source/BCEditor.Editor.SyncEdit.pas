@@ -28,7 +28,6 @@ type
   strict private const
     DefaultShortCut = 24650; // (Shift+Ctrl+J)
   strict private
-    FActivator: TBCEditorGlyph;
     FActive: Boolean;
     FBlockArea: TBCEditorLinesArea;
     FBlockSelected: Boolean;
@@ -42,8 +41,10 @@ type
     FShortCut: TShortCut;
     FSyncItems: TList;
     procedure DoChange(ASender: TObject);
-    procedure SetActivator(const AValue: TBCEditorGlyph);
     procedure SetActive(AValue: Boolean);
+  protected
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    property SyncItems: TList read FSyncItems write FSyncItems;
   public
     constructor Create;
     destructor Destroy; override;
@@ -59,14 +60,11 @@ type
     property EditArea: TBCEditorLinesArea read FEditArea write FEditArea;
     property EditWidth: Integer read FEditWidth write FEditWidth;
     property InEditor: Boolean read FInEditor write FInEditor default False;
-    property SyncItems: TList read FSyncItems write FSyncItems;
   published
-    property Activator: TBCEditorGlyph read FActivator write SetActivator;
     property Colors: TColors read FColors write FColors;
     property Enabled: Boolean read FEnabled write FEnabled default True;
     property Options: TBCEditorSyncEditOptions read FOptions write FOptions default [seCaseSensitive];
     property ShortCut: TShortCut read FShortCut write FShortCut default DefaultShortCut;
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
 implementation {***************************************************************}
@@ -112,7 +110,6 @@ begin
   FOptions := [seCaseSensitive];
   FSyncItems := TList.Create;
   FColors := TBCEditorSyncEdit.TColors.Create;
-  FActivator := TBCEditorGlyph.Create(HInstance, BCEDITOR_SYNCEDIT, clFuchsia);
 end;
 
 destructor TBCEditorSyncEdit.Destroy;
@@ -120,7 +117,6 @@ begin
   ClearSyncItems;
   FSyncItems.Free;
   FColors.Free;
-  FActivator.Free;
   inherited;
 end;
 
@@ -136,7 +132,6 @@ begin
   begin
     Self.Enabled := FEnabled;
     Self.FShortCut := FShortCut;
-    Self.FActivator.Assign(FActivator);
     Self.DoChange(Self);
   end
   else
@@ -166,11 +161,6 @@ end;
 procedure TBCEditorSyncEdit.MoveEndPositionChar(ACount: Integer);
 begin
   Inc(FEditArea.EndPosition.Char, ACount);
-end;
-
-procedure TBCEditorSyncEdit.SetActivator(const AValue: TBCEditorGlyph);
-begin
-  FActivator.Assign(AValue);
 end;
 
 procedure TBCEditorSyncEdit.SetActive(AValue: Boolean);

@@ -9,14 +9,12 @@ type
   TBCEditorCharSet = set of AnsiChar;
 
 const
-  BCEDITOR_BOOKMARK_IMAGE_COUNT = 10;
   BCEDITOR_WHEEL_DIVISOR = 120;
   BCEDITOR_TOKEN_MAX_LENGTH = 128;
   BCEDITOR_MAX_SCROLL_RANGE = High(Smallint);
   BCEDITOR_MAILTO = 'mailto:';
   BCEDITOR_HTTP = 'http://';
-  { Max values }
-  BCEDITOR_MAX_BOOKMARKS = 9;
+  BCEDITOR_BOOKMARKS = 10;
   { Characters }
   BCEDITOR_UNDERSCORE = '_';
   BCEDITOR_CODE_FOLDING_VALID_CHARACTERS = ['\', '@', '_'];
@@ -61,8 +59,14 @@ const
   clWordWrapIndicatorArrow = clNavy;
   clWordWrapIndicatorLines = clBlack;
   clSyncEditBackground = $00FCFDCD;
+  clBookmarkBorder = $00AB528D;
+  clBookmarkCover = clWhite;
+  clBookmarkRingLeft = $00929292;
+  clBookmarkRingMiddle = $00FCFCFC;
+  clBookmarkRingRight = $00BCBCBC;
+  clBookmarkNumber = clBlack;
+  clTransparent = clFuchsia;
   { Resource file bitmaps }
-  BCEDITOR_BOOKMARK_IMAGES = 'BCEDITORBOOKMARKIMAGES';
   BCEDITOR_MOUSE_MOVE_SCROLL = 'BCEDITORMOUSEMOVESCROLL';
   BCEDITOR_SYNCEDIT = 'BCEDITORSYNCEDIT';
   { Mouse wheel scroll cursor indexes }

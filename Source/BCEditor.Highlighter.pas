@@ -2002,9 +2002,6 @@ begin
         Search.Highlighter.Colors.Border := StringToColorDef(LColorsObject['SearchHighlighterBorder'].Value, Search.Highlighter.Colors.Border);
         Search.Highlighter.Colors.Foreground := StringToColorDef(LColorsObject['SearchHighlighterForeground'].Value, Search.Highlighter.Colors.Foreground);
         Search.InSelection.Background := StringToColorDef(LColorsObject['SearchInSelectionBackground'].Value, Search.InSelection.Background);
-        Search.Map.Colors.ActiveLine := StringToColorDef(LColorsObject['SearchMapActiveLine'].Value, Search.Map.Colors.ActiveLine);
-        Search.Map.Colors.Background := StringToColorDef(LColorsObject['SearchMapBackground'].Value, Search.Map.Colors.Background);
-        Search.Map.Colors.Foreground := StringToColorDef(LColorsObject['SearchMapForeground'].Value, Search.Map.Colors.Foreground);
         Selection.Colors.Background := StringToColorDef(LColorsObject['SelectionBackground'].Value, Selection.Colors.Background);
         Selection.Colors.Foreground := StringToColorDef(LColorsObject['SelectionForeground'].Value, Selection.Colors.Foreground);
         SpecialChars.Color := StringToColorDef(LColorsObject['SpecialCharForeground'].Value, SpecialChars.Color);

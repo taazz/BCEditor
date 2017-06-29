@@ -16,8 +16,6 @@ type
 
   TBCEditorDropFilesEvent = procedure(ASender: TObject; APos: TPoint; AFiles: TStrings) of object;
 
-  TBCEditorPaintEvent = procedure(ASender: TObject; ACanvas: TCanvas) of object;
-
   TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
 
   TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
@@ -221,16 +219,9 @@ type
     cfoHighlightFoldingLine,
     cfoHighlightIndentGuides,
     cfoShowCollapsedLine,
-    cfoShowIndentGuides,
     cfoShowTreeLine,
     cfoUncollapseByHintClick
   );
-
-  TBCEditorTokenInfoOption = (
-    tioAutoSize
-  );
-
-  TBCEditorLeftMarginBorderStyle = (mbsNone, mbsMiddle, mbsRight);
 
   TBCEditorScrollHintFormat = (shfTopLineOnly, shfTopToBottom);
 
@@ -246,7 +237,6 @@ type
   TBCEditorScrollOptions = set of TBCEditorScrollOption;
   TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
   TBCEditorTabOptions = set of TBCEditorTabOption;
-  TBCEditorTokenInfoOptions = set of TBCEditorTokenInfoOption;
   TBCEditorUndoOptions = set of TBCEditorUndoOption;
 
   TBCEditorRangeItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
