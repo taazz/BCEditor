@@ -59,12 +59,12 @@ const
   clWordWrapIndicatorArrow = clNavy;
   clWordWrapIndicatorLines = clBlack;
   clSyncEditBackground = $00FCFDCD;
-  clBookmarkBorder = $00AB528D;
-  clBookmarkCover = clWhite;
+  clBookmarkBorder = $00027397;
+  clBookmarkCover = $00B2E6FA;
   clBookmarkRingLeft = $00929292;
   clBookmarkRingMiddle = $00FCFCFC;
   clBookmarkRingRight = $00BCBCBC;
-  clBookmarkNumber = clBlack;
+  clBookmarkNumber = $00027397;
   clTransparent = clFuchsia;
   { Resource file bitmaps }
   BCEDITOR_MOUSE_MOVE_SCROLL = 'BCEDITORMOUSEMOVESCROLL';

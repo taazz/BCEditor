@@ -193,7 +193,6 @@ type
 
   TBCEditorLeftMarginLineNumberOption = (
     lnoIntens,
-    lnoLeadingZeros,
     lnoAfterLastLine
   );
 
@@ -214,13 +213,11 @@ type
   TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
 
   TBCEditorCodeFoldingOption = (
-    cfoAutoPadding,
     cfoFoldMultilineComments,
     cfoHighlightFoldingLine,
     cfoHighlightIndentGuides,
     cfoShowCollapsedLine,
-    cfoShowTreeLine,
-    cfoUncollapseByHintClick
+    cfoShowTreeLine
   );
 
   TBCEditorScrollHintFormat = (shfTopLineOnly, shfTopToBottom);

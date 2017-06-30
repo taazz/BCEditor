@@ -99,49 +99,55 @@ type
 
     TLineNumbers = class(TPersistent)
     strict private const
-      DefaultDigitCount = 4;
+      DefaultAutoSize = True;
       DefaultOptions = [lnoIntens];
       DefaultStartFrom = 1;
+      DefaultVisible = True;
+      DefaultWidth = 50;
     strict private
       FAutoSize: Boolean;
-      FDigitCount: Integer;
       FOnChange: TNotifyEvent;
       FOptions: TBCEditorLeftMarginLineNumberOptions;
       FStartFrom: Integer;
       FVisible: Boolean;
+      FWidth: Integer;
       procedure DoChange;
       procedure SetAutoSize(AValue: Boolean);
-      procedure SetDigitCount(AValue: Integer);
       procedure SetOptions(const AValue: TBCEditorLeftMarginLineNumberOptions);
       procedure SetStartFrom(const AValue: Integer);
       procedure SetVisible(const AValue: Boolean);
+      procedure SetWidth(const AValue: Integer);
     protected
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     public
       constructor Create();
       procedure Assign(ASource: TPersistent); override;
+      procedure ChangeScale(M, D: Integer);
       procedure SetOption(const AOption: TBCEditorLeftMarginLineNumberOption; const AEnabled: Boolean);
     published
-      property AutoSize: Boolean read FAutoSize write SetAutoSize;
-      property DigitCount: Integer read FDigitCount write SetDigitCount default DefaultDigitCount;
+      property AutoSize: Boolean read FAutoSize write SetAutoSize default DefaultAutoSize;
       property Options: TBCEditorLeftMarginLineNumberOptions read FOptions write SetOptions default DefaultOptions;
       property StartFrom: Integer read FStartFrom write SetStartFrom default DefaultStartFrom;
-      property Visible: Boolean read FVisible write SetVisible default True;
+      property Visible: Boolean read FVisible write SetVisible default DefaultVisible;
+      property Width: Integer read FWidth write SetWidth default DefaultWidth;
     end;
 
     TLineState = class(TPersistent)
+    strict private const
+      DefaultEnabled = True;
     strict private
       FEnabled: Boolean;
       FOnChange: TNotifyEvent;
       procedure DoChange;
       procedure SetEnabled(const AValue: Boolean);
       procedure SetOnChange(AValue: TNotifyEvent);
+    protected
+      property OnChange: TNotifyEvent read FOnChange write SetOnChange;
     public
-      constructor Create;
+      constructor Create();
       procedure Assign(ASource: TPersistent); override;
     published
-      property Enabled: Boolean read FEnabled write SetEnabled default True;
-      property OnChange: TNotifyEvent read FOnChange write SetOnChange;
+      property Enabled: Boolean read FEnabled write SetEnabled default DefaultEnabled;
     end;
 
   strict private
@@ -153,7 +159,7 @@ type
     FMarksPanel: TMarks.TPanel;
     FOnChange: TNotifyEvent;
     FWidth: Integer;
-    procedure DoChange;
+    procedure DoChange();
     procedure SetBookMarks(const AValue: TBookmarks);
     procedure SetColors(const AValue: TColors);
     procedure SetMarks(const AValue: TMarks);
@@ -166,7 +172,7 @@ type
     constructor Create(AOwner: TComponent);
     destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
-    procedure ChangeScale(M, D: Integer); {$MESSAGE 'Nils'}
+    procedure ChangeScale(M, D: Integer); dynamic;
     property Width: Integer read FWidth;
   published
     property Colors: TColors read FColors write SetColors;
@@ -374,31 +380,37 @@ end;
 
 { TBCEditorLeftMargin.TLineNumbers ********************************************}
 
-constructor TBCEditorLeftMargin.TLineNumbers.Create();
-begin
-  inherited;
-
-  FDigitCount := DefaultDigitCount;
-  FOptions := DefaultOptions;
-  FStartFrom := DefaultStartFrom;
-  FVisible := True;
-end;
-
 procedure TBCEditorLeftMargin.TLineNumbers.Assign(ASource: TPersistent);
 begin
   if Assigned(ASource) and (ASource is TBCEditorLeftMargin.TLineNumbers) then
   with ASource as TBCEditorLeftMargin.TLineNumbers do
   begin
     Self.FAutosize := FAutosize;
-    Self.FDigitCount := FDigitCount;
     Self.FOptions := FOptions;
     Self.FStartFrom := FStartFrom;
     Self.FVisible := FVisible;
+    Self.FWidth := FWidth;
 
     Self.DoChange;
   end
   else
     inherited Assign(ASource);
+end;
+
+constructor TBCEditorLeftMargin.TLineNumbers.Create();
+begin
+  inherited;
+
+  FAutoSize := DefaultAutoSize;
+  FOptions := DefaultOptions;
+  FStartFrom := DefaultStartFrom;
+  FVisible := DefaultVisible;
+  FWidth := DefaultWidth;
+end;
+
+procedure TBCEditorLeftMargin.TLineNumbers.ChangeScale(M, D: Integer);
+begin
+  FWidth := FWidth * M div D;
 end;
 
 procedure TBCEditorLeftMargin.TLineNumbers.DoChange;
@@ -412,17 +424,6 @@ begin
   if (AValue <> FAutoSize) then
   begin
     FAutoSize := AValue;
-    DoChange();
-  end;
-end;
-
-procedure TBCEditorLeftMargin.TLineNumbers.SetDigitCount(AValue: Integer);
-begin
-  AValue := MinMax(AValue, 2, 12);
-  if (FDigitCount <> AValue) then
-  begin
-    FDigitCount := AValue;
-    FAutosize := False;
     DoChange();
   end;
 end;
@@ -455,20 +456,30 @@ end;
 
 procedure TBCEditorLeftMargin.TLineNumbers.SetVisible(const AValue: Boolean);
 begin
-  if FVisible <> AValue then
+  if (AValue <> FVisible) then
   begin
     FVisible := AValue;
-    DoChange
+    DoChange();
+  end;
+end;
+
+procedure TBCEditorLeftMargin.TLineNumbers.SetWidth(const AValue: Integer);
+begin
+  if (AValue <> FWidth) then
+  begin
+    FWidth := AValue;
+    FAutosize := False;
+    DoChange();
   end;
 end;
 
 { TBCEditorLeftMargin.TLineState **********************************************}
 
-constructor TBCEditorLeftMargin.TLineState.Create;
+constructor TBCEditorLeftMargin.TLineState.Create();
 begin
   inherited;
 
-  FEnabled := True;
+  FEnabled := DefaultEnabled;
 end;
 
 procedure TBCEditorLeftMargin.TLineState.Assign(ASource: TPersistent);
@@ -551,12 +562,12 @@ end;
 
 procedure TBCEditorLeftMargin.ChangeScale(M, D: Integer);
 begin
-  FWidth := FWidth * M div D;
+  FLineNumbers.ChangeScale(M, D);
 end;
 
-procedure TBCEditorLeftMargin.DoChange;
+procedure TBCEditorLeftMargin.DoChange();
 begin
-  if Assigned(FOnChange) then
+  if (Assigned(FOnChange)) then
     FOnChange(Self);
 end;
 

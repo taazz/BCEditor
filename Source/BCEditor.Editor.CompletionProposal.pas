@@ -176,7 +176,7 @@ type
     constructor Create(AOwner: TComponent);
     destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
-    procedure ChangeScale(M, D: Integer); {$MESSAGE 'Nils'}
+    procedure ChangeScale(M, D: Integer);
     procedure SetOption(const AOption: TBCEditorCompletionProposalOption; const AEnabled: Boolean);
   published
     property CloseChars: string read FCloseChars write FCloseChars;

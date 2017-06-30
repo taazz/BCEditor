@@ -514,8 +514,8 @@ begin
   Dec(FDrawingCount);
   if FDrawingCount <= 0 then
   begin
-    if FHandle <> 0 then
-      RestoreDC(FHandle, FSaveHandle);
+//    if FHandle <> 0 then
+//      RestoreDC(FHandle, FSaveHandle);
     FSaveHandle := 0;
     FHandle := 0;
     FDrawingCount := 0;

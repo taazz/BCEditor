@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Classes,
   Graphics,
-  BCEditor.Editor.Glyph, BCEditor.Types, BCEditor.Consts;
+  BCEditor.Types, BCEditor.Consts;
 
 type
   TBCEditorSyncEdit = class(TPersistent)

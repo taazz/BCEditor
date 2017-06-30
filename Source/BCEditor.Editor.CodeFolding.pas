@@ -214,21 +214,18 @@ type
     end;
 
   strict private const
-    DefaultOptions = [cfoAutoPadding, cfoHighlightIndentGuides,
-      cfoShowTreeLine, cfoUncollapseByHintClick];
+    DefaultOptions = [cfoHighlightIndentGuides, cfoShowTreeLine];
   strict private
     FColors: TColors;
     FDelayInterval: Cardinal;
     FMouseOverHint: Boolean;
     FOnChange: TBCEditorCodeFoldingChangeEvent;
     FOptions: TBCEditorCodeFoldingOptions;
-    FPadding: Integer;
     FVisible: Boolean;
     procedure DoChange;
     procedure SetColors(const AValue: TColors);
     procedure SetOnChange(AValue: TBCEditorCodeFoldingChangeEvent);
     procedure SetOptions(AValue: TBCEditorCodeFoldingOptions);
-    procedure SetPadding(const AValue: Integer);
     procedure SetVisible(const AValue: Boolean);
   protected
     property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write SetOnChange;
@@ -241,7 +238,6 @@ type
     property Colors: TColors read FColors write SetColors;
     property DelayInterval: Cardinal read FDelayInterval write FDelayInterval default 300;
     property Options: TBCEditorCodeFoldingOptions read FOptions write SetOptions default DefaultOptions;
-    property Padding: Integer read FPadding write SetPadding default 2;
     property Visible: Boolean read FVisible write SetVisible default False;
   end;
 
@@ -658,7 +654,6 @@ begin
   FVisible := False;
   FOptions := DefaultOptions;
   FColors := TColors.Create;
-  FPadding := 2;
   FDelayInterval := 300;
 
   FMouseOverHint := False;
@@ -723,15 +718,6 @@ begin
     FOnChange(fcRescan)
   else
     DoChange;
-end;
-
-procedure TBCEditorCodeFolding.SetPadding(const AValue: Integer);
-begin
-  if FPadding <> AValue then
-  begin
-    FPadding := AValue;
-    DoChange;
-  end;
 end;
 
 procedure TBCEditorCodeFolding.SetVisible(const AValue: Boolean);
