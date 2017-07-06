@@ -8,9 +8,6 @@
       "\r\n",
       "news:comp.lang.pascal.borland"
     ],
-    "Editor": {
-      "URIOpener": true
-    },
     "MainRules": {
       "Attributes": {
         "Element": "Editor"

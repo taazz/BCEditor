@@ -62,7 +62,6 @@ contains
   BCEditor.MacroRecorder in '..\Source\BCEditor.MacroRecorder.pas',
   BCEditor.Print in '..\Source\BCEditor.Print.pas',
   BCEditor.Print.Preview in '..\Source\BCEditor.Print.Preview.pas',
-  BCEditor.StyleHooks in '..\Source\BCEditor.StyleHooks.pas',
   BCEditor.PaintHelper in '..\Source\BCEditor.PaintHelper.pas',
   BCEditor.Types in '..\Source\BCEditor.Types.pas',
   BCEditor.Utils in '..\Source\BCEditor.Utils.pas',

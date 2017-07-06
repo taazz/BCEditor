@@ -379,7 +379,6 @@ type
       procedure ImportColorsEditorProperties(AEditorObject: TJsonObject);
       procedure ImportColorsInfo(AInfoObject: TJsonObject);
       procedure ImportCompletionProposal(ACompletionProposalObject: TJsonObject);
-      procedure ImportEditorProperties(AEditorObject: TJsonObject);
       procedure ImportElements(AColorsObject: TJsonObject);
       procedure ImportHighlighter(AJSONObject: TJsonObject);
       procedure ImportKeyList(AKeyList: TKeyList; KeyListObject: TJsonObject; const AElementPrefix: string);
@@ -396,6 +395,7 @@ type
       procedure ImportFromStream(AStream: TStream);
     end;
 
+    PFind = ^TFind;
     TFind = record
     private
       FAttribute: TAttribute;
@@ -447,7 +447,6 @@ type
     procedure SetCodeFoldingRangeCount(AValue: Integer);
     procedure SetWordBreakChars(AChars: TBCEditorCharSet);
   protected
-    function TokenType(const AFind: TFind): TBCEditorRangeType;
     property Editor: TCustomControl read FEditor;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
@@ -1979,7 +1978,7 @@ begin
       LColorsObject := AEditorObject['Colors'].ObjectValue;
       if Assigned(LColorsObject) then
       begin
-        BackgroundColor := StringToColorDef(LColorsObject['Background'].Value, BackgroundColor);
+        Color := StringToColorDef(LColorsObject['Background'].Value, Color);
         ActiveLine.Color := StringToColorDef(LColorsObject['ActiveLineBackground'].Value, ActiveLine.Color);
         CodeFolding.Colors.Background := StringToColorDef(LColorsObject['CodeFoldingBackground'].Value, CodeFolding.Colors.Background);
         CodeFolding.Colors.Foreground := StringToColorDef(LColorsObject['CodeFoldingFoldingLine'].Value, CodeFolding.Colors.Foreground);
@@ -2117,12 +2116,6 @@ begin
   end;
 end;
 
-procedure TBCEditorHighlighter.TImportJSON.ImportEditorProperties(AEditorObject: TJsonObject);
-begin
-  if Assigned(AEditorObject) then
-    TCustomBCEditor(FHighlighter.Editor).URIOpener := StrToBoolDef(AEditorObject['URIOpener'].Value, False);
-end;
-
 procedure TBCEditorHighlighter.TImportJSON.ImportElements(AColorsObject: TJsonObject);
 var
   LElement: PElement;
@@ -2143,9 +2136,6 @@ begin
     LElement.Name := LJsonDataValue.ObjectValue['Name'].Value;
     LElement.FontStyles := StrToFontStyle(LJsonDataValue.ObjectValue['Style'].Value);
     FHighlighter.Colors.Styles.Add(LElement);
-
-    if LElement.Name = 'Editor' then
-      TCustomBCEditor(Highlighter.Editor).ForegroundColor := LElement.Foreground;
   end;
 end;
 
@@ -2177,7 +2167,6 @@ begin
 
   LHighlighterObject := AJSONObject['Highlighter'];
   ImportSample(LHighlighterObject.A['Sample']);
-  ImportEditorProperties(LHighlighterObject['Editor'].ObjectValue);
   ImportRange(FHighlighter.MainRules, LHighlighterObject['MainRules'].ObjectValue);
   ImportCodeFolding(AJSONObject['CodeFolding'].ObjectValue);
   ImportMatchingPair(AJSONObject['MatchingPair'].ObjectValue);
@@ -2717,29 +2706,6 @@ end;
 procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);
 begin
   FWordBreakChars := AChars;
-end;
-
-function TBCEditorHighlighter.TokenType(const AFind: TFind): TBCEditorRangeType;
-var
-  LCurrentRangeKeyList: TKeyList;
-  LIndex: Integer;
-  LTokenText: string;
-  LTokenType: TBCEditorRangeType;
-begin
-  LTokenType := AFind.FRange.TokenType;
-  if (LTokenType <> ttUnspecified) then
-    Result := LTokenType
-  else
-  begin
-    SetString(LTokenText, AFind.Text, AFind.Length);
-    for LIndex := 0 to AFind.FRange.KeyListCount - 1 do
-    begin
-      LCurrentRangeKeyList := AFind.FRange.KeyList[LIndex];
-      if (LCurrentRangeKeyList.KeyList.IndexOf(LTokenText) >= 0) then
-        Exit(LCurrentRangeKeyList.TokenType);
-    end;
-    Result := ttUnspecified
-  end;
 end;
 
 procedure TBCEditorHighlighter.UpdateAttributes(ARange: TRange; AParentRange: TRange);

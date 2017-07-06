@@ -17,7 +17,7 @@ type
     TOptions = set of TOption;
 
     TState = set of (lsLoading, lsSaving, lsDontTrim, lsUndo, lsRedo,
-      lsCaretMoved, lsSelChanged, lsTextChanged, lsInserting);
+      lsCaretChanged, lsSelChanged, lsInserting);
 
     TLine = packed record
     type
@@ -128,7 +128,7 @@ type
     FOldUndoListCount: Integer;
     FOnAfterUpdate: TNotifyEvent;
     FOnBeforeUpdate: TNotifyEvent;
-    FOnCaretMoved: TNotifyEvent;
+    FOnCaretChanged: TNotifyEvent;
     FOnCleared: TNotifyEvent;
     FOnDeleted: TChangeEvent;
     FOnDeleting: TChangeEvent;
@@ -154,14 +154,14 @@ type
     procedure DoPut(ALine: Integer; const AText: string);
     procedure ExchangeItems(ALine1, ALine2: Integer);
     procedure ExecuteUndoRedo(const List: TUndoList);
-    function GetArea(): TBCEditorLinesArea; inline;
-    function GetBOLPosition(ALine: Integer): TBCEditorLinesPosition; inline;
+    function GetArea(): TBCEditorLinesArea; {$IFNDEF Debug} inline; {$ENDIF}
+    function GetBOLPosition(ALine: Integer): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
     function GetCanRedo(): Boolean;
     function GetCanUndo(): Boolean;
     function GetChar(APosition: TBCEditorLinesPosition): Char;
     function GetEOFPosition(): TBCEditorLinesPosition;
-    function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition; inline;
-    function GetLineArea(ALine: Integer): TBCEditorLinesArea; inline;
+    function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
+    function GetLineArea(ALine: Integer): TBCEditorLinesArea; {$IFNDEF Debug} inline; {$ENDIF}
     function GetTextIn(const AArea: TBCEditorLinesArea): string;
     procedure InternalClear(const AClearUndo: Boolean); overload;
     procedure SetCaretPosition(const AValue: TBCEditorLinesPosition);
@@ -183,26 +183,28 @@ type
     procedure InsertIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
       const AIndentText: string);
     function CharIndexOf(const APosition: TBCEditorLinesPosition): Integer;
-    function InsertText(APosition: TBCEditorLinesPosition;
+    function InsertFile(const APosition: TBCEditorLinesPosition;
+      const AFilename: string): TBCEditorLinesPosition;
+    function InsertText(const APosition: TBCEditorLinesPosition;
       const AText: string): TBCEditorLinesPosition; overload;
-    function IsWordBreakChar(const AChar: Char): Boolean; inline;
-    function PositionOf(const ACharIndex: Integer): TBCEditorLinesPosition; overload; inline;
+    function IsWordBreakChar(const AChar: Char): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
+    function PositionOf(const ACharIndex: Integer): TBCEditorLinesPosition; overload; {$IFNDEF Debug} inline; {$ENDIF}
     function PositionOf(const ACharIndex: Integer;
       const ARelativePosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     procedure Put(ALine: Integer; const AText: string); override;
-    procedure Redo(); inline;
+    procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     function ReplaceText(const AArea: TBCEditorLinesArea; const AText: string): TBCEditorLinesPosition;
-    procedure SetBackground(const ALine: Integer; const AValue: TColor); inline;
-    procedure SetBeginRange(const ALine: Integer; const AValue: Pointer); inline;
+    procedure SetBackground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
+    procedure SetBeginRange(const ALine: Integer; const AValue: Pointer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
-    procedure SetFirstRow(const ALine: Integer; const AValue: Integer); inline;
-    procedure SetForeground(const ALine: Integer; const AValue: TColor); inline;
+    procedure SetFirstRow(const ALine: Integer; const AValue: Integer); {$IFNDEF Debug} inline; {$ENDIF}
+    procedure SetForeground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer); virtual;
-    procedure Undo(); inline;
+    procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure UndoGroupBreak();
     function ValidPosition(const APosition: TBCEditorLinesPosition): Boolean;
     property Area: TBCEditorLinesArea read GetArea;
@@ -220,7 +222,7 @@ type
     property LineArea[Line: Integer]: TBCEditorLinesArea read GetLineArea;
     property OnAfterUpdate: TNotifyEvent read FOnAfterUpdate write FOnAfterUpdate;
     property OnBeforeUpdate: TNotifyEvent read FOnBeforeUpdate write FOnBeforeUpdate;
-    property OnCaretMoved: TNotifyEvent read FOnCaretMoved write FOnCaretMoved;
+    property OnCaretChanged: TNotifyEvent read FOnCaretChanged write FOnCaretChanged;
     property OnCleared: TNotifyEvent read FOnCleared write FOnCleared;
     property OnDeleted: TChangeEvent read FOnDeleted write FOnDeleted;
     property OnDeleting: TChangeEvent read FOnDeleting write FOnDeleting;
@@ -790,7 +792,7 @@ begin
   FModified := False;
   FOnAfterUpdate := nil;
   FOnBeforeUpdate := nil;
-  FOnCaretMoved := nil;
+  FOnCaretChanged := nil;
   FOnCleared := nil;
   FOnDeleted := nil;
   FOnDeleting := nil;
@@ -813,8 +815,6 @@ var
   LText: string;
 begin
   BeginUpdate();
-  BeginUpdate();
-
   try
     if (AEndLine < Count - 1) then
       LArea := LinesArea(BOLPosition[ABeginLine], BOLPosition[ABeginLine + 1])
@@ -831,9 +831,9 @@ begin
       LArea);
   finally
     EndUpdate();
-    EndUpdate();
-    RedoList.Clear();
   end;
+
+  RedoList.Clear();
 end;
 
 procedure TBCEditorLines.Delete(ALine: Integer);
@@ -916,7 +916,6 @@ begin
   else
   begin
     BeginUpdate();
-
     try
       for LLine := LArea.BeginPosition.Line to LArea.EndPosition.Line do
         if (LeftStr(Items[LLine].Text, LIndentTextLength) = AIndentText) then
@@ -1006,9 +1005,6 @@ begin
   else
     CaretPosition := EOLPosition[ALine - 1];
 
-  if (UpdateCount > 0) then
-    Include(FState, lsTextChanged);
-
   if ((Count = 0) and Assigned(OnCleared)) then
     OnCleared(Self)
   else if (Assigned(OnDeleted)) then
@@ -1036,7 +1032,6 @@ begin
       LLinesEndPosition := AEndPosition;
 
     BeginUpdate();
-
     try
       for LLine := LLinesBeginPosition.Line to LLinesEndPosition.Line do
         if (LeftStr(Items[LLine].Text, Length(AIndentText)) = AIndentText) then
@@ -1062,7 +1057,6 @@ begin
   else
   begin
     BeginUpdate();
-
     try
       DoPut(AArea.BeginPosition.Line, LeftStr(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char)
         + Copy(Items[AArea.EndPosition.Line].Text, 1 + AArea.EndPosition.Char, MaxInt));
@@ -1134,8 +1128,6 @@ begin
       CaretPosition := EOLPosition[ALine];
     SelArea := LinesArea(CaretPosition, CaretPosition);
 
-    if (UpdateCount > 0) then
-      Include(FState, lsTextChanged);
     if (Assigned(OnInserted)) then
       OnInserted(Self, ALine);
   finally
@@ -1264,10 +1256,10 @@ begin
 
     finally
       EndUpdate();
-
-      if ((lsLoading in State) and (LLineBreak[0] <> #0)) then
-        LineBreak := StrPas(PChar(@LLineBreak[0]));
     end;
+
+    if ((lsLoading in State) and (LLineBreak[0] <> #0)) then
+      LineBreak := StrPas(PChar(@LLineBreak[0]));
   end;
 end;
 
@@ -1306,8 +1298,6 @@ begin
 
   if (LModified and not (lsInserting in State)) then
   begin
-    if (UpdateCount > 0) then
-      Include(FState, lsTextChanged);
     if (Assigned(OnUpdated)) then
       OnUpdated(Self, ALine);
   end;
@@ -1353,107 +1343,108 @@ begin
     end;
 
     BeginUpdate();
+    try
+      LCaretPosition := CaretPosition;
+      LSelArea := SelArea;
 
-    LCaretPosition := CaretPosition;
-    LSelArea := SelArea;
+      repeat
+        LUndoItem := List.Pop();
 
-    repeat
-      LUndoItem := List.Pop();
-
-      case (LUndoItem.UndoType) of
-        utSelection:
-          begin
-            LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
-              LUndoItem.Area, LUndoItem.Text, LUndoItem.BlockNumber);
-          end;
-        utInsert,
-        utReplace,
-        utBackspace,
-        utDelete:
-          begin
-            if (not LUndoItem.Area.IsEmpty()
-             and ((LUndoItem.UndoType in [utReplace])
-               or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List = UndoList)))) then
+        case (LUndoItem.UndoType) of
+          utSelection:
             begin
-              // Debug 2017-05-03
-              try
-                LText := TextIn[LUndoItem.Area];
-              except
-                on E: Exception do
-                  E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
-                    + 'Progress: ' + Progress + #13#10
-                    + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10
-                    + 'Area: ' + Area.ToString() + #13#10#13#10
-                    + E.ClassName + ':' + #13#10
-                    + E.Message));
-              end;
-              DoDeleteText(LUndoItem.Area);
-              if (not (LUndoItem.UndoType in [utReplace])) then
+              LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
+                LUndoItem.Area, LUndoItem.Text, LUndoItem.BlockNumber);
+            end;
+          utInsert,
+          utReplace,
+          utBackspace,
+          utDelete:
+            begin
+              if (not LUndoItem.Area.IsEmpty()
+               and ((LUndoItem.UndoType in [utReplace])
+                 or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List = UndoList)))) then
+              begin
+                // Debug 2017-05-03
+                try
+                  LText := TextIn[LUndoItem.Area];
+                except
+                  on E: Exception do
+                    E.RaiseOuterException(Exception.Create(LUndoItem.ToString() + #13#10
+                      + 'Progress: ' + Progress + #13#10
+                      + 'LDestinationList.Count: ' + IntToStr(LDestinationList.Count) + #13#10
+                      + 'Area: ' + Area.ToString() + #13#10#13#10
+                      + E.ClassName + ':' + #13#10
+                      + E.Message));
+                end;
+                DoDeleteText(LUndoItem.Area);
+                if (not (LUndoItem.UndoType in [utReplace])) then
+                  LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
+                    LUndoItem.Area, LText, LUndoItem.BlockNumber);
+              end
+              else
+                LText := '';
+              if ((LUndoItem.UndoType in [utReplace])
+                  or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List <> UndoList))) then
+              begin
+                if (LUndoItem.Text = '') then
+                  LEndPosition := LUndoItem.Area.BeginPosition
+                else
+                try
+                  LEndPosition := DoInsertText(LUndoItem.Area.BeginPosition, LUndoItem.Text);
+                except
+                  on E: Exception do
+                    E.RaiseOuterException(EAssertionFailed.Create(LUndoItem.ToString() + #13#10
+                      + 'Progress: ' + Progress + #13#10#13#10
+                      + E.ClassName + ':' + #13#10
+                      + E.Message));
+                end;
                 LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
-                  LUndoItem.Area, LText, LUndoItem.BlockNumber);
+                  LinesArea(LUndoItem.Area.BeginPosition, LEndPosition), LText, LUndoItem.BlockNumber);
+              end;
+            end;
+          utClear:
+            if (List = RedoList) then
+            begin
+              LText := Text;
+              InternalClear(False);
+              LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
+                LinesArea(BOFPosition, InvalidLinesPosition), LText, LUndoItem.BlockNumber);
             end
             else
-              LText := '';
-            if ((LUndoItem.UndoType in [utReplace])
-                or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List <> UndoList))) then
             begin
-              if (LUndoItem.Text = '') then
-                LEndPosition := LUndoItem.Area.BeginPosition
-              else
-              try
-                LEndPosition := DoInsertText(LUndoItem.Area.BeginPosition, LUndoItem.Text);
-              except
-                on E: Exception do
-                  E.RaiseOuterException(EAssertionFailed.Create(LUndoItem.ToString() + #13#10
-                    + 'Progress: ' + Progress + #13#10#13#10
-                    + E.ClassName + ':' + #13#10
-                    + E.Message));
-              end;
+              LEndPosition := DoInsertText(LUndoItem.Area.BeginPosition, LUndoItem.Text);
               LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
-                LinesArea(LUndoItem.Area.BeginPosition, LEndPosition), LText, LUndoItem.BlockNumber);
+                LinesArea(LUndoItem.Area.BeginPosition, LEndPosition), '', LUndoItem.BlockNumber);
             end;
-          end;
-        utClear:
-          if (List = RedoList) then
-          begin
-            LText := Text;
-            InternalClear(False);
-            LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
-              LinesArea(BOFPosition, InvalidLinesPosition), LText, LUndoItem.BlockNumber);
-          end
-          else
-          begin
-            LEndPosition := DoInsertText(LUndoItem.Area.BeginPosition, LUndoItem.Text);
-            LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
-              LinesArea(LUndoItem.Area.BeginPosition, LEndPosition), '', LUndoItem.BlockNumber);
-          end;
-        utInsertIndent,
-        utDeleteIndent:
-          begin
-            if ((LUndoItem.UndoType <> utInsertIndent) xor (List = UndoList)) then
-              DoDeleteIndent(LUndoItem.Area.BeginPosition, LUndoItem.Area.EndPosition,
-                LUndoItem.Text)
-            else
-              DoInsertIndent(LUndoItem.Area, LUndoItem.Text);
-            LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
-              LUndoItem.Area, LUndoItem.Text, LUndoItem.BlockNumber);
-          end;
-        else raise ERangeError.Create('UndoType: ' + IntToStr(Ord(LUndoItem.UndoType)));
-      end;
+          utInsertIndent,
+          utDeleteIndent:
+            begin
+              if ((LUndoItem.UndoType <> utInsertIndent) xor (List = UndoList)) then
+                DoDeleteIndent(LUndoItem.Area.BeginPosition, LUndoItem.Area.EndPosition,
+                  LUndoItem.Text)
+              else
+                DoInsertIndent(LUndoItem.Area, LUndoItem.Text);
+              LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
+                LUndoItem.Area, LUndoItem.Text, LUndoItem.BlockNumber);
+            end;
+          else raise ERangeError.Create('UndoType: ' + IntToStr(Ord(LUndoItem.UndoType)));
+        end;
 
-      LCaretPosition := LUndoItem.CaretPosition;
-      LSelArea := LUndoItem.SelArea;
+        LCaretPosition := LUndoItem.CaretPosition;
+        LSelArea := LUndoItem.SelArea;
 
-      LPreviousBlockNumber := LUndoItem.BlockNumber;
-      if (List.Count > 0) then
-        LUndoItem := List.Peek();
-    until ((List.Count = 0)
-      or (LUndoItem.BlockNumber <> LPreviousBlockNumber));
+        LPreviousBlockNumber := LUndoItem.BlockNumber;
+        if (List.Count > 0) then
+          LUndoItem := List.Peek();
+      until ((List.Count = 0)
+        or (LUndoItem.BlockNumber <> LPreviousBlockNumber));
 
-    CaretPosition := LCaretPosition;
-    SelArea := LSelArea;
-
-    EndUpdate();
+      CaretPosition := LCaretPosition;
+      SelArea := LSelArea;
+    finally
+      EndUpdate();
+    end;
 
     if (List = UndoList) then
       Exclude(FState, lsUndo)
@@ -1708,7 +1699,39 @@ begin
   RedoList.Clear();
 end;
 
-function TBCEditorLines.InsertText(APosition: TBCEditorLinesPosition;
+function TBCEditorLines.InsertFile(const APosition: TBCEditorLinesPosition;
+  const AFilename: string): TBCEditorLinesPosition;
+var
+  LBuffer: TBytes;
+  LEncoding: TEncoding;
+  LSize: Integer;
+  LStream: TFileStream;
+begin
+  BeginUpdate();
+  try
+    LStream := TFileStream.Create(AFilename, fmShareDenyWrite);
+    LSize := LStream.Size - LStream.Position;
+    SetLength(LBuffer, LSize);
+    LStream.Read(LBuffer, 0, LSize);
+    LEncoding := nil;
+    LSize := TEncoding.GetBufferEncoding(LBuffer, LEncoding, Encoding);
+    if (not Assigned(LEncoding)) then
+    begin
+      LStream.Read(LBuffer, LSize);
+      Result := InsertText(APosition, StringOf(LBuffer));
+    end
+    else
+    begin
+      Result := InsertText(APosition, LEncoding.GetString(LBuffer, LSize, Length(LBuffer) - LSize));
+      LEncoding.Free();
+    end;
+    LStream.Free();
+  finally
+    EndUpdate();
+  end;
+end;
+
+function TBCEditorLines.InsertText(const APosition: TBCEditorLinesPosition;
   const AText: string): TBCEditorLinesPosition;
 var
   LCaretPosition: TBCEditorLinesPosition;
@@ -1760,8 +1783,8 @@ begin
     CaretPosition := Result;
   finally
     EndUpdate();
-    RedoList.Clear();
   end;
+  RedoList.Clear();
 end;
 
 procedure TBCEditorLines.InternalClear(const AClearUndo: Boolean);
@@ -1915,7 +1938,7 @@ var
   LText: string;
 begin
   if (AArea.IsEmpty()) then
-    InsertText(AArea.BeginPosition, AText)
+    Result := InsertText(AArea.BeginPosition, AText)
   else
   begin
     BeginUpdate();
@@ -1973,13 +1996,15 @@ begin
   if (AValue <> FCaretPosition) then
   begin
     BeginUpdate();
+    try
+      FCaretPosition := AValue;
 
-    FCaretPosition := AValue;
+      SelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
 
-    SelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
-
-    Include(FState, lsCaretMoved);
-    EndUpdate();
+      Include(FState, lsCaretChanged);
+    finally
+      EndUpdate();
+    end;
   end
   else
     SelArea := LinesArea(AValue, AValue);
@@ -2033,11 +2058,13 @@ begin
       UndoList.GroupBreak();
 
       BeginUpdate();
-      for LLine := 0 to Count - 1 do
-        if (Items[LLine].State = lsModified) then
-          Items.List[LLine].State := lsSaved;
-      EndUpdate();
-      Editor.Invalidate();
+      try
+        for LLine := 0 to Count - 1 do
+          if (Items[LLine].State = lsModified) then
+            Items.List[LLine].State := lsSaved;
+      finally
+        EndUpdate();
+      end;
     end;
   end;
 end;
@@ -2047,21 +2074,23 @@ begin
   if (AValue <> FSelArea) then
   begin
     BeginUpdate();
+    try
+      FSelArea.BeginPosition := AValue.BeginPosition;
+      if (FSelArea.BeginPosition.Line < Count) then
+        FSelArea.BeginPosition.Char := Min(FSelArea.BeginPosition.Char, Length(Items[FSelArea.BeginPosition.Line].Text))
+      else
+        FSelArea.BeginPosition := EOFPosition;
 
-    FSelArea.BeginPosition := AValue.BeginPosition;
-    if (FSelArea.BeginPosition.Line < Count) then
-      FSelArea.BeginPosition.Char := Min(FSelArea.BeginPosition.Char, Length(Items[FSelArea.BeginPosition.Line].Text))
-    else
-      FSelArea.BeginPosition := EOFPosition;
+      FSelArea.EndPosition := AValue.EndPosition;
+      if (FSelArea.EndPosition.Line < Count) then
+        FSelArea.EndPosition.Char := Min(FSelArea.EndPosition.Char, Length(Items[FSelArea.EndPosition.Line].Text))
+      else
+        FSelArea.EndPosition := EOFPosition;
 
-    FSelArea.EndPosition := AValue.EndPosition;
-    if (FSelArea.EndPosition.Line < Count) then
-      FSelArea.EndPosition.Char := Min(FSelArea.EndPosition.Char, Length(Items[FSelArea.EndPosition.Line].Text))
-    else
-      FSelArea.EndPosition := EOFPosition;
-
-    Include(FState, lsSelChanged);
-    EndUpdate();
+      Include(FState, lsSelChanged);
+    finally
+      EndUpdate();
+    end;
   end;
 end;
 
@@ -2078,27 +2107,28 @@ begin
   Include(FState, lsLoading);
 
   BeginUpdate();
+  try
+    if (loUndoAfterLoad in Options) then
+      DeleteText(LinesArea(BOFPosition, EOFPosition));
 
-  if (loUndoAfterLoad in Options) then
-    DeleteText(LinesArea(BOFPosition, EOFPosition));
+    InternalClear(not (loUndoAfterLoad in Options));
 
-  InternalClear(not (loUndoAfterLoad in Options));
+    LEndPosition := InsertText(BOFPosition, AValue);
+    for LLine := 0 to Count - 1 do
+      Items.List[LLine].State := lsLoaded;
 
-  LEndPosition := InsertText(BOFPosition, AValue);
-  for LLine := 0 to Count - 1 do
-    Items.List[LLine].State := lsLoaded;
+    if (loUndoAfterLoad in Options) then
+    begin
+      UndoList.Push(utInsert, BOFPosition, InvalidLinesArea,
+        LinesArea(BOFPosition, LEndPosition));
 
-  if (loUndoAfterLoad in Options) then
-  begin
-    UndoList.Push(utInsert, BOFPosition, InvalidLinesArea,
-      LinesArea(BOFPosition, LEndPosition));
+      RedoList.Clear();
+    end;
 
-    RedoList.Clear();
+    CaretPosition := BOFPosition;
+  finally
+    EndUpdate();
   end;
-
-  CaretPosition := BOFPosition;
-
-  EndUpdate();
 
   Exclude(FState, lsLoading);
 end;
@@ -2111,14 +2141,15 @@ begin
       OnBeforeUpdate(Self);
 
     UndoList.BeginUpdate();
-    FState := FState - [lsCaretMoved, lsSelChanged, lsTextChanged];
+
+    FState := FState - [lsCaretChanged, lsSelChanged];
     FOldUndoListCount := UndoList.Count;
     FOldCaretPosition := CaretPosition;
     FOldSelArea := SelArea;
   end
   else
   begin
-    if (not (lsRedo in State) and ((lsCaretMoved in State) or (lsSelChanged in State)) and not UndoList.Updated) then
+    if (not (lsRedo in State) and ((lsCaretChanged in State) or (lsSelChanged in State)) and not UndoList.Updated) then
     begin
       if (not (lsUndo in State)) then
       begin
@@ -2133,14 +2164,14 @@ begin
 
     UndoList.EndUpdate();
 
-    if (Assigned(OnCaretMoved) and (lsCaretMoved in FState)) then
-      OnCaretMoved(Self);
+    if (Assigned(OnCaretChanged) and (lsCaretChanged in FState)) then
+      OnCaretChanged(Self);
     if (Assigned(OnSelChange) and (lsSelChanged in FState)) then
       OnSelChange(Self);
     if (Assigned(OnAfterUpdate)) then
       OnAfterUpdate(Self);
 
-    FState := FState - [lsCaretMoved, lsSelChanged, lsTextChanged];
+    FState := FState - [lsCaretChanged, lsSelChanged];
   end;
 end;
 

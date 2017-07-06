@@ -9,6 +9,7 @@ resourcestring
   SBCEditorSearchStringNotFound = 'Search string ''%s'' not found';
   SBCEditorSearchMatchNotFound = 'Search match not found.%sRestart search from the beginning of the file?';
   SBCEditorRightMarginPosition = 'Position: %d';
+  SBCEditorCodeFoldingCollapsedMark = '%d Lines';
 
   { BCEditor.MacroRecorder }
   SBCEditorCannotRecord = 'Cannot record macro; already recording or playing';

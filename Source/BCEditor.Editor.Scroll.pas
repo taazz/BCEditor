@@ -23,7 +23,7 @@ type
     end;
 
   strict private const
-    DefaultOptions = [soShowVerticalScrollHint, soWheelClickMove];
+    DefaultOptions = [soMiddleClickMove];
   strict private
     FHint: TBCEditorScroll.THint;
     FIndicator: TBCEditorGlyph;

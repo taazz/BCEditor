@@ -1564,7 +1564,8 @@ begin
     Name := 'Courier New';
     Size := 10;
   end;
-  FPaintHelper := TBCEditorPaintHelper.Create([fsBold], FFontDummy);
+  FPaintHelper := TBCEditorPaintHelper.Create(FFontDummy);
+  FPaintHelper.Style := [fsBold];
 end;
 
 destructor TBCEditorPrint.Destroy;
@@ -1677,8 +1678,8 @@ begin
   CharWidth := LTextMetric.tmAveCharWidth;
   FLineHeight := LTextMetric.tmHeight + LTextMetric.tmExternalLeading;
 
-  FPaintHelper.SetBaseFont(FFont);
-  FPaintHelper.SetStyle(FFont.Style);
+  FPaintHelper.Font := FFont;
+  FPaintHelper.Style := FFont.Style;
 
   FMargins.InitPage(FCanvas, 1, FPrinterInfo, FLineNumbers, FLineNumbersInMargin, FLines.Count - 1 + FLineOffset);
   CalculatePages;
@@ -1913,6 +1914,7 @@ var
   LIndex: Integer;
   LLines: TStringList;
   LOldWrapPosition: Integer;
+  LSpaceWidth: Integer;
   LToken: TBCEditorHighlighter.TFind;
   LTokenStart: Integer;
   LWrapPosition: Integer;
@@ -1944,13 +1946,13 @@ var
     begin
       LTempText := Copy(AText, LLast + 1, TBCEditorWrapPosition(AList[LCount]).Index - LLast);
       LLast := TBCEditorWrapPosition(AList[LCount]).Index;
-      ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.SpaceWidth, FYPos, LTempText);
+      ClippedTextOut(FMargins.PixelLeft + LFirstPosition * LSpaceWidth, FYPos, LTempText);
       LFirstPosition := 0;
       LCount := LCount + 1;
       FYPos := FYPos + FLineHeight;
     end;
     LTempText := Copy(AText, LLast + 1, LTokenEnd - LLast);
-    ClippedTextOut(FMargins.PixelLeft + LFirstPosition * FPaintHelper.SpaceWidth, FYPos, LTempText);
+    ClippedTextOut(FMargins.PixelLeft + LFirstPosition * LSpaceWidth, FYPos, LTempText);
     LTokenStart := LToken.Char + LToken.Length - Length(LTempText);
   end;
 
@@ -1959,12 +1961,13 @@ var
   LTempText: string;
   LTokenText: string;
 begin
-  FPaintHelper.BeginDrawing(FCanvas.Handle);
+  FPaintHelper.BeginDrawing(FCanvas);
   with FMargins do
     LClipRect := Rect(PixelLeft, PixelTop, PixelRight, PixelBottom);
 
   if Highlight and Assigned(FHighlighter) and (FLines.Count > 0) then
   begin
+    LSpaceWidth := FPaintHelper.TextWidth(BCEDITOR_SPACE_CHAR, 1);
     SaveCurrentFont;
     LTokenStart := 0;
     LCount := 0;
@@ -2213,7 +2216,7 @@ begin
   FEditor := AValue;
   Highlighter := AValue.Highlighter;
   Font := AValue.Font;
-  CharWidth := AValue.PaintHelper.SpaceWidth;
+  CharWidth := AValue.PaintHelper.TextWidth(BCEDITOR_SPACE_CHAR, 1);
   FTabWidth := AValue.Tabs.Width;
   SetLines(AValue.Lines);
   FSelectionAvailable := AValue.SelectionAvailable;

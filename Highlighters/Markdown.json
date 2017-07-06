@@ -15,9 +15,6 @@
       "\r\n",
       "Welcome to my homepage [hyperlink syntax](http://www.bonecode.com)"
     ],
-    "Editor": {
-      "URIOpener": true
-    },
     "MainRules": {
       "Attributes": {
         "Element": "Editor"

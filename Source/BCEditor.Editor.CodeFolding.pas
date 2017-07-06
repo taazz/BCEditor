@@ -148,7 +148,6 @@ type
         FBeginLine: Integer;
         FCollapsed: Boolean;
         FCollapsedBy: Integer;
-        FCollapsedMarkRect: TRect;
         FEndLine: Integer;
         FFoldRangeLevel: Integer;
         FIndentLevel: Integer;
@@ -169,7 +168,6 @@ type
         property BeginLine: Integer read FBeginLine write FBeginLine;
         property Collapsed: Boolean read FCollapsed write FCollapsed default False;
         property CollapsedBy: Integer read FCollapsedBy write FCollapsedBy;
-        property CollapsedMarkRect: TRect read FCollapsedMarkRect write FCollapsedMarkRect;
         property EndLine: Integer read FEndLine write FEndLine;
         property FoldRangeLevel: Integer read FFoldRangeLevel write FFoldRangeLevel;
         property IndentLevel: Integer read FIndentLevel write FIndentLevel;

@@ -14,7 +14,7 @@ type
 
   TBCEditorCharMethod = function(const AChar: Char): Boolean of object;
 
-  TBCEditorDropFilesEvent = procedure(ASender: TObject; APos: TPoint; AFiles: TStrings) of object;
+  TBCEditorHintEvent = procedure(ASender: TObject; const AX, AY: Integer; const APos: TPoint; const AIndex: Integer; var AHint: string) of object;
 
   TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
 
@@ -24,7 +24,6 @@ type
 
   TBCEditorOption = (
     eoAutoIndent, { Will indent the caret on new lines with the same amount of leading white space as the preceding line }
-    eoDragDropEditing, { Allows you to select a block of text and drag it within the document to another location }
     eoDropFiles, { Allows the editor accept OLE file drops }
     eoTrimTrailingLines, { Empty lines at the end of text will be removed while saving }
     eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
@@ -47,7 +46,7 @@ type
     soBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
     soBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
     soShowVerticalScrollHint, { Shows a hint of the visible line numbers when scrolling vertically }
-    soWheelClickMove { Scrolling by mouse move after wheel click. }
+    soMiddleClickMove { Scrolling by mouse move after wheel click. }
   );
 
   TBCEditorTabOption = (
@@ -60,7 +59,7 @@ type
     soExpandRealNumbers,
     soTermsCaseSensitive,
     soToEndOfLine,
-    soTripleClickRowSelect
+    soTripleClickLineSelect
   );
 
   TBCEditorSearchEvent = (
@@ -171,14 +170,12 @@ type
     ttHighlightedBlock,
     ttHighlightedBlockSymbol,
     ttLineComment,
-    ttMailtoLink,
     ttMethod,
     ttMethodName,
     ttNumber,
     ttReservedWord,
     ttString,
-    ttSymbol,
-    ttWebLink
+    ttSymbol
   );
 
 
@@ -216,7 +213,6 @@ type
     cfoFoldMultilineComments,
     cfoHighlightFoldingLine,
     cfoHighlightIndentGuides,
-    cfoShowCollapsedLine,
     cfoShowTreeLine
   );
 
@@ -255,6 +251,7 @@ function Point(const APosition: TBCEditorLinesPosition): TPoint; overload; inlin
 function RowsPosition(const AColumn: Integer; const ARow: Integer): TBCEditorRowsPosition; inline;
 
 const
+  InvalidCaretPos: TPoint = ( X: -1; Y: -1 );
   InvalidLinesArea: TBCEditorLinesArea = ( BeginPosition: ( Char: -1; Line: -1; ); EndPosition: ( Char: -1; Line: -1; ) );
   InvalidLinesPosition: TBCEditorLinesPosition = ( Char: -1; Line: -1; );
   InvalidRowsPosition: TBCEditorRowsPosition = ( Column: -1; Row: -1; );

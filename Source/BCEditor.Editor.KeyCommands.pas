@@ -21,8 +21,6 @@ const
   ecLineEnd = 8;
   ecPageUp = 9;
   ecPageDown = 10;
-  ecPageLeft = 11;
-  ecPageRight = 12;
   ecPageTop = 13;
   ecPageBottom = 14;
   ecEditorTop = 15;
@@ -40,8 +38,6 @@ const
   ecSelectionLineEnd = ecLineEnd + ecSelection;
   ecSelectionPageUp = ecPageUp + ecSelection;
   ecSelectionPageDown = ecPageDown + ecSelection;
-  ecSelectionPageLeft = ecPageLeft + ecSelection;
-  ecSelectionPageRight = ecPageRight + ecSelection;
   ecSelectionPageTop = ecPageTop + ecSelection;
   ecSelectionPageBottom = ecPageBottom + ecSelection;
   ecSelectionEditorTop = ecEditorTop + ecSelection;
@@ -113,9 +109,6 @@ const
   { Case }
   ecUpperCase = 620;
   ecLowerCase = 621;
-  ecAlternatingCase = 622;
-  ecSentenceCase = 623;
-  ecTitleCase = 624;
   { Search }
   ecSearchFindFirst = 802;
   ecSearchFind = 803;
@@ -219,7 +212,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 101] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 94] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -231,8 +224,6 @@ const
     (Value: ecLineEnd; Name: 'ecLineEnd'),
     (Value: ecPageUp; Name: 'ecPageUp'),
     (Value: ecPageDown; Name: 'ecPageDown'),
-    (Value: ecPageLeft; Name: 'ecPageLeft'),
-    (Value: ecPageRight; Name: 'ecPageRight'),
     (Value: ecPageTop; Name: 'ecPageTop'),
     (Value: ecPageBottom; Name: 'ecPageBottom'),
     (Value: ecEditorTop; Name: 'ecEditorTop'),
@@ -249,8 +240,6 @@ const
     (Value: ecSelectionLineEnd; Name: 'ecSelectionLineEnd'),
     (Value: ecSelectionPageUp; Name: 'ecSelectionPageUp'),
     (Value: ecSelectionPageDown; Name: 'ecSelectionPageDown'),
-    (Value: ecSelectionPageLeft; Name: 'ecSelectionPageLeft'),
-    (Value: ecSelectionPageRight; Name: 'ecSelectionPageRight'),
     (Value: ecSelectionPageTop; Name: 'ecSelectionPageTop'),
     (Value: ecSelectionPageBottom; Name: 'ecSelectionPageBottom'),
     (Value: ecSelectionEditorTop; Name: 'ecSelectionEditorTop'),
@@ -311,9 +300,6 @@ const
     (Value: ecShiftTab; Name: 'ecShiftTab'),
     (Value: ecUpperCase; Name: 'ecUpperCase'),
     (Value: ecLowerCase; Name: 'ecLowerCase'),
-    (Value: ecAlternatingCase; Name: 'ecAlternatingCase'),
-    (Value: ecSentenceCase; Name: 'ecSentenceCase'),
-    (Value: ecTitleCase; Name: 'ecTitleCase'),
     (Value: ecSearchFindFirst; Name: 'ecSearchFindFirst'),
     (Value: ecSearchFind; Name: 'ecSearchFind'),
     (Value: ecSearchReplace; Name: 'ecSearchReplace'),
