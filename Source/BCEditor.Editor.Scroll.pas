@@ -5,7 +5,7 @@ interface
 uses
   Classes, UITypes,
   Forms,
-  BCEditor.Editor.Glyph, BCEditor.Types;
+  BCEditor.Types;
 
 type
   TBCEditorScrollEvent = procedure(ASender: TObject; AScrollBar: TScrollBarKind) of object;
@@ -26,13 +26,11 @@ type
     DefaultOptions = [soMiddleClickMove];
   strict private
     FHint: TBCEditorScroll.THint;
-    FIndicator: TBCEditorGlyph;
     FMaxWidth: Integer;
     FOnChange: TNotifyEvent;
     FOptions: TBCEditorScrollOptions;
     procedure DoChange;
     procedure SetHint(const AValue: TBCEditorScroll.THint);
-    procedure SetIndicator(const AValue: TBCEditorGlyph);
     procedure SetOnChange(AValue: TNotifyEvent);
     procedure SetOptions(const AValue: TBCEditorScrollOptions);
   public
@@ -42,7 +40,6 @@ type
     procedure SetOption(const AOption: TBCEditorScrollOption; const AEnabled: Boolean);
   published
     property Hint: TBCEditorScroll.THint read FHint write SetHint;
-    property Indicator: TBCEditorGlyph read FIndicator write SetIndicator;
     property Options: TBCEditorScrollOptions read FOptions write SetOptions default DefaultOptions;
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   end;
@@ -80,13 +77,11 @@ begin
   FOptions := DefaultOptions;
   FMaxWidth := 1024;
   FHint := TBCEditorScroll.THint.Create;
-  FIndicator := TBCEditorGlyph.Create(HInstance, BCEDITOR_MOUSE_MOVE_SCROLL, clFuchsia);
 end;
 
 destructor TBCEditorScroll.Destroy;
 begin
   FHint.Free;
-  FIndicator.Free;
 
   inherited;
 end;
@@ -97,7 +92,6 @@ begin
   with ASource as TBCEditorScroll do
   begin
     Self.FHint.Assign(FHint);
-    Self.FIndicator.Assign(FIndicator);
     Self.FOptions := FOptions;
     Self.FMaxWidth := FMaxWidth;
     Self.DoChange;
@@ -115,11 +109,6 @@ end;
 procedure TBCEditorScroll.SetHint(const AValue: THint);
 begin
   FHint.Assign(AValue);
-end;
-
-procedure TBCEditorScroll.SetIndicator(const AValue: TBCEditorGlyph);
-begin
-  FIndicator.Assign(AValue);
 end;
 
 procedure TBCEditorScroll.SetOnChange(AValue: TNotifyEvent);

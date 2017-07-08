@@ -140,9 +140,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas">
             <BuildOrder>9</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Glyph.pas">
-            <BuildOrder>10</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.KeyCommands.pas">
             <BuildOrder>12</BuildOrder>
         </DelphiCompile>

@@ -62,7 +62,6 @@ const
   clBookmarkNumber = $00027397;
   clTransparent = clFuchsia;
   { Resource file bitmaps }
-  BCEDITOR_MOUSE_MOVE_SCROLL = 'BCEDITORMOUSEMOVESCROLL';
   BCEDITOR_SYNCEDIT = 'BCEDITORSYNCEDIT';
 
 implementation {***************************************************************}
