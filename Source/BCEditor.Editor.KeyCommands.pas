@@ -55,7 +55,6 @@ const
   ecOverwriteMode = 222;
   ecToggleMode = 223;
   { Bookmark }
-  ecToggleBookmark = 300;
   ecGotoBookmark1 = 310;
   ecGotoBookmark2 = 311;
   ecGotoBookmark3 = 312;
@@ -65,6 +64,7 @@ const
   ecGotoBookmark7 = 316;
   ecGotoBookmark8 = 317;
   ecGotoBookmark9 = 318;
+  ecGotoBookmark0 = 319;
   ecSetBookmark1 = 320;
   ecSetBookmark2 = 321;
   ecSetBookmark3 = 322;
@@ -74,6 +74,7 @@ const
   ecSetBookmark7 = 326;
   ecSetBookmark8 = 327;
   ecSetBookmark9 = 328;
+  ecSetBookmark0 = 329;
   ecGotoNextBookmark = 330;
   ecGotoPreviousBookmark = 331;
   { CompletionProposal }
@@ -212,7 +213,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 94] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 95] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -254,7 +255,6 @@ const
     (Value: ecInsertMode; Name: 'ecInsertMode'),
     (Value: ecOverwriteMode; Name: 'ecOverwriteMode'),
     (Value: ecToggleMode; Name: 'ecToggleMode'),
-    (Value: ecToggleBookmark; Name: 'ecToggleBookmark'),
     (Value: ecGotoBookmark1; Name: 'ecGotoBookmark1'),
     (Value: ecGotoBookmark2; Name: 'ecGotoBookmark2'),
     (Value: ecGotoBookmark3; Name: 'ecGotoBookmark3'),
@@ -264,6 +264,7 @@ const
     (Value: ecGotoBookmark7; Name: 'ecGotoBookmark7'),
     (Value: ecGotoBookmark8; Name: 'ecGotoBookmark8'),
     (Value: ecGotoBookmark9; Name: 'ecGotoBookmark9'),
+    (Value: ecGotoBookmark0; Name: 'ecGotoBookmark9'),
     (Value: ecSetBookmark1; Name: 'ecSetBookmark1'),
     (Value: ecSetBookmark2; Name: 'ecSetBookmark2'),
     (Value: ecSetBookmark3; Name: 'ecSetBookmark3'),
@@ -273,6 +274,7 @@ const
     (Value: ecSetBookmark7; Name: 'ecSetBookmark7'),
     (Value: ecSetBookmark8; Name: 'ecSetBookmark8'),
     (Value: ecSetBookmark9; Name: 'ecSetBookmark9'),
+    (Value: ecSetBookmark0; Name: 'ecSetBookmark9'),
     (Value: ecGotoNextBookmark; Name: 'ecGotoNextBookmark'),
     (Value: ecGotoPreviousBookmark; Name: 'ecGotoPreviousBookmark'),
     (Value: ecContextHelp; Name: 'ecContextHelp'),
@@ -676,7 +678,6 @@ begin
   Add(ecDeleteLine, [ssCtrl], Ord('Y'));
   Add(ecDeleteEndOfLine, [ssCtrl, ssShift], Ord('Y'));
   { Bookmarks }
-  Add(ecToggleBookmark, [ssCtrl], VK_F2);
   Add(ecGotoBookmark1, [ssCtrl], Ord('1'));
   Add(ecGotoBookmark2, [ssCtrl], Ord('2'));
   Add(ecGotoBookmark3, [ssCtrl], Ord('3'));
@@ -686,6 +687,7 @@ begin
   Add(ecGotoBookmark7, [ssCtrl], Ord('7'));
   Add(ecGotoBookmark8, [ssCtrl], Ord('8'));
   Add(ecGotoBookmark9, [ssCtrl], Ord('9'));
+  Add(ecGotoBookmark0, [ssCtrl], Ord('0'));
   Add(ecSetBookmark1, [ssCtrl, ssShift], Ord('1'));
   Add(ecSetBookmark2, [ssCtrl, ssShift], Ord('2'));
   Add(ecSetBookmark3, [ssCtrl, ssShift], Ord('3'));
@@ -695,6 +697,7 @@ begin
   Add(ecSetBookmark7, [ssCtrl, ssShift], Ord('7'));
   Add(ecSetBookmark8, [ssCtrl, ssShift], Ord('8'));
   Add(ecSetBookmark9, [ssCtrl, ssShift], Ord('9'));
+  Add(ecSetBookmark0, [ssCtrl, ssShift], Ord('0'));
   Add(ecGotoNextBookmark, [], VK_F2);
   Add(ecGotoPreviousBookmark, [ssShift], VK_F2);
   { Comments }

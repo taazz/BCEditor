@@ -31,6 +31,7 @@ type
 
   strict private
     FBackgroundColor: TColor;
+    FBrush: TBrush;
     FCanvas: TCanvas;
     FDrawingCount: Integer;
     FForegroundColor: TColor;
@@ -48,7 +49,8 @@ type
     procedure EndDrawing();
     function ExtTextOut(X, Y: Integer; Options: Longint;
       Rect: TRect; Str: LPCWSTR; Count: Longint; Dx: PInteger): BOOL; {$IFNDEF Debug} inline; {$ENDIF}
-    procedure FillRect(const ARect: TRect); {$IFNDEF Debug} inline; {$ENDIF}
+    function FillRect(const ARect: TRect): BOOL; {$IFNDEF Debug} inline; {$ENDIF}
+    function FrameRect(const ARect: TRect; AColor: TColor): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function TextHeight(const AText: PChar; const ALength: Integer): Integer;
     function TextWidth(const AText: PChar; const ALength: Integer): Integer;
     property BackgroundColor: TColor read FBackgroundColor write SetBackgroundColor;
@@ -150,6 +152,7 @@ constructor TBCEditorPaintHelper.Create(const AFont: TFont);
 begin
   inherited Create();
 
+  FBrush := TBrush.Create();
   FObjectFonts := TObjectFonts.Create();
   FSavedHandles := TStack<Integer>.Create();
   FForegroundColor := clWindowText;
@@ -160,6 +163,7 @@ end;
 
 destructor TBCEditorPaintHelper.Destroy();
 begin
+  FBrush.Free();
   FObjectFonts.Free();
   FSavedHandles.Free();
 
@@ -183,9 +187,15 @@ begin
   Result := Windows.ExtTextOut(Canvas.Handle, X, Y, Options, @Rect, Str, Count, Dx);
 end;
 
-procedure TBCEditorPaintHelper.FillRect(const ARect: TRect);
+function TBCEditorPaintHelper.FillRect(const ARect: TRect): BOOL;
 begin
-  Windows.ExtTextOut(Canvas.Handle, 0, 0, ETO_OPAQUE, ARect, '', 0, nil);
+  Result := Windows.ExtTextOut(Canvas.Handle, 0, 0, ETO_OPAQUE, ARect, '', 0, nil);
+end;
+
+function TBCEditorPaintHelper.FrameRect(const ARect: TRect; AColor: TColor): Integer;
+begin
+  FBrush.Color := AColor;
+  Result := Windows.FrameRect(Canvas.Handle, ARect, FBrush.Handle);
 end;
 
 procedure TBCEditorPaintHelper.SetBackgroundColor(const AValue: TColor);
