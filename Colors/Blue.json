@@ -41,8 +41,6 @@
         "SyncEditBackground": "$00FCFDCD",
         "SyncEditEditBorder": "$00333333",
         "SyncEditWordBorder": "$00A56D53",
-        "WordWrapIndicatorArrow": "$00333333",
-        "WordWrapIndicatorLines": "$009f6f2f"
       },
       "Fonts": {
         "Text": "Consolas",

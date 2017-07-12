@@ -3,7 +3,7 @@ unit BCEditor.Editor.SyncEdit;
 interface {********************************************************************}
 
 uses
-  Classes,
+  Classes, Generics.Collections,
   Graphics,
   BCEditor.Types, BCEditor.Consts;
 
@@ -39,18 +39,18 @@ type
     FOnChange: TNotifyEvent;
     FOptions: TBCEditorSyncEditOptions;
     FShortCut: TShortCut;
-    FSyncItems: TList;
+    FSyncItems: TList<TBCEditorLinesPosition>;
     procedure DoChange(ASender: TObject);
     procedure SetActive(AValue: Boolean);
   protected
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    property SyncItems: TList read FSyncItems write FSyncItems;
+    property SyncItems: TList<TBCEditorLinesPosition> read FSyncItems;
   public
-    constructor Create;
-    destructor Destroy; override;
     procedure Abort;
     procedure Assign(ASource: TPersistent); override;
-    procedure ClearSyncItems;
+    procedure ClearSyncItems();
+    constructor Create();
+    destructor Destroy(); override;
     procedure MoveBeginPositionChar(ACount: Integer);
     procedure MoveEndPositionChar(ACount: Integer);
     procedure SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
@@ -108,7 +108,7 @@ begin
   FInEditor := False;
   FShortCut := DefaultShortCut;
   FOptions := [seCaseSensitive];
-  FSyncItems := TList.Create;
+  FSyncItems := TList<TBCEditorLinesPosition>.Create();
   FColors := TBCEditorSyncEdit.TColors.Create;
 end;
 
@@ -139,11 +139,7 @@ begin
 end;
 
 procedure TBCEditorSyncEdit.ClearSyncItems;
-var
-  LIndex: Integer;
 begin
-  for LIndex := FSyncItems.Count - 1 downto 0 do
-    Dispose(PBCEditorTextPosition(FSyncItems.Items[LIndex]));
   FSyncItems.Clear;
 end;
 

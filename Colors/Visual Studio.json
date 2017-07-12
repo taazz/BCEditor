@@ -41,8 +41,6 @@
         "SyncEditBackground": "$00FCFDCD",
         "SyncEditEditBorder": "clBlack",
         "SyncEditWordBorder": "$00FF9933",
-        "WordWrapIndicatorArrow": "clBlack",
-        "WordWrapIndicatorLines": "clBlue"
       },
       "Fonts": {
         "Text": "Courier New",

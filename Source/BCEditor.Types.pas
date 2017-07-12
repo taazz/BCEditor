@@ -4,7 +4,7 @@ interface {********************************************************************}
 
 uses
   Windows,
-  Classes, SysUtils,
+  Classes, SysUtils, Types,
   Forms, Graphics, Controls,
   BCEditor.Consts;
 
@@ -14,7 +14,9 @@ type
 
   TBCEditorCharMethod = function(const AChar: Char): Boolean of object;
 
+  TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;
   TBCEditorHintEvent = procedure(ASender: TObject; const AX, AY: Integer; const APos: TPoint; const AIndex: Integer; var AHint: string) of object;
+  TBCEditorWordBreakProc = function(lpch: LPTSTR; ichCurrent: Integer; cch: Integer; code: Integer): Integer; stdcall;
 
   TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
 
@@ -121,7 +123,7 @@ type
     bpoToggleMarkByClick
   );
 
-  PBCEditorTextPosition = ^TBCEditorLinesPosition;
+  PBCEditorLinesPosition = ^TBCEditorLinesPosition;
   TBCEditorLinesPosition = packed record
     Char: Integer;
     Line: Integer;
@@ -137,7 +139,7 @@ type
   TBCEditorLinesArea = record
     BeginPosition: TBCEditorLinesPosition;
     EndPosition: TBCEditorLinesPosition;
-    function Containts(Position: TBCEditorLinesPosition): Boolean; inline;
+    function Contains(Position: TBCEditorLinesPosition): Boolean; inline;
     class operator Equal(a, b: TBCEditorLinesArea): Boolean; inline;
     function IsEmpty(): Boolean; inline;
     class operator NotEqual(a, b: TBCEditorLinesArea): Boolean; inline;
@@ -365,7 +367,7 @@ end;
 
 { TBCEditorLinesArea **********************************************************}
 
-function TBCEditorLinesArea.Containts(Position: TBCEditorLinesPosition): Boolean;
+function TBCEditorLinesArea.Contains(Position: TBCEditorLinesPosition): Boolean;
 begin
   Result := (BeginPosition <= Position) and (Position <= EndPosition);
 end;

@@ -4,7 +4,7 @@ interface {********************************************************************}
 
 uses
   Classes, SysUtils, Generics.Collections,
-  Controls, Graphics,
+  Controls, Graphics, StdCtrls,
   JsonDataObjects,
   BCEditor.Consts, BCEditor.Editor.CodeFolding, BCEditor.Types;
 
@@ -450,7 +450,7 @@ type
     property Editor: TCustomControl read FEditor;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
-    constructor Create(AEditor: TCustomControl);
+    constructor Create(const AEditor: TCustomControl);
     destructor Destroy(); override;
     function FindFirstToken(const ABeginRange: TRange; const ALineText: string;
       out AFind: TFind): Boolean;
@@ -2007,8 +2007,6 @@ begin
         SyncEdit.Colors.Background := StringToColorDef(LColorsObject['SyncEditBackground'].Value, SyncEdit.Colors.Background);
         SyncEdit.Colors.EditBorder := StringToColorDef(LColorsObject['SyncEditEditBorder'].Value, SyncEdit.Colors.EditBorder);
         SyncEdit.Colors.WordBorder := StringToColorDef(LColorsObject['SyncEditWordBorder'].Value, SyncEdit.Colors.WordBorder);
-        WordWrap.Colors.Arrow := StringToColorDef(LColorsObject['WordWrapIndicatorArrow'].Value, WordWrap.Colors.Arrow);
-        WordWrap.Colors.Lines := StringToColorDef(LColorsObject['WordWrapIndicatorLines'].Value, WordWrap.Colors.Lines);
       end;
       LFontsObject := AEditorObject['Fonts'].ObjectValue;
       if Assigned(LFontsObject) then
@@ -2462,12 +2460,12 @@ begin
     LRegion.Free;
   end;
   CodeFoldingRangeCount := 0;
-  TCustomBCEditor(Editor).ClearMatchingPair;
+  TCustomBCEditor(Editor).InvalidateMatchingPair();
 end;
 
-constructor TBCEditorHighlighter.Create(AEditor: TCustomControl);
+constructor TBCEditorHighlighter.Create(const AEditor: TCustomControl);
 begin
-  inherited Create;
+  inherited Create();
 
   FEditor := AEditor;
   FWordBreakChars := BCEDITOR_WORD_BREAK_CHARACTERS;

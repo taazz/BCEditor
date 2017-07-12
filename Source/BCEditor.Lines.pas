@@ -4,7 +4,7 @@ interface {********************************************************************}
 
 uses
   SysUtils, Classes, Generics.Collections, RegularExpressions,
-  Graphics, Controls,
+  Graphics, Controls, StdCtrls,
   BCEditor.Utils, BCEditor.Consts, BCEditor.Types;
 
 type
@@ -66,6 +66,24 @@ type
         const APattern: string; const AReplaceText: string = '');
       function Find(var APosition: TBCEditorLinesPosition; out AFoundLength: Integer): Boolean;
       procedure Replace();
+      property Area: TBCEditorLinesArea read FArea;
+      property ErrorMessage: string read FErrorMessage;
+    end;
+
+    TWordSearch = class
+    private
+      FArea: TBCEditorLinesArea;
+      FCaseSensitive: Boolean;
+      FErrorMessage: string;
+      FFoundLength: Integer;
+      FFoundPosition: TBCEditorLinesPosition;
+      FLines: TBCEditorLines;
+      function FindNormal(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
+    public
+      constructor Create(const ALines: TBCEditorLines;
+        const AArea: TBCEditorLinesArea;
+        const ACaseSensitive: Boolean);
+      function Find(var APosition: TBCEditorLinesPosition; out AFoundLength: Integer): Boolean;
       property Area: TBCEditorLinesArea read FArea;
       property ErrorMessage: string read FErrorMessage;
     end;
@@ -133,6 +151,7 @@ type
     FOnDeleted: TChangeEvent;
     FOnDeleting: TChangeEvent;
     FOnInserted: TChangeEvent;
+    FOnLoaded: TNotifyEvent;
     FOnSelChange: TNotifyEvent;
     FOnUpdated: TChangeEvent;
     FOptions: TOptions;
@@ -163,6 +182,7 @@ type
     function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
     function GetLineArea(ALine: Integer): TBCEditorLinesArea; {$IFNDEF Debug} inline; {$ENDIF}
     function GetTextIn(const AArea: TBCEditorLinesArea): string;
+    function GetTextLength(): Integer;
     procedure InternalClear(const AClearUndo: Boolean); overload;
     procedure SetCaretPosition(const AValue: TBCEditorLinesPosition);
     procedure SetModified(const AValue: Boolean);
@@ -178,7 +198,6 @@ type
     procedure DeleteText(AArea: TBCEditorLinesArea); overload;
     function Get(ALine: Integer): string; override;
     function GetCount(): Integer; override;
-    function GetTextLength(): Integer;
     function GetTextStr(): string; override;
     procedure InsertIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
       const AIndentText: string);
@@ -227,6 +246,7 @@ type
     property OnDeleted: TChangeEvent read FOnDeleted write FOnDeleted;
     property OnDeleting: TChangeEvent read FOnDeleting write FOnDeleting;
     property OnInserted: TChangeEvent read FOnInserted write FOnInserted;
+    property OnLoaded: TNotifyEvent read FOnLoaded write FOnLoaded;
     property OnSelChange: TNotifyEvent read FOnSelChange write FOnSelChange;
     property OnUpdated: TChangeEvent read FOnUpdated write FOnUpdated;
     property Options: TOptions read FOptions write FOptions;
@@ -236,6 +256,7 @@ type
     property SortOrder: TBCEditorSortOrder read FSortOrder write FSortOrder;
     property State: TState read FState;
     property TextIn[const Area: TBCEditorLinesArea]: string read GetTextIn;
+    property TextLength: Integer read GetTextLength;
     property UndoList: TUndoList read FUndoList;
   public
     function Add(const AText: string): Integer; override;
@@ -564,6 +585,96 @@ begin
     FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition), FRegEx.Replace(FLines.TextIn[LinesArea(FFoundPosition, LEndPosition)], FPattern, FReplaceText, FRegExOptions));
 end;
 
+{ TBCEditorLines.TWordSearch **************************************************}
+
+constructor TBCEditorLines.TWordSearch.Create(const ALines: TBCEditorLines;
+  const AArea: TBCEditorLinesArea;
+  const ACaseSensitive: Boolean);
+begin
+  Assert((BOFPosition <= AArea.BeginPosition) and (AArea.BeginPosition <= AArea.EndPosition) and (AArea.EndPosition <= ALines.EOFPosition));
+
+  inherited Create();
+
+  FLines := ALines;
+
+  FArea := AArea;
+  FCaseSensitive := ACaseSensitive;
+end;
+
+function TBCEditorLines.TWordSearch.Find(var APosition: TBCEditorLinesPosition;
+  out AFoundLength: Integer): Boolean;
+begin
+  Assert((FArea.BeginPosition <= APosition) and (APosition <= FArea.EndPosition));
+
+  Result := FindNormal(APosition, AFoundLength);
+
+  Result := Result and (FFoundPosition <= FArea.EndPosition);
+
+  if (Result) then
+  begin
+    APosition := FFoundPosition;
+    AFoundLength := FFoundLength;
+  end;
+end;
+
+function TBCEditorLines.TWordSearch.FindNormal(const APosition: TBCEditorLinesPosition;
+  const AFoundLength: Integer): Boolean;
+var
+  LLineLength: Integer;
+  LLinePos: PChar;
+  LLineEndPos: PChar;
+  LLineText: string;
+begin
+  Result := False;
+
+  LLinePos := nil; // Compiler waring only
+  LLineEndPos := nil; // Compiler waring only
+
+  FFoundPosition := APosition;
+
+  while (not Result
+    and (FFoundPosition <= FLines.EOFPosition)) do
+  begin
+    LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
+
+    if (LLineLength > 0) then
+    begin
+      if (FCaseSensitive) then
+        LLineText := FLines.Items[FFoundPosition.Line].Text
+      else
+      begin
+        // Since we modify LLineText with CharLowerBuff, we need a copy of the
+        // string - not only a copy of the pointer to the string...
+        LLineText := Copy(FLines.Items[FFoundPosition.Line].Text, 1, LLineLength);
+        CharLowerBuff(PChar(LLineText), Length(LLineText));
+      end;
+
+      LLinePos := @LLineText[1 + FFoundPosition.Char];
+      LLineEndPos := @LLineText[1 + Length(LLineText)];
+      while (not Result
+        and (LLinePos <= LLineEndPos)) do
+      begin
+        Result := FLines.IsWordBreakChar(LLinePos^);
+
+        if (not Result) then
+          Inc(LLinePos);
+      end;
+    end;
+
+    if (not Result) then
+      FFoundPosition := FLines.BOLPosition[FFoundPosition.Line + 1]
+    else
+      FFoundPosition.Char := LLinePos - @LLineText[1];
+  end;
+
+  if (Result) then
+    while ((@LLinePos[1] <= LLineEndPos) and FLines.IsWordBreakChar(LLinePos[1])) do
+      Inc(LLinePos);
+
+  if (Result) then
+    FFoundLength := LLinePos - @LLineText[1] - FFoundPosition.Char;
+end;
+
 { TBCEditorLines.TUndoList ****************************************************}
 
 function TBCEditorLines.TUndoItem.ToString(): string;
@@ -797,6 +908,7 @@ begin
   FOnDeleted := nil;
   FOnDeleting := nil;
   FOnInserted := nil;
+  FOnLoaded := nil;
   FOnSelChange := nil;
   FOnUpdated := nil;
   FOptions := DefaultOptions;
@@ -928,7 +1040,7 @@ begin
   if ((ABeginPosition <= CaretPosition) and (CaretPosition <= AEndPosition)
     and (CaretPosition.Char > Length(Items[CaretPosition.Line].Text))) then
     FCaretPosition.Char := Length(Items[CaretPosition.Line].Text);
-  if (FSelArea.Containts(ABeginPosition) and FSelArea.Containts(AEndPosition))
+  if (FSelArea.Contains(ABeginPosition) and FSelArea.Contains(AEndPosition))
     and (CaretPosition.Char > Length(Items[FSelArea.BeginPosition.Line].Text)) then
     FSelArea.BeginPosition.Char := Length(Items[SelArea.BeginPosition.Line].Text);
   if ((ABeginPosition <= FSelArea.EndPosition) and (FSelArea.EndPosition <= AEndPosition)
@@ -1518,7 +1630,7 @@ var
   LEndChar: Integer;
   LEndLine: Integer;
   LLine: Integer;
-  StringBuilder: TStringBuilder;
+  LStringBuilder: TStringBuilder;
 begin
   Assert((BOFPosition <= AArea.BeginPosition) and (AArea.EndPosition <= EOFPosition),
     'BOFPosition: ' + BOFPosition.ToString() + #13#10
@@ -1565,7 +1677,7 @@ begin
     end
     else
     begin
-      StringBuilder := TStringBuilder.Create();
+      LStringBuilder := TStringBuilder.Create();
 
       LEndChar := Length(Items[AArea.BeginPosition.Line].Text);
       if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
@@ -1578,10 +1690,10 @@ begin
         + 'ABeginPosition.Char: ' + IntToStr(AArea.BeginPosition.Char) + #13#10
         + 'Length: ' + IntToStr(Length(Items[AArea.BeginPosition.Line].Text)));
 
-      StringBuilder.Append(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char, LEndChar - AArea.BeginPosition.Char);
+      LStringBuilder.Append(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char, LEndChar - AArea.BeginPosition.Char);
       for LLine := AArea.BeginPosition.Line + 1 to LEndLine - 1 do
       begin
-        StringBuilder.Append(LineBreak);
+        LStringBuilder.Append(LineBreak);
         LEndChar := Length(Items[LLine].Text);
         if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
           while ((LEndChar > 0) and (Items[LLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
@@ -1595,7 +1707,7 @@ begin
           'LEndChar: ' + LEndChar.ToString() + #13#10
           + 'Length: ' + Length(Items[LLine].Text).ToString());
 
-        StringBuilder.Append(Items[LLine].Text, 0, LEndChar);
+        LStringBuilder.Append(Items[LLine].Text, 0, LEndChar);
       end;
       if (LEndLine = AArea.EndPosition.Line) then
         LEndChar := AArea.EndPosition.Char
@@ -1607,13 +1719,13 @@ begin
       if ((LEndChar > 0)
         or not (loTrimTrailingSpaces in Options) or not (lsSaving in State) or (LEndChar <> Length(Items[LEndLine].Text))) then
       begin
-        StringBuilder.Append(LineBreak);
-        StringBuilder.Append(Items[LEndLine].Text, 0, LEndChar);
+        LStringBuilder.Append(LineBreak);
+        LStringBuilder.Append(Items[LEndLine].Text, 0, LEndChar);
       end;
 
-      Result := StringBuilder.ToString();
+      Result := LStringBuilder.ToString();
 
-      StringBuilder.Free();
+      LStringBuilder.Free();
     end;
   end;
 end;
@@ -2164,12 +2276,14 @@ begin
 
     UndoList.EndUpdate();
 
-    if (Assigned(OnCaretChanged) and (lsCaretChanged in FState)) then
-      OnCaretChanged(Self);
-    if (Assigned(OnSelChange) and (lsSelChanged in FState)) then
-      OnSelChange(Self);
-    if (Assigned(OnAfterUpdate)) then
-      OnAfterUpdate(Self);
+    if (Assigned(FOnCaretChanged) and (lsCaretChanged in FState)) then
+      FOnCaretChanged(Self);
+    if (Assigned(FOnSelChange) and (lsSelChanged in FState)) then
+      FOnSelChange(Self);
+    if (Assigned(FOnAfterUpdate)) then
+      FOnAfterUpdate(Self);
+    if (Assigned(FOnLoaded) and (lsLoading in FState)) then
+      FOnLoaded(Self);
 
     FState := FState - [lsCaretChanged, lsSelChanged];
   end;

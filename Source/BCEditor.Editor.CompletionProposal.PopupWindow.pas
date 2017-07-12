@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Messages,
   Classes, Types,
-  Forms, Controls, Graphics,
+  Forms, Controls, Graphics, StdCtrls,
   BCEditor.Utils, BCEditor.Types,
   BCEditor.Editor.CompletionProposal;
 

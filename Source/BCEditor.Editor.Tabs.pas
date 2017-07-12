@@ -10,16 +10,13 @@ type
   TBCEditorTabs = class(TPersistent)
   strict private const
     DefaultOptions = [toSelectedBlockIndent];
-    DefaultWantTabs = True;
     DefaultWidth = 2;
   strict private
     FOnChange: TNotifyEvent;
     FOptions: TBCEditorTabOptions;
-    FWantTabs: Boolean;
     FWidth: Integer;
     procedure DoChange();
     procedure SetOptions(const AValue: TBCEditorTabOptions);
-    procedure SetWantTabs(const AValue: Boolean);
     procedure SetWidth(const AValue: Integer);
   protected
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -28,7 +25,6 @@ type
     procedure Assign(ASource: TPersistent); override;
   published
     property Options: TBCEditorTabOptions read FOptions write SetOptions default DefaultOptions;
-    property WantTabs: Boolean read FWantTabs write SetWantTabs default DefaultWantTabs;
     property Width: Integer read FWidth write SetWidth default DefaultWidth;
   end;
 
@@ -41,7 +37,6 @@ begin
   inherited;
 
   FOptions := DefaultOptions;
-  FWantTabs := DefaultWantTabs;
   FWidth := DefaultWidth;
 end;
 
@@ -50,7 +45,6 @@ begin
   if (ASource is TBCEditorTabs) then
   begin
     FOptions := TBCEditorTabs(ASource).FOptions;
-    FWantTabs := TBCEditorTabs(ASource).FWantTabs;
     FWidth := TBCEditorTabs(ASource).FWidth;
     DoChange();
   end
@@ -69,15 +63,6 @@ begin
   if (FOptions <> AValue) then
   begin
     FOptions := AValue;
-    DoChange();
-  end;
-end;
-
-procedure TBCEditorTabs.SetWantTabs(const AValue: Boolean);
-begin
-  if (FWantTabs <> AValue) then
-  begin
-    FWantTabs := AValue;
     DoChange();
   end;
 end;

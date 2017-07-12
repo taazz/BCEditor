@@ -144,7 +144,6 @@
         <DCCReference Include="..\Source\BCEditor.Editor.SpecialChars.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.SyncEdit.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.Tabs.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.WordWrap.pas"/>
         <DCCReference Include="..\Source\BCEditor.Export.HTML.pas"/>
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
         <DCCReference Include="..\Source\BCEditor.KeyboardHandler.pas"/>

@@ -91,7 +91,7 @@ const
   ecDeleteLine = 507;
   ecClear = 508;
   { Insert }
-  ecLineBreak = 509;
+  ecReturn = 509;
   ecInsertLine = 510;
   ecChar = 511;
   ecString = 512;
@@ -286,7 +286,7 @@ const
     (Value: ecDeleteEndOfLine; Name: 'ecDeleteEndOfLine'),
     (Value: ecDeleteLine; Name: 'ecDeleteLine'),
     (Value: ecClear; Name: 'ecClear'),
-    (Value: ecLineBreak; Name: 'ecLineBreak'),
+    (Value: ecReturn; Name: 'ecReturn'),
     (Value: ecInsertLine; Name: 'ecInsertLine'),
     (Value: ecChar; Name: 'ecChar'),
     (Value: ecString; Name: 'ecString'),
@@ -654,8 +654,8 @@ begin
   Add(ecSearchNext, [], VK_F3);
   Add(ecSearchPrevious, [ssShift], VK_F3);
   { Enter (return) & Tab }
-  Add(ecLineBreak, [], VK_RETURN);
-  Add(ecLineBreak, [ssShift], VK_RETURN);
+  Add(ecReturn, [], VK_RETURN);
+  Add(ecReturn, [ssShift], VK_RETURN);
   Add(ecTab, [], VK_TAB);
   Add(ecShiftTab, [ssShift], VK_TAB);
   { Help }

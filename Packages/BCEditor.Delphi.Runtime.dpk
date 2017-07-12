@@ -52,7 +52,6 @@ contains
   BCEditor.Editor.SpecialChars in '..\Source\BCEditor.Editor.SpecialChars.pas',
   BCEditor.Editor.SyncEdit in '..\Source\BCEditor.Editor.SyncEdit.pas',
   BCEditor.Editor.Tabs in '..\Source\BCEditor.Editor.Tabs.pas',
-  BCEditor.Editor.WordWrap in '..\Source\BCEditor.Editor.WordWrap.pas',
   BCEditor.Export.HTML in '..\Source\BCEditor.Export.HTML.pas',
   BCEditor.Highlighter in '..\Source\BCEditor.Highlighter.pas',
   BCEditor.KeyboardHandler in '..\Source\BCEditor.KeyboardHandler.pas',

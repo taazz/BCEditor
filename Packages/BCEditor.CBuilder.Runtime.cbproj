@@ -176,9 +176,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.Tabs.pas">
             <BuildOrder>26</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.WordWrap.pas">
-            <BuildOrder>29</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
             <BuildOrder>30</BuildOrder>
         </DelphiCompile>

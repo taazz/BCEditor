@@ -4,7 +4,7 @@ interface
 
 uses
   Classes, Contnrs,
-  Controls, Graphics,
+  Controls, Graphics, StdCtrls,
   BCEditor.Consts;
 
 type
@@ -18,7 +18,7 @@ type
     FLine: Integer;
     FVisible: Boolean;
   public
-    constructor Create(AOwner: TCustomControl);
+    constructor Create(const AEditor: TCustomControl);
     property Char: Integer read FChar write FChar;
     property Data: Pointer read FData write FData;
     property ImageIndex: Integer read FImageIndex write FImageIndex;
@@ -39,7 +39,7 @@ type
     procedure SetItem(AIndex: Integer; AItem: TBCEditorMark);
     property OwnsObjects;
   public
-    constructor Create(AOwner: TCustomControl);
+    constructor Create(const AEditor: TCustomControl);
     procedure ClearLine(ALine: Integer);
     function Extract(AItem: TBCEditorMark): TBCEditorMark;
     function Find(const AIndex: Integer): TBCEditorMark;
@@ -67,18 +67,19 @@ begin
   Result := TBCEditorMark(Item1).Line - TBCEditorMark(Item2).Line;
 end;
 
-constructor TBCEditorMark.Create(AOwner: TCustomControl);
+constructor TBCEditorMark.Create(const AEditor: TCustomControl);
 begin
   inherited Create;
 
   FIndex := -1;
-  FEditor := AOwner;
+  FEditor := AEditor;
 end;
 
-constructor TBCEditorMarkList.Create(AOwner: TCustomControl);
+constructor TBCEditorMarkList.Create(const AEditor: TCustomControl);
 begin
-  inherited Create;
-  FEditor := AOwner;
+  inherited Create();
+
+  FEditor := AEditor;
 end;
 
 procedure TBCEditorMarkList.ClearLine(ALine: Integer);
