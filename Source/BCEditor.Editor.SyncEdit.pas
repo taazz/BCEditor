@@ -3,7 +3,7 @@ unit BCEditor.Editor.SyncEdit;
 interface {********************************************************************}
 
 uses
-  Classes, Generics.Collections,
+  Classes,
   Graphics,
   BCEditor.Types, BCEditor.Consts;
 
@@ -26,51 +26,30 @@ type
     end;
 
   strict private const
+    DefaultOptions = [seoButton, seoCaseSensitive];
     DefaultShortCut = 24650; // (Shift+Ctrl+J)
   strict private
-    FActive: Boolean;
-    FBlockArea: TBCEditorLinesArea;
-    FBlockSelected: Boolean;
     FColors: TBCEditorSyncEdit.TColors;
-    FEditArea: TBCEditorLinesArea;
-    FEditWidth: Integer;
     FEnabled: Boolean;
-    FInEditor: Boolean;
     FOnChange: TNotifyEvent;
     FOptions: TBCEditorSyncEditOptions;
     FShortCut: TShortCut;
-    FSyncItems: TList<TBCEditorLinesPosition>;
     procedure DoChange(ASender: TObject);
-    procedure SetActive(AValue: Boolean);
   protected
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    property SyncItems: TList<TBCEditorLinesPosition> read FSyncItems;
   public
-    procedure Abort;
     procedure Assign(ASource: TPersistent); override;
-    procedure ClearSyncItems();
     constructor Create();
     destructor Destroy(); override;
-    procedure MoveBeginPositionChar(ACount: Integer);
-    procedure MoveEndPositionChar(ACount: Integer);
     procedure SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
-    property Active: Boolean read FActive write SetActive default False;
-    property BlockArea: TBCEditorLinesArea read FBlockArea write FBlockArea;
-    property BlockSelected: Boolean read FBlockSelected write FBlockSelected default False;
-    property EditArea: TBCEditorLinesArea read FEditArea write FEditArea;
-    property EditWidth: Integer read FEditWidth write FEditWidth;
-    property InEditor: Boolean read FInEditor write FInEditor default False;
   published
     property Colors: TColors read FColors write FColors;
     property Enabled: Boolean read FEnabled write FEnabled default True;
-    property Options: TBCEditorSyncEditOptions read FOptions write FOptions default [seCaseSensitive];
+    property Options: TBCEditorSyncEditOptions read FOptions write FOptions default DefaultOptions;
     property ShortCut: TShortCut read FShortCut write FShortCut default DefaultShortCut;
   end;
 
 implementation {***************************************************************}
-
-uses
-  Menus;
 
 { TBCEditorSyncEdit.TColors ***************************************************}
 
@@ -98,33 +77,6 @@ end;
 
 { TBCEditorSyncEdit ***********************************************************}
 
-constructor TBCEditorSyncEdit.Create;
-begin
-  inherited Create;
-
-  FActive := False;
-  FBlockSelected := False;
-  FEnabled := True;
-  FInEditor := False;
-  FShortCut := DefaultShortCut;
-  FOptions := [seCaseSensitive];
-  FSyncItems := TList<TBCEditorLinesPosition>.Create();
-  FColors := TBCEditorSyncEdit.TColors.Create;
-end;
-
-destructor TBCEditorSyncEdit.Destroy;
-begin
-  ClearSyncItems;
-  FSyncItems.Free;
-  FColors.Free;
-  inherited;
-end;
-
-procedure TBCEditorSyncEdit.Abort;
-begin
-  FActive := False;
-end;
-
 procedure TBCEditorSyncEdit.Assign(ASource: TPersistent);
 begin
   if Assigned(ASource) and (ASource is TBCEditorSyncEdit) then
@@ -138,9 +90,21 @@ begin
     inherited Assign(ASource);
 end;
 
-procedure TBCEditorSyncEdit.ClearSyncItems;
+constructor TBCEditorSyncEdit.Create();
 begin
-  FSyncItems.Clear;
+  inherited Create();
+
+  FColors := TBCEditorSyncEdit.TColors.Create();
+  FEnabled := True;
+  FOptions := DefaultOptions;
+  FShortCut := DefaultShortCut;
+end;
+
+destructor TBCEditorSyncEdit.Destroy();
+begin
+  FColors.Free();
+
+  inherited;
 end;
 
 procedure TBCEditorSyncEdit.DoChange(ASender: TObject);
@@ -149,25 +113,9 @@ begin
     FOnChange(ASender);
 end;
 
-procedure TBCEditorSyncEdit.MoveBeginPositionChar(ACount: Integer);
-begin
-  Inc(FEditArea.BeginPosition.Char, ACount);
-end;
-
-procedure TBCEditorSyncEdit.MoveEndPositionChar(ACount: Integer);
-begin
-  Inc(FEditArea.EndPosition.Char, ACount);
-end;
-
-procedure TBCEditorSyncEdit.SetActive(AValue: Boolean);
-begin
-  FActive := AValue;
-  DoChange(Self);
-end;
-
 procedure TBCEditorSyncEdit.SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
 begin
-  if AEnabled then
+  if (AEnabled) then
     Include(FOptions, AOption)
   else
     Exclude(FOptions, AOption);

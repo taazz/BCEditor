@@ -3,8 +3,7 @@ unit BCEditor.Utils;
 interface {********************************************************************}
 
 uses
-  Classes,
-  Graphics;
+  Classes;
 
 function CaseNone(const AChar: Char): Char;
 function CaseStringNone(const AString: string): string;
@@ -13,15 +12,12 @@ procedure ClearList(var AList: TList);
 function ConvertTabs(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean): string;
 procedure FreeList(var AList: TList);
 function MinMax(const AValue, AMinValue, AMaxValue: Integer): Integer;
-function TextHeight(ACanvas: TCanvas; const AText: string): Integer;
-function TextWidth(ACanvas: TCanvas; const AText: string): Integer;
 
 implementation {***************************************************************}
 
 uses
-  Windows,
-  Math, SysUtils, Character,
-  BCEditor.Consts, BCEditor.Types;
+  Math,
+  BCEditor.Consts;
 
 function CaseNone(const AChar: Char): Char;
 begin
@@ -95,22 +91,6 @@ end;
 function MinMax(const AValue, AMinValue, AMaxValue: Integer): Integer;
 begin
   Result := Max(Min(AValue, AMaxValue), AMinValue);
-end;
-
-function TextHeight(ACanvas: TCanvas; const AText: string): Integer;
-var
-  LSize: TSize;
-begin
-  GetTextExtentPoint32(ACanvas.Handle, PChar(AText), Length(AText), LSize);
-  Result := LSize.cy;
-end;
-
-function TextWidth(ACanvas: TCanvas; const AText: string): Integer;
-var
-  LSize: TSize;
-begin
-  GetTextExtentPoint32(ACanvas.Handle, PChar(AText), Length(AText), LSize);
-  Result := LSize.cx;
 end;
 
 end.

@@ -213,18 +213,20 @@ type
     TKeyList = class(TRule)
     strict private
       FKeyList: TStringList;
+      FSyncEdit: Boolean;
     public
       constructor Create;
       destructor Destroy; override;
       property KeyList: TStringList read FKeyList write FKeyList;
+      property SyncEdit: Boolean read FSyncEdit write FSyncEdit;
     end;
 
     TSet = class(TRule)
     strict private
-      FCharSet: TBCEditorCharSet;
+      FCharSet: TBCEditorAnsiCharSet;
     public
-      constructor Create(ACharSet: TBCEditorCharSet = []);
-      property CharSet: TBCEditorCharSet read FCharSet write FCharSet;
+      constructor Create(ACharSet: TBCEditorAnsiCharSet = []);
+      property CharSet: TBCEditorAnsiCharSet read FCharSet write FCharSet;
     end;
 
     TCaseFunction = function(const AChar: Char): Char;
@@ -244,7 +246,7 @@ type
       FDefaultSymbols: TDefaultParser;
       FDefaultTermSymbol: TDelimitersParser;
       FDefaultToken: TToken;
-      FDelimiters: TBCEditorCharSet;
+      FDelimiters: TBCEditorAnsiCharSet;
       FKeyList: TList;
       FOpenBeginningOfLine: Boolean;
       FOpenToken: TMultiToken;
@@ -278,7 +280,7 @@ type
       function FindToken(const AString: string): TToken;
       procedure Prepare(AParent: TRange);
       procedure Reset;
-      procedure SetDelimiters(const ADelimiters: TBCEditorCharSet);
+      procedure SetDelimiters(const ADelimiters: TBCEditorAnsiCharSet);
       property AlternativeCloseArray: TBCEditorArrayOfString read FAlternativeCloseArray write FAlternativeCloseArray;
       property AlternativeCloseArrayCount: Integer read FAlternativeCloseArrayCount write SetAlternativeCloseArrayCount;
       property CaseFunct: TCaseFunction read FCaseFunct;
@@ -289,7 +291,7 @@ type
       property CloseToken: TMultiToken read FCloseToken write FCloseToken;
       property ClosingToken: TToken read FClosingToken write FClosingToken;
       property DefaultToken: TToken read FDefaultToken;
-      property Delimiters: TBCEditorCharSet read FDelimiters write FDelimiters;
+      property Delimiters: TBCEditorAnsiCharSet read FDelimiters write FDelimiters;
       property KeyList[const AIndex: Integer]: TKeyList read GetKeyList;
       property KeyListCount: Integer read GetKeyListCount;
       property OpenBeginningOfLine: Boolean read FOpenBeginningOfLine write FOpenBeginningOfLine;
@@ -308,7 +310,7 @@ type
 
     TComments = class(TObject)
     strict private
-      FChars: TBCEditorCharSet;
+      FChars: TBCEditorAnsiCharSet;
       FBlockComments: TBCEditorArrayOfString;
       FLineComments: TBCEditorArrayOfString;
       procedure AddChars(const AToken: string);
@@ -317,7 +319,7 @@ type
       procedure AddLineComment(const AToken: string);
       procedure Clear;
       destructor Destroy; override;
-      property Chars: TBCEditorCharSet read FChars write FChars;
+      property Chars: TBCEditorAnsiCharSet read FChars write FChars;
       property BlockComments: TBCEditorArrayOfString read FBlockComments;
       property LineComments: TBCEditorArrayOfString read FLineComments;
     end;
@@ -414,7 +416,7 @@ type
     end;
 
   strict private
-    FAllDelimiters: TBCEditorCharSet;
+    FAllDelimiters: TBCEditorAnsiCharSet;
     FAttributes: TStringList;
     FCodeFoldingRangeCount: Integer;
     FCodeFoldingRegions: TBCEditorCodeFoldingRegions;
@@ -424,8 +426,8 @@ type
     FEditor: TCustomControl;
     FFileName: string;
     FFilePath: string;
-    FFoldCloseKeyChars: TBCEditorCharSet;
-    FFoldOpenKeyChars: TBCEditorCharSet;
+    FFoldCloseKeyChars: TBCEditorAnsiCharSet;
+    FFoldOpenKeyChars: TBCEditorAnsiCharSet;
     FMainRules: TRange;
     FMatchingPairHighlight: Boolean;
     FMatchingPairs: TList<TMatchingPairToken>;
@@ -433,10 +435,10 @@ type
     FName: string;
     FOnChange: TNotifyEvent;
     FSample: string;
-    FSkipCloseKeyChars: TBCEditorCharSet;
-    FSkipOpenKeyChars: TBCEditorCharSet;
+    FSkipCloseKeyChars: TBCEditorAnsiCharSet;
+    FSkipOpenKeyChars: TBCEditorAnsiCharSet;
     FTemporaryCurrentTokens: TList<TToken>;
-    FWordBreakChars: TBCEditorCharSet;
+    FWordBreakChars: TBCEditorAnsiCharSet;
     procedure AddAllAttributes(ARange: TRange);
     procedure SetFileName(AValue: string);
     procedure UpdateAttributes(ARange: TRange; AParentRange: TRange);
@@ -445,7 +447,7 @@ type
     function GetAttribute(AIndex: Integer): TAttribute;
     procedure AddAttribute(AHighlighterAttribute: TAttribute);
     procedure SetCodeFoldingRangeCount(AValue: Integer);
-    procedure SetWordBreakChars(AChars: TBCEditorCharSet);
+    procedure SetWordBreakChars(AChars: TBCEditorAnsiCharSet);
   protected
     property Editor: TCustomControl read FEditor;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -471,17 +473,17 @@ type
     property CompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
     property FileName: string read FFileName write SetFileName;
     property FilePath: string read FFilePath write FFilePath;
-    property FoldCloseKeyChars: TBCEditorCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
-    property FoldOpenKeyChars: TBCEditorCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
+    property FoldCloseKeyChars: TBCEditorAnsiCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
+    property FoldOpenKeyChars: TBCEditorAnsiCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
     property MainRules: TRange read FMainRules;
     property MatchingPairHighlight: Boolean read FMatchingPairHighlight write FMatchingPairHighlight default True;
     property MatchingPairs: TList<TMatchingPairToken> read FMatchingPairs;
     property MultiHighlighter: Boolean read FMultiHighlighter write FMultiHighlighter;
     property Name: string read FName write FName;
     property Sample: string read FSample write FSample;
-    property SkipCloseKeyChars: TBCEditorCharSet read FSkipCloseKeyChars write FSkipCloseKeyChars;
-    property SkipOpenKeyChars: TBCEditorCharSet read FSkipOpenKeyChars write FSkipOpenKeyChars;
-    property WordBreakChars: TBCEditorCharSet read FWordBreakChars write SetWordBreakChars;
+    property SkipCloseKeyChars: TBCEditorAnsiCharSet read FSkipCloseKeyChars write FSkipCloseKeyChars;
+    property SkipOpenKeyChars: TBCEditorAnsiCharSet read FSkipOpenKeyChars write FSkipOpenKeyChars;
+    property WordBreakChars: TBCEditorAnsiCharSet read FWordBreakChars write SetWordBreakChars;
   end;
 
 implementation {***************************************************************}
@@ -938,7 +940,7 @@ end;
 
 { TBCEditorHighlighter.TSet ***************************************************}
 
-constructor TBCEditorHighlighter.TSet.Create(ACharSet: TBCEditorCharSet = []);
+constructor TBCEditorHighlighter.TSet.Create(ACharSet: TBCEditorAnsiCharSet = []);
 begin
   inherited Create;
 
@@ -1356,7 +1358,7 @@ begin
   end;
 end;
 
-procedure TBCEditorHighlighter.TRange.SetDelimiters(const ADelimiters: TBCEditorCharSet);
+procedure TBCEditorHighlighter.TRange.SetDelimiters(const ADelimiters: TBCEditorAnsiCharSet);
 var
   LIndex: Integer;
 begin
@@ -1463,7 +1465,7 @@ end;
 function TBCEditorHighlighter.TParser.GetToken(const ARange: TRange;
   const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
 var
-  LAllowedDelimiters: TBCEditorCharSet;
+  LAllowedDelimiters: TBCEditorAnsiCharSet;
   LBeginChar: Integer;
   LCurrentTokenNode: TTokenNode;
   LFindTokenNode: TTokenNode;
@@ -1530,7 +1532,9 @@ begin
       if (AChar <= Length(ALineText)) then
         Inc(AChar);
 
-      if ((LFindTokenNode.BreakType = btAny) or (AChar = Length(ALineText)) or CharInSet(ALineText[1 + AChar], ARange.Delimiters)) then
+      if ((LFindTokenNode.BreakType = btAny)
+        or (AChar = Length(ALineText))
+        or CharInSet(ALineText[1 + AChar], ARange.Delimiters)) then
       begin
         AToken := LFindTokenNode.Token;
         Exit(True);
@@ -1651,7 +1655,7 @@ begin
     Result := StringToColor(AString);
 end;
 
-function StrToSet(const AString: string): TBCEditorCharSet;
+function StrToSet(const AString: string): TBCEditorAnsiCharSet;
 var
   LIndex: Integer;
 begin
@@ -1993,7 +1997,7 @@ begin
         LeftMargin.Colors.Foreground := StringToColorDef(LColorsObject['LeftMarginLineNumbers'].Value, LeftMargin.Colors.Foreground);
         LeftMargin.Colors.BookmarkPanelBackground := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, LeftMargin.Colors.BookmarkPanelBackground);
         LeftMargin.Colors.LineStateModified := StringToColorDef(LColorsObject['LeftMarginLineStateModified'].Value, LeftMargin.Colors.LineStateModified);
-        LeftMargin.Colors.LineStateNormal := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, LeftMargin.Colors.LineStateNormal);
+        LeftMargin.Colors.LineStateLoaded := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, LeftMargin.Colors.LineStateLoaded);
         MatchingPair.Colors.Matched := StringToColorDef(LColorsObject['MatchingPairMatched'].Value, MatchingPair.Colors.Matched);
         MatchingPair.Colors.Underline := StringToColorDef(LColorsObject['MatchingPairUnderline'].Value, MatchingPair.Colors.Underline);
         MatchingPair.Colors.Unmatched := StringToColorDef(LColorsObject['MatchingPairUnmatched'].Value, MatchingPair.Colors.Unmatched);
@@ -2184,6 +2188,7 @@ begin
     for LIndex := 0 to LWordArray.Count - 1 do
       AKeyList.KeyList.Add(LWordArray.S[LIndex]);
     ImportAttributes(AKeyList.Attribute, KeyListObject['Attributes'].ObjectValue, AElementPrefix);
+    AKeyList.SyncEdit := KeyListObject['SyncEdit'].ObjectValue.B['Enabled'];
   end;
 end;
 
@@ -2539,7 +2544,7 @@ function TBCEditorHighlighter.FindNextToken(var AFind: TFind): Boolean;
 var
   LChar: Integer;
   LCloseParent: Boolean;
-  LDelimiters: TBCEditorCharSet;
+  LDelimiters: TBCEditorAnsiCharSet;
   LIndex: Integer;
   LKeywordText: string;
   LParser: TBaseParser;
@@ -2701,7 +2706,7 @@ begin
   end;
 end;
 
-procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorCharSet);
+procedure TBCEditorHighlighter.SetWordBreakChars(AChars: TBCEditorAnsiCharSet);
 begin
   FWordBreakChars := AChars;
 end;

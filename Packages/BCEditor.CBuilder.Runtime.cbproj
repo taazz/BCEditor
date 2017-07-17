@@ -128,9 +128,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.ActiveLine.pas">
             <BuildOrder>3</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Caret.pas">
-            <BuildOrder>5</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.pas">
             <BuildOrder>7</BuildOrder>
         </DelphiCompile>

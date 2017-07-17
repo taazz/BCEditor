@@ -790,7 +790,7 @@ begin
     PixelRight := APrinterInfo.PrintableWidth - APrinterInfo.PixFromRight(FRight);
   end;
   if ALineNumbers and (not ALineNumbersInMargin) then
-    PixelLeft := PixelLeft + TextWidth(ACanvas, IntToStr(AMaxLineNumber) + ': ');
+    PixelLeft := PixelLeft + ACanvas.TextWidth(IntToStr(AMaxLineNumber) + ': ');
   PixelTop := APrinterInfo.PixFromTop(FTop);
   PixelBottom := APrinterInfo.PrintableHeight - APrinterInfo.PixFromBottom(FBottom);
   PixelHeader := APrinterInfo.PixFromTop(FHeader);
@@ -1215,10 +1215,10 @@ begin
     GetTextMetrics(ACanvas.Handle, LTextMetric);
     with TLineInfo(FLineInfo[LCurrentLine - 1]), LTextMetric do
     begin
-      LineHeight := Max(LineHeight, TextHeight(ACanvas, 'W'));
+      LineHeight := Max(LineHeight, ACanvas.TextHeight('W'));
       MaxBaseDistance := Max(MaxBaseDistance, tmHeight - tmDescent);
     end;
-    FFrameHeight := Max(FFrameHeight, LOrginalHeight + TextHeight(ACanvas, 'W'));
+    FFrameHeight := Max(FFrameHeight, LOrginalHeight + ACanvas.TextHeight('W'));
   end;
   FFrameHeight := FFrameHeight + 2 * FMargins.PixelInternalMargin;
 end;
@@ -1428,9 +1428,9 @@ begin
       X := PixelLeftTextIndent;
       case LAlignment of
         taRightJustify:
-          X := PixelRightTextIndent - TextWidth(ACanvas, S);
+          X := PixelRightTextIndent - ACanvas.TextWidth(S);
         taCenter:
-          X := (PixelLeftTextIndent + PixelRightTextIndent - TextWidth(ACanvas, S)) div 2;
+          X := (PixelLeftTextIndent + PixelRightTextIndent - ACanvas.TextWidth(S)) div 2;
       end;
     end;
     LOldAlign := SetTextAlign(ACanvas.Handle, TA_BASELINE);
@@ -1748,8 +1748,8 @@ begin
     TBCEditorPageLine(FPages[LIndex]).Free;
   FPages.Clear;
   FMaxWidth := FMargins.PixelRight - FMargins.PixelLeft;
-  FMaxColumn := FMaxWidth div TextWidth(FCanvas, 'W') - 1;
-  FMaxWidth := TextWidth(FCanvas, StringOfChar('W', FMaxColumn)); // TODO: This does not work with non-fixed width fonts
+  FMaxColumn := FMaxWidth div FCanvas.TextWidth('W') - 1;
+  FMaxWidth := FCanvas.TextWidth(StringOfChar('W', FMaxColumn)); // TODO: This does not work with non-fixed width fonts
   FPageCount := 1;
   LPageLine := TBCEditorPageLine.Create;
   LPageLine.FirstLine := 0;
@@ -1793,7 +1793,7 @@ begin
         LText := Copy(FLines[LIndex], LSelectionStart, LSelectionLength);
       end;
 
-      if TextWidth(FCanvas, LText) > FMaxWidth then
+      if FCanvas.TextWidth(LText) > FMaxWidth then
       begin
         LList := TList.Create;
         try
@@ -2015,7 +2015,7 @@ begin
         begin
           SetString(LTokenText, LToken.Text, LToken.Length);
           ClippedTextOut(LLeft, FYPos, LTokenText);
-          Inc(LLeft, TextWidth(FCanvas, LTokenText));
+          Inc(LLeft, FCanvas.TextWidth(LTokenText));
         end;
       until (not FHighlighter.FindNextToken(LToken));
     RestoreCurrentFont;

@@ -14,8 +14,9 @@ A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VC
 * Synchron edit
 * Completion proposal
 * Undo, redo
-* Fonts with variable character width
 * Macro recorder
+* Fonts with variable character width
+* Windows DPI Aware
 
 <h3>Build requirements</h3>
 

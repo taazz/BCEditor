@@ -174,7 +174,7 @@ var
 
   procedure CalculateFormPlacement;
   begin
-    LPoint.X := APoint.X - TextWidth(FBitmapBuffer.Canvas, ACurrentString);
+    LPoint.X := APoint.X - FBitmapBuffer.Canvas.TextWidth(ACurrentString);
     LPoint.Y := APoint.Y;
 
     ClientHeight := FItemHeight * FCompletionProposal.VisibleLines + FTitleHeight + 2;
@@ -233,7 +233,7 @@ var
         LMaxWidth := 0;
         for LIndex := 0 to LItems.Count - 1 do
         begin
-          LTempWidth := TextWidth(FBitmapBuffer.Canvas, LItems[LIndex].Value);
+          LTempWidth := FBitmapBuffer.Canvas.TextWidth(LItems[LIndex].Value);
           if LTempWidth > LMaxWidth then
             LMaxWidth := LTempWidth;
         end;
@@ -312,7 +312,7 @@ var
 begin
   Result := '';
 
-  LTextCaretPosition := LinesPosition(TCustomBCEditor(Editor).CaretPos);
+  LTextCaretPosition := TCustomBCEditor(Editor).CaretPos;
 
   LLineText := TCustomBCEditor(Editor).Lines[Min(LTextCaretPosition.Line, TCustomBCEditor(Editor).Lines.Count - 1)];
   LChar := LTextCaretPosition.Char;
@@ -343,7 +343,7 @@ begin
   begin
     LColumn := FCompletionProposal.Columns[LColumnIndex];
     FBitmapBuffer.Canvas.Font.Assign(LColumn.Font);
-    LHeight := TextHeight(FBitmapBuffer.Canvas, 'X');
+    LHeight := FBitmapBuffer.Canvas.TextHeight('X');
     if LHeight > Result then
       Result := LHeight;
   end;
@@ -368,7 +368,7 @@ begin
   begin
     LColumn := FCompletionProposal.Columns[LColumnIndex];
     FBitmapBuffer.Canvas.Font.Assign(LColumn.Title.Font);
-    LHeight := TextHeight(FBitmapBuffer.Canvas, 'X');
+    LHeight := FBitmapBuffer.Canvas.TextHeight('X');
     if LHeight > Result then
       Result := LHeight;
   end;
@@ -397,9 +397,9 @@ begin
     BeginUpdate;
     Lines.BeginUpdate();
     try
-      LTextPosition := LinesPosition(CaretPos);
+      LTextPosition := CaretPos;
 
-      if not SelectionAvailable then
+      if (SelLength = 0) then
       begin
         SelectionBeginPosition := LinesPosition(FCompletionStartChar, LTextPosition.Line);
         if AEndToken = BCEDITOR_NONE_CHAR then
@@ -430,7 +430,7 @@ begin
         SetFocus;
 
       ScrollToCaret;
-      CaretPos := Point(SelectionEndPosition);
+      CaretPos := SelectionEndPosition;
       SelectionBeginPosition := LinesPosition(CaretPos.X + 1, CaretPos.Y);
     finally
       Lines.EndUpdate();
@@ -501,7 +501,7 @@ begin
     VK_RIGHT:
       with TCustomBCEditor(Editor) do
       begin
-        LTextCaretPosition := LinesPosition(CaretPos);
+        LTextCaretPosition := CaretPos;
         if LTextCaretPosition.Char < Length(Lines[LTextCaretPosition.Line]) then
           LChar := Lines[LTextCaretPosition.Line][1 + LTextCaretPosition.Char]
         else

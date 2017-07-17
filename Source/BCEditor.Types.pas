@@ -3,26 +3,20 @@ unit BCEditor.Types;
 interface {********************************************************************}
 
 uses
-  Windows,
-  Classes, SysUtils, Types,
-  Forms, Graphics, Controls,
+  SysUtils, Types,
+  Graphics, Controls,
   BCEditor.Consts;
 
 type
   TBCEditorArrayOfString = array of string;
   TBCEditorArrayOfSingle = array of Single;
 
-  TBCEditorCharMethod = function(const AChar: Char): Boolean of object;
+  TBCEditorCaretChangedEvent = procedure(ASender: TObject; ACaretPos: TPoint) of object;
 
   TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;
   TBCEditorHintEvent = procedure(ASender: TObject; const AX, AY: Integer; const APos: TPoint; const AIndex: Integer; var AHint: string) of object;
-  TBCEditorWordBreakProc = function(lpch: LPTSTR; ichCurrent: Integer; cch: Integer; code: Integer): Integer; stdcall;
 
   TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
-
-  TBCEditorTokenAddon = (taNone, taDoubleUnderline, taUnderline, taWaveLine);
-
-  TBCEditorCreateFileStreamEvent = procedure(ASender: TObject; const AFileName: string; var AStream: TStream) of object;
 
   TBCEditorOption = (
     eoAutoIndent, { Will indent the caret on new lines with the same amount of leading white space as the preceding line }
@@ -31,14 +25,6 @@ type
     eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
   );
   TBCEditorOptions = set of TBCEditorOption;
-
-  TBCEditorCaretOption = (
-    coRightMouseClickMove { When clicking with the right mouse for a popup menu, move the cursor to that location }
-  );
-  TBCEditorCaretMultiEditOption = (
-    meoShowActiveLine,
-    meoShowGhost { Ghost caret follows mouse cursor when moved }
-  );
 
   TBCEditorTextEntryMode = (temInsert, temOverwrite);
 
@@ -83,7 +69,8 @@ type
     soWrapAround
   );
   TBCEditorSyncEditOption = (
-    seCaseSensitive
+    seoButton,
+    seoCaseSensitive
   );
   TBCEditorSyncEditOptions = set of TBCEditorSyncEditOption;
 
@@ -130,6 +117,8 @@ type
     class operator Equal(a, b: TBCEditorLinesPosition): Boolean; inline;
     class operator GreaterThan(a, b: TBCEditorLinesPosition): Boolean; inline;
     class operator GreaterThanOrEqual(a, b: TBCEditorLinesPosition): Boolean; inline;
+    class operator Implicit(a: TBCEditorLinesPosition): TPoint; inline;
+    class operator Implicit(a: TPoint): TBCEditorLinesPosition; inline;
     class operator LessThan(a, b: TBCEditorLinesPosition): Boolean; inline;
     class operator LessThanOrEqual(a, b: TBCEditorLinesPosition): Boolean; inline;
     class operator NotEqual(a, b: TBCEditorLinesPosition): Boolean; inline;
@@ -220,8 +209,6 @@ type
 
   TBCEditorScrollHintFormat = (shfTopLineOnly, shfTopToBottom);
 
-  TBCEditorCaretOptions = set of TBCEditorCaretOption;
-  TBCEditorCaretMultiEditOptions = set of TBCEditorCaretMultiEditOption;
   TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
   TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
   TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
@@ -236,34 +223,18 @@ type
 
   TBCEditorRangeItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
 
-  TBCEditorQuadColor = packed record
-  case Boolean of
-    True: (Blue, Green, Red, Alpha: Byte);
-    False: (Quad: Cardinal);
-  end;
-  PBCEditorQuadColor = ^TBCEditorQuadColor;
-
-function Empty(const AArea: TBCEditorLinesArea): Boolean; inline;
 function Max(const A, B: TBCEditorLinesPosition): TBCEditorLinesPosition; overload; inline;
 function Min(const A, B: TBCEditorLinesPosition): TBCEditorLinesPosition; overload; inline;
 function LinesArea(const ABeginPosition, AEndPosition: TBCEditorLinesPosition): TBCEditorLinesArea; inline;
 function LinesPosition(const AChar, ALine: Integer): TBCEditorLinesPosition; overload; inline;
-function LinesPosition(const APos: TPoint): TBCEditorLinesPosition; overload; inline;
-function Point(const APosition: TBCEditorLinesPosition): TPoint; overload; inline;
-function RowsPosition(const AColumn: Integer; const ARow: Integer): TBCEditorRowsPosition; inline;
+function RowsPosition(const AColumn, ARow: Integer): TBCEditorRowsPosition; inline;
 
 const
-  InvalidCaretPos: TPoint = ( X: -1; Y: -1 );
   InvalidLinesArea: TBCEditorLinesArea = ( BeginPosition: ( Char: -1; Line: -1; ); EndPosition: ( Char: -1; Line: -1; ) );
   InvalidLinesPosition: TBCEditorLinesPosition = ( Char: -1; Line: -1; );
   InvalidRowsPosition: TBCEditorRowsPosition = ( Column: -1; Row: -1; );
 
 implementation {***************************************************************}
-
-function Empty(const AArea: TBCEditorLinesArea): Boolean; inline;
-begin
-  Result := AArea.BeginPosition = AArea.EndPosition;
-end;
 
 function Max(const A, B: TBCEditorLinesPosition): TBCEditorLinesPosition;
 begin
@@ -293,19 +264,13 @@ begin
   Result.Line := ALine;
 end;
 
-function LinesPosition(const APos: TPoint): TBCEditorLinesPosition;
-begin
-  Result.Char := APos.X;
-  Result.Line := APos.Y;
-end;
-
 function Point(const APosition: TBCEditorLinesPosition): TPoint;
 begin
   Result.X := APosition.Char;
   Result.Y := APosition.Line;
 end;
 
-function RowsPosition(const AColumn: Integer; const ARow: Integer): TBCEditorRowsPosition;
+function RowsPosition(const AColumn, ARow: Integer): TBCEditorRowsPosition;
 begin
   Result.Column := AColumn;
   Result.Row := ARow;
@@ -345,6 +310,18 @@ begin
   Result := (a.Line > b.Line) or (a.Line = b.Line) and (a.Char >= b.Char);
 end;
 
+class operator TBCEditorLinesPosition.Implicit(a: TBCEditorLinesPosition): TPoint;
+begin
+  Result.X := a.Char;
+  Result.Y := a.Line;
+end;
+
+class operator TBCEditorLinesPosition.Implicit(a: TPoint): TBCEditorLinesPosition;
+begin
+  Result.Char := a.X;
+  Result.Line := a.Y;
+end;
+
 class operator TBCEditorLinesPosition.LessThan(a, b: TBCEditorLinesPosition): Boolean;
 begin
   Result := (a.Line < b.Line) or (a.Line = b.Line) and (a.Char < b.Char);
@@ -377,14 +354,14 @@ begin
   Result := (a.BeginPosition = b.BeginPosition) and (a.EndPosition = b.EndPosition);
 end;
 
+function TBCEditorLinesArea.IsEmpty(): Boolean;
+begin
+  Result := (BeginPosition = EndPosition) or (EndPosition = InvalidLinesPosition);
+end;
+
 class operator TBCEditorLinesArea.NotEqual(a, b: TBCEditorLinesArea): Boolean;
 begin
   Result := (a.BeginPosition <> b.BeginPosition) or (a.EndPosition <> b.EndPosition);
-end;
-
-function TBCEditorLinesArea.IsEmpty(): Boolean;
-begin
-  Result := BeginPosition = EndPosition;
 end;
 
 function TBCEditorLinesArea.ToString(): string;

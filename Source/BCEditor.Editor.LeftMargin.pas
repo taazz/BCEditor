@@ -27,7 +27,7 @@ type
       property Border: TColor read FBorder write FBorder default clLeftMarginBackground;
       property Foreground: TColor read FForeground write FForeground default clLeftMarginForeground;
       property LineStateModified: TColor read FLineStateModified write FLineStateModified default clYellow;
-      property LineStateNormal: TColor read FLineStateNormal write FLineStateNormal default clLime;
+      property LineStateLoaded: TColor read FLineStateNormal write FLineStateNormal default clLime;
     end;
 
     TBookMarks = class(TPersistent)

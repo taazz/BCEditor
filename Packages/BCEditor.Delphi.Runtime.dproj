@@ -129,7 +129,6 @@
         <DCCReference Include="..\Source\BCEditor.Consts.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.ActiveLine.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.Caret.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.CodeFolding.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.CompletionProposal.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas"/>
