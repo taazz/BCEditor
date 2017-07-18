@@ -10,11 +10,9 @@ uses
 type
   TBCEditorLines = class(TStrings)
   private type
-
     TWordSearch = class
     private
       FArea: TBCEditorLinesArea;
-      FCaseSensitive: Boolean;
       FErrorMessage: string;
       FFoundLength: Integer;
       FFoundPosition: TBCEditorLinesPosition;
@@ -23,8 +21,7 @@ type
         const AFoundLength: Integer): Boolean;
     public
       constructor Create(const ALines: TBCEditorLines;
-        const AArea: TBCEditorLinesArea;
-        const ACaseSensitive: Boolean);
+        const AArea: TBCEditorLinesArea);
       function Find(var APosition: TBCEditorLinesPosition;
         out AFoundLength: Integer): Boolean;
       property Area: TBCEditorLinesArea read FArea;
@@ -33,6 +30,7 @@ type
 
   protected type
     TCompare = function(Lines: TBCEditorLines; Line1, Line2: Integer): Integer;
+    TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
 
     TOption = (loTrimTrailingSpaces, loTrimTrailingLines, loUndoGrouped,
       loUndoAfterLoad, loUndoAfterSave, loSyncEditCaseSensitive, loReadOnly,
@@ -113,8 +111,6 @@ type
       function ToString(): string;
     end;
 
-  public type
-    TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
     TUndoList = class(TList<TUndoItem>)
     strict private
       FBlockNumber: Integer;
@@ -144,9 +140,9 @@ type
 
   protected const
     BOFPosition: TBCEditorLinesPosition = ( Char: 0; Line: 0; );
-  strict private const
+  private const
     DefaultOptions = [loUndoGrouped];
-  strict private
+  private
     FCaretPosition: TBCEditorLinesPosition;
     FCaseSensitive: Boolean;
     FItems: TItems;
@@ -617,8 +613,7 @@ end;
 { TBCEditorLines.TWordSearch **************************************************}
 
 constructor TBCEditorLines.TWordSearch.Create(const ALines: TBCEditorLines;
-  const AArea: TBCEditorLinesArea;
-  const ACaseSensitive: Boolean);
+  const AArea: TBCEditorLinesArea);
 begin
   Assert((BOFPosition <= AArea.BeginPosition) and (AArea.BeginPosition <= AArea.EndPosition) and (AArea.EndPosition <= ALines.EOFPosition));
 
@@ -627,7 +622,6 @@ begin
   FLines := ALines;
 
   FArea := AArea;
-  FCaseSensitive := ACaseSensitive;
 end;
 
 function TBCEditorLines.TWordSearch.Find(var APosition: TBCEditorLinesPosition;
@@ -658,6 +652,7 @@ begin
 
   LLinePos := nil; // Compiler waring only
   LLineEndPos := nil; // Compiler waring only
+  LLineText := ''; // Compiler waring only
 
   FFoundPosition := APosition;
 
@@ -668,15 +663,7 @@ begin
 
     if (LLineLength > FFoundPosition.Char) then
     begin
-      if (FCaseSensitive) then
-        LLineText := FLines.Items[FFoundPosition.Line].Text
-      else
-      begin
-        // Since we modify LLineText with CharLowerBuff, we need a copy of the
-        // string - not only a copy of the pointer to the string...
-        LLineText := Copy(FLines.Items[FFoundPosition.Line].Text, 1, LLineLength);
-        CharLowerBuff(PChar(LLineText), Length(LLineText));
-      end;
+      LLineText := FLines.Items[FFoundPosition.Line].Text;
 
       LLinePos := @LLineText[1 + FFoundPosition.Char];
       LLineEndPos := @LLineText[Length(LLineText)];
@@ -914,7 +901,7 @@ begin
   else if (APosition < ARelativePosition) then
   begin
     Result := - ARelativePosition.Char - LLineBreakLength;
-    for LLine := ARelativePosition.Line - 1 downto APosition.Line + 1 do
+    for LLine := APosition.Line - 1 downto ARelativePosition.Line + 1 do
     begin
       Dec(Result, Length(Items[LLine].Text));
       Dec(Result, LLineBreakLength);
@@ -924,7 +911,7 @@ begin
   else
   begin
     Result := Length(Items[ARelativePosition.Line].Text) - APosition.Char + LLineBreakLength;
-    for LLine := APosition.Line + 1 to ARelativePosition.Line - 1 do
+    for LLine := ARelativePosition.Line + 1 to APosition.Line - 1 do
     begin
       Inc(Result, Length(Items[LLine].Text));
       Inc(Result, LLineBreakLength);
@@ -2304,8 +2291,7 @@ begin
 
   LSearch := TWordSearch.Create(Self,
     LinesArea(Min(SelArea.BeginPosition, SelArea.EndPosition),
-      Max(SelArea.BeginPosition, SelArea.EndPosition)),
-    loSyncEditCaseSensitive in Options);
+      Max(SelArea.BeginPosition, SelArea.EndPosition)));
   LPosition := LSearch.Area.BeginPosition;
   while ((not AAvailable or not Result)
     and LSearch.Area.Contains(LPosition)

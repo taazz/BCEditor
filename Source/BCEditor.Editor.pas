@@ -69,6 +69,18 @@ type
     TMouseCapture = (mcNone, mcSyncEditButton, mcMarks, mcLineNumbers,
       mcLineState, mcCodeFolding, mcText, mcScrolling);
 
+    TState = set of (esFontChanged, esSizeChanged, esRowsChanged,
+      esCaretInvalid, esCaretChanged, esSelectionChanged,
+      esScrolled, esLinesCleared, esLinesDeleted, esLinesInserted,
+      esLinesUpdated, esIgnoreNextChar, esSyncEditInvalid,
+      esFindind, esReplacing, esScrolling, esUpdated,
+      esPainting, esBuildingRows, esHandlingMouse,
+      esCodeFoldingInvalid, esSysFontChanged, esHighlighterChanged,
+      esWaitForDrag, esDragging, esMouseDouble, esScrollToCaret);
+
+    TPendingJob = (pjBuildRows);
+    TPendingJobs = set of TPendingJob;
+
     TOverlay = record
       Area: TBCEditorLinesArea;
       Style: (osRect, osUnderline, osWaveLine);
@@ -162,19 +174,11 @@ type
       property Text[Row: Integer]: string read GetText; default;
     end;
 
-    TState = set of (esFontChanged, esSizeChanged, esRowsChanged,
-      esCaretInvalid, esCaretChanged, esSelectionChanged,
-      esScrolled, esLinesCleared, esLinesDeleted, esLinesInserted,
-      esLinesUpdated, esIgnoreNextChar, esSyncEditInvalid,
-      esFindind, esReplacing, esScrolling, esUpdated,
-      esPainting, esBuildingRows, esHandlingMouse,
-      esCodeFoldingInvalid, esSysFontChanged, esHighlighterChanged,
-      esWaitForDrag, esDragging, esMouseDouble, esScrollToCaret);
-
   private const
     DefaultOptions = [eoAutoIndent, eoDropFiles];
     DefaultUndoOptions = [uoGroupUndo];
     UM_FREE_COMPLETIONPROPOSAL_POPUPWINDOW = WM_USER;
+    UM_IDLE = WM_USER + 1;
   private
     FActiveLine: TBCEditorActiveLine;
     FAllCodeFoldingRanges: TBCEditorCodeFolding.TAllRanges;
@@ -198,6 +202,7 @@ type
     FCurrentMatchingPair: TMatchingPairResult;
     FDoubleClickTime: Cardinal;
     FFontPitchFixed: Boolean;
+    FFormWnd: HWND;
     FHideSelectionBeforeSearch: Boolean;
     FHideScrollBars: Boolean;
     FHighlightedFoldRange: TBCEditorCodeFolding.TRanges.TRange;
@@ -217,6 +222,7 @@ type
     FItalicOffsetCache: array [AnsiChar] of Byte;
     FKeyboardHandler: TBCEditorKeyboardHandler;
     FKeyCommands: TBCEditorKeyCommands;
+    FLastBuiltLine: Integer;
     FLastCursorPoint: TPoint;
     FLastDoubleClickTime: Cardinal;
     FLastKey: Word;
@@ -267,6 +273,7 @@ type
     FOverlays: TOverlays;
     FPaintHelper: TBCEditorPaintHelper;
     FParentWnd: HWND;
+    FPendingJobs: TPendingJobs;
     FPopupMenu: HMENU;
     FReadOnly: Boolean;
     FReplace: TBCEditorReplace;
@@ -314,6 +321,7 @@ type
     procedure AfterLinesUpdate(Sender: TObject);
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarkListChange(Sender: TObject);
+    procedure BuildRows(const ACanvas: TCanvas; const RequiredRow: Integer);
     procedure CheckIfAtMatchingKeywords;
     procedure ClearCodeFolding();
     function ClientToLines(const X, Y: Integer; const AForCaret: Boolean = False): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
@@ -328,6 +336,7 @@ type
     function ComputeIndentText(const IndentCount: Integer): string;
     procedure ComputeMetrics();
     function ComputeTextColumns(const AText: PChar; const ALength, AColumn: Integer): Integer; {$IFNDEF Debug} inline; {$ENDIF}
+    procedure Delay(const AAction: TPendingJob);
     procedure DeleteChar;
     procedure DeleteLastWordOrBeginningOfLine(const ACommand: TBCEditorCommand);
     procedure DeleteLine;
@@ -418,11 +427,13 @@ type
     function GetWordAt(ALinesPos: TPoint): string; {$IFNDEF Debug} inline; {$ENDIF}
     function GetWordAtLinesPosition(const ALinesPosition: TBCEditorLinesPosition): string;
     procedure HighlighterChanged(ASender: TObject);
+    procedure Idle(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure InitCodeFolding();
     procedure InsertLine();
     procedure InsertLineIntoRows(const ALine: Integer; const ANewLine: Boolean); overload;
     function InsertLineIntoRows(const ALine: Integer; const ARow: Integer): Integer; overload;
     procedure InvalidateCaret();
+    procedure InvalidateRows();
     procedure InvalidateScrollBars();
     procedure InvalidateSyncEdit();
     function IsKeywordAtPosition(const APosition: TBCEditorLinesPosition;
@@ -493,6 +504,7 @@ type
     function TokenWidth(const AText: PChar; const ALength: Integer;
       const AColumn: Integer; const AToken: TBCEditorHighlighter.TFind): Integer; // inline takes the double time. Why???
     procedure UMFreeCompletionProposalPopupWindow(var AMessage: TMessage); message UM_FREE_COMPLETIONPROPOSAL_POPUPWINDOW;
+    procedure UMIdle(var AMessage: TMessage); message UM_IDLE;
     procedure UpdateLinesBeginRanges(const ALine: Integer);
     procedure UpdateRows(const ALine: Integer);
     procedure WMChar(var AMessage: TWMChar); message WM_CHAR;
@@ -850,6 +862,7 @@ type
     property TextEntryMode;
     property UndoOptions;
     property Visible;
+    property WantTabs;
     property WantReturns;
     property Width;
     property WordWrap;
@@ -883,6 +896,9 @@ const
   tiShowHint = 1;
   tiScrolling = 2;
   tiScroll = 3;
+  tiIdle = 4;
+
+  RowToInsert = -2;
 
 var
   GLineWidth: Integer;
@@ -1532,6 +1548,59 @@ begin
   Invalidate;
 end;
 
+procedure TCustomBCEditor.BuildRows(const ACanvas: TCanvas;
+   const RequiredRow: Integer);
+var
+  LCodeFolding: Integer;
+  LLine: Integer;
+  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRow: Integer;
+begin
+  Include(FState, esBuildingRows);
+  FPaintHelper.BeginDrawing(ACanvas);
+  try
+    for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
+    begin
+      LRange := FAllCodeFoldingRanges[LCodeFolding];
+      if (Assigned(LRange) and LRange.Collapsed) then
+        for LLine := LRange.BeginLine + 1 to LRange.EndLine do
+          FLines.SetFirstRow(LLine, -1);
+    end;
+
+    LRow := FRows.Count;
+    LLine := FLastBuiltLine + 1;
+    while ((LLine < FLines.Count)
+      and ((LRow < RequiredRow) or (RequiredRow < 0))) do
+    begin
+      if (FLines.Items[LLine].FirstRow = RowToInsert) then
+      begin
+        Inc(LRow, InsertLineIntoRows(LLine, LRow));
+        FLastBuiltLine := LLine;
+      end;
+      FLastBuiltLine := LLine;
+      Inc(LLine);
+    end;
+  finally
+    FPaintHelper.EndDrawing();
+    Exclude(FState, esBuildingRows);
+  end;
+
+  if (LLine < FLines.Count) then
+    Delay(pjBuildRows)
+  else
+  begin
+    InitCodeFolding();
+
+    if (UpdateCount > 0) then
+      Include(FState, esRowsChanged)
+    else
+    begin
+      InvalidateScrollBars();
+      Invalidate();
+    end;
+  end;
+end;
+
 procedure TCustomBCEditor.ChainEditor(AEditor: TCustomBCEditor);
 begin
   if Highlighter.FileName = '' then
@@ -1635,7 +1704,7 @@ end;
 procedure TCustomBCEditor.Clear();
 begin
   FLines.Clear();
-  FRows.Clear();
+  InvalidateRows();
   ClearCodeFolding();
   InvalidateMatchingPair();
   ClearBookmarks;
@@ -2149,11 +2218,13 @@ begin
   FInsertPosCache := nil;
   FMouseCapture := mcNone;
   FLastCursorPoint := Point(-1, -1);
+  FLastBuiltLine := -1;
   FLineHeight := 0;
   FOldSelectionAvailable := False;
   FOnChange := nil;
   FOptions := DefaultOptions;
   FParentWnd := 0;
+  FPendingJobs := [];
   FPopupMenu := 0;
   FReadOnly := False;
   FScrollBars := ssBoth;
@@ -2289,6 +2360,7 @@ procedure TCustomBCEditor.CreateWnd();
 begin
   inherited;
 
+  FFormWnd := GetParentForm(Self).Handle;
   FParentWnd := FParentWnd;
   FDlgCtrlID := GetDlgCtrlID(Handle);
 
@@ -2307,6 +2379,13 @@ begin
     CopyToClipboard();
     SelText := '';
   end;
+end;
+
+procedure TCustomBCEditor.Delay(const AAction: TPendingJob);
+begin
+  Include(FPendingJobs, AAction);
+
+  SetTimer(Handle, tiIdle, 10, nil);
 end;
 
 function TCustomBCEditor.DeleteBookmark(const ALine: Integer; const AIndex: Integer): Boolean;
@@ -2910,7 +2989,7 @@ var
   LNewCaretPosition: TBCEditorLinesPosition;
 begin
   LNewCaretPosition := FLines.CaretPosition;
-  if (WordWrap) then
+  if (FWordWrap) then
     LNewCaretPosition := FRows.BORPosition[FRows.CaretPosition.Row]
   else if (FLines.CaretPosition.Line < FLines.Count) then
   begin
@@ -4398,7 +4477,7 @@ begin
       if not ReadOnly then
         InsertLine;
     ecReturn:
-      if (not ReadOnly and WantReturns) then
+      if (not ReadOnly and FWantReturns) then
         DoReturnKey();
     ecTab:
       if (not ReadOnly and FWantTabs) then
@@ -4891,7 +4970,7 @@ procedure TCustomBCEditor.HighlighterChanged(ASender: TObject);
 var
   LElement: TBCEditorHighlighter.PElement;
 begin
-  FRows.Clear();
+  InvalidateRows();
 
   LElement := FHighlighter.Colors.GetElement(BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR);
   if (Assigned(LElement) and (LElement^.Foreground <> clNone)) then
@@ -4915,7 +4994,7 @@ begin
   Assert(not Assigned(FChainedEditor));
   Assert(FLines = FOriginalLines);
 
-  LOldWordWrap := WordWrap;
+  LOldWordWrap := FWordWrap;
   WordWrap := False;
 
   if Assigned(FChainedEditor) then
@@ -4936,6 +5015,15 @@ begin
   LinesHookChanged;
 
   WordWrap := LOldWordWrap;
+end;
+
+procedure TCustomBCEditor.Idle();
+begin
+  if (pjBuildRows in FPendingJobs) then
+  begin
+    Exclude(FPendingJobs, pjBuildRows);
+    BuildRows(Canvas, FRows.Count + 1);
+  end;
 end;
 
 procedure TCustomBCEditor.InitCodeFolding();
@@ -5023,7 +5111,7 @@ var
 begin
   FPaintHelper.BeginDrawing(Canvas);
   try
-    if (not WordWrap) then
+    if (not FWordWrap) then
     begin
       LColumn := 0;
       LRowWidth := 0;
@@ -5167,6 +5255,16 @@ begin
 
   if (not (esPainting in FState)) then
     Invalidate();
+end;
+
+procedure TCustomBCEditor.InvalidateRows();
+var
+  LLine: Integer;
+begin
+  FRows.Clear();
+  for LLine := 0 to FLines.Count - 1 do
+    FLines.SetFirstRow(LLine, RowToInsert);
+  FLastBuiltLine := -1;
 end;
 
 procedure TCustomBCEditor.InvalidateScrollBars();
@@ -5526,7 +5624,7 @@ begin
   ClearCodeFolding;
   ClearBookmarks;
   FMarkList.Clear;
-  FRows.Clear();
+  InvalidateRows();
 
   Modified := True;
 
@@ -5589,8 +5687,7 @@ begin
     Result := RowsPosition(ALinesPosition.Char, ALinesPosition.Line)
   else if (ALinesPosition.Line >= FLines.Count) then
     Result := RowsPosition(ALinesPosition.Char, FRows.Count + ALinesPosition.Line - FLines.Count)
-  else if ((FRows.Count >= 0) and (FLines.Items[ALinesPosition.Line].FirstRow < 0)) then
-    // FRows.Count >= 0 is not needed, but BuildRows must be called to initialize FLines.FirstRow
+  else if (FLines.Items[ALinesPosition.Line].FirstRow < 0) then
     raise ERangeError.CreateFmt(SBCEditorLineIsNotVisible, [ALinesPosition.Line])
   else
   begin
@@ -5713,7 +5810,7 @@ begin
     and (LMsg.Message = WM_MOUSEMOVE)
     and (KeysToShiftState(LMsg.wParam) = AShift)) then
     // Do nothing - handle this message within the next equal message
-  else
+  else if (FLineHeight > 0) then
   begin
     Include(FState, esHandlingMouse);
     Process(paMouseMove, nil, mbLeft, AShift, X, Y);
@@ -5779,7 +5876,7 @@ begin
       LLineTextLength := Length(FLines.Items[FLines.CaretPosition.Line].Text);
 
       LNewCaretPosition := LinesPosition(Max(0, FLines.CaretPosition.Char + AColumns), FLines.CaretPosition.Line);
-      if (not (soBeyondEndOfLine in FScroll.Options) or WordWrap) then
+      if (not (soBeyondEndOfLine in FScroll.Options) or FWordWrap) then
         LNewCaretPosition.Char := Min(LNewCaretPosition.Char, LLineTextLength);
 
       { Skip combined and non-spacing marks }
@@ -5800,7 +5897,7 @@ begin
 
       MoveCaretAndSelection(FLines.SelArea.BeginPosition, LNewCaretPosition, SelectionCommand);
     end
-    else if ((soBeyondEndOfLine in FScroll.Options) and not WordWrap) then
+    else if ((soBeyondEndOfLine in FScroll.Options) and not FWordWrap) then
       MoveCaretAndSelection(FLines.SelArea.BeginPosition, LinesPosition(FLines.CaretPosition.Char + AColumns, FLines.CaretPosition.Line), SelectionCommand);
 end;
 
@@ -5821,7 +5918,7 @@ begin
     LNewCaretPosition.Row := Max(0, Min(FRows.Count - 1, LNewCaretPosition.Row + ARows));
   LNewCaretPosition.Column := ClientToRows(LX, LNewCaretPosition.Row * LineHeight, True).Column;
 
-  if (not (soBeyondEndOfLine in FScroll.Options) or WordWrap) then
+  if (not (soBeyondEndOfLine in FScroll.Options) or FWordWrap) then
     if (LNewCaretPosition.Row < FRows.Count) then
       if (not (rfLastRowOfLine in FRows.Items[LNewCaretPosition.Row].Flags)) then
         LNewCaretPosition.Column := Min(LNewCaretPosition.Column, FRows.Items[LNewCaretPosition.Row].Length - 1)
@@ -6102,26 +6199,22 @@ procedure TCustomBCEditor.Paint();
       LGraphics.Free();
 
 
+      // SyncEdit Button
       LResInfo := FindResource(HInstance, BCEDITOR_SYNCEDIT, RT_GROUP_ICON);
       LResData := LoadResource(HInstance, LResInfo);
       LResource := LockResource(LResData);
       LIconId := LookupIconIdFromDirectoryEx(LResource, TRUE, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
       LResInfo := FindResource(HInstance, MAKEINTRESOURCE(LIconId), RT_ICON);
       LResData := LoadResource(HInstance, LResInfo);
-
       LIcon := TGPBitmap.Create(CreateIconFromResourceEx(
         LockResource(LResData), SizeOfResource(HInstance, LResInfo),
         TRUE, $00030000, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
-
       LWidth := GetSystemMetrics(SM_CXSMICON) + 2 * GetSystemMetrics(SM_CXEDGE);
       LHeight := GetSystemMetrics(SM_CYSMICON) + 2 * GetSystemMetrics(SM_CYEDGE);
       LRect := Rect(0, 0, LWidth, LHeight);
-
       LBrush.SetColor(clTransparent);
-
       LBitmap := TGPBitmap.Create(LWidth, LHeight);
       LGraphics := TGPGraphics.Create(LBitmap);
-
       if (Assigned(FSyncEditButtonNormalBitmap)) then FSyncEditButtonNormalBitmap.Free();
       if (not StyleServices.Enabled) then
       begin
@@ -6140,7 +6233,6 @@ procedure TCustomBCEditor.Paint();
       end;
       LGraphics.DrawImage(LIcon, GetSystemMetrics(SM_CXEDGE), GetSystemMetrics(SM_CYEDGE));
       FSyncEditButtonNormalBitmap := TGPCachedBitmap.Create(LBitmap, APaintVar^.Graphics);
-
       if (Assigned(FSyncEditButtonHotBitmap)) then FSyncEditButtonHotBitmap.Free();
       if (not StyleServices.Enabled) then
       begin
@@ -6159,7 +6251,6 @@ procedure TCustomBCEditor.Paint();
       end;
       LGraphics.DrawImage(LIcon, GetSystemMetrics(SM_CXEDGE), GetSystemMetrics(SM_CYEDGE));
       FSyncEditButtonHotBitmap := TGPCachedBitmap.Create(LBitmap, APaintVar^.Graphics);
-
       if (Assigned(FSyncEditButtonPressedBitmap)) then FSyncEditButtonPressedBitmap.Free();
       if (not StyleServices.Enabled) then
       begin
@@ -6180,55 +6271,11 @@ procedure TCustomBCEditor.Paint();
       FSyncEditButtonPressedBitmap := TGPCachedBitmap.Create(LBitmap, APaintVar^.Graphics);
       LGraphics.Free();
       LBitmap.Free();
-
       LIcon.Free();
     end;
 
     LBrush.Free();
     LPen.Free();
-  end;
-
-  procedure BuildRows(const AUpdateScrollBars: Boolean); {$IFNDEF Debug} inline; {$ENDIF}
-  const
-    RowToInsert = -3;
-  var
-    LCodeFolding: Integer;
-    LLine: Integer;
-    LRange: TBCEditorCodeFolding.TRanges.TRange;
-    LRow: Integer;
-  begin
-    HandleNeeded();
-
-    Include(FState, esBuildingRows);
-    try
-      for LLine := 0 to FLines.Count - 1 do
-        FLines.SetFirstRow(LLine, RowToInsert);
-
-      for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
-      begin
-        LRange := FAllCodeFoldingRanges[LCodeFolding];
-        if (Assigned(LRange) and LRange.Collapsed) then
-          for LLine := LRange.BeginLine + 1 to LRange.EndLine do
-            FLines.SetFirstRow(LLine, -1);
-      end;
-
-      LRow := 0;
-      for LLine := 0 to FLines.Count - 1 do
-        if (FLines.Items[LLine].FirstRow = RowToInsert) then
-          Inc(LRow, InsertLineIntoRows(LLine, LRow));
-    finally
-      Exclude(FState, esBuildingRows);
-    end;
-
-    InitCodeFolding();
-
-    if (UpdateCount > 0) then
-      Include(FState, esRowsChanged)
-    else
-    begin
-      InvalidateScrollBars();
-      Invalidate();
-    end;
   end;
 
   procedure BuildOverlaysFromSyncEdit(); {$IFNDEF Debug} inline; {$ENDIF}
@@ -6271,7 +6318,7 @@ procedure TCustomBCEditor.Paint();
     LVertScrollInfo: TScrollInfo;
   begin
     LVertScrollInfo.cbSize := SizeOf(ScrollInfo);
-    LVertScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
+    LVertScrollInfo.fMask := SIF_RANGE or SIF_PAGE or SIF_POS;
     LVertScrollInfo.nMin := 0;
     LVertScrollInfo.nMax := Max(FRows.CaretPosition.Row, FRows.Count - 1);
     LVertScrollInfo.nPage := VisibleRows;
@@ -6280,7 +6327,7 @@ procedure TCustomBCEditor.Paint();
     SetScrollInfo(Handle, SB_VERT, LVertScrollInfo, TRUE);
 
     LHorzScrollInfo.cbSize := SizeOf(ScrollInfo);
-    LHorzScrollInfo.fMask := SIF_PAGE or SIF_POS or SIF_RANGE;
+    LHorzScrollInfo.fMask := SIF_RANGE or SIF_PAGE or SIF_POS;
     LHorzScrollInfo.nMin := 0;
     if ((FRows.CaretPosition.Row < FRows.Count)
       and (FRows.CaretPosition.Column <= FRows.Items[FRows.CaretPosition.Row].Columns)) then
@@ -6294,8 +6341,8 @@ procedure TCustomBCEditor.Paint();
     LHorzScrollInfo.nTrackPos := 0;
     SetScrollInfo(Handle, SB_HORZ, LHorzScrollInfo, TRUE);
 
-    ShowScrollBar(Handle, SB_VERT, not HideScrollBars or (FScrollBars in [ssVertical, ssBoth]) and (LVertScrollInfo.nMax >= INT(LVertScrollInfo.nPage)));
-    ShowScrollBar(Handle, SB_HORZ, not HideScrollBars or (FScrollBars in [ssHorizontal, ssBoth]) and (LHorzScrollInfo.nMax >= INT(LHorzScrollInfo.nPage)));
+    ShowScrollBar(Handle, SB_VERT, not FHideScrollBars or (FScrollBars in [ssVertical, ssBoth]) and (LVertScrollInfo.nMax >= INT(LVertScrollInfo.nPage)));
+    ShowScrollBar(Handle, SB_HORZ, not FHideScrollBars or (FScrollBars in [ssHorizontal, ssBoth]) and (LHorzScrollInfo.nMax >= INT(LHorzScrollInfo.nPage)));
     FScrollingEnabled := (soMiddleClickMove in FScroll.Options)
       and ((LVertScrollInfo.nMax >= INT(LVertScrollInfo.nPage))
         or (LHorzScrollInfo.nMax >= INT(LHorzScrollInfo.nPage)));
@@ -6338,8 +6385,8 @@ begin
   Include(FState, esPainting);
   try
     if ((FState * [esFontChanged] <> [])
-      or ((FState * [esSizeChanged] <> []) and WordWrap)) then
-      FRows.Clear();
+      or ((FState * [esSizeChanged] <> []) and FWordWrap)) then
+      InvalidateRows();
 
     if (FState * [esFontChanged, esSysFontChanged, esHighlighterChanged] <> []) then
     begin
@@ -6390,8 +6437,8 @@ begin
 
         if ((LTextWidth <> FTextRect.Width) or (LVisibleRows <> VisibleRows)) then
         begin
-          if (WordWrap and (LTextWidth <> FTextRect.Width)) then
-            FRows.Clear();
+          if (FWordWrap and (LTextWidth <> FTextRect.Width)) then
+            InvalidateRows();
 
           FVisibleRows := LVisibleRows;
 
@@ -6419,7 +6466,7 @@ begin
       ScanMatchingPair();
 
     if ((FRows.Count = 0) and (FLines.Count > 0)) then
-      BuildRows(False);
+      BuildRows(Canvas, -1 {TopRow + VisibleRows});
 
     if (esScrollToCaret in FState) then
     begin
@@ -6726,6 +6773,7 @@ begin
   if ((LRect.Right >= ARect.Left) and (LRect.Left <= ARect.Right)) then
     case (AAction) of
       paPaint:
+        if (not LIsLineBreakToken or (ALinesPosition.Line < FLines.Count - 1)) then
         begin
           LEndPosition := LinesPosition(ALinesPosition.Char + LLength, ALinesPosition.Line);
 
@@ -7007,6 +7055,20 @@ begin
             FPaintHelper.ExtTextOut(LCollapsedMarkRect.Left, LCollapsedMarkRect.Top,
               0, LCollapsedMarkRect, BCEDITOR_CODEFOLDING_COLLAPSEDMARK, Length(BCEDITOR_CODEFOLDING_COLLAPSEDMARK), nil);
           end;
+
+          if ((FState * [esCaretInvalid] <> [])
+            and (ALinesPosition.Line = FLines.CaretPosition.Line)
+            and (ALinesPosition.Char <= FLines.CaretPosition.Char) and (FLines.CaretPosition.Char < ALinesPosition.Char + ALength)) then
+          begin
+            LLength := FLines.CaretPosition.Char - ALinesPosition.Char;
+            if (LLength = 0) then
+              FCaretPos := Point(ARect.Left, ARect.Top)
+            else
+              FCaretPos := Point(ARect.Left + FPaintHelper.TextWidth(LText, LLength), ARect.Top);
+          end;
+
+          if (Assigned(APaintVar)) then
+            APaintVar^.PreviousUCC := LIsUCCToken;
         end;
       paMouseDown,
       paMouseMove,
@@ -7014,7 +7076,8 @@ begin
       paHint:
         if ((LRect.Left <= X) and (X < LRect.Right)
           and (LRect.Top <= Y) and (Y < LRect.Bottom)
-          and (MouseCapture in [mcNone, mcText])) then
+          and (MouseCapture in [mcNone, mcText])
+          and (not LIsLineBreakToken or (ALinesPosition.Line < FLines.Count - 1))) then
         begin
           LLine := ALinesPosition.Line;
           if (not Assigned(AText)) then
@@ -7159,7 +7222,8 @@ begin
           Result := True;
         end;
       paMouseDouble:
-        if ((LRect.Left <= X) and (X < LRect.Right)) then
+        if ((LRect.Left <= X) and (X < LRect.Right)
+          and (not LIsLineBreakToken or (ALinesPosition.Line < FLines.Count - 1))) then
         begin
           if (AButton = mbLeft) then
             if (LCollapsedMarkRect.Contains(Point(X, Y))) then
@@ -7173,20 +7237,6 @@ begin
           Result := True;
         end;
     end;
-
-  if (Assigned(APaintVar)) then
-    APaintVar^.PreviousUCC := LIsUCCToken;
-
-  if ((FState * [esCaretInvalid] <> [])
-    and (ALinesPosition.Line = FLines.CaretPosition.Line)
-    and (ALinesPosition.Char <= FLines.CaretPosition.Char) and (FLines.CaretPosition.Char < ALinesPosition.Char + ALength)) then
-  begin
-    LLength := FLines.CaretPosition.Char - ALinesPosition.Char;
-    if (LLength = 0) then
-      FCaretPos := Point(ARect.Left, ARect.Top)
-    else
-      FCaretPos := Point(ARect.Left + FPaintHelper.TextWidth(LText, LLength), ARect.Top);
-  end;
 
   if (Assigned(ARange)) then
     ARect.Left := Max(ARect.Left, LCollapsedMarkRect.Right)
@@ -7740,9 +7790,9 @@ var
   end;
 
 var
+  LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
   LColumn: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
   LRect: TRect;
   LRow: Integer;
   LToken: TBCEditorHighlighter.TFind;
@@ -7772,13 +7822,6 @@ begin
           LLine := FRows.Items[LRow].Line
         else
           LLine := -1;
-
-        if (Assigned(APaintVar)) then
-        begin
-          APaintVar^.PreviousFontStyles := [];
-          APaintVar^.PreviousBackgroundColor := clNone;
-          APaintVar^.PreviousUCC := False;
-        end;
 
         LRect := Rect(
           0, (LRow - FTopRow) * FLineHeight,
@@ -7831,7 +7874,16 @@ begin
             end;
 
             LColumn := 0;
+
             if (FHighlighter.FindFirstToken(FRows.Items[LRow].BeginRange, FRows[LRow], LToken)) then
+            begin
+              if (Assigned(APaintVar)) then
+              begin
+                APaintVar^.PreviousFontStyles := [];
+                APaintVar^.PreviousBackgroundColor := clNone;
+                APaintVar^.PreviousUCC := False;
+              end;
+
               repeat
                 Result := Result or ProcessToken(AAction, APaintVar, AButton, AShift, X, Y, LRect,
                   LinesPosition(FRows.Items[LRow].Char + LToken.Char, LLine),
@@ -7845,21 +7897,22 @@ begin
                   LColumn := FTabs.Width - LColumn mod FTabs.Width;
               until ((LRect.Left > ClientWidth)
                 or not FHighlighter.FindNextToken(LToken));
+            end;
 
             if (LRect.Left <= ClientWidth) then
             begin
               if (not FCodeFolding.Visible
                 or not (rfLastRowOfLine in FRows.Items[LRow].Flags)) then
-                LRange := nil
+                LCodeFoldingRange := nil
               else
               begin
-                LRange := CodeFoldingCollapsableFoldRangeForLine(LLine);
-                if (Assigned(LRange) and (not LRange.Collapsed or LRange.ParentCollapsed)) then
-                  LRange := nil;
+                LCodeFoldingRange := CodeFoldingCollapsableFoldRangeForLine(LLine);
+                if (Assigned(LCodeFoldingRange) and (not LCodeFoldingRange.Collapsed or LCodeFoldingRange.ParentCollapsed)) then
+                  LCodeFoldingRange := nil;
               end;
               Result := Result or ProcessToken(AAction, APaintVar, AButton, AShift, X, Y, LRect,
                 FRows.EORPosition[LRow], RowsPosition(FRows.Items[LRow].Length, LRow),
-                nil, 0, nil, LRange);
+                nil, 0, nil, LCodeFoldingRange);
             end;
           end;
 
@@ -9683,7 +9736,7 @@ var
   LOldCaretInView: Boolean;
   LOldTopRow: Integer;
 begin
-  if (AValue <> WordWrap) then
+  if (AValue <> FWordWrap) then
   begin
     FWordWrap := AValue;
 
@@ -9695,7 +9748,7 @@ begin
         HorzTextPos := 0;
       TopRow := LOldTopRow;
 
-      FRows.Clear();
+      InvalidateRows();
       if (LOldCaretInView) then
         ScrollToCaret();
 
@@ -9931,8 +9984,8 @@ end;
 
 procedure TCustomBCEditor.TabsChanged(ASender: TObject);
 begin
-  if (WordWrap) then
-    FRows.Clear();
+  if (FWordWrap) then
+    InvalidateRows();
   InvalidateCaret();
   Invalidate();
 end;
@@ -10027,6 +10080,20 @@ begin
   end;
 end;
 
+procedure TCustomBCEditor.UMIdle(var AMessage: TMessage);
+var
+  LMsg: TMsg;
+begin
+  while (FPendingJobs <> []) do
+    if (PeekMessage(LMsg, FFormWnd, 0, 0, PM_NOREMOVE)) then
+    begin
+      SetTimer(Handle, tiIdle, 10, nil);
+      break;
+    end
+    else
+      Idle();
+end;
+
 procedure TCustomBCEditor.Undo();
 begin
   FLines.Undo();
@@ -10040,7 +10107,7 @@ begin
   if FLines = FOriginalLines then
     Exit;
 
-  LOldWrap := WordWrap;
+  LOldWrap := FWordWrap;
   WordWrap := False;
 
   with FLines do
@@ -10258,8 +10325,8 @@ begin
       WM_CLEAR: Perform(AMessage.ItemID, 0, 0);
       EM_SETSEL: Perform(AMessage.ItemID, 0, -1);
       WM_APP + 0: { Right to left Reading order }
-        MessageBox(Handle, 'The developer of the BCEditor don''t know, how to implement this feature.' + #10
-          + 'If you know it, please contact him at: https://github.com/bonecode/BCEditor/',
+        MessageBox(Handle, 'Does it make sense to heave a right to left order this editor?' + #10
+          + 'If yes, please explaint it to the developer of the BCEditor at: https://github.com/bonecode/BCEditor/',
           'Help wanted',
           MB_OK);
       WM_APP + 1: { Show Unicode control characters }
@@ -10407,8 +10474,8 @@ begin
                   LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
-//              WM_APP + 0: { Right to left Reading order }
-//                  LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED;
+              WM_APP + 0: { Right to left Reading order }
+                  LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED;
 //              WM_APP + 1: { Show Unicode control characters }
 //                if (not FUCCVisible) then
 //                  LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_CHECKED
@@ -10466,9 +10533,9 @@ procedure TCustomBCEditor.WMGetDlgCode(var AMessage: TWMGetDlgCode);
 begin
   inherited;
   AMessage.Result := AMessage.Result or DLGC_WANTARROWS or DLGC_WANTCHARS;
-  if WantTabs then
+  if FWantTabs then
     AMessage.Result := AMessage.Result or DLGC_WANTTAB;
-  if WantReturns then
+  if FWantReturns then
     AMessage.Result := AMessage.Result or DLGC_WANTALLKEYS;
 end;
 
@@ -10743,6 +10810,11 @@ begin
       Process(paScrolling, nil, mbLeft, [], FCursorPoint.X, FCursorPoint.Y);
     tiScroll:
       Process(paMouseMove, nil, mbLeft, [], FCursorPoint.X, FCursorPoint.Y);
+    tiIdle:
+      begin
+        KillTimer(Handle, Msg.TimerID);
+        Perform(UM_IDLE, 0, 0);
+      end;
   end;
 end;
 
@@ -10778,10 +10850,7 @@ begin
       TopRow := TopRow - VisibleRows;
     SB_THUMBPOSITION, SB_THUMBTRACK:
       begin
-        if FRows.Count > BCEDITOR_MAX_SCROLL_RANGE then
-          TopRow := MulDiv(VisibleRows + FRows.Count - 1, AMessage.Pos, BCEDITOR_MAX_SCROLL_RANGE)
-        else
-          TopRow := AMessage.Pos;
+        TopRow := AMessage.Pos;
 
         if soShowVerticalScrollHint in FScroll.Options then
         begin

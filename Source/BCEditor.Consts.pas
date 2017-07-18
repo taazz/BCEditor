@@ -9,7 +9,6 @@ type
   TBCEditorAnsiCharSet = set of AnsiChar;
 
 const
-  BCEDITOR_MAX_SCROLL_RANGE = High(Smallint);
   BCEDITOR_BOOKMARKS = 10;
   BCEDITOR_CODEFOLDING_COLLAPSEDMARK: PChar = '...';
   { Characters }
