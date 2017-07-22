@@ -148,9 +148,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.LeftMargin.pas">
             <BuildOrder>19</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Marks.pas">
-            <BuildOrder>20</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.MatchingPair.pas">
             <BuildOrder>21</BuildOrder>
         </DelphiCompile>
@@ -159,9 +156,6 @@
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Replace.pas">
             <BuildOrder>24</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Scroll.pas">
-            <BuildOrder>26</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.Search.pas">
             <BuildOrder>27</BuildOrder>

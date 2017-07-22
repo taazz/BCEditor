@@ -4,10 +4,9 @@ interface
 
 resourcestring
 
-  { BCEditor.Editor.Base }
+  { BCEditor.Editor }
   SBCEditorVersion = 'Версия';
-  SBCEditorScrollInfoTopLine = 'Верхняя строка: %d';
-  SBCEditorScrollInfo = '%d - %d';
+  SBCEditorScrollInfo = 'Верхняя строка: %d';
   SBCEditorSearchStringNotFound = 'Строка ''%s'' не найдена';
   SBCEditorSearchMatchNotFound = 'Выражение не найдено. %s Повторить поиск с начала текста?';
   SBCEditorRightMarginPosition = 'Позиция: %d';

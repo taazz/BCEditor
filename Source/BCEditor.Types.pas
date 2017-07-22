@@ -20,22 +20,16 @@ type
 
   TBCEditorOption = (
     eoAutoIndent, { Will indent the caret on new lines with the same amount of leading white space as the preceding line }
+    eoBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
+    eoBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
     eoDropFiles, { Allows the editor accept OLE file drops }
+    eoMiddleClickScrolling, { Scrolling by mouse move after wheel click. }
     eoTrimTrailingLines, { Empty lines at the end of text will be removed while saving }
     eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
   );
   TBCEditorOptions = set of TBCEditorOption;
 
   TBCEditorTextEntryMode = (temInsert, temOverwrite);
-
-  TBCEditorScrollOption = (
-    soHalfPage, { When scrolling with page-up and page-down commands, only scroll a half page at a time }
-    soHintFollows, { The scroll hint follows the mouse when scrolling vertically }
-    soBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
-    soBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
-    soShowVerticalScrollHint, { Shows a hint of the visible line numbers when scrolling vertically }
-    soMiddleClickMove { Scrolling by mouse move after wheel click. }
-  );
 
   TBCEditorTabOption = (
     toPreviousLineIndent,
@@ -130,9 +124,12 @@ type
     EndPosition: TBCEditorLinesPosition;
     function Contains(Position: TBCEditorLinesPosition): Boolean; inline;
     class operator Equal(a, b: TBCEditorLinesArea): Boolean; inline;
+    function IntersectWith(a: TBCEditorLinesArea): Boolean; inline;
     function IsEmpty(): Boolean; inline;
     class operator NotEqual(a, b: TBCEditorLinesArea): Boolean; inline;
     function ToString(): string; inline;
+    class function Union(const a, b: TBCEditorLinesArea): TBCEditorLinesArea; overload; static;
+    procedure Union(const a: TBCEditorLinesArea); overload;
   end;
 
   TBCEditorRowsPosition = packed record
@@ -207,8 +204,6 @@ type
     cfoShowTreeLine
   );
 
-  TBCEditorScrollHintFormat = (shfTopLineOnly, shfTopToBottom);
-
   TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
   TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
   TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
@@ -216,7 +211,6 @@ type
   TBCEditorSearchMapOptions = set of TBCEditorSearchMapOption;
   TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
   TBCEditorReplaceOptions = set of TBCEditorReplaceOption;
-  TBCEditorScrollOptions = set of TBCEditorScrollOption;
   TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
   TBCEditorTabOptions = set of TBCEditorTabOption;
   TBCEditorUndoOptions = set of TBCEditorUndoOption;
@@ -354,6 +348,11 @@ begin
   Result := (a.BeginPosition = b.BeginPosition) and (a.EndPosition = b.EndPosition);
 end;
 
+function TBCEditorLinesArea.IntersectWith(a: TBCEditorLinesArea): Boolean;
+begin
+  Result := (Self.BeginPosition <= a.EndPosition) and (Self.EndPosition >= a.BeginPosition);
+end;
+
 function TBCEditorLinesArea.IsEmpty(): Boolean;
 begin
   Result := (BeginPosition = EndPosition) or (EndPosition = InvalidLinesPosition);
@@ -367,6 +366,18 @@ end;
 function TBCEditorLinesArea.ToString(): string;
 begin
   Result := '(' + BeginPosition.ToString() + '-' + EndPosition.ToString() + ')';
+end;
+
+class function TBCEditorLinesArea.Union(const a, b: TBCEditorLinesArea): TBCEditorLinesArea;
+begin
+  Result.BeginPosition := Min(a.BeginPosition, b.BeginPosition);
+  Result.EndPosition := Max(a.EndPosition, b.EndPosition);
+end;
+
+procedure TBCEditorLinesArea.Union(const a: TBCEditorLinesArea);
+begin
+  BeginPosition := Min(a.BeginPosition, BeginPosition);
+  EndPosition := Max(a.BeginPosition, EndPosition);
 end;
 
 end.

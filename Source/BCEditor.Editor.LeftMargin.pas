@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Classes, UITypes,
   Graphics, ImgList,
-  BCEditor.Editor.Marks, BCEditor.Types, BCEditor.Consts;
+  BCEditor.Types, BCEditor.Consts;
 
 type
   TBCEditorLeftMargin = class(TPersistent)
@@ -14,87 +14,57 @@ type
     strict private
       FBackground: TColor;
       FBookmarkPanelBackground: TColor;
-      FBorder: TColor;
       FForeground: TColor;
       FLineStateModified: TColor;
-      FLineStateNormal: TColor;
+      FLineStateLoaded: TColor;
     public
-      constructor Create;
+      constructor Create();
       procedure Assign(ASource: TPersistent); override;
     published
       property Background: TColor read FBackground write FBackground default clLeftMarginBackground;
       property BookmarkPanelBackground: TColor read FBookmarkPanelBackground write FBookmarkPanelBackground default clBtnFace;
-      property Border: TColor read FBorder write FBorder default clLeftMarginBackground;
       property Foreground: TColor read FForeground write FForeground default clLeftMarginForeground;
       property LineStateModified: TColor read FLineStateModified write FLineStateModified default clYellow;
-      property LineStateLoaded: TColor read FLineStateNormal write FLineStateNormal default clLime;
+      property LineStateLoaded: TColor read FLineStateLoaded write FLineStateLoaded default clLime;
     end;
 
     TBookMarks = class(TPersistent)
     strict private
-      FImages: TCustomImageList;
-      FLeftMargin: Integer;
       FOnChange: TNotifyEvent;
       FOwner: TComponent;
       FShortCuts: Boolean;
       FVisible: Boolean;
       procedure DoChange;
-      procedure SetImages(const AValue: TCustomImageList);
       procedure SetVisible(AValue: Boolean);
     public
       constructor Create(AOwner: TComponent);
       procedure Assign(ASource: TPersistent); override;
     published
-      property Images: TCustomImageList read FImages write SetImages;
-      property LeftMargin: Integer read FLeftMargin write FLeftMargin default 2;
       property ShortCuts: Boolean read FShortCuts write FShortCuts default True;
       property Visible: Boolean read FVisible write SetVisible default True;
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     end;
 
     TMarks = class(TPersistent)
-    type
-      TPanel = class(TPersistent)
-      strict private
-        FOnChange: TNotifyEvent;
-        FOptions: TBCEditorLeftMarginBookMarkPanelOptions;
-        FVisible: Boolean;
-        FWidth: Integer;
-        procedure DoChange;
-        procedure SetVisible(const AValue: Boolean);
-        procedure SetWidth(AValue: Integer);
-      public
-        constructor Create;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property Options: TBCEditorLeftMarginBookMarkPanelOptions read FOptions write FOptions default [bpoToggleBookmarkByClick];
-        property Visible: Boolean read FVisible write SetVisible default True;
-        property Width: Integer read FWidth write SetWidth default 20;
-        property OnChange: TNotifyEvent read FOnChange write FOnChange;
-      end;
-
     strict private
       FDefaultImageIndex: Integer;
       FImages: TCustomImageList;
-      FLeftMargin: Integer;
       FOnChange: TNotifyEvent;
-      FOverlappingOffset: Integer;
       FOwner: TComponent;
       FShortCuts: Boolean;
       FVisible: Boolean;
       procedure DoChange;
       procedure SetImages(const AValue: TCustomImageList);
       procedure SetVisible(AValue: Boolean);
+    protected
+      property OnChange: TNotifyEvent read FOnChange write FOnChange;
     public
       constructor Create(AOwner: TComponent);
       procedure Assign(ASource: TPersistent); override;
     published
       property DefaultImageIndex: Integer read FDefaultImageIndex write FDefaultImageIndex default -1;
       property Images: TCustomImageList read FImages write SetImages;
-      property LeftMargin: Integer read FLeftMargin write FLeftMargin default 2;
-      property OverlappingOffset: Integer read FOverlappingOffset write FOverlappingOffset default 4;
       property Visible: Boolean read FVisible write SetVisible default True;
-      property OnChange: TNotifyEvent read FOnChange write FOnChange;
     end;
 
     TLineNumbers = class(TPersistent)
@@ -147,7 +117,6 @@ type
     FLineNumbers: TLineNumbers;
     FLineState: TLineState;
     FMarks: TMarks;
-    FMarksPanel: TMarks.TPanel;
     FOnChange: TNotifyEvent;
     procedure DoChange();
     procedure SetBookMarks(const AValue: TBookmarks);
@@ -166,7 +135,6 @@ type
     property LineNumbers: TLineNumbers read FLineNumbers write FLineNumbers;
     property LineState: TLineState read FLineState write FLineState;
     property Marks: TMarks read FMarks write SetMarks;
-    property MarksPanel: TMarks.TPanel read FMarksPanel write FMarksPanel;
   end;
 
 implementation {***************************************************************}
@@ -177,17 +145,6 @@ uses
 
 { TBCEditorLeftMargin.TColors *************************************************}
 
-constructor TBCEditorLeftMargin.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clLeftMarginBackground;
-  FBookmarkPanelBackground := clBtnFace;
-  FBorder := clLeftMarginBackground;
-  FLineStateModified := clYellow;
-  FLineStateNormal := clLime;
-end;
-
 procedure TBCEditorLeftMargin.TColors.Assign(ASource: TPersistent);
 begin
   if ASource is TBCEditorLeftMargin.TColors then
@@ -195,12 +152,22 @@ begin
   begin
     Self.FBackground := FBackground;
     Self.FBookmarkPanelBackground := FBookmarkPanelBackground;
-    Self.FBorder := FBorder;
     Self.FLineStateModified := FLineStateModified;
-    Self.FLineStateNormal := FLineStateNormal;
+    Self.FLineStateLoaded := FLineStateLoaded;
   end
   else
     inherited Assign(ASource);
+end;
+
+constructor TBCEditorLeftMargin.TColors.Create();
+begin
+  inherited;
+
+  FBackground := clLeftMarginBackground;
+  FBookmarkPanelBackground := clBtnFace;
+  FForeground := clLeftMarginForeground;
+  FLineStateModified := clYellow;
+  FLineStateLoaded := clLime;
 end;
 
 { TBCEditorLeftMargin.TBookmarks **********************************************}
@@ -210,7 +177,6 @@ begin
   inherited Create;
 
   FOwner := AOwner;
-  FLeftMargin := 2;
   FShortCuts := True;
   FVisible := True;
 end;
@@ -220,8 +186,6 @@ begin
   if Assigned(ASource) and (ASource is TBCEditorLeftMargin.TBookmarks) then
   with ASource as TBCEditorLeftMargin.TBookmarks do
   begin
-    Self.FImages := FImages;
-    Self.FLeftMargin := FLeftMargin;
     Self.FShortCuts := FShortCuts;
     Self.FVisible := FVisible;
     if Assigned(Self.FOnChange) then
@@ -237,17 +201,6 @@ begin
     FOnChange(Self);
 end;
 
-procedure TBCEditorLeftMargin.TBookmarks.SetImages(const AValue: TCustomImageList);
-begin
-  if FImages <> AValue then
-  begin
-    FImages := AValue;
-    if Assigned(FImages) then
-      FImages.FreeNotification(FOwner);
-    DoChange;
-  end;
-end;
-
 procedure TBCEditorLeftMargin.TBookmarks.SetVisible(AValue: Boolean);
 begin
   if FVisible <> AValue then
@@ -257,66 +210,14 @@ begin
   end;
 end;
 
-{ TBCEditorLeftMargin.TMarks.TPanel *******************************************}
-
-constructor TBCEditorLeftMargin.TMarks.TPanel.Create;
-begin
-  inherited;
-
-  FWidth := 20;
-  FOptions := [bpoToggleBookmarkByClick];
-  FVisible := True;
-end;
-
-procedure TBCEditorLeftMargin.TMarks.TPanel.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorLeftMargin.TMarks.TPanel) then
-  with ASource as TBCEditorLeftMargin.TMarks.TPanel do
-  begin
-    Self.FVisible := FVisible;
-    Self.FWidth := FWidth;
-    if Assigned(Self.FOnChange) then
-      Self.FOnChange(Self);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorLeftMargin.TMarks.TPanel.DoChange;
-begin
-  if Assigned(FOnChange) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorLeftMargin.TMarks.TPanel.SetVisible(const AValue: Boolean);
-begin
-  if FVisible <> AValue then
-  begin
-    FVisible := AValue;
-    DoChange
-  end;
-end;
-
-procedure TBCEditorLeftMargin.TMarks.TPanel.SetWidth(AValue: Integer);
-begin
-  AValue := Max(0, AValue);
-  if FWidth <> AValue then
-  begin
-    FWidth := AValue;
-    DoChange
-  end;
-end;
-
 { TBCEditorLeftMargin.TMarks **************************************************}
 
 constructor TBCEditorLeftMargin.TMarks.Create(AOwner: TComponent);
 begin
-  inherited Create;
+  inherited Create();
 
   FOwner := AOwner;
   FDefaultImageIndex := -1;
-  FLeftMargin := 2;
-  FOverlappingOffset := 4;
   FShortCuts := True;
   FVisible := True;
 end;
@@ -328,8 +229,6 @@ begin
   begin
     Self.FDefaultImageIndex := FDefaultImageIndex;
     Self.FImages := FImages;
-    Self.FLeftMargin := FLeftMargin;
-    Self.FOverlappingOffset := FOverlappingOffset;
     Self.FShortCuts := FShortCuts;
     Self.FVisible := FVisible;
     if Assigned(Self.FOnChange) then
@@ -347,12 +246,12 @@ end;
 
 procedure TBCEditorLeftMargin.TMarks.SetImages(const AValue: TCustomImageList);
 begin
-  if FImages <> AValue then
+  if (AValue <> FImages) then
   begin
     FImages := AValue;
     if Assigned(FImages) then
       FImages.FreeNotification(FOwner);
-    DoChange;
+    DoChange();
   end;
 end;
 
@@ -485,7 +384,6 @@ begin
   FMarks := TMarks.Create(AOwner);
   FLineState := TLineState.Create;
   FLineNumbers := TLineNumbers.Create;
-  FMarksPanel := TMarks.TPanel.Create;
   FOnChange := nil;
 end;
 
@@ -496,7 +394,6 @@ begin
   FColors.Free();
   FLineState.Free();
   FLineNumbers.Free();
-  FMarksPanel.Free();
 
   inherited;
 end;
@@ -510,7 +407,6 @@ begin
     Self.FMarks.Assign(FMarks);
     Self.FColors.Assign(FColors);
     Self.FLineNumbers.Assign(FLineNumbers);
-    Self.FMarksPanel.Assign(FMarksPanel);
     Self.DoChange;
   end
   else
@@ -545,7 +441,7 @@ begin
   FBookmarks.OnChange := AValue;
   FLineState.OnChange := AValue;
   FLineNumbers.OnChange := AValue;
-  FMarksPanel.OnChange := AValue;
+  FMarks.OnChange := AValue;
 end;
 
 end.

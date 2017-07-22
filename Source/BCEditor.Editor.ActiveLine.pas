@@ -13,16 +13,17 @@ type
     FColor: TColor;
     FOnChange: TNotifyEvent;
     FVisible: Boolean;
-    procedure DoChange(ASender: TObject);
+    procedure DoChange();
     procedure SetColor(const AValue: TColor);
     procedure SetVisible(const AValue: Boolean);
+  protected
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     constructor Create();
     procedure Assign(ASource: TPersistent); override;
   published
     property Color: TColor read FColor write SetColor default clActiveLineBackground;
     property Visible: Boolean read FVisible write SetVisible default True;
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   end;
 
 implementation {***************************************************************}
@@ -34,6 +35,7 @@ begin
   inherited;
 
   FColor := clActiveLineBackground;
+  FOnChange := nil;
   FVisible := True;
 end;
 
@@ -44,16 +46,16 @@ begin
   begin
     Self.FColor := FColor;
     Self.FVisible := FVisible;
-    Self.DoChange(Self);
+    Self.DoChange();
   end
   else
     inherited Assign(ASource);
 end;
 
-procedure TBCEditorActiveLine.DoChange(ASender: TObject);
+procedure TBCEditorActiveLine.DoChange();
 begin
-  if Assigned(FOnChange) then
-    FOnChange(ASender);
+  if (Assigned(FOnChange)) then
+    FOnChange(Self);
 end;
 
 procedure TBCEditorActiveLine.SetColor(const AValue: TColor);
@@ -61,7 +63,7 @@ begin
   if FColor <> AValue then
   begin
     FColor := AValue;
-    DoChange(Self);
+    DoChange();
   end;
 end;
 
@@ -70,7 +72,7 @@ begin
   if FVisible <> AValue then
   begin
     FVisible := AValue;
-    DoChange(Self);
+    DoChange();
   end;
 end;
 

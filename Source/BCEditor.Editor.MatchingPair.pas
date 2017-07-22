@@ -9,75 +9,26 @@ uses
 
 type
   TBCEditorMatchingPair = class(TPersistent)
-  type
-    TColors = class(TPersistent)
-    strict private
-      FMatched: TColor;
-      FUnderline: TColor;
-      FUnmatched: TColor;
-    public
-      constructor Create;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Matched: TColor read FMatched write FMatched default clAqua;
-      property Underline: TColor read FUnderline write FUnderline default clMatchingPairUnderline;
-      property Unmatched: TColor read FUnmatched write FUnmatched default clYellow;
-    end;
-
   strict private
-    FColors: TColors;
+    FColor: TColor;
     FEnabled: Boolean;
-    procedure SetColors(const AValue: TColors);
+    FOnChange: TNotifyEvent;
+    procedure DoChange();
+    procedure SetColor(const AValue: TColor);
+    procedure SetEnabled(const AValue: Boolean);
+  protected
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
-    constructor Create;
-    destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
+    constructor Create();
   published
-    property Colors: TColors read FColors write SetColors;
-    property Enabled: Boolean read FEnabled write FEnabled default True;
+    property Color: TColor read FColor write SetColor default clMatchingPair;
+    property Enabled: Boolean read FEnabled write SetEnabled default True;
   end;
 
 implementation {***************************************************************}
 
 { TBCEditorMatchingPair *******************************************************}
-
-constructor TBCEditorMatchingPair.TColors.Create;
-begin
-  inherited;
-
-  FMatched := clAqua;
-  FUnderline := clMatchingPairUnderline;
-  FUnmatched := clYellow;
-end;
-
-procedure TBCEditorMatchingPair.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TBCEditorMatchingPair.TColors then
-  with ASource as TBCEditorMatchingPair.TColors do
-  begin
-    Self.FMatched := FMatched;
-    Self.FUnmatched := FUnmatched;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorMatchingPair *******************************************************}
-
-constructor TBCEditorMatchingPair.Create;
-begin
-  inherited;
-
-  FColors := TBCEditorMatchingPair.TColors.Create;
-  FEnabled := True;
-end;
-
-destructor TBCEditorMatchingPair.Destroy;
-begin
-  FColors.Free;
-
-  inherited;
-end;
 
 procedure TBCEditorMatchingPair.Assign(ASource: TPersistent);
 begin
@@ -85,15 +36,44 @@ begin
   with ASource as TBCEditorMatchingPair do
   begin
     Self.FEnabled := FEnabled;
-    Self.FColors.Assign(FColors);
+    Self.FColor := FColor;
+    Self.DoChange();
   end
   else
     inherited Assign(ASource);
 end;
 
-procedure TBCEditorMatchingPair.SetColors(const AValue: TColors);
+constructor TBCEditorMatchingPair.Create();
 begin
-  FColors.Assign(AValue);
+  inherited;
+
+  FColor := clMatchingPair;
+  FEnabled := True;
+  FOnChange := nil;
+end;
+
+procedure TBCEditorMatchingPair.DoChange();
+begin
+  if (Assigned(FOnChange)) then
+    FOnChange(Self);
+end;
+
+procedure TBCEditorMatchingPair.SetColor(const AValue: TColor);
+begin
+  if (AValue <> FColor) then
+  begin
+    FColor := AValue;
+    DoChange();
+  end;
+end;
+
+procedure TBCEditorMatchingPair.SetEnabled(const AValue: Boolean);
+begin
+  if (AValue <> FEnabled) then
+  begin
+    FEnabled := AValue;
+    DoChange();
+  end;
 end;
 
 end.

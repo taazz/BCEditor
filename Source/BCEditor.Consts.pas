@@ -67,7 +67,7 @@ const
   clSearchMapActiveLine = $00F4F4F4;
   clIndentHighlight = $00CC9999;
   clIndent = $00CC9999;
-  clMatchingPairUnderline = $00FFFF00;
+  clMatchingPair = clAqua;
   clWordWrapIndicatorArrow = clNavy;
   clWordWrapIndicatorLines = clBlack;
   clSyncEditBackground = $00FCFDCD;

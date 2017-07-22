@@ -2219,7 +2219,7 @@ begin
   CharWidth := AValue.PaintHelper.TextWidth(BCEDITOR_SPACE_CHAR, 1);
   FTabWidth := AValue.Tabs.Width;
   SetLines(AValue.Lines);
-  FSelectionAvailable := AValue.SelectionAvailable;
+  FSelectionAvailable := AValue.SelLength <> 0;
   FBlockBeginPosition := AValue.SelectionBeginPosition;
   FBlockEndPosition := AValue.SelectionEndPosition;
 end;
