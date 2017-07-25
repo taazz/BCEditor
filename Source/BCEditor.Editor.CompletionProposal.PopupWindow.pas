@@ -429,7 +429,6 @@ begin
       if CanFocus then
         SetFocus;
 
-      ScrollToCaret;
       CaretPos := SelectionEndPosition;
       SelectionBeginPosition := LinesPosition(CaretPos.X + 1, CaretPos.Y);
     finally

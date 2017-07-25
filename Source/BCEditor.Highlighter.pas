@@ -326,7 +326,8 @@ type
 
     TBaseParser = class abstract
     public
-      function GetToken(const ARange: TRange; const ALineText: string;
+      function GetToken(const ARange: TRange;
+        const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; virtual; abstract;
     end;
 
@@ -340,7 +341,8 @@ type
       constructor Create(AChar: Char; AToken: TToken; ABreakType: TBCEditorBreakType); reintroduce; overload; virtual;
       constructor Create(ASet: TSet); reintroduce; overload; virtual;
       destructor Destroy; override;
-      function GetToken(const ARange: TRange; const ALineText: string;
+      function GetToken(const ARange: TRange;
+        const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; override;
       property HeadNode: TTokenNode read FHeadNode;
       property Sets: TList read FSets;
@@ -352,7 +354,8 @@ type
     public
       constructor Create(AToken: TToken); reintroduce; virtual;
       destructor Destroy; override;
-      function GetToken(const ARange: TRange; const ALineText: string;
+      function GetToken(const ARange: TRange;
+        const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; override;
     end;
 
@@ -362,7 +365,8 @@ type
     public
       constructor Create(AToken: TToken); virtual;
       destructor Destroy; override;
-      function GetToken(const ARange: TRange; const ALineText: string;
+      function GetToken(const ARange: TRange;
+        const ALineText: PChar; const ALineLength: Integer;
         var AChar: Integer; out AToken: TToken): Boolean; override;
     end;
 
@@ -403,7 +407,9 @@ type
       FAttribute: TAttribute;
       FChar: Integer;
       FLength: Integer;
-      FLineText: string;
+      FLineChar: Integer;
+      FLineLength: Integer;
+      FLineText: PChar;
       FRange: TRange;
       FText: PChar;
       FToken: TToken;
@@ -454,8 +460,8 @@ type
   public
     constructor Create(const AEditor: TCustomControl);
     destructor Destroy(); override;
-    function FindFirstToken(const ABeginRange: TRange; const ALineText: string;
-      out AFind: TFind): Boolean;
+    function FindFirstToken(const ABeginRange: TRange; const AText: PChar;
+      const ALength, AFirstChar: Integer; out AFind: TFind): Boolean; overload;
     function FindNextToken(var AFind: TFind): Boolean;
     procedure AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
     procedure AddKeywords(var AStringList: TStringList);
@@ -1463,7 +1469,8 @@ begin
 end;
 
 function TBCEditorHighlighter.TParser.GetToken(const ARange: TRange;
-  const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
+  const ALineText: PChar; const ALineLength: Integer;
+  var AChar: Integer; out AToken: TToken): Boolean;
 var
   LAllowedDelimiters: TBCEditorAnsiCharSet;
   LBeginChar: Integer;
@@ -1497,10 +1504,10 @@ begin
       else
         LFindTokenNode := nil;
       LPreviousChar := AChar;
-      while ((LCurrentTokenNode.NextNodes.Count > 0) and (AChar + 1 < Length(ALineText))) do
+      while ((LCurrentTokenNode.NextNodes.Count > 0) and (AChar + 1 < ALineLength)) do
       begin
         Inc(AChar);
-        LCurrentTokenNode := LCurrentTokenNode.NextNodes.FindNode(ARange.CaseFunct(ALineText[1 + AChar]));
+        LCurrentTokenNode := LCurrentTokenNode.NextNodes.FindNode(ARange.CaseFunct(ALineText[AChar]));
         if not Assigned(LCurrentTokenNode) then
         begin
           Dec(AChar);
@@ -1526,15 +1533,15 @@ begin
       if (not Assigned(LFindTokenNode) or not Assigned(LFindTokenNode.Token)
         or ((LFindTokenNode.Token.Attribute.EscapeChar <> BCEDITOR_NONE_CHAR)
           and (LBeginChar > 0)
-          and (ALineText[1 + LBeginChar - 1] = LFindTokenNode.Token.Attribute.EscapeChar))) then
+          and (ALineText[LBeginChar - 1] = LFindTokenNode.Token.Attribute.EscapeChar))) then
         Continue;
 
-      if (AChar <= Length(ALineText)) then
+      if (AChar <= ALineLength) then
         Inc(AChar);
 
       if ((LFindTokenNode.BreakType = btAny)
-        or (AChar = Length(ALineText))
-        or CharInSet(ALineText[1 + AChar], ARange.Delimiters)) then
+        or (AChar = ALineLength)
+        or CharInSet(ALineText[AChar], ARange.Delimiters)) then
       begin
         AToken := LFindTokenNode.Token;
         Exit(True);
@@ -1546,13 +1553,13 @@ begin
   for LIndex := 0 to Sets.Count - 1 do
     LAllowedDelimiters := LAllowedDelimiters - TSet(Sets.List[LIndex]).CharSet;
 
-  if (AChar < Length(ALineText)) then
+  if (AChar < ALineLength) then
     for LIndex := 0 to Sets.Count - 1 do
     begin
       AChar := LBeginChar;
       LSet := TSet(Sets.List[LIndex]);
-      LLinePos := @ALineText[1 + AChar];
-      LLineEndPos := @ALineText[Length(ALineText)];
+      LLinePos := @ALineText[AChar];
+      LLineEndPos := @ALineText[ALineLength];
       repeat
         Inc(AChar);
         Inc(LLinePos);
@@ -1612,7 +1619,8 @@ begin
 end;
 
 function TBCEditorHighlighter.TDefaultParser.GetToken(const ARange: TRange;
-  const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
+  const ALineText: PChar; const ALineLength: Integer;
+  var AChar: Integer; out AToken: TToken): Boolean;
 begin
   Inc(AChar);
   Result := False;
@@ -1634,9 +1642,10 @@ begin
 end;
 
 function TBCEditorHighlighter.TDelimitersParser.GetToken(const ARange: TRange;
-  const ALineText: string; var AChar: Integer; out AToken: TToken): Boolean;
+  const ALineText: PChar; const ALineLength: Integer;
+  var AChar: Integer; out AToken: TToken): Boolean;
 begin
-  if (AChar < Length(ALineText)) then
+  if (AChar < ALineLength) then
     Inc(AChar);
   AToken := FToken;
   Result := True;
@@ -2517,44 +2526,50 @@ begin
 end;
 
 function TBCEditorHighlighter.FindFirstToken(const ABeginRange: TRange;
-  const ALineText: string; out AFind: TFind): Boolean;
+  const AText: PChar; const ALength, AFirstChar: Integer; out AFind: TFind): Boolean;
 begin
-  AFind.FChar := 0;
-  AFind.FLineText := ALineText;
-  if (not Assigned(ABeginRange)) then
-    AFind.FRange := MainRules
+  if (not Assigned(AText) or (ALength = 0)) then
+    Result := False
   else
-    AFind.FRange := ABeginRange;
-  AFind.FLength := 0;
-  AFind.FToken := nil;
-
-  if (Assigned(AFind.FRange) and not AFind.FRange.Prepared) then
   begin
-    FAttributes.Clear();
-    AddAllAttributes(MainRules);
-    FMainRules.Prepare(FMainRules);
-  end;
+    AFind.FChar := AFirstChar;
+    AFind.FLineChar := 0;
+    AFind.FLineText := AText;
+    AFind.FLineLength := ALength;
+    if (not Assigned(ABeginRange)) then
+      AFind.FRange := MainRules
+    else
+      AFind.FRange := ABeginRange;
+    AFind.FLength := 0;
+    AFind.FToken := nil;
 
-  Result := FindNextToken(AFind);
+    if (Assigned(AFind.FRange) and not AFind.FRange.Prepared) then
+    begin
+      FAttributes.Clear();
+      AddAllAttributes(MainRules);
+      FMainRules.Prepare(FMainRules);
+    end;
+
+    Result := FindNextToken(AFind);
+  end;
 end;
 
 function TBCEditorHighlighter.FindNextToken(var AFind: TFind): Boolean;
 var
-  LChar: Integer;
   LCloseParent: Boolean;
+  LChar: Integer;
   LDelimiters: TBCEditorAnsiCharSet;
   LIndex: Integer;
   LKeywordText: string;
   LParser: TBaseParser;
 begin
-  Result := AFind.FChar + AFind.FLength < Length(AFind.FLineText);
+  Result := AFind.FLineChar + AFind.FLength < AFind.FLineLength;
 
   if (Result) then
   begin
-    LChar := AFind.FChar + AFind.FLength;
-
-    AFind.FChar := LChar;
-    AFind.FText := @AFind.FLineText[1 + LChar];
+    Inc(AFind.FChar, AFind.FLength);
+    Inc(AFind.FLineChar, AFind.FLength);
+    AFind.FText := @AFind.FLineText[AFind.FLineChar];
 
     if (FTemporaryCurrentTokens.Count > 0) then
     begin
@@ -2570,8 +2585,8 @@ begin
       for LIndex := 0 to AFind.FRange.AlternativeCloseArrayCount - 1 do
       begin
         LKeywordText := AFind.FRange.AlternativeCloseArray[LIndex];
-        if ((Length(AFind.FLineText) - LChar >= Length(LKeywordText))
-          and (StrLComp(@AFind.FLineText[1 + LChar], PChar(LKeywordText), Length(LKeywordText)) = 0)) then
+        if ((AFind.FLineLength - AFind.FLineChar >= Length(LKeywordText))
+          and (StrLComp(@AFind.FLineText[AFind.FLineChar], PChar(LKeywordText), Length(LKeywordText)) = 0)) then
         begin
           AFind.FRange := AFind.FRange.Parent;
           Break;
@@ -2580,9 +2595,11 @@ begin
 
     if Assigned(AFind.FRange) then
     begin
+      LChar := AFind.FLineChar;
+
       LCloseParent := AFind.FRange.CloseParent;
-      if (AFind.FRange.CloseOnTerm and CharInSet(AFind.FLineText[1 + LChar], AFind.FRange.Delimiters) and
-        not (AFind.FRange.SkipWhitespace and CharInSet(AFind.FLineText[1 + LChar], BCEDITOR_ABSOLUTE_DELIMITERS))) then
+      if (AFind.FRange.CloseOnTerm and CharInSet(AFind.FLineText[LChar], AFind.FRange.Delimiters) and
+        not (AFind.FRange.SkipWhitespace and CharInSet(AFind.FLineText[LChar], BCEDITOR_ABSOLUTE_DELIMITERS))) then
       begin
         AFind.FRange := AFind.FRange.Parent;
         if Assigned(AFind.FRange) then
@@ -2590,14 +2607,14 @@ begin
             AFind.FRange := AFind.FRange.Parent;
       end;
 
-      if (Ord(AFind.FLineText[1 + LChar]) < 256) then
-        LParser := AFind.FRange.SymbolParsers[AnsiChar(AFind.FRange.CaseFunct(AFind.FLineText[1 + LChar]))]
+      if (Ord(AFind.FLineText[LChar]) < 256) then
+        LParser := AFind.FRange.SymbolParsers[AnsiChar(AFind.FRange.CaseFunct(AFind.FLineText[LChar]))]
       else
         LParser := AFind.FRange.SymbolParsers['a'];
 
       if (not Assigned(LParser)) then
         Inc(LChar)
-      else if (not LParser.GetToken(AFind.FRange, AFind.FLineText, LChar, AFind.FToken)) then
+      else if (not LParser.GetToken(AFind.FRange, AFind.FLineText, AFind.FLineLength, LChar, AFind.FToken)) then
       begin
         AFind.FToken := AFind.FRange.DefaultToken;
 
@@ -2606,15 +2623,15 @@ begin
         else
           LDelimiters := FAllDelimiters;
 
-        if (Ord(AFind.FLineText[1 + LChar - 1]) < 256) then
-          while ((LChar < Length(AFind.FLineText))
-            and (Ord(AFind.FLineText[1 + LChar]) < 256)
-            and not CharInSet(AFind.FLineText[1 + LChar], LDelimiters)) do
+        if (Ord(AFind.FLineText[LChar - 1]) < 256) then
+          while ((LChar < AFind.FLineLength)
+            and (Ord(AFind.FLineText[LChar]) < 256)
+            and not CharInSet(AFind.FLineText[LChar], LDelimiters)) do
             Inc(LChar)
         else
-          while ((LChar < Length(AFind.FLineText))
-            and (Ord(AFind.FLineText[1 + LChar]) >= 256)
-            and not CharInSet(AFind.FLineText[1 + LChar], LDelimiters)) do
+          while ((LChar < AFind.FLineLength)
+            and (Ord(AFind.FLineText[LChar]) >= 256)
+            and not CharInSet(AFind.FLineText[LChar], LDelimiters)) do
             Inc(LChar)
       end
       else if (AFind.FRange.ClosingToken = AFind.FToken) then
@@ -2634,7 +2651,7 @@ begin
         FTemporaryCurrentTokens.Add(AFind.FToken);
     end;
 
-    AFind.FLength := LChar - AFind.FChar;
+    AFind.FLength := LChar - AFind.FLineChar;
     if (not Assigned(AFind.FToken)) then
       AFind.FAttribute := nil
     else

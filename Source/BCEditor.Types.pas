@@ -340,7 +340,7 @@ end;
 
 function TBCEditorLinesArea.Contains(Position: TBCEditorLinesPosition): Boolean;
 begin
-  Result := (BeginPosition <= Position) and (Position <= EndPosition);
+  Result := (BeginPosition <= Position) and (Position < EndPosition);
 end;
 
 class operator TBCEditorLinesArea.Equal(a, b: TBCEditorLinesArea): Boolean;

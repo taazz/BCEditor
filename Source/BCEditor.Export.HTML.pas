@@ -155,7 +155,9 @@ begin
   begin
     LTextLine := '';
     LColumn := 0;
-    if (FHighlighter.FindFirstToken(FLines.Items[LLine].BeginRange, FLines.Items[LLine].Text, LToken)) then
+    if (FHighlighter.FindFirstToken(FLines.Items[LLine].BeginRange,
+      PChar(FLines.Items[LLine].Text), Length(FLines.Items[LLine].Text), 0,
+      LToken)) then
       repeat
         SetString(LTokenText, LToken.Text, LToken.Length);
         if LTokenText = BCEDITOR_TAB_CHAR then

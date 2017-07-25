@@ -1711,7 +1711,7 @@ begin
     while LLine < FLines.Count do
     begin
       FLines.Objects[LLine] := LRange;
-      if (FHighlighter.FindFirstToken(LRange, FLines[LLine], LToken)) then
+      if (FHighlighter.FindFirstToken(LRange, PChar(FLines[LLine]), Length(FLines[LLine]), LToken)) then
         repeat
           LRange := LToken.Range;
         until (not FHighlighter.FindNextToken(LToken));
@@ -1972,7 +1972,7 @@ begin
     LTokenStart := 0;
     LCount := 0;
     LLeft := FMargins.PixelLeft;
-    if (FHighlighter.FindFirstToken(TBCEditorHighlighter.TRange(FLines.Objects[FLine]), AText, LToken)) then
+    if (FHighlighter.FindFirstToken(TBCEditorHighlighter.TRange(FLines.Objects[FLine]), PChar(AText), Length(AText), LToken)) then
       repeat
         FCanvas.Font.Color := FFontColor;
         FCanvas.Brush.Color := FDefaultBackground;

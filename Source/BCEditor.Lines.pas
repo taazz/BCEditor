@@ -82,7 +82,7 @@ type
 
     TLine = packed record
     type
-      TFlags = set of (lfHasTabs);
+      TFlags = set of (lfContainsTabs);
       TState = (lsLoaded, lsModified, lsSaved);
     public
       Background: TColor;
@@ -95,6 +95,7 @@ type
       FirstRow: Integer;
       Flags: TFlags;
       Foreground: TColor;
+      RowCount: Integer;
       State: TLine.TState;
       Text: string;
     end;
@@ -197,7 +198,6 @@ type
     FOnCaretChanged: TNotifyEvent;
     FOnCleared: TNotifyEvent;
     FOnDeactivateSyncEdit: TNotifyEvent;
-    FOnDeleted: TChangeEvent;
     FOnDeleting: TChangeEvent;
     FOnInserted: TChangeEvent;
     FOnLoaded: TNotifyEvent;
@@ -286,8 +286,8 @@ type
     procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
-    procedure SetFirstRow(const ALine: Integer; const AValue: Integer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetForeground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
+    procedure SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer; ACompare: TCompare = nil);
@@ -313,7 +313,6 @@ type
     property OnBookmarksChange: TNotifyEvent read FOnBookmarksChange write FOnBookmarksChange;
     property OnCaretChanged: TNotifyEvent read FOnCaretChanged write FOnCaretChanged;
     property OnCleared: TNotifyEvent read FOnCleared write FOnCleared;
-    property OnDeleted: TChangeEvent read FOnDeleted write FOnDeleted;
     property OnDeleting: TChangeEvent read FOnDeleting write FOnDeleting;
     property OnInserted: TChangeEvent read FOnInserted write FOnInserted;
     property OnLoaded: TNotifyEvent read FOnLoaded write FOnLoaded;
@@ -592,6 +591,7 @@ function TBCEditorLines.TSearch.FindNormal(const APosition: TBCEditorLinesPositi
   const AFoundLength: Integer): Boolean;
 var
   LLineEndPos: PChar;
+  LLineFirstChar: Integer;
   LLineLength: Integer;
   LLinePos: PChar;
   LLineText: string;
@@ -608,9 +608,14 @@ begin
 
     while (not Result
       and (FBackwards and (FFoundPosition > Max(FArea.BeginPosition, FLines.BOFPosition))
-        or not FBackwards and (FFoundPosition <= Min(FArea.EndPosition, FLines.EOFPosition)))) do
+        or not FBackwards and (FFoundPosition < Min(FArea.EndPosition, FLines.EOFPosition)))) do
     begin
+      LLineFirstChar := 0;
+      if (FBackwards and (FFoundPosition.Line = FArea.BeginPosition.Line)) then
+        LLineFirstChar := Max(LLineFirstChar, FArea.BeginPosition.Char);
       LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
+      if (not FBackwards and (FFoundPosition.Line = FArea.EndPosition.Line)) then
+        LLineLength := Min(LLineLength, FArea.EndPosition.Char + 1);
 
       if (LLineLength > 0) then
       begin
@@ -628,7 +633,7 @@ begin
           Dec(FFoundPosition.Char);
 
         while (not Result
-          and (FBackwards and (FFoundPosition.Char >= 0)
+          and (FBackwards and (FFoundPosition.Char >= LLineFirstChar)
             or not FBackwards and (FFoundPosition.Char + LPatternLength <= LLineLength))) do
         begin
           LLinePos := @LLineText[1 + FFoundPosition.Char];
@@ -841,7 +846,7 @@ end;
 
 procedure TBCEditorLines.TUndoList.BeginUpdate();
 begin
-  if (UpdateCount = 0) then
+  if (FUpdateCount = 0) then
   begin
     Inc(FBlockNumber);
     FChanges := 0;
@@ -971,7 +976,7 @@ begin
       Add(LItem);
     end;
 
-    if (UpdateCount > 0) then
+    if (FUpdateCount > 0) then
       Inc(FChanges);
     FGroupBreak := False;
   end;
@@ -1120,7 +1125,6 @@ begin
   FOnBeforeUpdate := nil;
   FOnCaretChanged := nil;
   FOnCleared := nil;
-  FOnDeleted := nil;
   FOnDeleting := nil;
   FOnInserted := nil;
   FOnLoaded := nil;
@@ -1308,9 +1312,7 @@ begin
     CaretPosition := EOLPosition[ALine - 1];
 
   if ((Count = 0) and Assigned(FOnCleared)) then
-    FOnCleared(Self)
-  else if (Assigned(FOnDeleted)) then
-    FOnDeleted(Self, ALine);
+    FOnCleared(Self);
 end;
 
 procedure TBCEditorLines.DoDeleteIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
@@ -1585,7 +1587,7 @@ begin
       begin
         if (LPos^ = BCEDITOR_TAB_CHAR) then
         begin
-          Include(Items.List[ALine].Flags, lfHasTabs);
+          Include(Items.List[ALine].Flags, lfContainsTabs);
           break;
         end;
         Inc(LPos);
@@ -2626,13 +2628,6 @@ begin
   Items.List[ALine].CodeFolding.TreeLine := AValue;
 end;
 
-procedure TBCEditorLines.SetFirstRow(const ALine: Integer; const AValue: Integer);
-begin
-  Assert((0 <= ALine) and (ALine < Count));
-
-  Items.List[ALine].FirstRow := AValue;
-end;
-
 procedure TBCEditorLines.SetForeground(const ALine: Integer; const AValue: TColor);
 begin
   Assert((0 <= ALine) and (ALine < Count));
@@ -2662,6 +2657,14 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TBCEditorLines.SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  Items.List[ALine].FirstRow := AFirstRow;
+  Items.List[ALine].RowCount := ARowCount;
 end;
 
 procedure TBCEditorLines.SetSelArea(AValue: TBCEditorLinesArea);
@@ -2837,6 +2840,7 @@ begin
   begin
     if (AArea.EndPosition = InvalidLinesPosition) then
       Result := FSyncEditItems[LIndex].Area.Contains(AArea.BeginPosition)
+        or (FSyncEditItems[LIndex].Area.BeginPosition = AArea.BeginPosition)
     else
       Result := FSyncEditItems[LIndex].Area.IntersectWith(AArea);
     Inc(LIndex);
@@ -2851,7 +2855,8 @@ begin
   LIndex := 0;
   while ((Result < 0) and (LIndex < FSyncEditItems.Count)) do
   begin
-    if (FSyncEditItems[LIndex].Area.Contains(APosition)) then
+    if (FSyncEditItems[LIndex].Area.Contains(APosition)
+      or (FSyncEditItems[LIndex].Area.BeginPosition = APosition)) then
       Result := LIndex;
     Inc(LIndex);
   end;
