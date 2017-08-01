@@ -148,7 +148,7 @@ var
   LPreviousElement: string;
   LTextLine: string;
   LTokenText: string;
-  LToken: TBCEditorHighlighter.TFind;
+  LToken: TBCEditorHighlighter.TTokenFind;
 begin
   LPreviousElement := '';
   for LLine := 0 to FLines.Count - 1 do

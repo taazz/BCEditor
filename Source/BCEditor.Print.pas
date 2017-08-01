@@ -364,7 +364,7 @@ implementation {***************************************************************}
 
 uses
   UITypes, Types, Math,
-  BCEditor.Consts;
+  BCEditor.Consts, BCEditor.Lines;
 
 const
   mmPerInch = 25.4;
@@ -1702,7 +1702,7 @@ procedure TBCEditorPrint.InitHighlighterRanges;
 var
   LLine: Integer;
   LRange: TBCEditorHighlighter.TRange;
-  LToken: TBCEditorHighlighter.TFind;
+  LToken: TBCEditorHighlighter.TTokenFind;
 begin
   if not FHighlighterRangesSet and Assigned(FHighlighter) and (FLines.Count > 0) then
   begin
@@ -1711,7 +1711,7 @@ begin
     while LLine < FLines.Count do
     begin
       FLines.Objects[LLine] := LRange;
-      if (FHighlighter.FindFirstToken(LRange, PChar(FLines[LLine]), Length(FLines[LLine]), LToken)) then
+      if (FHighlighter.FindFirstToken(LRange, PChar(FLines[LLine]), Length(FLines[LLine]), 0, LToken)) then
         repeat
           LRange := LToken.Range;
         until (not FHighlighter.FindNextToken(LToken));
@@ -1915,7 +1915,7 @@ var
   LLines: TStringList;
   LOldWrapPosition: Integer;
   LSpaceWidth: Integer;
-  LToken: TBCEditorHighlighter.TFind;
+  LToken: TBCEditorHighlighter.TTokenFind;
   LTokenStart: Integer;
   LWrapPosition: Integer;
 
@@ -1972,7 +1972,7 @@ begin
     LTokenStart := 0;
     LCount := 0;
     LLeft := FMargins.PixelLeft;
-    if (FHighlighter.FindFirstToken(TBCEditorHighlighter.TRange(FLines.Objects[FLine]), PChar(AText), Length(AText), LToken)) then
+    if (FHighlighter.FindFirstToken(TBCEditorHighlighter.TRange(FLines.Objects[FLine]), PChar(AText), Length(AText), 0, LToken)) then
       repeat
         FCanvas.Font.Color := FFontColor;
         FCanvas.Brush.Color := FDefaultBackground;

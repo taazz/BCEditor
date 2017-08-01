@@ -401,8 +401,8 @@ type
       procedure ImportFromStream(AStream: TStream);
     end;
 
-    PFind = ^TFind;
-    TFind = record
+    PTokenFind = ^TTokenFind;
+    TTokenFind = record
     private
       FAttribute: TAttribute;
       FChar: Integer;
@@ -443,7 +443,7 @@ type
     FSample: string;
     FSkipCloseKeyChars: TBCEditorAnsiCharSet;
     FSkipOpenKeyChars: TBCEditorAnsiCharSet;
-    FTemporaryCurrentTokens: TList<TToken>;
+    FTemporaryCurrentTokens: TObjectList<TToken>;
     FWordBreakChars: TBCEditorAnsiCharSet;
     procedure AddAllAttributes(ARange: TRange);
     procedure SetFileName(AValue: string);
@@ -461,8 +461,8 @@ type
     constructor Create(const AEditor: TCustomControl);
     destructor Destroy(); override;
     function FindFirstToken(const ABeginRange: TRange; const AText: PChar;
-      const ALength, AFirstChar: Integer; out AFind: TFind): Boolean; overload;
-    function FindNextToken(var AFind: TFind): Boolean;
+      const ALength, AFirstChar: Integer; out AFind: TTokenFind): Boolean; overload;
+    function FindNextToken(var AFind: TTokenFind): Boolean;
     procedure AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
     procedure AddKeywords(var AStringList: TStringList);
     procedure Clear();
@@ -2499,7 +2499,7 @@ begin
   FMatchingPairs := TList<TMatchingPairToken>.Create();
   FMatchingPairHighlight := True;
 
-  FTemporaryCurrentTokens := TList<TToken>.Create();
+  FTemporaryCurrentTokens := TObjectList<TToken>.Create();
 
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
 end;
@@ -2526,7 +2526,7 @@ begin
 end;
 
 function TBCEditorHighlighter.FindFirstToken(const ABeginRange: TRange;
-  const AText: PChar; const ALength, AFirstChar: Integer; out AFind: TFind): Boolean;
+  const AText: PChar; const ALength, AFirstChar: Integer; out AFind: TTokenFind): Boolean;
 begin
   if (not Assigned(AText) or (ALength = 0)) then
     Result := False
@@ -2554,7 +2554,7 @@ begin
   end;
 end;
 
-function TBCEditorHighlighter.FindNextToken(var AFind: TFind): Boolean;
+function TBCEditorHighlighter.FindNextToken(var AFind: TTokenFind): Boolean;
 var
   LCloseParent: Boolean;
   LChar: Integer;
@@ -2573,11 +2573,7 @@ begin
 
     if (FTemporaryCurrentTokens.Count > 0) then
     begin
-      while (FTemporaryCurrentTokens.Count > 0) do
-      begin
-        FTemporaryCurrentTokens[0].Free();
-        FTemporaryCurrentTokens.Delete(0);
-      end;
+      FTemporaryCurrentTokens.Clear();
       AFind.FToken := nil;
     end;
 

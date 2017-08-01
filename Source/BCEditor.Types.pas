@@ -22,7 +22,7 @@ type
     eoAutoIndent, { Will indent the caret on new lines with the same amount of leading white space as the preceding line }
     eoBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
     eoBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
-    eoDropFiles, { Allows the editor accept OLE file drops }
+    eoAcceptFiles, { Allows the editor accept OLE file drops }
     eoMiddleClickScrolling, { Scrolling by mouse move after wheel click. }
     eoTrimTrailingLines, { Empty lines at the end of text will be removed while saving }
     eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
