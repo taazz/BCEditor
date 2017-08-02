@@ -11,6 +11,8 @@ type
   TBCEditorArrayOfString = array of string;
   TBCEditorArrayOfSingle = array of Single;
 
+  TBCEditorInterruptFunc = function(): Boolean of object;
+
   TBCEditorCaretChangedEvent = procedure(ASender: TObject; ACaretPos: TPoint) of object;
 
   TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;
