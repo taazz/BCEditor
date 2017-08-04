@@ -110,6 +110,9 @@ const
   { Case }
   ecUpperCase = 620;
   ecLowerCase = 621;
+  { SyncEdit }
+  ecActivateSyncEdit = 701;
+  ecDeactivateSyncEdit = 702;
   { Search }
   ecSearchFindFirst = 802;
   ecSearchFind = 803;
@@ -213,7 +216,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 95] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 97] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -302,6 +305,8 @@ const
     (Value: ecShiftTab; Name: 'ecShiftTab'),
     (Value: ecUpperCase; Name: 'ecUpperCase'),
     (Value: ecLowerCase; Name: 'ecLowerCase'),
+    (Value: ecActivateSyncEdit; Name: 'ecActivateSyncEdit'),
+    (Value: ecDeactivateSyncEdit; Name: 'ecDeactivateSyncEdit'),
     (Value: ecSearchFindFirst; Name: 'ecSearchFindFirst'),
     (Value: ecSearchFind; Name: 'ecSearchFind'),
     (Value: ecSearchReplace; Name: 'ecSearchReplace'),

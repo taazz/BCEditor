@@ -3,52 +3,35 @@ unit BCEditor.Lines;
 interface {********************************************************************}
 
 uses
-  SysUtils, Classes, Generics.Collections, RegularExpressions,
+  SysUtils, Classes, Generics.Collections, RegularExpressions, SyncObjs,
   Graphics, Controls, StdCtrls, Types,
   BCEditor.Utils, BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter;
 
 type
   TBCEditorLines = class(TStrings)
-  public type
-    TMark = class;
-    TMarkList = class;
-
-    TMark = class
-    protected
-      FData: Pointer;
-      FMarkList: TMarkList;
-      FImageIndex: Integer;
-      FIndex: Integer;
-      FPos: TPoint;
-      FVisible: Boolean;
-    public
-      constructor Create(const AMarkList: TMarkList);
-      property Data: Pointer read FData write FData;
-      property ImageIndex: Integer read FImageIndex write FImageIndex;
-      property Index: Integer read FIndex write FIndex;
-      property MarkList: TMarkList read FMarkList;
-      property Pos: TPoint read FPos write FPos;
-      property Visible: Boolean read FVisible write FVisible;
-    end;
-
-    TMarkList = class(TList<TMark>)
-    private
-      FLines: TBCEditorLines;
-      FOnChange: TNotifyEvent;
-    protected
-      procedure Notify(const Item: TMark; Action: TCollectionNotification); override;
-      property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    public
-      procedure Clear();
-      procedure ClearLine(const ALine: Integer);
-      constructor Create(const ALines: TBCEditorLines);
-      procedure Delete(AIndex: Integer);
-      destructor Destroy(); override;
-      function IndexOfIndex(const AIndex: Integer): Integer;
-      function Remove(AValue: TMark): Integer;
-    end;
-
   private type
+    TJobThread = class(TThread)
+    protected type
+      TJob = (tjActivateSyncEdit);
+    private
+      FCriticalSection: TCriticalSection;
+      FEvent: TEvent;
+      FJob: TJob;
+      FLines: TBCEditorLines;
+      FExecuted: TThreadProcedure;
+      procedure Executed();
+      function Terminated(): Boolean;
+    protected
+      procedure Execute(); override;
+      function IsRunning(): Boolean; overload; inline;
+      function IsRunning(const AJob: TJob): Boolean; overload; inline;
+      procedure Run(const AJob: TJob; const AExecuted: TThreadProcedure);
+    public
+      constructor Create(const ALines: TBCEditorLines);
+      destructor Destroy(); override;
+      procedure Terminate();
+    end;
+
     TWordSearch = class
     private
       FArea: TBCEditorLinesArea;
@@ -80,6 +63,8 @@ type
       lsCaretChanged, lsSelChanged, lsInserting,
       lsSyncEdit);
 
+    TTask = (ltActivateSyncEdit);
+
     TLine = packed record
     type
       TFlags = set of (lfContainsTabs);
@@ -99,7 +84,7 @@ type
       State: TLine.TState;
       Text: string;
     end;
-    TItems = TList<TLine>;
+    TLines = TList<TLine>;
 
     TSearch = class
     private
@@ -178,15 +163,57 @@ type
       property UpdateCount: Integer read FUpdateCount;
     end;
 
-  protected const
-    BOFPosition: TBCEditorLinesPosition = ( Char: 0; Line: 0; );
+  public type
+    TMark = class;
+    TMarkList = class;
+
+    TMark = class
+    protected
+      FData: Pointer;
+      FMarkList: TMarkList;
+      FImageIndex: Integer;
+      FIndex: Integer;
+      FPos: TPoint;
+      FVisible: Boolean;
+    public
+      constructor Create(const AMarkList: TMarkList);
+      property Data: Pointer read FData write FData;
+      property ImageIndex: Integer read FImageIndex write FImageIndex;
+      property Index: Integer read FIndex write FIndex;
+      property MarkList: TMarkList read FMarkList;
+      property Pos: TPoint read FPos write FPos;
+      property Visible: Boolean read FVisible write FVisible;
+    end;
+
+    TMarkList = class(TList<TMark>)
+    private
+      FLines: TBCEditorLines;
+      FOnChange: TNotifyEvent;
+    protected
+      procedure Notify(const Item: TMark; Action: TCollectionNotification); override;
+      property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    public
+      procedure Clear();
+      procedure ClearLine(const ALine: Integer);
+      constructor Create(const ALines: TBCEditorLines);
+      procedure Delete(AIndex: Integer);
+      destructor Destroy(); override;
+      function IndexOfIndex(const AIndex: Integer): Integer;
+      function Remove(AValue: TMark): Integer;
+    end;
+
   private const
     DefaultOptions = [loUndoGrouped];
+  protected const
+    BOFPosition: TBCEditorLinesPosition = ( Char: 0; Line: 0; );
+
   private
     FBookmarks: TMarkList;
     FCaretPosition: TBCEditorLinesPosition;
     FCaseSensitive: Boolean;
-    FItems: TItems;
+    FHighlighter: TBCEditorHighlighter;
+    FItems: TLines;
+    FJobThread: TJobThread;
     FMarks: TMarkList;
     FModified: Boolean;
     FOldCaretPosition: TBCEditorLinesPosition;
@@ -241,13 +268,17 @@ type
     procedure MarksChanged(ASender: TObject); {$IFNDEF Debug} inline; {$ENDIF}
     procedure ReplaceText(const AArea: TBCEditorLinesArea; const AText: string;
       const AUndoType: TUndoItem.TType); overload;
+    function ScanSyncEdit(const AHighlighter: TBCEditorHighlighter;
+      const ATerminated: TBCEditorInterruptFunc;
+      const ACheckAvailable: Boolean): Boolean;
     procedure SetCaretPosition(const AValue: TBCEditorLinesPosition);
     procedure SetModified(const AValue: Boolean);
     procedure SetSelArea(AValue: TBCEditorLinesArea);
     function SyncEditItemIn(const AArea: TBCEditorLinesArea): Boolean;
     procedure QuickSort(ALeft, ARight: Integer; ACompare: TCompare);
   protected
-    function ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
+    function ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter;
+      const AExecuted: TThreadProcedure): Boolean;
     function CharIndexOf(const APosition: TBCEditorLinesPosition): Integer; overload; inline;
     function CharIndexOf(const APosition: TBCEditorLinesPosition;
       const ARelativePosition: TBCEditorLinesPosition): Integer; overload;
@@ -259,6 +290,7 @@ type
     procedure DeleteText(const AArea: TBCEditorLinesArea;
       const ABackspace: Boolean = False);
     function Get(ALine: Integer): string; override;
+    function GetCanModify(): Boolean; virtual;
     function GetCount(): Integer; override;
     function GetTextStr(): string; override;
     procedure InsertIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
@@ -279,9 +311,6 @@ type
       const AInterrupted: TBCEditorInterruptFunc;
       const APosition: TBCEditorLinesPosition;
       out AOpenArea, ACloseArea: TBCEditorLinesArea): Boolean;
-    function ScanSyncEdit(const AHighlighter: TBCEditorHighlighter;
-      const AInterrupted: TBCEditorInterruptFunc;
-      const ACheckAvailable: Boolean = False): Boolean;
     procedure SetBackground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetBeginRange(const ALine: Integer; const AValue: Pointer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
@@ -292,13 +321,17 @@ type
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer; ACompare: TCompare = nil);
+    function SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
+      const AInterrupted: TBCEditorInterruptFunc): Boolean;
     function SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
+    procedure TerminateJob();
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure UndoGroupBreak();
     function ValidPosition(const APosition: TBCEditorLinesPosition): Boolean;
     property Area: TBCEditorLinesArea read GetArea;
     property BOLPosition[Line: Integer]: TBCEditorLinesPosition read GetBOLPosition;
     property Bookmarks: TMarkList read FBookmarks;
+    property CanModify: Boolean read GetCanModify;
     property CanRedo: Boolean read GetCanRedo;
     property CanUndo: Boolean read GetCanUndo;
     property CaretPosition: TBCEditorLinesPosition read FCaretPosition write SetCaretPosition;
@@ -306,7 +339,7 @@ type
     property Char[Position: TBCEditorLinesPosition]: Char read GetChar;
     property EOFPosition: TBCEditorLinesPosition read GetEOFPosition;
     property EOLPosition[ALine: Integer]: TBCEditorLinesPosition read GetEOLPosition;
-    property Items: TItems read FItems;
+    property Items: TLines read FItems;
     property Marks: TMarkList read FMarks;
     property Modified: Boolean read FModified write SetModified;
     property LineArea[Line: Integer]: TBCEditorLinesArea read GetLineArea;
@@ -350,7 +383,6 @@ uses
   Math, StrUtils, SysConst;
 
 resourcestring
-  SBCEditorCharIndexInLineBreak = 'Character index is inside line break (%d)';
   SBCEditorPatternContainsWordBreakChar = 'Pattern contains word break character';
 
 function HasLineBreak(const AText: string): Boolean;
@@ -365,6 +397,81 @@ begin
     else
       Inc(LPos);
   Result := False;
+end;
+
+{ TBCEditorLines.TJobThread ********************************************}
+
+constructor TBCEditorLines.TJobThread.Create(const ALines: TBCEditorLines);
+begin
+  inherited Create(False);
+
+  FLines := ALines;
+
+  FCriticalSection := TCriticalSection.Create();
+  FEvent := TEvent.Create(nil, False, True, '');
+end;
+
+destructor TBCEditorLines.TJobThread.Destroy();
+begin
+  FCriticalSection.Free();
+  FEvent.Free();
+
+  inherited;
+end;
+
+procedure TBCEditorLines.TJobThread.Execute();
+begin
+  while ((FEvent.WaitFor(INFINITE) = wrSignaled) and not Terminated) do
+  begin
+    case (FJob) of
+      tjActivateSyncEdit:
+        FLines.ScanSyncEdit(FLines.FHighlighter, Terminated, False);
+    end;
+    if (not Terminated) then
+    begin
+      if (Assigned(FExecuted)) then
+        Synchronize(Executed);
+      FEvent.ResetEvent();
+    end;
+  end;
+end;
+
+procedure TBCEditorLines.TJobThread.Executed();
+begin
+  if (not Terminated) then
+    FExecuted();
+end;
+
+function TBCEditorLines.TJobThread.IsRunning(): Boolean;
+begin
+  Result := FEvent.WaitFor(IGNORE) = wrSignaled;
+end;
+
+function TBCEditorLines.TJobThread.IsRunning(const AJob: TJob): Boolean;
+begin
+  Result := IsRunning() and (FJob = AJob);
+end;
+
+procedure TBCEditorLines.TJobThread.Run(const AJob: TJob; const AExecuted: TThreadProcedure);
+begin
+  FJob := AJob;
+  FExecuted := AExecuted;
+
+  FEvent.SetEvent();
+end;
+
+procedure TBCEditorLines.TJobThread.Terminate();
+begin
+  FEvent.SetEvent();
+
+  inherited;
+end;
+
+function TBCEditorLines.TJobThread.Terminated(): Boolean;
+begin
+  FCriticalSection.Enter();
+  Result := inherited Terminated;
+  FCriticalSection.Leave();
 end;
 
 { TBCEditorLines.TMark ********************************************************}
@@ -995,28 +1102,21 @@ begin
     Result := - Result;
 end;
 
-function TBCEditorLines.ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter): Boolean;
+function TBCEditorLines.ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter;
+  const AExecuted: TThreadProcedure): Boolean;
 begin
   Result := not SelArea.IsEmpty();
   if (Result) then
   begin
-    FSyncEditArea := SelArea;
-    Result := ScanSyncEdit(AHighlighter, nil);
+    FSyncEditArea := FSelArea;
+    SelArea := LinesArea(CaretPosition, CaretPosition);
+    Include(FState, lsSyncEdit);
 
-    if (not Result) then
-      FSyncEditArea := InvalidLinesArea
-    else
-    begin
-      Include(FState, lsSyncEdit);
+    FHighlighter := AHighlighter;
 
-      BeginUpdate();
-      try
-        CaretPosition := FSyncEditItems[0].Area.BeginPosition;
-        SelArea := FSyncEditItems[0].Area;
-      finally
-        EndUpdate();
-      end;
-    end;
+    if (not Assigned(FJobThread)) then
+      FJobThread := TJobThread.Create(Self);
+    FJobThread.Run(tjActivateSyncEdit, AExecuted);
 
     if (Assigned(FOnSyncEditChange)) then
       FOnSyncEditChange(Self);
@@ -1025,7 +1125,7 @@ end;
 
 function TBCEditorLines.Add(const AText: string): Integer;
 begin
-  if (loReadOnly in FOptions) then
+  if (not CanModify) then
     Result := -1
   else
   begin
@@ -1081,7 +1181,7 @@ end;
 
 procedure TBCEditorLines.Clear();
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     FBookmarks.Clear();
     FMarks.Clear();
@@ -1133,7 +1233,8 @@ begin
   FBookmarks.OnChange := BookmarksChanged;
   FCaretPosition := BOFPosition;
   FCaseSensitive := False;
-  FItems := TItems.Create();
+  FItems := TLines.Create();
+  FJobThread := nil;
   FMarks := TMarkList.Create(Self);
   FMarks.OnChange := MarksChanged;
   FModified := False;
@@ -1159,6 +1260,9 @@ procedure TBCEditorLines.DeactivateSyncEdit();
 begin
   if (lsSyncEdit in FState) then
   begin
+    if (Assigned(FJobThread) and FJobThread.IsRunning(tjActivateSyncEdit)) then
+      TerminateJob();
+
     Exclude(FState, lsSyncEdit);
 
     if (Assigned(FOnSyncEditChange)) then
@@ -1178,7 +1282,7 @@ var
   LText: string;
   LUndoType: TUndoItem.TType;
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     DeactivateSyncEdit();
 
@@ -1238,7 +1342,7 @@ var
   LIndentTextLength: Integer;
   LSelArea: TBCEditorLinesArea;
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     LArea := LinesArea(Min(ABeginPosition, AEndPosition), Max(ABeginPosition, AEndPosition));
 
@@ -1300,6 +1404,8 @@ end;
 
 destructor TBCEditorLines.Destroy();
 begin
+  TerminateJob();
+
   FBookmarks.Free();
   FItems.Free();
   FMarks.Free();
@@ -1642,7 +1748,7 @@ var
   LText: string;
   LUndoItem: TUndoItem;
 begin
-  if (not (loReadOnly in FOptions) and (List.Count > 0)) then
+  if (CanModify and (List.Count > 0)) then
   begin
     if (List = UndoList) then
     begin
@@ -1774,6 +1880,12 @@ end;
 function TBCEditorLines.GetBOLPosition(ALine: Integer): TBCEditorLinesPosition;
 begin
   Result := LinesPosition(0, ALine);
+end;
+
+function TBCEditorLines.GetCanModify(): Boolean;
+begin
+  Result := not (loReadOnly in FOptions)
+    and (not Assigned(FJobThread) or not FJobThread.IsRunning());
 end;
 
 function TBCEditorLines.GetCanRedo(): Boolean;
@@ -1937,7 +2049,7 @@ var
   LIndex: Integer;
   LSelArea: TBCEditorLinesArea;
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     DeactivateSyncEdit();
 
@@ -1970,7 +2082,7 @@ var
   LCaretPosition: TBCEditorLinesPosition;
   LSelArea: TBCEditorLinesArea;
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     LArea.BeginPosition := Min(ABeginPosition, AEndPosition);
     LArea.EndPosition := Max(ABeginPosition, AEndPosition);
@@ -1995,7 +2107,7 @@ var
   LSize: Integer;
   LStream: TFileStream;
 begin
-  if (not (loReadOnly in FOptions) and not SyncEdit) then
+  if (CanModify and not SyncEdit) then
   begin
     DeactivateSyncEdit();
 
@@ -2137,7 +2249,7 @@ procedure TBCEditorLines.Put(ALine: Integer; const AText: string);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     DeactivateSyncEdit();
 
@@ -2298,7 +2410,7 @@ begin
   Assert((BOFPosition <= AArea.BeginPosition) and (AArea.EndPosition <= EOFPosition));
   Assert((AArea.EndPosition = InvalidLinesPosition) or (AArea.BeginPosition <= AArea.EndPosition));
 
-  if (not (loReadOnly in FOptions)
+  if (CanModify
     and (not AArea.IsEmpty() or (AText <> ''))) then
   begin
     BeginUpdate();
@@ -2613,8 +2725,8 @@ begin
 end;
 
 function TBCEditorLines.ScanSyncEdit(const AHighlighter: TBCEditorHighlighter;
-  const AInterrupted: TBCEditorInterruptFunc;
-  const ACheckAvailable: Boolean = False): Boolean;
+  const ATerminated: TBCEditorInterruptFunc;
+  const ACheckAvailable: Boolean): Boolean;
 type
   TWord = record
     Count: Integer;
@@ -2687,7 +2799,7 @@ begin
       Max(FSyncEditArea.BeginPosition, FSyncEditArea.EndPosition));
   LSearch := TWordSearch.Create(Self, LArea);
   LPosition := LSearch.Area.BeginPosition;
-  while ((not Assigned(AInterrupted) or not AInterrupted())
+  while ((not Assigned(ATerminated) or not ATerminated())
     and (not ACheckAvailable or not Result)
     and LSearch.Area.Contains(LPosition)
     and LSearch.Find(LPosition, LLength)) do
@@ -2697,7 +2809,7 @@ begin
 
     LIgnoreWord := CharInSet(LWord.Word[1], ['0' .. '9']);
     for LKeyListIndex := 0 to AHighlighter.MainRules.KeyListCount - 1 do
-      if (not Assigned(AInterrupted) or not AInterrupted()) then
+      if (not Assigned(ATerminated) or not ATerminated()) then
         LIgnoreWord := LIgnoreWord
           or not AHighlighter.MainRules.KeyList[LKeyListIndex].SyncEdit
             and (AHighlighter.MainRules.KeyList[LKeyListIndex].KeyList.IndexOf(LWord.Word) >= 0);
@@ -2817,7 +2929,7 @@ procedure TBCEditorLines.SetModified(const AValue: Boolean);
 var
   LLine: Integer;
 begin
-  if ((AValue <> FModified) and (not AValue or not (loReadOnly in FOptions))) then
+  if ((AValue <> FModified) and (not AValue or CanModify)) then
   begin
     FModified := AValue;
 
@@ -2880,7 +2992,7 @@ var
   LOldCaretPosition: TBCEditorLinesPosition;
   LOldSelArea: TBCEditorLinesArea;
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     DeactivateSyncEdit();
 
@@ -2967,7 +3079,7 @@ var
   LCompare: TCompare;
   LText: string;
 begin
-  if (not (loReadOnly in FOptions)) then
+  if (CanModify) then
   begin
     BeginUpdate();
     try
@@ -3015,6 +3127,14 @@ begin
   end;
 end;
 
+function TBCEditorLines.SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
+  const AInterrupted: TBCEditorInterruptFunc): Boolean;
+begin
+  Assert(not (lsSyncEdit in FState));
+
+  Result := ScanSyncEdit(AHighlighter, AInterrupted, True);
+end;
+
 function TBCEditorLines.SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
 var
   LIndex: Integer;
@@ -3027,6 +3147,17 @@ begin
       or (FSyncEditItems[LIndex].Area.EndPosition = APosition)) then
       Result := LIndex;
     Inc(LIndex);
+  end;
+end;
+
+procedure TBCEditorLines.TerminateJob();
+begin
+  if (Assigned(FJobThread) and FJobThread.IsRunning(tjActivateSyncEdit)) then
+  begin
+    FJobThread.Terminate();
+    FJobThread.WaitFor();
+    FJobThread.Free();
+    FJobThread := nil;
   end;
 end;
 

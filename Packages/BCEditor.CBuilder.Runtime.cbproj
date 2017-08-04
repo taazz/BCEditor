@@ -173,9 +173,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">
             <BuildOrder>31</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.KeyboardHandler.pas">
-            <BuildOrder>32</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Language.pas">
             <BuildOrder>33</BuildOrder>
         </DelphiCompile>

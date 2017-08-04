@@ -15,7 +15,7 @@ uses
   BCEditor.Editor.Replace, BCEditor.Editor.Search,
   BCEditor.Editor.Selection, BCEditor.Editor.SpecialChars,
   BCEditor.Editor.Tabs,
-  BCEditor.Highlighter, BCEditor.KeyboardHandler, BCEditor.Lines,
+  BCEditor.Highlighter, BCEditor.Lines,
   BCEditor.PaintHelper, BCEditor.Editor.SyncEdit, BCEditor.Utils;
 
 type
@@ -64,6 +64,9 @@ type
     TClientJob = (cjTokenWidth, cjPaint, cjMouseDown, cjMouseDouble, cjMouseTriple,
       cjMouseMove, cjMouseUp, cjHint, cjScrolling);
 
+    TIdleJob = (ijBuildRows, ijUpdateScrollBars, ijScanMatchingPair, ijSyncEditAvailable);
+    TIdleJobs = set of TIdleJob;
+
     TMouseCapture = (mcNone, mcSyncEditButton, mcMarks, mcLineNumbers,
       mcLineState, mcCodeFolding, mcText, mcScrolling);
 
@@ -71,12 +74,10 @@ type
       esMatchedPairInvalid, esSyncEditInvalid, esSyncEditOverlaysInvalid,
       esCaretChanged, esFontChanged, esHighlighterChanged, esSelChanged,
       esSizeChanged, esSysFontChanged, esTextChanged,
-      esBuildingRows, esDragging, esFinding, esPainting, esReplacing, esScrolling,
+      esActivatingSyncEdit, esBuildingRows, esDragging, esFinding, esPainting,
+      esReplacing, esScrolling,
       esTextUpdated,
       esIgnoreNextChar, esWaitForDrag, esMouseDouble);
-
-    TDelayedJob = (djBuildRows, djUpdateScrollBars, djScanSyncEdit, djScanMatchingPair);
-    TDelayedJobs = set of TDelayedJob;
 
     TOverlay = record
       Area: TBCEditorLinesArea;
@@ -182,8 +183,6 @@ type
     DefaultOptions = [eoAutoIndent, eoAcceptFiles, eoMiddleClickScrolling];
     DefaultUndoOptions = [uoGroupUndo];
     UM_FREE_COMPLETIONPROPOSALPOPUP = WM_USER;
-    UM_FREE_FINDDIALOG = WM_USER + 1;
-    UM_FREE_REPLACEDIALOG = WM_USER + 2;
   private
     FActiveLine: TBCEditorActiveLine;
     FAllCodeFoldingRanges: TBCEditorCodeFolding.TAllRanges;
@@ -225,7 +224,6 @@ type
     FInsertPos: TPoint;
     FInsertPosBitmap: TGPCachedBitmap;
     FInsertPosCache: TBitmap;
-    FKeyboardHandler: TBCEditorKeyboardHandler;
     FKeyCommands: TBCEditorKeyCommands;
     FLastBuiltLine: Integer;
     FLastCursorPoint: TPoint;
@@ -281,7 +279,7 @@ type
     FOverlays: TOverlays;
     FPaintHelper: TBCEditorPaintHelper;
     FParentWnd: HWND;
-    FPendingJobs: TDelayedJobs;
+    FPendingJobs: TIdleJobs;
     FPopupMenu: HMENU;
     FReadOnly: Boolean;
     FReplace: TBCEditorReplace;
@@ -361,7 +359,6 @@ type
     procedure DoScroll(const ACommand: TBCEditorCommand);
     function DoSearch(AArea: TBCEditorLinesArea; var APosition: TBCEditorLinesPosition): Boolean;
     function DoSearchFind(const First: Boolean; const Action: TSearchFind): Boolean;
-    procedure FindDialogClosing(Sender: TObject);
     procedure DoSearchFindExecute(Sender: TObject);
     function DoSearchNext(APosition: TBCEditorLinesPosition;
       out ASearchResult: TBCEditorLinesArea; const WrapAround: Boolean = False): Boolean;
@@ -403,6 +400,7 @@ type
     procedure EMSetTabStop(var AMessage: TMessage); message EM_SETTABSTOPS;
     procedure EMUndo(var AMessage: TMessage); message EM_UNDO;
     procedure ExpandCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
+    procedure FindDialogClosing(Sender: TObject);
     function FindHookedCommandEvent(const AHookedCommandEvent: TBCEditorHookedCommandEvent): Integer;
     procedure FontChanged(ASender: TObject);
     function GetCanPaste(): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
@@ -410,6 +408,7 @@ type
     function GetCanUndo(): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     function GetCaretPos(): TPoint;
     function GetCharAt(APos: TPoint): Char; {$IFNDEF Debug} inline; {$ENDIF}
+    function GetCursor(): TCursor; {$IFNDEF Debug} inline; {$ENDIF}
     function GetFindTokenData(const ARow: Integer; var ALeft: Integer;
       out ABeginRange: TBCEditorHighlighter.TRange;
       out AText: PChar; out ALength, AChar: Integer; out AColumn: Integer): Boolean;
@@ -466,10 +465,11 @@ type
     procedure MoveCaretVertically(const ARows: Integer; const ASelect: Boolean);
     function NextWordPosition(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     function PreviousWordPosition(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
+    procedure ProcessCommand(const ACommand: TBCEditorCommand; const AData: Pointer = nil);
     function ProcessClient(const AJob: TClientJob;
       const APaintVar: PPaintVar; const AClipRect: TRect;
       const AButton: TMouseButton; const AShift: TShiftState; AMousePoint: TPoint): Boolean;
-    procedure ProcessDelayed(const AJob: TDelayedJob);
+    procedure ProcessIdle(const AJob: TIdleJob);
     function ProcessToken(const AJob: TClientJob;
       const APaintVar: PPaintVar; const AClipRect: TRect;
       const AButton: TMouseButton; const AShift: TShiftState; const AMousePoint: TPoint;
@@ -487,13 +487,13 @@ type
       const AVisibleOnly: Boolean = False): TPoint;
     procedure ScanCodeFolding();
     function ScanMatchingPair(const AInterrupted: TBCEditorInterruptFunc): Boolean;
-    function ScanSyncEdit(const AInterrupted: TBCEditorInterruptFunc): Boolean;
-    procedure ScrollToCaret();
+    procedure ScrollInView();
     procedure SearchChanged(AEvent: TBCEditorSearchEvent);
     procedure SetActiveLine(const AValue: TBCEditorActiveLine);
     procedure SetBorderStyle(const AValue: TBorderStyle);
     procedure SetCaretPos(const AValue: TPoint);
     procedure SetCodeFolding(const AValue: TBCEditorCodeFolding);
+    procedure SetCursor(ACursor: TCursor);
     procedure SetDefaultKeyCommands;
     procedure SetHideScrollBars(AValue: Boolean);
     procedure SetHideSelection(AValue: Boolean); {$IFNDEF Debug} inline; {$ENDIF}
@@ -527,15 +527,15 @@ type
     procedure SetWordBlock(const ALinesPosition: TBCEditorLinesPosition);
     procedure SetWordWrap(const AValue: Boolean);
     procedure SpecialCharsChanged(ASender: TObject);
+    procedure SyncEditActivated();
     procedure SyncEditChanged(ASender: TObject);
     procedure TabsChanged(ASender: TObject);
     function TokenColumns(const AText: PChar; const ALength, AColumn: Integer): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function TokenWidth(const AText: PChar; const ALength: Integer;
       const AColumn: Integer; const AToken: TBCEditorHighlighter.TTokenFind): Integer; // inline takes the double time. Why???
     procedure UMFreeCompletionProposalPopup(var AMessage: TMessage); message UM_FREE_COMPLETIONPROPOSALPOPUP;
-    procedure UMFreeFindDialog(var AMessage: TMessage); message UM_FREE_FINDDIALOG;
-    procedure UMFreeReplaceDialog(var AMessage: TMessage); message UM_FREE_REPLACEDIALOG;
     procedure UpdateCaret();
+    procedure UpdateCursor(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure UpdateLineInRows(const ALine: Integer);
     procedure UpdateMetrics();
     procedure UpdateScrollBars();
@@ -558,6 +558,7 @@ type
     procedure WMNCPaint(var AMessage: TWMNCPaint); message WM_NCPAINT;
     procedure WMPaint(var AMessage: TWMPaint); message WM_PAINT;
     procedure WMPaste(var AMessage: TWMPaste); message WM_PASTE;
+    procedure WMSetCursor(var AMessage: TWMSetCursor); message WM_SETCURSOR;
     procedure WMSetFocus(var AMessage: TWMSetFocus); message WM_SETFOCUS;
     procedure WMSetText(var AMessage: TWMSetText); message WM_SETTEXT;
     procedure WMStyleChanged(var AMessage: TWMStyleChanged); message WM_STYLECHANGED;
@@ -600,6 +601,7 @@ type
       APosition: TBCEditorLinesPosition): TBCEditorReplaceAction;
     function DoSearchMatchNotFoundWrapAroundDialog: Boolean; virtual;
     procedure DoSearchStringNotFoundDialog; virtual;
+    procedure DoSyncEdit(const ACommand: TBCEditorCommand);
     procedure DoTripleClick;
     procedure DragCanceled(); override;
     procedure DragOver(ASource: TObject; X, Y: Integer; AState: TDragState; var AAccept: Boolean); overload; override;
@@ -619,7 +621,6 @@ type
     function IsEmptyChar(const AChar: Char): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     function IsWordBreakChar(const AChar: Char): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     procedure KeyDown(var AKey: Word; AShift: TShiftState); override;
-    procedure KeyUp(var AKey: Word; AShift: TShiftState); override;
     procedure LeftMarginChanged(ASender: TObject);
     function LinesToRows(const ALinesPosition: TBCEditorLinesPosition): TBCEditorRowsPosition;
     procedure LineUpdated(ASender: TObject; const ALine: Integer); virtual;
@@ -645,6 +646,7 @@ type
     function WordEnd(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     property AllCodeFoldingRanges: TBCEditorCodeFolding.TAllRanges read FAllCodeFoldingRanges;
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle default bsSingle;
+    property Cursor: TCursor read GetCursor write SetCursor;
     property HideScrollBars: Boolean read FHideScrollBars write SetHideScrollBars default True;
     property HideSelection: Boolean read FHideSelection write SetHideSelection default True;
     property LineHeight: Integer read FLineHeight;
@@ -688,12 +690,6 @@ type
     procedure AddHighlighterKeywords(AStringList: TStrings);
     procedure AddKeyCommand(ACommand: TBCEditorCommand; AShift: TShiftState; AKey: Word;
       ASecondaryShift: TShiftState = []; ASecondaryKey: Word = 0);
-    procedure AddKeyDownHandler(AHandler: TKeyEvent);
-    procedure AddKeyPressHandler(AHandler: TBCEditorKeyPressWEvent);
-    procedure AddKeyUpHandler(AHandler: TKeyEvent);
-    procedure AddMouseCursorHandler(AHandler: TBCEditorMouseCursorEvent);
-    procedure AddMouseDownHandler(AHandler: TMouseEvent);
-    procedure AddMouseUpHandler(AHandler: TMouseEvent);
     procedure Assign(ASource: TPersistent); override;
     procedure BeginUndoBlock(); deprecated 'Use Lines.EndUpdate()'; // 2017-07-12
     procedure BeginUpdate();
@@ -725,12 +721,6 @@ type
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure RegisterCommandHandler(const AHookedCommandEvent: TBCEditorHookedCommandEvent; AHandlerData: Pointer);
     procedure RemoveChainedEditor;
-    procedure RemoveKeyDownHandler(AHandler: TKeyEvent);
-    procedure RemoveKeyPressHandler(AHandler: TBCEditorKeyPressWEvent);
-    procedure RemoveKeyUpHandler(AHandler: TKeyEvent);
-    procedure RemoveMouseCursorHandler(AHandler: TBCEditorMouseCursorEvent);
-    procedure RemoveMouseDownHandler(AHandler: TMouseEvent);
-    procedure RemoveMouseUpHandler(AHandler: TMouseEvent);
     function ReplaceText(): Integer;
     procedure SaveToFile(const AFileName: string; AEncoding: TEncoding = nil);
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil);
@@ -797,7 +787,6 @@ type
     property CompletionProposal;
     property Constraints;
     property Ctl3D;
-    property Cursor;
     property Enabled;
     property Font;
     property Height;
@@ -1467,36 +1456,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.AddKeyDownHandler(AHandler: TKeyEvent);
-begin
-  FKeyboardHandler.AddKeyDownHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.AddKeyPressHandler(AHandler: TBCEditorKeyPressWEvent);
-begin
-  FKeyboardHandler.AddKeyPressHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.AddKeyUpHandler(AHandler: TKeyEvent);
-begin
-  FKeyboardHandler.AddKeyUpHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.AddMouseCursorHandler(AHandler: TBCEditorMouseCursorEvent);
-begin
-  FKeyboardHandler.AddMouseCursorHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.AddMouseDownHandler(AHandler: TMouseEvent);
-begin
-  FKeyboardHandler.AddMouseDownHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.AddMouseUpHandler(AHandler: TMouseEvent);
-begin
-  FKeyboardHandler.AddMouseUpHandler(AHandler);
-end;
-
 procedure TCustomBCEditor.AfterLinesUpdate(Sender: TObject);
 begin
   if (not (csReading in ComponentState)) then
@@ -1586,7 +1545,7 @@ begin
   end;
 
   if (LLine < FLines.Count) then
-    ProcessDelayed(djBuildRows)
+    ProcessIdle(ijBuildRows)
   else
     InvalidateScrollBars();
 
@@ -1824,7 +1783,7 @@ procedure TCustomBCEditor.CMCursorChanged(var AMessage: TMessage);
 begin
   inherited;
 
-  Perform(WM_SETCURSOR, WindowHandle, HTCLIENT);
+  Windows.SetCursor(Screen.Cursors[Cursor]);
 end;
 
 procedure TCustomBCEditor.CMSysFontChanged(var AMessage: TMessage);
@@ -2142,6 +2101,9 @@ begin
         DoImeStr(AData);
       ecCompletionProposal:
         DoCompletionProposal();
+      ecActivateSyncEdit,
+      ecDeactivateSyncEdit:
+        DoSyncEdit(ACommand);
     end;
 
     { Notify hooked command handlers after the command was executed inside of the class }
@@ -2306,7 +2268,6 @@ begin
   FTabs := TBCEditorTabs.Create;
   FTabs.OnChange := TabsChanged;
   { Text }
-  FKeyboardHandler := TBCEditorKeyboardHandler.Create;
   FKeyCommands := TBCEditorKeyCommands.Create(Self);
   SetDefaultKeyCommands;
   { Completion proposal }
@@ -2539,7 +2500,6 @@ begin
     FInsertPosCache.Free();
   if (Assigned(FInsertPosBitmap)) then
     FInsertPosBitmap.Free();
-  FKeyboardHandler.Free();
   FMatchingPair.Free();
   FOriginalLines.Free();
   FOverlays.Free();
@@ -3591,6 +3551,27 @@ begin
     SetBookmark(LIndex, LLinesCaretPosition);
 end;
 
+procedure TCustomBCEditor.DoSyncEdit(const ACommand: TBCEditorCommand);
+begin
+  case (ACommand) of
+    ecActivateSyncEdit:
+      begin
+        Include(FState, esActivatingSyncEdit);
+        FLines.ActivateSyncEdit(FHighlighter, SyncEditActivated);
+        Sleep(GClientRefreshTime); // If activation is fast enough, prevent double painting
+        UpdateCursor();
+        InvalidateText();
+      end;
+    ecDeactivateSyncEdit:
+      begin
+        Exclude(FState, esActivatingSyncEdit);
+        FLines.DeactivateSyncEdit();
+        UpdateCursor();
+        InvalidateText();
+      end;
+  end;
+end;
+
 procedure TCustomBCEditor.DoTabKey(const ACommand: TBCEditorCommand);
 var
   LChangeScrollPastEndOfLine: Boolean;
@@ -4179,7 +4160,7 @@ end;
 
 procedure TCustomBCEditor.EMScrollCaret(var AMessage: TMessage);
 begin
-  ScrollToCaret();
+  ScrollInView();
 end;
 
 procedure TCustomBCEditor.EMSetIMEStatus(var AMessage: TMessage);
@@ -4396,11 +4377,6 @@ end;
 
 procedure TCustomBCEditor.FindDialogClosing(Sender: TObject);
 begin
-  if (Assigned(FFindDialog) and (Sender = FFindDialog)) then
-    PostMessage(WindowHandle, UM_FREE_REPLACEDIALOG, 0, 0)
-  else if (Assigned(FReplaceDialog) and (Sender = FReplaceDialog)) then
-    PostMessage(WindowHandle, UM_FREE_REPLACEDIALOG, 0, 0);
-
   HideSelection := FHideSelectionBeforeSearch;
 end;
 
@@ -4577,6 +4553,11 @@ end;
 function TCustomBCEditor.GetCharAt(APos: TPoint): Char;
 begin
   Result := FLines.Char[APos];
+end;
+
+function TCustomBCEditor.GetCursor(): TCursor;
+begin
+  Result := inherited Cursor;
 end;
 
 function TCustomBCEditor.GetFindTokenData(const ARow: Integer; var ALeft: Integer;
@@ -4846,6 +4827,7 @@ begin
   else
     Color := clWindow;
 
+  FLines.TerminateJob();
   InvalidateRows();
 
   Include(FState, esHighlighterChanged);
@@ -4887,29 +4869,33 @@ begin
   FIdleInterrupted := False;
   while ((FPendingJobs <> []) and not FIdleInterrupted) do
   begin
-    if (djUpdateScrollBars in FPendingJobs) then
+    if (ijUpdateScrollBars in FPendingJobs) then
     begin
       if (esScrollBarsInvalid in FState) then
         UpdateScrollBars();
-      Exclude(FPendingJobs, djUpdateScrollBars);
+      Exclude(FPendingJobs, ijUpdateScrollBars);
     end
-    else if (djScanMatchingPair in FPendingJobs) then
+    else if (ijScanMatchingPair in FPendingJobs) then
     begin
       if (esMatchedPairInvalid in FState) then
         ScanMatchingPair(IdleInterrupted);
       if (not FIdleInterrupted) then
-        Exclude(FPendingJobs, djScanMatchingPair);
+        Exclude(FPendingJobs, ijScanMatchingPair);
     end
-    else if (djScanSyncEdit in FPendingJobs) then
+    else if (ijSyncEditAvailable in FPendingJobs) then
     begin
       if (esSyncEditInvalid in FState) then
-        ScanSyncEdit(IdleInterrupted);
+      begin
+        FSyncEditAvailable := FLines.SyncEditAvailable(FHighlighter, IdleInterrupted);
+        if (FSyncEditAvailable) then
+          InvalidateSyncEditButton();
+      end;
       if (not FIdleInterrupted) then
-        Exclude(FPendingJobs, djScanSyncEdit);
+        Exclude(FPendingJobs, ijSyncEditAvailable);
     end
-    else if (djBuildRows in FPendingJobs) then
+    else if (ijBuildRows in FPendingJobs) then
     begin
-      Exclude(FPendingJobs, djBuildRows);
+      Exclude(FPendingJobs, ijBuildRows);
       BuildRows(Canvas, FRows.Count);
       LTickCount := GetTickCount();
       if (LTickCount >= LLastUpdateScrollBars + GClientRefreshTime) then
@@ -4935,8 +4921,9 @@ function TCustomBCEditor.IdleInterrupted(): Boolean;
 var
   LMsg: TMsg;
 begin
-  FIdleInterrupted := PeekMessage(LMsg, FFormWnd, 0, 0, PM_NOREMOVE)
-    or GetUpdateRect(FFormWnd, nil, False);
+  if (not FIdleInterrupted) then
+    FIdleInterrupted := PeekMessage(LMsg, FFormWnd, 0, 0, PM_NOREMOVE)
+      or GetUpdateRect(FFormWnd, nil, False);
   Result := FIdleInterrupted;
 end;
 
@@ -5214,7 +5201,7 @@ procedure TCustomBCEditor.InvalidateMatchingPair();
 begin
   Include(FState, esMatchedPairInvalid);
 
-  ProcessDelayed(djScanMatchingPair);
+  ProcessIdle(ijScanMatchingPair);
 end;
 
 procedure TCustomBCEditor.InvalidateOverlays();
@@ -5255,7 +5242,7 @@ begin
   Include(FState, esScrollBarsInvalid);
 
   if (not (esPainting in FState)) then
-    ProcessDelayed(djUpdateScrollBars);
+    ProcessIdle(ijUpdateScrollBars);
 end;
 
 procedure TCustomBCEditor.InvalidateSearchResults();
@@ -5272,7 +5259,7 @@ begin
   if (FSyncEdit.Enabled and not FLines.SyncEdit and not FLines.SelArea.IsEmpty()) then
   begin
     Include(FState, esSyncEditInvalid);
-    ProcessDelayed(djScanSyncEdit);
+    ProcessIdle(ijSyncEditAvailable);
   end;
 end;
 
@@ -5364,7 +5351,7 @@ begin
     Include(FState, esIgnoreNextChar)
   else if ((AKey = BCEDITOR_ESCAPE_KEY) and FLines.SyncEdit) then
   begin
-    FLines.DeactivateSyncEdit();
+    ProcessCommand(ecDeactivateSyncEdit);
     AKey := 0;
     Exit;
   end
@@ -5381,15 +5368,13 @@ begin
     if (AShift = LShortCutShift) and (AKey = LShortCutKey) then
     begin
       if (not FLines.SyncEdit) then
-        FLines.ActivateSyncEdit(FHighlighter)
+        ProcessCommand(ecActivateSyncEdit)
       else
-        FLines.DeactivateSyncEdit();
+        ProcessCommand(ecDeactivateSyncEdit);
       AKey := 0;
       Exit;
     end;
   end;
-
-  FKeyboardHandler.ExecuteKeyDown(Self, AKey, AShift);
 
   LData := nil;
   LChar := BCEDITOR_NONE_CHAR;
@@ -5426,13 +5411,6 @@ begin
     if Assigned(LData) then
       FreeMem(LData);
   end;
-end;
-
-procedure TCustomBCEditor.KeyUp(var AKey: Word; AShift: TShiftState);
-begin
-  inherited;
-
-  FKeyboardHandler.ExecuteKeyUp(Self, AKey, AShift);
 end;
 
 procedure TCustomBCEditor.LeftMarginChanged(ASender: TObject);
@@ -5532,7 +5510,7 @@ begin
   InvalidateCaret();
   InvalidateSyncEditOverlays();
 
-  ScrollToCaret();
+  ScrollInView();
 
   if (FUpdateCount > 0) then
     Include(FState, esCaretChanged)
@@ -5748,8 +5726,6 @@ begin
 
   inherited;
 
-  FKeyboardHandler.ExecuteMouseDown(Self, AButton, AShift, X, Y);
-
   if (GetTickCount() < FLastDoubleClickTime + FDoubleClickTime) then
   begin
     LAction := cjMouseTriple;
@@ -5808,8 +5784,6 @@ begin
     KillTimer(WindowHandle, tiScroll);
 
   inherited;
-
-  FKeyboardHandler.ExecuteMouseUp(Self, AButton, AShift, X, Y);
 
   ProcessClient(cjMouseUp, nil, ClientRect, AButton, AShift, Point(X, Y));
 
@@ -6021,6 +5995,15 @@ begin
     Result := FLines.EOLPosition[Result.Line - 1]
   else
     Result := FLines.BOFPosition;
+end;
+
+procedure TCustomBCEditor.ProcessCommand(const ACommand: TBCEditorCommand; const AData: Pointer = nil);
+begin
+  case (ACommand) of
+    ecActivateSyncEdit,
+    ecDeactivateSyncEdit:
+      CommandProcessor(ACommand, #0, nil);
+  end;
 end;
 
 function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
@@ -6407,9 +6390,9 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
             and (AButton = mbLeft)) then
           begin
             if (not FLines.SyncEdit) then
-              FLines.ActivateSyncEdit(FHighlighter)
+              ProcessCommand(ecActivateSyncEdit)
             else
-              FLines.DeactivateSyncEdit();
+              ProcessCommand(ecDeactivateSyncEdit);
             MouseCapture := mcNone;
             Result := True;
           end;
@@ -6655,7 +6638,7 @@ begin
     Write;
 end;
 
-procedure TCustomBCEditor.ProcessDelayed(const AJob: TDelayedJob);
+procedure TCustomBCEditor.ProcessIdle(const AJob: TIdleJob);
 begin
   if (HandleAllocated and (FPendingJobs = [])) then
     SetTimer(WindowHandle, tiIdle, 10, nil);
@@ -7432,36 +7415,6 @@ begin
   FChainedEditor := nil;
 
   UnhookEditorLines;
-end;
-
-procedure TCustomBCEditor.RemoveKeyDownHandler(AHandler: TKeyEvent);
-begin
-  FKeyboardHandler.RemoveKeyDownHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.RemoveKeyPressHandler(AHandler: TBCEditorKeyPressWEvent);
-begin
-  FKeyboardHandler.RemoveKeyPressHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.RemoveKeyUpHandler(AHandler: TKeyEvent);
-begin
-  FKeyboardHandler.RemoveKeyUpHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.RemoveMouseCursorHandler(AHandler: TBCEditorMouseCursorEvent);
-begin
-  FKeyboardHandler.RemoveMouseCursorHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.RemoveMouseDownHandler(AHandler: TMouseEvent);
-begin
-  FKeyboardHandler.RemoveMouseDownHandler(AHandler);
-end;
-
-procedure TCustomBCEditor.RemoveMouseUpHandler(AHandler: TMouseEvent);
-begin
-  FKeyboardHandler.RemoveMouseUpHandler(AHandler);
 end;
 
 procedure TCustomBCEditor.ReplaceChanged(AEvent: TBCEditorReplaceChanges);
@@ -8518,15 +8471,7 @@ begin
   end;
 end;
 
-function TCustomBCEditor.ScanSyncEdit(const AInterrupted: TBCEditorInterruptFunc): Boolean;
-begin
-  Result := FSyncEdit.Enabled and FLines.ScanSyncEdit(FHighlighter, AInterrupted, not FLines.SyncEdit);
-  FSyncEditAvailable := Result and not FLines.SyncEdit;
-  if (Result and not FLines.SyncEdit) then
-    InvalidateSyncEditButton();
-end;
-
-procedure TCustomBCEditor.ScrollToCaret();
+procedure TCustomBCEditor.ScrollInView();
 var
   LTextPos: TPoint;
   LNewTextPos: TPoint;
@@ -8649,6 +8594,14 @@ begin
   ExpandCodeFoldingLines();
   FCodeFolding.Assign(AValue);
   InvalidateCodeFolding();
+end;
+
+procedure TCustomBCEditor.SetCursor(ACursor: TCursor);
+begin
+  if (FState * [esActivatingSyncEdit] <> []) then
+    inherited Cursor := crHourGlass
+  else
+    inherited Cursor := ACursor;
 end;
 
 procedure TCustomBCEditor.SetDefaultKeyCommands;
@@ -9143,7 +9096,7 @@ begin
   begin
     FWordWrap := AValue;
 
-    ScrollToCaret();
+    ScrollInView();
 
     InvalidateRect(nil);
   end;
@@ -9354,6 +9307,16 @@ begin
   end;
 end;
 
+procedure TCustomBCEditor.SyncEditActivated();
+begin
+  Assert(FLines.SyncEdit and (FLines.SyncEditItems.Count > 0));
+
+  Exclude(FState, esActivatingSyncEdit);
+  SetCaretAndSelection(FLines.SyncEditItems[0].Area.BeginPosition, FLines.SyncEditItems[0].Area);
+  UpdateCursor();
+  InvalidateText();
+end;
+
 procedure TCustomBCEditor.SyncEditChanged(ASender: TObject);
 begin
   if (seoCaseSensitive in FSyncEdit.Options) then
@@ -9364,7 +9327,8 @@ begin
   if (FLines.SyncEdit) then
   begin
     FLines.SelArea := FLines.SyncEditArea;
-    FLines.ActivateSyncEdit(FHighlighter);
+    ProcessCommand(ecDeactivateSyncEdit);
+    ProcessCommand(ecActivateSyncEdit);
   end;
 end;
 
@@ -9482,18 +9446,6 @@ begin
     FreeAndNil(FCompletionProposalPopup);
 end;
 
-procedure TCustomBCEditor.UMFreeFindDialog(var AMessage: TMessage);
-begin
-  if (Assigned(FFindDialog)) then
-    FreeAndNil(FFindDialog);
-end;
-
-procedure TCustomBCEditor.UMFreeReplaceDialog(var AMessage: TMessage);
-begin
-  if (Assigned(FReplaceDialog)) then
-    FreeAndNil(FReplaceDialog);
-end;
-
 procedure TCustomBCEditor.Undo();
 begin
   FLines.Undo();
@@ -9608,6 +9560,11 @@ begin
 
     FState := FState - [esCaretInvalid];
   end;
+end;
+
+procedure TCustomBCEditor.UpdateCursor();
+begin
+  Perform(WM_SETCURSOR, WindowHandle, MakeLong(HTCLIENT, WM_MOUSEMOVE));
 end;
 
 procedure TCustomBCEditor.UpdateLineInRows(const ALine: Integer);
@@ -9773,10 +9730,7 @@ begin
   if LKey <> BCEDITOR_NONE_CHAR then
   begin
     if not (esIgnoreNextChar in FState) then
-    begin
-      FKeyboardHandler.ExecuteKeyPress(Self, LKey);
-      CommandProcessor(ecChar, LKey, nil);
-    end
+      CommandProcessor(ecChar, LKey, nil)
     else
       Exclude(FState, esIgnoreNextChar);
   end;
@@ -10670,6 +10624,23 @@ begin
     PasteFromClipboard();
     AMessage.Result := LRESULT(TRUE);
   end;
+end;
+
+procedure TCustomBCEditor.WMSetCursor(var AMessage: TWMSetCursor);
+var
+  LCursorPoint: TPoint;
+begin
+  if ((AMessage.CursorWnd = WindowHandle)
+    and (AMessage.HitTest = HTCLIENT)
+    and (FLineHeight > 0)
+    and not (csDesigning in ComponentState)) then
+  begin
+    GetCursorPos(LCursorPoint);
+    LCursorPoint := ScreenToClient(LCursorPoint);
+    ProcessClient(cjMouseMove, nil, ClientRect, mbLeft, [], LCursorPoint);
+  end
+  else
+    inherited;
 end;
 
 procedure TCustomBCEditor.WMSetFocus(var AMessage: TWMSetFocus);

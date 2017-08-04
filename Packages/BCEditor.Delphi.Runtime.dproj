@@ -143,7 +143,6 @@
         <DCCReference Include="..\Source\BCEditor.Editor.Tabs.pas"/>
         <DCCReference Include="..\Source\BCEditor.Export.HTML.pas"/>
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
-        <DCCReference Include="..\Source\BCEditor.KeyboardHandler.pas"/>
         <DCCReference Include="..\Source\BCEditor.Language.pas"/>
         <DCCReference Include="..\Source\BCEditor.Lines.pas"/>
         <DCCReference Include="..\Source\BCEditor.MacroRecorder.pas"/>
