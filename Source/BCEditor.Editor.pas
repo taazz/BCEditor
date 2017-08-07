@@ -4416,6 +4416,8 @@ begin
 
   if ((LFindResult.Area = InvalidLinesArea)
     and not (soEntireScope in FSearch.Options)
+    and (not LFindResult.Backwards and (FFindArea.BeginPosition > FLines.BOFPosition)
+      or LFindResult.Backwards and (FFindArea.EndPosition < FLines.EOFPosition))
     and (FFindState = fsRequested)) then
     PostMessage(WindowHandle, UM_FIND_WRAPAROUND, 0, 0)
   else
@@ -4880,7 +4882,7 @@ var
   LMsg: TMsg;
 begin
   if (not FIdleTerminated) then
-    FIdleTerminated := PeekMessage(LMsg, FFormWnd, 0, 0, PM_NOREMOVE)
+    FIdleTerminated := PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)
       or GetUpdateRect(FFormWnd, nil, False);
   Result := FIdleTerminated;
 end;

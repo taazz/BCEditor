@@ -26,7 +26,7 @@
         "SpecialCharForeground": "clGrayText",
         "SyncEditBackground": "$009999CC",
         "SyncEditEditBorder": "clYellow",
-        "SyncEditWordBorder": "clSilver",
+        "SyncEditWordBorder": "clSilver"
       },
       "Fonts": {
         "Text": "Courier New",
