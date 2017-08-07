@@ -19,19 +19,16 @@ type
       TColors = class(TPersistent)
       strict private
         FBackground: TColor;
-        FBorder: TColor;
         FForeground: TColor;
         FOnChange: TNotifyEvent;
         procedure DoChange;
         procedure SetBackground(const AValue: TColor);
-        procedure SetBorder(const AValue: TColor);
         procedure SetForeground(const AValue: TColor);
       public
         constructor Create;
         procedure Assign(ASource: TPersistent); override;
       published
         property Background: TColor read FBackground write SetBackground default clSearchHighlighter;
-        property Border: TColor read FBorder write SetBorder default clNone;
         property Foreground: TColor read FForeground write SetForeground default clWindowText;
         property OnChange: TNotifyEvent read FOnChange write FOnChange;
       end;
@@ -54,8 +51,6 @@ type
   strict private const
     DefaultOptions = [];
   strict private
-    FCaseSensitive: Boolean;
-    FEnabled: Boolean;
     FEngineType: TBCEditorSearchEngine;
     FHighlighter: THighlighter;
     FOnChange: TNotifyEvent;
@@ -65,14 +60,10 @@ type
     FOptions: TBCEditorSearchOptions;
     FPattern: string;
     FVisible: Boolean;
-    FWholeWordsOnly: Boolean;
-    procedure SetCaseSensitive(const AValue: Boolean);
-    procedure SetEnabled(const AValue: Boolean);
     procedure SetEngineType(const AValue: TBCEditorSearchEngine);
     procedure SetHighlighter(const AValue: THighlighter);
     procedure SetOnChange(const AValue: TNotifyEvent);
     procedure SetPattern(const AValue: string);
-    procedure SetWholeWordsOnly(const AValue: Boolean);
   protected
     property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   public
@@ -82,15 +73,12 @@ type
     property Pattern: string read FPattern write SetPattern;
     property Visible: Boolean read FVisible write FVisible;
   published
-    property CaseSensitive: Boolean read FCaseSensitive write SetCaseSensitive default False;
-    property Enabled: Boolean read FEnabled write SetEnabled default True;
     property Engine: TBCEditorSearchEngine read FEngineType write SetEngineType default seNormal;
     property Highlighter: THighlighter read FHighlighter write SetHighlighter;
     property OnFind: TNotifyEvent read FOnFind write FOnFind;
     property OnExecuted: TExecutedEvent read FOnExecuted write FOnExecuted;
     property OnWrapAround: TWrapAroundEvent read FOnWrapAround write FOnWrapAround;
     property Options: TBCEditorSearchOptions read FOptions write FOptions default DefaultOptions;
-    property WholeWordsOnly: Boolean read FWholeWordsOnly write SetWholeWordsOnly default False;
   end;
 
 implementation {***************************************************************}
@@ -107,7 +95,6 @@ begin
   inherited;
 
   FBackground := clSearchHighlighter;
-  FBorder := clNone;
   FForeground := clWindowText;
 end;
 
@@ -117,7 +104,6 @@ begin
   with ASource as TColors do
   begin
     Self.FBackground := FBackground;
-    Self.FBorder := FBorder;
     Self.FForeground := FForeground;
     Self.DoChange;
   end
@@ -136,15 +122,6 @@ begin
   if FBackground <> AValue then
   begin
     FBackground := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorSearch.THighlighter.TColors.SetBorder(const AValue: TColor);
-begin
-  if FBorder <> AValue then
-  begin
-    FBorder := AValue;
     DoChange;
   end;
 end;
@@ -209,12 +186,9 @@ begin
   if Assigned(ASource) and (ASource is TBCEditorSearch) then
   with ASource as TBCEditorSearch do
   begin
-    Self.FCaseSensitive := FCaseSensitive;
-    Self.FEnabled := FEnabled;
     Self.FEngineType := FEngineType;
     Self.FHighlighter.Assign(FHighlighter);
     Self.FOptions := FOptions;
-    Self.FWholeWordsOnly := FWholeWordsOnly;
     if (Assigned(FOnChange)) then
       FOnChange(Self);
   end
@@ -226,13 +200,10 @@ constructor TBCEditorSearch.Create();
 begin
   inherited;
 
-  FCaseSensitive := False;
-  FEnabled := True;
   FEngineType := seNormal;
   FHighlighter := THighlighter.Create;
   FOnExecuted := nil;
   FOptions := DefaultOptions;
-  FWholeWordsOnly := False;
 end;
 
 destructor TBCEditorSearch.Destroy();
@@ -240,26 +211,6 @@ begin
   FHighlighter.Free();
 
   inherited;
-end;
-
-procedure TBCEditorSearch.SetCaseSensitive(const AValue: Boolean);
-begin
-  if (AValue <> FCaseSensitive) then
-  begin
-    FCaseSensitive := AValue;
-    if (Assigned(FOnChange)) then
-      FOnChange(Self);
-  end;
-end;
-
-procedure TBCEditorSearch.SetEnabled(const AValue: Boolean);
-begin
-  if FEnabled <> AValue then
-  begin
-    FEnabled := AValue;
-    if (Assigned(FOnChange)) then
-      FOnChange(Self);
-  end;
 end;
 
 procedure TBCEditorSearch.SetEngineType(const AValue: TBCEditorSearchEngine);
@@ -288,16 +239,6 @@ begin
   if (AValue <> FPattern) then
   begin
     FPattern := AValue;
-    if (Assigned(FOnChange)) then
-      FOnChange(Self);
-  end;
-end;
-
-procedure TBCEditorSearch.SetWholeWordsOnly(const AValue: Boolean);
-begin
-  if (AValue <> FWholeWordsOnly) then
-  begin
-    FWholeWordsOnly := AValue;
     if (Assigned(FOnChange)) then
       FOnChange(Self);
   end;

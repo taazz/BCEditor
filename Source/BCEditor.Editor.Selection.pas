@@ -27,7 +27,7 @@ type
     end;
 
   strict private const
-    DefaultOptions = [soTermsCaseSensitive, soTripleClickLineSelect];
+    DefaultOptions = [soTripleClickLineSelect];
   strict private
     FColors: TColors;
     FOptions: TBCEditorSelectionOptions;

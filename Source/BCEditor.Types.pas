@@ -34,7 +34,6 @@ type
 
   TBCEditorSelectionOption = (
     soExpandRealNumbers,
-    soTermsCaseSensitive,
     soToEndOfLine,
     soTripleClickLineSelect
   );

@@ -19,7 +19,6 @@
         "LeftMarginBookmarkPanel": "clWhite",
         "MatchingPairMatched": "clAqua",
         "SearchHighlighterBackground": "clBlack",
-        "SearchHighlighterBorder": "clNone",
         "SearchHighlighterForeground": "clWhite",
         "SelectionBackground": "$00FF9933",
         "SelectionForeground": "clWhite",

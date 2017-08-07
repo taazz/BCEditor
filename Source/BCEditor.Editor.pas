@@ -23,6 +23,8 @@ type
   private type
     TBCEditorActiveLine = class(BCEditor.Editor.ActiveLine.TBCEditorActiveLine);
     TBCEditorCodeFolding = class(BCEditor.Editor.CodeFolding.TBCEditorCodeFolding);
+    TBCEditorCompletionProposal = class(BCEditor.Editor.CompletionProposal.TBCEditorCompletionProposal);
+    TBCEditorCompletionProposalPopup = class(BCEditor.Editor.CompletionProposal.PopupWindow.TBCEditorCompletionProposalPopup);
     TBCEditorHighlighter = class(BCEditor.Highlighter.TBCEditorHighlighter);
     TBCEditorLeftMargin = class(BCEditor.Editor.LeftMargin.TBCEditorLeftMargin);
     TBCEditorMatchingPair = class(BCEditor.Editor.MatchingPair.TBCEditorMatchingPair);
@@ -260,7 +262,6 @@ type
     FOldActiveLine: Integer;
     FOldClientRect: TRect;
     FOldSelArea: TBCEditorLinesArea;
-    FOnBeforeCompletionProposalExecute: TBCEditorCompletionProposalEvent;
     FOnCaretChanged: TBCEditorCaretChangedEvent;
     FOnChainCaretMoved: TNotifyEvent;
     FOnChainLinesCleared: TNotifyEvent;
@@ -269,8 +270,8 @@ type
     FOnChainLinesUpdated: TBCEditorLines.TChangeEvent;
     FOnChange: TNotifyEvent;
     FOnCommandProcessed: TBCEditorProcessCommandEvent;
-    FOnCompletionProposalCanceled: TNotifyEvent;
-    FOnCompletionProposalSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent;
+    FOnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent;
+    FOnCompletionProposalShow: TBCEditorCompletionProposalShowEvent;
     FOnContextHelp: TBCEditorContextHelpEvent;
     FOnHint: TBCEditorHintEvent;
     FOnKeyPressW: TBCEditorKeyPressWEvent;
@@ -658,12 +659,11 @@ type
     property LineHeight: Integer read FLineHeight;
     property MarksPanelPopupMenu: TPopupMenu read FMarksPanelPopupMenu write FMarksPanelPopupMenu;
     property MouseCapture: TMouseCapture read FMouseCapture write SetMouseCapture;
-    property OnBeforeCompletionProposalExecute: TBCEditorCompletionProposalEvent read FOnBeforeCompletionProposalExecute write FOnBeforeCompletionProposalExecute;
     property OnCaretChanged: TBCEditorCaretChangedEvent read FOnCaretChanged write FOnCaretChanged;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnCommandProcessed: TBCEditorProcessCommandEvent read FOnCommandProcessed write FOnCommandProcessed;
-    property OnCompletionProposalCanceled: TNotifyEvent read FOnCompletionProposalCanceled write FOnCompletionProposalCanceled;
-    property OnCompletionProposalSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent read FOnCompletionProposalSelected write FOnCompletionProposalSelected;
+    property OnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent read FOnCompletionProposalClose write FOnCompletionProposalClose;
+    property OnCompletionProposalShow: TBCEditorCompletionProposalShowEvent read FOnCompletionProposalShow write FOnCompletionProposalShow;
     property OnContextHelp: TBCEditorContextHelpEvent read FOnContextHelp write FOnContextHelp;
     property OnHint: TBCEditorHintEvent read FOnHint write FOnHint;
     property OnKeyPress: TBCEditorKeyPressWEvent read FOnKeyPressW write FOnKeyPressW;
@@ -782,6 +782,7 @@ type
   TBCEditor = class(TCustomBCEditor)
   public
     property Canvas;
+    property Lines;
     property TextEntryMode;
   published
     property ActiveLine;
@@ -793,26 +794,24 @@ type
     property CompletionProposal;
     property Constraints;
     property Ctl3D;
+    property DoubleBuffered;
     property Enabled;
     property Font;
     property Height;
     property HideScrollBars;
     property HideSelection;
-    property Highlighter;
     property ImeMode;
     property ImeName;
     property KeyCommands;
     property LeftMargin;
-    property Lines;
     property MatchingPair;
     property Name;
-    property OnBeforeCompletionProposalExecute;
     property OnCaretChanged;
     property OnChange;
     property OnClick;
     property OnCommandProcessed;
-    property OnCompletionProposalCanceled;
-    property OnCompletionProposalSelected;
+    property OnCompletionProposalClose;
+    property OnCompletionProposalShow;
     property OnContextHelp;
     property OnContextPopup;
     property OnDblClick;
@@ -2867,7 +2866,6 @@ begin
   else
     LPoint := RowsToClient(FRows.CaretPosition, True);
   Inc(LPoint.Y, FLineHeight);
-  LPoint := ClientToScreen(LPoint);
 
   FCompletionProposalPopup := TBCEditorCompletionProposalPopup.Create(Self);
   with FCompletionProposalPopup do
@@ -2877,8 +2875,7 @@ begin
       LControl := LControl.Parent;
     if LControl is TCustomForm then
       PopupParent := TCustomForm(LControl);
-    OnCanceled := FOnCompletionProposalCanceled;
-    OnSelected := FOnCompletionProposalSelected;
+    OnClose := FOnCompletionProposalClose;
     Assign(FCompletionProposal);
 
     LItems := TStringList.Create;
@@ -2902,8 +2899,8 @@ begin
 
     LCurrentInput := GetCurrentInput();
     LCanExecute := True;
-    if Assigned(FOnBeforeCompletionProposalExecute) then
-      FOnBeforeCompletionProposalExecute(Self, FCompletionProposal.Columns,
+    if Assigned(FOnCompletionProposalShow) then
+      FOnCompletionProposalShow(Self, FCompletionProposal.Columns,
         LCurrentInput, LCanExecute);
     if LCanExecute then
       Execute(LCurrentInput, LPoint)
@@ -6869,32 +6866,36 @@ begin
         else
           LBackgroundColor := clWindow;
 
-        if (FLines.SyncEdit
-          and (FLines.SyncEditArea.BeginPosition < FLines.SyncEditArea.EndPosition)) then
-          ApplyPart(FLines.SyncEditArea, ptSyncEdit);
+        if (not LIsLineBreakToken
+          or (soToEndOfLine in FSelection.Options)) then
+        begin
+          if (FLines.SyncEdit
+            and (FLines.SyncEditArea.BeginPosition < FLines.SyncEditArea.EndPosition)) then
+            ApplyPart(FLines.SyncEditArea, ptSyncEdit);
 
-        if ((esHighlightSearchAllAreas in FState)
-          and (APaintVar^.SearchResultIndex < FLines.SearchAllAreas.Count)) then
-          repeat
-            if ((ALinesPosition <= FLines.SearchAllAreas[APaintVar^.SearchResultIndex].BeginPosition)
-              or (FLines.SearchAllAreas[APaintVar^.SearchResultIndex].EndPosition < LEndPosition)) then
-              ApplyPart(FLines.SearchAllAreas[APaintVar^.SearchResultIndex], ptSearchResult);
+          if ((esHighlightSearchAllAreas in FState)
+            and (APaintVar^.SearchResultIndex < FLines.SearchAllAreas.Count)) then
+            repeat
+              if ((ALinesPosition <= FLines.SearchAllAreas[APaintVar^.SearchResultIndex].BeginPosition)
+                or (FLines.SearchAllAreas[APaintVar^.SearchResultIndex].EndPosition < LEndPosition)) then
+                ApplyPart(FLines.SearchAllAreas[APaintVar^.SearchResultIndex], ptSearchResult);
 
-            if (FLines.SearchAllAreas[APaintVar^.SearchResultIndex].EndPosition <= LEndPosition) then
-              Inc(APaintVar^.SearchResultIndex)
-            else
-              break;
-          until ((APaintVar^.SearchResultIndex = FLines.SearchAllAreas.Count)
-            or (FLines.SearchAllAreas[APaintVar^.SearchResultIndex].BeginPosition > LEndPosition));
+              if (FLines.SearchAllAreas[APaintVar^.SearchResultIndex].EndPosition <= LEndPosition) then
+                Inc(APaintVar^.SearchResultIndex)
+              else
+                break;
+            until ((APaintVar^.SearchResultIndex = FLines.SearchAllAreas.Count)
+              or (FLines.SearchAllAreas[APaintVar^.SearchResultIndex].BeginPosition > LEndPosition));
 
-        ApplyPart(FMatchedPairOpenArea, ptMatchingPair);
-        ApplyPart(FMatchedPairCloseArea, ptMatchingPair);
+          ApplyPart(FMatchedPairOpenArea, ptMatchingPair);
+          ApplyPart(FMatchedPairCloseArea, ptMatchingPair);
 
-        if (not APaintVar^.SelArea.IsEmpty()) then
-          ApplyPart(APaintVar^.SelArea, ptSelection);
+          if (not APaintVar^.SelArea.IsEmpty()) then
+            ApplyPart(APaintVar^.SelArea, ptSelection);
 
-        if (APaintVar^.Parts.Count > 0) then
-          CompleteParts();
+          if (APaintVar^.Parts.Count > 0) then
+            CompleteParts();
+        end;
 
 
         LBorderColor := clNone;

@@ -800,7 +800,8 @@ begin
           LLinePos := @LLineText[1 + FFoundPosition.Char];
           LLineEndPos := @LLineText[Length(LLineText)];
 
-          if (not FWholeWords or not FLines.IsWordBreakChar(LLinePos^)) then
+          if ((LLineText[1 + FFoundPosition.Char] = FPattern[1])
+            and (not FWholeWords or not FLines.IsWordBreakChar(LLinePos^))) then
           begin
             LPatternPos := @FPattern[1];
             LPatternEndPos := @FPattern[LPatternLength];

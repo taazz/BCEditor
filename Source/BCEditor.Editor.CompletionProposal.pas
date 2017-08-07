@@ -8,6 +8,9 @@ uses
   BCEditor.Types;
 
 type
+  TBCEditorCompletionProposalCloseEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
+  TBCEditorCompletionProposalPopupWindowValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
+
   TBCEditorCompletionProposalItems = class(TCollection)
     type
 
@@ -112,7 +115,7 @@ type
     property Items[AIndex: Integer]: TColumn read GetItem write SetItem; default;
   end;
 
-  TBCEditorCompletionProposalEvent = procedure(Sender: TObject;
+  TBCEditorCompletionProposalShowEvent = procedure(Sender: TObject;
     const AColumns: TBCEditorCompletionProposalColumns;
     const AInput: string; var ACanExecute: Boolean) of object;
 

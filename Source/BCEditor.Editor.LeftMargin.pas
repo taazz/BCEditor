@@ -64,7 +64,7 @@ type
     published
       property DefaultImageIndex: Integer read FDefaultImageIndex write FDefaultImageIndex default -1;
       property Images: TCustomImageList read FImages write SetImages;
-      property Visible: Boolean read FVisible write SetVisible default True;
+      property Visible: Boolean read FVisible write SetVisible default False;
     end;
 
     TLineNumbers = class(TPersistent)
@@ -218,7 +218,7 @@ begin
   FOwner := AOwner;
   FDefaultImageIndex := -1;
   FShortCuts := True;
-  FVisible := True;
+  FVisible := False;
 end;
 
 procedure TBCEditorLeftMargin.TMarks.Assign(ASource: TPersistent);

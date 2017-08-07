@@ -10,9 +10,6 @@ uses
   BCEditor.Editor.CompletionProposal;
 
 type
-  TBCEditorCompletionProposalPopupWindowSelectedEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
-  TBCEditorCompletionProposalPopupWindowValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
-
   TBCEditorCompletionProposalPopup = class(TCustomControl)
   strict private
     FAdjustCompletionStart: Boolean;
@@ -27,8 +24,7 @@ type
     FItemIndexArray: array of Integer;
     FItems: TStrings;
     FMargin: Integer;
-    FOnCanceled: TNotifyEvent;
-    FOnSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent;
+    FOnClose: TBCEditorCompletionProposalCloseEvent;
     FOnValidate: TBCEditorCompletionProposalPopupWindowValidateEvent;
     FOriginalHeight: Integer;
     FOriginalWidth: Integer;
@@ -62,6 +58,7 @@ type
     procedure MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer); override;
     procedure Paint; override;
     procedure Show(Origin: TPoint); virtual;
+    property OnClose: TBCEditorCompletionProposalCloseEvent read FOnClose write FOnClose;
   public
     constructor Create(const AEditor: TCustomControl); reintroduce;
     destructor Destroy; override;
@@ -77,8 +74,6 @@ type
     property Editor: TCustomControl read FEditor;
     property Items: TBCEditorCompletionProposalItems read GetItems;
     property TopLine: Integer read FTopLine write SetTopLine;
-    property OnCanceled: TNotifyEvent read FOnCanceled write FOnCanceled;
-    property OnSelected: TBCEditorCompletionProposalPopupWindowSelectedEvent read FOnSelected write FOnSelected;
     property PopupParent: TCustomForm read FPopupParent write SetPopupParent;
   end;
 
@@ -125,8 +120,7 @@ begin
   FFiltered := False;
   FItemHeight := 0;
   FMargin := 2;
-  FOnCanceled := nil;
-  FOnSelected := nil;
+  FOnClose := nil;
   FPopupParent := nil;
   FValueSet := False;
   ParentCtl3D := False;
@@ -153,13 +147,18 @@ begin
 end;
 
 destructor TBCEditorCompletionProposalPopup.Destroy();
+var
+  LSelectedItem: string;
 begin
   if FItemHeight <> 0 then
     FCompletionProposal.VisibleLines := ClientHeight div FItemHeight;
   FCompletionProposal.Width := Width;
 
-  if not FValueSet and Assigned(FOnCanceled) then
-    FOnCanceled(FCompletionProposal);
+  if not FValueSet and Assigned(FOnClose) then
+  begin
+    LSelectedItem := '';
+    FOnClose(FEditor, LSelectedItem);
+  end;
 
   FBitmapBuffer.Free;
   SetLength(FItemIndexArray, 0);
@@ -419,8 +418,8 @@ begin
       else
         LValue := SelText;
 
-      if Assigned(FOnSelected) then
-        FOnSelected(FCompletionProposal, LValue);
+      if Assigned(FOnClose) then
+        FOnClose(FEditor, LValue);
 
       FValueSet := SelText <> LValue;
       if FValueSet then
@@ -828,8 +827,11 @@ begin
 end;
 
 procedure TBCEditorCompletionProposalPopup.Show(Origin: TPoint);
+var
+  LScreen: TPoint;
 begin
-  SetBounds(Origin.X, Origin.Y, Width, Height);
+  LScreen := ClientToScreen(Origin);
+  SetBounds(LScreen.X, LScreen.Y, Width, Height);
 
   SetWindowPos(Handle, HWND_TOP, 0, 0, 0, 0, SWP_SHOWWINDOW or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER);
 
