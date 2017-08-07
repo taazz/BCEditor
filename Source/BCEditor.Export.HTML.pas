@@ -36,7 +36,7 @@ implementation
 uses
   Windows,
   UITypes, StrUtils,
-  BCEditor.Consts, BCEditor.Utils;
+  BCEditor.Consts;
 
 constructor TBCEditorExportHTML.Create(ALines: BCEditor.Lines.TBCEditorLines;
   AHighlighter: TBCEditorHighlighter; AFont: TFont; const ATabWidth: Integer;

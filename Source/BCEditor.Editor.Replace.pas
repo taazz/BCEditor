@@ -8,8 +8,7 @@ uses
 
 type
   TBCEditorReplaceChangeEvent = procedure(Event: TBCEditorReplaceChanges) of object;
-  TBCEditorReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; APosition: TBCEditorLinesPosition;
-      var AAction: TBCEditorReplaceAction) of object;
+  TBCEditorReplaceEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; var AAction: TBCEditorReplaceAction) of object;
 
   TBCEditorReplace = class(TPersistent)
   strict private const

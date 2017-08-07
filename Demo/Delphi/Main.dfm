@@ -69,14 +69,7 @@ object MainForm: TMainForm
     Width = 477
     Height = 524
     Margins.Left = 0
-    ActiveLine.Indicator.Visible = False
     Align = alClient
-    CodeFolding.Hint.Font.Charset = DEFAULT_CHARSET
-    CodeFolding.Hint.Font.Color = clWindowText
-    CodeFolding.Hint.Font.Height = -11
-    CodeFolding.Hint.Font.Name = 'Courier New'
-    CodeFolding.Hint.Font.Style = []
-    CodeFolding.Hint.Indicator.Glyph.Visible = False
     CompletionProposal.CloseChars = '()[]. '
     CompletionProposal.Columns = <
       item
@@ -98,21 +91,6 @@ object MainForm: TMainForm
     Font.Height = -12
     Font.Name = 'Courier New'
     Font.Style = []
-    LeftMargin.Font.Charset = DEFAULT_CHARSET
-    LeftMargin.Font.Color = 13408665
-    LeftMargin.Font.Height = -11
-    LeftMargin.Font.Name = 'Courier New'
-    LeftMargin.Font.Style = []
     TabOrder = 1
-    TokenInfo.Font.Charset = DEFAULT_CHARSET
-    TokenInfo.Font.Color = clWindowText
-    TokenInfo.Font.Height = -11
-    TokenInfo.Font.Name = 'Courier New'
-    TokenInfo.Font.Style = []
-    TokenInfo.Title.Font.Charset = DEFAULT_CHARSET
-    TokenInfo.Title.Font.Color = clWindowText
-    TokenInfo.Title.Font.Height = -11
-    TokenInfo.Title.Font.Name = 'Courier New'
-    TokenInfo.Title.Font.Style = []
   end
 end

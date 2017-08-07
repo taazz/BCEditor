@@ -3,7 +3,7 @@ unit BCEditor.Editor.CodeFolding;
 interface {********************************************************************}
 
 uses
-  Classes, SysUtils, Types,
+  Classes, SysUtils, Types, Generics.Collections,
   Graphics, Controls,
   BCEditor.Types, BCEditor.Consts;
 
@@ -194,7 +194,7 @@ type
 
     TAllRanges = class(TRanges)
     strict private
-      FList: TList;
+      FList: TObjectList<TRanges.TRange>;
       function GetAllCount: Integer;
       function GetItem(AIndex: Integer): TRanges.TRange;
       procedure SetItem(AIndex: Integer; Value: TRanges.TRange);
@@ -208,7 +208,7 @@ type
       procedure UpdateFoldRanges;
       property AllCount: Integer read GetAllCount;
       property Items[AIndex: Integer]: TRanges.TRange read GetItem write SetItem; default;
-      property List: TList read FList;
+      property List: TObjectList<TRanges.TRange> read FList;
     end;
 
   strict private const
@@ -242,8 +242,7 @@ type
 implementation {***************************************************************}
 
 uses
-  Math,
-  BCEditor.Utils;
+  Math;
 
 { TBCEditorCodeFolding.TColors *************************************************}
 
@@ -554,12 +553,12 @@ constructor TBCEditorCodeFolding.TAllRanges.Create;
 begin
   inherited;
 
-  FList := TList.Create;
+  FList := TObjectList<TRanges.TRange>.Create;
 end;
 
 destructor TBCEditorCodeFolding.TAllRanges.Destroy;
 begin
-  FreeList(FList);
+  FList.Free();
 
   inherited;
 end;
@@ -567,7 +566,7 @@ end;
 procedure TBCEditorCodeFolding.TAllRanges.ClearAll;
 begin
   Clear;
-  ClearList(FList);
+  FList.Clear();
 end;
 
 procedure TBCEditorCodeFolding.TAllRanges.Delete(AIndex: Integer);

@@ -114,11 +114,12 @@ const
   ecActivateSyncEdit = 701;
   ecDeactivateSyncEdit = 702;
   { Search }
-  ecSearchFindFirst = 802;
-  ecSearchFind = 803;
-  ecSearchReplace = 804;
-  ecSearchNext = 800;
-  ecSearchPrevious = 801;
+  ecShowFind = 801;
+  ecFindFirst = 802;
+  ecFindNext = 803;
+  ecFindPrevious = 804;
+  ecShowReplace = 805;
+  ecReplace = 806;
   { Comments }
   ecLineComment = 900;
   ecBlockComment = 901;
@@ -216,7 +217,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 97] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 98] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -307,11 +308,12 @@ const
     (Value: ecLowerCase; Name: 'ecLowerCase'),
     (Value: ecActivateSyncEdit; Name: 'ecActivateSyncEdit'),
     (Value: ecDeactivateSyncEdit; Name: 'ecDeactivateSyncEdit'),
-    (Value: ecSearchFindFirst; Name: 'ecSearchFindFirst'),
-    (Value: ecSearchFind; Name: 'ecSearchFind'),
-    (Value: ecSearchReplace; Name: 'ecSearchReplace'),
-    (Value: ecSearchNext; Name: 'ecSearchNext'),
-    (Value: ecSearchPrevious; Name: 'ecSearchPrevious'),
+    (Value: ecShowFind; Name: 'ecShowFind'),
+    (Value: ecFindFirst; Name: 'ecFindFirst'),
+    (Value: ecFindNext; Name: 'ecFindNext'),
+    (Value: ecFindPrevious; Name: 'ecFindPrevious'),
+    (Value: ecShowReplace; Name: 'ecShowReplace'),
+    (Value: ecReplace; Name: 'ecReplace'),
     (Value: ecLineComment; Name: 'ecLineComment'),
     (Value: ecBlockComment; Name: 'ecBlockComment'),
     (Value: ecCompletionProposal; Name: 'ecCompletionProposal')
@@ -654,10 +656,10 @@ begin
   Add(ecBackspace, [ssShift], VK_BACK);
   Add(ecDeleteLastWord, [ssCtrl], VK_BACK);
   { Search }
-  Add(ecSearchFind, [ssCtrl], Ord('F'));
-  Add(ecSearchReplace, [ssCtrl], Ord('R'));
-  Add(ecSearchNext, [], VK_F3);
-  Add(ecSearchPrevious, [ssShift], VK_F3);
+  Add(ecShowFind, [ssCtrl], Ord('F'));
+  Add(ecShowReplace, [ssCtrl], Ord('R'));
+  Add(ecFindNext, [], VK_F3);
+  Add(ecFindPrevious, [ssShift], VK_F3);
   { Enter (return) & Tab }
   Add(ecReturn, [], VK_RETURN);
   Add(ecReturn, [ssShift], VK_RETURN);

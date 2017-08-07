@@ -6,7 +6,7 @@ uses
   Messages,
   Classes, Types,
   Forms, Controls, Graphics, StdCtrls,
-  BCEditor.Utils, BCEditor.Types,
+  BCEditor.Types,
   BCEditor.Editor.CompletionProposal;
 
 type
@@ -632,7 +632,7 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.MoveSelectedLine(ALineCount: Integer);
 begin
-  FSelectedLine := MinMax(FSelectedLine + ALineCount, 0, Length(FItemIndexArray) - 1);
+  FSelectedLine := Min(Max(FSelectedLine + ALineCount, 0), Length(FItemIndexArray) - 1);
   if FSelectedLine >= TopLine + GetVisibleLines then
     TopLine := FSelectedLine - GetVisibleLines + 1;
   if FSelectedLine < TopLine then

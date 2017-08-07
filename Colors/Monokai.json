@@ -1,15 +1,5 @@
 {
   "Colors": {
-    "Info": {
-      "General": {
-        "Version": "2.0.0",
-        "Date": "05.01.2017"
-      },
-      "Author": {
-        "Name": "Lasse Rautiainen",
-        "Mail": "lasse@bonecode.com"
-      }
-    },
     "Editor": {
       "Colors": {
         "Background": "$00222827",
@@ -31,13 +21,12 @@
         "SearchHighlighterBackground": "$003E4849",
         "SearchHighlighterBorder": "clNone",
         "SearchHighlighterForeground": "clNone",
-        "SearchInSelectionBackground": "$00808080",
         "SelectionBackground": "$003E4849",
         "SelectionForeground": "clNone",
         "SpecialCharForeground": "clGrayText",
         "SyncEditBackground": "$00808080",
         "SyncEditEditBorder": "$00F8F8F2",
-        "SyncEditWordBorder": "$003E4849",
+        "SyncEditWordBorder": "$003E4849"
       },
       "Fonts": {
         "Text": "Consolas",

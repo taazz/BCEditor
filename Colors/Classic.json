@@ -1,15 +1,5 @@
 {
   "Colors": {
-    "Info": {
-      "General": {
-        "Version": "2.0.0",
-        "Date": "05.01.2017"
-      },
-      "Author": {
-        "Name": "Lasse Rautiainen",
-        "Mail": "lasse@bonecode.com"
-      }
-    },
     "Editor": {
       "Colors": {
         "Background": "clNavy",
@@ -31,7 +21,6 @@
         "SearchHighlighterBackground": "clBlack",
         "SearchHighlighterBorder": "clNone",
         "SearchHighlighterForeground": "$00FCFDCD",
-        "SearchInSelectionBackground": "$009999CC",
         "SelectionBackground": "clSilver",
         "SelectionForeground": "clNavy",
         "SpecialCharForeground": "clGrayText",

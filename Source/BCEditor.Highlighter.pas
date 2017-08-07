@@ -183,7 +183,7 @@ type
 
     TTokenNodeList = class(TObject)
     strict private
-      FNodeList: TList;
+      FNodeList: TObjectList<TTokenNode>;
     public
       procedure AddNode(const ANode: TTokenNode);
       constructor Create;
@@ -229,7 +229,7 @@ type
       property CharSet: TBCEditorAnsiCharSet read FCharSet write FCharSet;
     end;
 
-    TCaseFunction = function(const AChar: Char): Char;
+    TCaseFunction = function(AChar: Char): Char;
     TStringCaseFunction = function(const AString: string): string;
 
     TRange = class(TRule)
@@ -247,16 +247,16 @@ type
       FDefaultTermSymbol: TDelimitersParser;
       FDefaultToken: TToken;
       FDelimiters: TBCEditorAnsiCharSet;
-      FKeyList: TList;
+      FKeyList: TObjectList<TKeyList>;
       FOpenBeginningOfLine: Boolean;
       FOpenToken: TMultiToken;
       FPrepared: Boolean;
-      FRanges: TList;
-      FSets: TList;
+      FRanges: TObjectList<TRange>;
+      FSets: TObjectList<TSet>;
       FSkipWhitespace: Boolean;
       FStringCaseFunct: TStringCaseFunction;
       FSymbolParsers: TSymbolParsers;
-      FTokens: TList;
+      FTokens: TObjectList<TToken>;
       FUseDelimitersForText: Boolean;
       function GetKeyList(const AIndex: Integer): TKeyList;
       function GetKeyListCount: Integer;
@@ -497,7 +497,7 @@ implementation {***************************************************************}
 uses
   Types, IOUtils, TypInfo,
   GraphUtil,
-  BCEditor.Editor, BCEditor.Language, BCEditor.Utils,
+  BCEditor.Editor, BCEditor.Language,
   BCEditor.Editor.CompletionProposal;
 
 resourcestring
@@ -506,6 +506,16 @@ resourcestring
 
 type
   TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
+
+function CaseNone(AChar: Char): Char;
+begin
+  Result := AChar;
+end;
+
+function CaseStringNone(const AString: string): string;
+begin
+  Result := AString;
+end;
 
 { TBCEditorHighlighter.TInfo **************************************************}
 
@@ -867,12 +877,13 @@ constructor TBCEditorHighlighter.TTokenNodeList.Create;
 begin
   inherited;
 
-  FNodeList := TList.Create;
+  FNodeList := TObjectList<TTokenNode>.Create;
 end;
 
 destructor TBCEditorHighlighter.TTokenNodeList.Destroy;
 begin
-  FreeList(FNodeList);
+  FNodeList.Free();
+
   inherited;
 end;
 
@@ -884,7 +895,7 @@ begin
   Result := nil;
   for LIndex := FNodeList.Count - 1 downto 0 do
   begin
-    LTokenNode := TTokenNode(FNodeList.List[LIndex]);
+    LTokenNode := FNodeList.List[LIndex];
     if LTokenNode.Char = AChar then
       Exit(LTokenNode);
   end;
@@ -897,13 +908,13 @@ end;
 
 function TBCEditorHighlighter.TTokenNodeList.GetNode(const AIndex: Integer): TTokenNode;
 begin
-  Result := TBCEditorHighlighter.TTokenNode(FNodeList[AIndex]);
+  Result := FNodeList[AIndex];
 end;
 
 procedure TBCEditorHighlighter.TTokenNodeList.SetNode(const AIndex: Integer; const AValue: TTokenNode);
 begin
   if AIndex < FNodeList.Count then
-    TBCEditorHighlighter.TTokenNode(FNodeList[AIndex]).Free;
+    FNodeList[AIndex].Free;
   FNodeList[AIndex] := AValue;
 end;
 
@@ -989,7 +1000,7 @@ begin
   while LLow <= LHigh do
   begin
     LMiddle := LLow + (LHigh - LLow) shr 1;
-    LToken := TToken(FTokens.Items[LMiddle]);
+    LToken := FTokens.Items[LMiddle];
     LCompare := CompareStr(LToken.Symbol, AToken.Symbol);
 
     if LCompare < 0 then
@@ -1033,10 +1044,10 @@ begin
     for LIndex := 0 to FRanges.Count - 1 do
       TRange(FRanges[LIndex]).Clear;
 
-  ClearList(FRanges);
-  ClearList(FTokens);
-  ClearList(FKeyList);
-  ClearList(FSets);
+  FRanges.Clear();
+  FTokens.Clear();
+  FKeyList.Clear();
+  FSets.Clear();
 end;
 
 constructor TBCEditorHighlighter.TRange.Create(const AOpenToken: string; const ACloseToken: string);
@@ -1053,10 +1064,10 @@ begin
 
   FPrepared := False;
 
-  FRanges := TList.Create;
-  FKeyList := TList.Create;
-  FSets := TList.Create;
-  FTokens := TList.Create;
+  FRanges := TObjectList<TRange>.Create;
+  FKeyList := TObjectList<TKeyList>.Create;
+  FSets := TObjectList<TSet>.Create;
+  FTokens := TObjectList<TToken>.Create;
 
   FDelimiters := BCEDITOR_DEFAULT_DELIMITERS;
 
@@ -1102,7 +1113,7 @@ begin
   begin
     LMiddle := LLow + (LHigh - LLow) shr 1;
 
-    LToken := TToken(FTokens.Items[LMiddle]);
+    LToken := FTokens.Items[LMiddle];
     LCompare := CompareStr(LToken.Symbol, AString);
 
     if LCompare = 0 then
@@ -1117,7 +1128,7 @@ end;
 
 function TBCEditorHighlighter.TRange.GetKeyList(const AIndex: Integer): TKeyList;
 begin
-  Result := TKeyList(FKeyList[AIndex]);
+  Result := FKeyList[AIndex];
 end;
 
 function TBCEditorHighlighter.TRange.GetKeyListCount: Integer;
@@ -1127,7 +1138,7 @@ end;
 
 function TBCEditorHighlighter.TRange.GetRange(const AIndex: Integer): TRange;
 begin
-  Result := TRange(FRanges[AIndex]);
+  Result := FRanges[AIndex];
 end;
 
 function TBCEditorHighlighter.TRange.GetRangeCount: Integer;
@@ -1137,7 +1148,7 @@ end;
 
 function TBCEditorHighlighter.TRange.GetSet(const AIndex: Integer): TSet;
 begin
-  Result := TSet(FSets.List[AIndex]);
+  Result := FSets.List[AIndex];
 end;
 
 function TBCEditorHighlighter.TRange.GetSetCount: Integer;
@@ -1147,7 +1158,7 @@ end;
 
 function TBCEditorHighlighter.TRange.GetToken(const AIndex: Integer): TToken;
 begin
-  Result := TToken(FTokens[AIndex]);
+  Result := FTokens[AIndex];
 end;
 
 procedure TBCEditorHighlighter.TRange.Prepare(AParent: TRange);
@@ -1209,7 +1220,7 @@ begin
   if Assigned(FRanges) then
   for LIndex := 0 to FRanges.Count - 1 do
   begin
-    LRange := TRange(FRanges[LIndex]);
+    LRange := FRanges[LIndex];
 
     for LIndex2 := 0 to LRange.FOpenToken.SymbolCount - 1 do
     begin
@@ -1226,7 +1237,7 @@ begin
   if Assigned(FKeyList) then
   for LIndex := 0 to FKeyList.Count - 1 do
   begin
-    LKeyList := TKeyList(FKeyList[LIndex]);
+    LKeyList := FKeyList[LIndex];
 
     for LIndex2 := 0 to LKeyList.KeyList.Count - 1 do
     begin
@@ -1239,7 +1250,7 @@ begin
   if Assigned(FTokens) then
   for LIndex := 0 to FTokens.Count - 1 do
   begin
-    LTempToken := TToken(FTokens[LIndex]);
+    LTempToken := FTokens[LIndex];
     LLength := Length(LTempToken.Symbol);
     if LLength < 1 then
       Continue;
@@ -1284,7 +1295,7 @@ begin
       LAnsiChar := AnsiChar(CaseFunct(Char(LIndex)));
       for LIndex2 := 0 to FSets.Count - 1 do
       begin
-        LSet := TSet(FSets.List[LIndex2]);
+        LSet := FSets.List[LIndex2];
         if CharInSet(LAnsiChar, LSet.CharSet) then
           if not Assigned(SymbolParsers[LAnsiChar]) then
             FSymbolParsers[LAnsiChar] := TParser.Create(LSet)
@@ -1336,10 +1347,10 @@ begin
   FDefaultSymbols := nil;
 
   if Assigned(FRanges) then
-  for LIndex := 0 to FRanges.Count - 1 do
-    TRange(FRanges[LIndex]).Reset;
+    for LIndex := 0 to FRanges.Count - 1 do
+      FRanges[LIndex].Reset;
 
-  ClearList(FTokens);
+  FTokens.Clear();
   FPrepared := False;
 end;
 
@@ -1354,7 +1365,7 @@ begin
   FCaseSensitive := AValue;
   if not AValue then
   begin
-    FCaseFunct := CaseUpper;
+    FCaseFunct := UpCase;
     FStringCaseFunct := AnsiUpperCase;
   end
   else
@@ -2010,7 +2021,6 @@ begin
         Search.Highlighter.Colors.Background := StringToColorDef(LColorsObject['SearchHighlighterBackground'].Value, Search.Highlighter.Colors.Background);
         Search.Highlighter.Colors.Border := StringToColorDef(LColorsObject['SearchHighlighterBorder'].Value, Search.Highlighter.Colors.Border);
         Search.Highlighter.Colors.Foreground := StringToColorDef(LColorsObject['SearchHighlighterForeground'].Value, Search.Highlighter.Colors.Foreground);
-        Search.InSelection.Background := StringToColorDef(LColorsObject['SearchInSelectionBackground'].Value, Search.InSelection.Background);
         Selection.Colors.Background := StringToColorDef(LColorsObject['SelectionBackground'].Value, Selection.Colors.Background);
         Selection.Colors.Foreground := StringToColorDef(LColorsObject['SelectionForeground'].Value, Selection.Colors.Foreground);
         SpecialChars.Color := StringToColorDef(LColorsObject['SpecialCharForeground'].Value, SpecialChars.Color);

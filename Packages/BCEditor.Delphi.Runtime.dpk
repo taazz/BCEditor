@@ -58,7 +58,6 @@ contains
   BCEditor.Print.Preview in '..\Source\BCEditor.Print.Preview.pas',
   BCEditor.PaintHelper in '..\Source\BCEditor.PaintHelper.pas',
   BCEditor.Types in '..\Source\BCEditor.Types.pas',
-  BCEditor.Utils in '..\Source\BCEditor.Utils.pas',
   JsonDataObjects in '..\Source\JsonDataObjects.pas';
 
 end.

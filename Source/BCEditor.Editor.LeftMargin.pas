@@ -140,8 +140,7 @@ type
 implementation {***************************************************************}
 
 uses
-  SysUtils, Math,
-  BCEditor.Utils;
+  SysUtils, Math;
 
 { TBCEditorLeftMargin.TColors *************************************************}
 

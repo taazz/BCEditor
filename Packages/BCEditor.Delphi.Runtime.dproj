@@ -150,7 +150,6 @@
         <DCCReference Include="..\Source\BCEditor.Print.Preview.pas"/>
         <DCCReference Include="..\Source\BCEditor.PaintHelper.pas"/>
         <DCCReference Include="..\Source\BCEditor.Types.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Utils.pas"/>
         <DCCReference Include="..\Source\JsonDataObjects.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>

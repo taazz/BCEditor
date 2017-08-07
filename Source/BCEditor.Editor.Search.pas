@@ -10,7 +10,8 @@ uses
 type
   TBCEditorSearch = class(TPersistent)
   public type
-    TChangeEvent = procedure(Event: TBCEditorSearchEvent) of object;
+    TExecutedEvent = procedure(ASender: TObject; const AErrorMessage: string) of object;
+    TWrapAroundEvent = function(ASender: TObject; const APattern: string; const ABackwards: Boolean): Boolean of object;
 
     THighlighter = class(TPersistent)
     type
@@ -20,7 +21,7 @@ type
         FBackground: TColor;
         FBorder: TColor;
         FForeground: TColor;
-        FOnChange: TChangeEvent;
+        FOnChange: TNotifyEvent;
         procedure DoChange;
         procedure SetBackground(const AValue: TColor);
         procedure SetBorder(const AValue: TColor);
@@ -32,53 +33,35 @@ type
         property Background: TColor read FBackground write SetBackground default clSearchHighlighter;
         property Border: TColor read FBorder write SetBorder default clNone;
         property Foreground: TColor read FForeground write SetForeground default clWindowText;
-        property OnChange: TChangeEvent read FOnChange write FOnChange;
+        property OnChange: TNotifyEvent read FOnChange write FOnChange;
       end;
 
     strict private
       FColors: TColors;
-      FOnChange: TChangeEvent;
+      FOnChange: TNotifyEvent;
       procedure DoChange;
       procedure SetColors(const AValue: TColors);
-      procedure SetOnChange(AValue: TChangeEvent);
+      procedure SetOnChange(AValue: TNotifyEvent);
     public
       constructor Create;
       destructor Destroy; override;
       procedure Assign(ASource: TPersistent); override;
     published
       property Colors: TColors read FColors write SetColors;
-      property OnChange: TChangeEvent read FOnChange write SetOnChange;
-    end;
-
-    TInSelection = class(TPersistent)
-    strict private
-      FActive: Boolean;
-      FBackground: TColor;
-      FOnChange: TChangeEvent;
-      FSelectionBeginPosition: TBCEditorLinesPosition;
-      FSelectionEndPosition: TBCEditorLinesPosition;
-      procedure SetActive(AValue: Boolean);
-      procedure SetBackground(const AValue: TColor);
-    public
-      constructor Create;
-      procedure Assign(ASource: TPersistent); override;
-      property SelectionBeginPosition: TBCEditorLinesPosition read FSelectionBeginPosition write FSelectionBeginPosition;
-      property SelectionEndPosition: TBCEditorLinesPosition read FSelectionEndPosition write FSelectionEndPosition;
-    published
-      property Active: Boolean read FActive write SetActive default False;
-      property Background: TColor read FBackground write SetBackground default clSearchInSelectionBackground;
-      property OnChange: TChangeEvent read FOnChange write FOnChange;
+      property OnChange: TNotifyEvent read FOnChange write SetOnChange;
     end;
 
   strict private const
-    DefaultOptions = [soHighlightResults, soSearchOnTyping];
+    DefaultOptions = [];
   strict private
     FCaseSensitive: Boolean;
     FEnabled: Boolean;
     FEngineType: TBCEditorSearchEngine;
     FHighlighter: THighlighter;
-    FInSelection: TInSelection;
-    FOnChange: TChangeEvent;
+    FOnChange: TNotifyEvent;
+    FOnFind: TNotifyEvent;
+    FOnExecuted: TExecutedEvent;
+    FOnWrapAround: TWrapAroundEvent;
     FOptions: TBCEditorSearchOptions;
     FPattern: string;
     FVisible: Boolean;
@@ -87,16 +70,15 @@ type
     procedure SetEnabled(const AValue: Boolean);
     procedure SetEngineType(const AValue: TBCEditorSearchEngine);
     procedure SetHighlighter(const AValue: THighlighter);
-    procedure SetInSelection(const AValue: TInSelection);
-    procedure SetOnChange(const AValue: TChangeEvent);
+    procedure SetOnChange(const AValue: TNotifyEvent);
     procedure SetPattern(const AValue: string);
     procedure SetWholeWordsOnly(const AValue: Boolean);
   protected
-    property OnChange: TChangeEvent read FOnChange write SetOnChange;
+    property OnChange: TNotifyEvent read FOnChange write SetOnChange;
   public
+    procedure Assign(ASource: TPersistent); override;
     constructor Create();
     destructor Destroy(); override;
-    procedure Assign(ASource: TPersistent); override;
     property Pattern: string read FPattern write SetPattern;
     property Visible: Boolean read FVisible write FVisible;
   published
@@ -104,7 +86,9 @@ type
     property Enabled: Boolean read FEnabled write SetEnabled default True;
     property Engine: TBCEditorSearchEngine read FEngineType write SetEngineType default seNormal;
     property Highlighter: THighlighter read FHighlighter write SetHighlighter;
-    property InSelection: TInSelection read FInSelection write SetInSelection;
+    property OnFind: TNotifyEvent read FOnFind write FOnFind;
+    property OnExecuted: TExecutedEvent read FOnExecuted write FOnExecuted;
+    property OnWrapAround: TWrapAroundEvent read FOnWrapAround write FOnWrapAround;
     property Options: TBCEditorSearchOptions read FOptions write FOptions default DefaultOptions;
     property WholeWordsOnly: Boolean read FWholeWordsOnly write SetWholeWordsOnly default False;
   end;
@@ -144,7 +128,7 @@ end;
 procedure TBCEditorSearch.THighlighter.TColors.DoChange;
 begin
   if Assigned(FOnChange) then
-    FOnChange(seInvalidate);
+    FOnChange(Self);
 end;
 
 procedure TBCEditorSearch.THighlighter.TColors.SetBackground(const AValue: TColor);
@@ -204,7 +188,7 @@ end;
 procedure TBCEditorSearch.THighlighter.DoChange;
 begin
   if Assigned(FOnChange) then
-    FOnChange(seInvalidate);
+    FOnChange(Self);
 end;
 
 procedure TBCEditorSearch.THighlighter.SetColors(const AValue: TColors);
@@ -212,79 +196,13 @@ begin
   FColors.Assign(AValue);
 end;
 
-procedure TBCEditorSearch.THighlighter.SetOnChange(AValue: TChangeEvent);
+procedure TBCEditorSearch.THighlighter.SetOnChange(AValue: TNotifyEvent);
 begin
   FOnChange := AValue;
   FColors.OnChange := FOnChange;
 end;
 
-{ TBCEditorSearch.TInSelection ************************************************}
-
-constructor TBCEditorSearch.TInSelection.Create;
-begin
-  inherited;
-
-  FActive := False;
-  FBackground := clSearchInSelectionBackground;
-end;
-
-procedure TBCEditorSearch.TInSelection.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TInSelection) then
-  with ASource as TInSelection do
-  begin
-    Self.FActive := FActive;
-    Self.FBackground := FBackground;
-    Self.FSelectionBeginPosition := FSelectionBeginPosition;
-    Self.FSelectionEndPosition := FSelectionEndPosition;
-    if (Assigned(FOnChange)) then
-      FOnChange(seChange);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorSearch.TInSelection.SetActive(AValue: Boolean);
-begin
-  if FActive <> AValue then
-  begin
-    FActive := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(seChange);
-  end;
-end;
-
-procedure TBCEditorSearch.TInSelection.SetBackground(const AValue: TColor);
-begin
-  if (AValue <> FBackground) then
-  begin
-    FBackground := AValue;
-    if Assigned(FOnChange) then
-      FOnChange(seInvalidate);
-  end;
-end;
 { TBCEditorSearch *************************************************************}
-
-constructor TBCEditorSearch.Create();
-begin
-  inherited;
-
-  FCaseSensitive := False;
-  FEnabled := True;
-  FEngineType := seNormal;
-  FHighlighter := THighlighter.Create;
-  FInSelection := TInSelection.Create;
-  FOptions := DefaultOptions;
-  FWholeWordsOnly := False;
-end;
-
-destructor TBCEditorSearch.Destroy();
-begin
-  FHighlighter.Free();
-  FInSelection.Free();
-
-  inherited;
-end;
 
 procedure TBCEditorSearch.Assign(ASource: TPersistent);
 begin
@@ -295,14 +213,33 @@ begin
     Self.FEnabled := FEnabled;
     Self.FEngineType := FEngineType;
     Self.FHighlighter.Assign(FHighlighter);
-    Self.FInSelection.Assign(FInSelection);
     Self.FOptions := FOptions;
     Self.FWholeWordsOnly := FWholeWordsOnly;
     if (Assigned(FOnChange)) then
-      FOnChange(seChange);
+      FOnChange(Self);
   end
   else
     inherited Assign(ASource);
+end;
+
+constructor TBCEditorSearch.Create();
+begin
+  inherited;
+
+  FCaseSensitive := False;
+  FEnabled := True;
+  FEngineType := seNormal;
+  FHighlighter := THighlighter.Create;
+  FOnExecuted := nil;
+  FOptions := DefaultOptions;
+  FWholeWordsOnly := False;
+end;
+
+destructor TBCEditorSearch.Destroy();
+begin
+  FHighlighter.Free();
+
+  inherited;
 end;
 
 procedure TBCEditorSearch.SetCaseSensitive(const AValue: Boolean);
@@ -311,7 +248,7 @@ begin
   begin
     FCaseSensitive := AValue;
     if (Assigned(FOnChange)) then
-      FOnChange(seChange);
+      FOnChange(Self);
   end;
 end;
 
@@ -321,7 +258,7 @@ begin
   begin
     FEnabled := AValue;
     if (Assigned(FOnChange)) then
-      FOnChange(seChange);
+      FOnChange(Self);
   end;
 end;
 
@@ -331,7 +268,7 @@ begin
   begin
     FEngineType := AValue;
     if (Assigned(FOnChange)) then
-      FOnChange(seChange);
+      FOnChange(Self);
   end;
 end;
 
@@ -340,16 +277,10 @@ begin
   FHighlighter.Assign(AValue);
 end;
 
-procedure TBCEditorSearch.SetInSelection(const AValue: TInSelection);
-begin
-  FInSelection.Assign(AValue);
-end;
-
-procedure TBCEditorSearch.SetOnChange(const AValue: TChangeEvent);
+procedure TBCEditorSearch.SetOnChange(const AValue: TNotifyEvent);
 begin
   FOnChange := AValue;
   FHighlighter.OnChange := FOnChange;
-  FInSelection.OnChange := FOnChange;
 end;
 
 procedure TBCEditorSearch.SetPattern(const AValue: string);
@@ -358,7 +289,7 @@ begin
   begin
     FPattern := AValue;
     if (Assigned(FOnChange)) then
-      FOnChange(seChange);
+      FOnChange(Self);
   end;
 end;
 
@@ -368,7 +299,7 @@ begin
   begin
     FWholeWordsOnly := AValue;
     if (Assigned(FOnChange)) then
-      FOnChange(seChange);
+      FOnChange(Self);
   end;
 end;
 

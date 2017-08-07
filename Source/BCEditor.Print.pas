@@ -6,7 +6,7 @@ uses
   Windows,
   SysUtils, Classes,
   Graphics, Printers,
-  BCEditor.Editor, BCEditor.Types, BCEditor.Utils, BCEditor.Highlighter,
+  BCEditor.Editor, BCEditor.Types, BCEditor.Highlighter,
   BCEditor.Editor.Selection, BCEditor.PaintHelper;
 
 type
@@ -1588,6 +1588,32 @@ begin
 end;
 
 procedure TBCEditorPrint.SetLines(const AValue: TStrings);
+
+  function ConvertTabs(const ALine: string; ATabWidth: Integer; var AHasTabs: Boolean): string;
+  var
+    LCount: Integer;
+    LPosition: Integer;
+  begin
+    AHasTabs := False;
+    Result := ALine;
+    LPosition := 1;
+    while True do
+    begin
+      LPosition := Pos(BCEDITOR_TAB_CHAR, Result, LPosition);
+      if LPosition = 0 then
+        Break;
+
+      AHasTabs := True;
+
+      Delete(Result, LPosition, Length(BCEDITOR_TAB_CHAR));
+
+      LCount := ATabWidth - (LPosition - ATabWidth - 1) mod ATabWidth;
+
+      Insert(StringOfChar(BCEDITOR_SPACE_CHAR, LCount), Result, LPosition);
+      Inc(LPosition, LCount);
+    end;
+  end;
+
 var
   LHasTabs: Boolean;
   LIndex: Integer;

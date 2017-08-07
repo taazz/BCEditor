@@ -5,27 +5,29 @@ interface {********************************************************************}
 uses
   SysUtils, Classes, Generics.Collections, RegularExpressions, SyncObjs,
   Graphics, Controls, StdCtrls, Types,
-  BCEditor.Utils, BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter;
+  BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter, BCEditor.Language;
 
 type
   TBCEditorLines = class(TStrings)
   private type
     TJobThread = class(TThread)
     protected type
-      TJob = (tjActivateSyncEdit);
+      TJob = (tjActivateSyncEdit, tjSearch, tjSearchAll);
+      TJobs = set of TJob;
+      TExecutedProc = procedure(const AData: Pointer) of object;
     private
-      FCriticalSection: TCriticalSection;
       FEvent: TEvent;
       FJob: TJob;
       FLines: TBCEditorLines;
-      FExecuted: TThreadProcedure;
-      procedure Executed();
+      FExecuted: TExecutedProc;
       function Terminated(): Boolean;
     protected
       procedure Execute(); override;
       function IsRunning(): Boolean; overload; inline;
       function IsRunning(const AJob: TJob): Boolean; overload; inline;
-      procedure Run(const AJob: TJob; const AExecuted: TThreadProcedure);
+      function IsRunning(const AJobs: TJobs): Boolean; overload; inline;
+      procedure Run(const AJob: TJob; const AExecuted: TExecutedProc);
+      property Job: TJob read FJob;
     public
       constructor Create(const ALines: TBCEditorLines);
       destructor Destroy(); override;
@@ -54,14 +56,23 @@ type
     TCompare = function(Lines: TBCEditorLines; Line1, Line2: Integer): Integer;
     TChangeEvent = procedure(Sender: TObject; const Line: Integer) of object;
 
+    PFindResult = ^TFindResult;
+    TFindResult = record
+      Area: TBCEditorLinesArea;
+      Backwards: Boolean;
+      ErrorMessage: string;
+    end;
+
     TOption = (loTrimTrailingSpaces, loTrimTrailingLines, loUndoGrouped,
       loUndoAfterLoad, loUndoAfterSave, loSyncEditCaseSensitive, loReadOnly,
       loBeyondEndOfFile, loBeyondEndOfLine);
     TOptions = set of TOption;
 
-    TState = set of (lsLoading, lsSaving, lsDontTrim, lsUndo, lsRedo,
-      lsCaretChanged, lsSelChanged, lsInserting,
-      lsSyncEdit);
+    TState = set of (lsLoading, lsSaving, lsInserting, lsScanningSearch,
+      lsScanningSearchAll, lsScanningSyncEdit,
+      lsDontTrim, lsUndo, lsRedo,
+      lsCaretChanged, lsSelChanged,
+      lsSearch, lsSyncEdit);
 
     TTask = (ltActivateSyncEdit);
 
@@ -87,7 +98,7 @@ type
     TLines = TList<TLine>;
 
     TSearch = class
-    private
+    strict private
       FArea: TBCEditorLinesArea;
       FBackwards: Boolean;
       FCaseSensitive: Boolean;
@@ -104,6 +115,7 @@ type
       function FindLinesRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
       function FindNormal(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
       function FindTextRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
+      function GetRegExpr(): Boolean;
     protected
       property Lines: TBCEditorLines read FLines;
     public
@@ -114,7 +126,13 @@ type
       function Find(var APosition: TBCEditorLinesPosition; out AFoundLength: Integer): Boolean;
       procedure Replace();
       property Area: TBCEditorLinesArea read FArea;
+      property Backwards: Boolean read FBackwards;
+      property CaseSensitive: Boolean read FCaseSensitive;
       property ErrorMessage: string read FErrorMessage;
+      property Pattern: string read FPattern;
+      property RegExpr: Boolean read GetRegExpr;
+      property ReplaceText: string read FReplaceText;
+      property WholeWords: Boolean read FWholeWords;
     end;
 
     TSyncEditItem = record
@@ -233,6 +251,11 @@ type
     FOnUpdated: TChangeEvent;
     FOptions: TOptions;
     FRedoList: TUndoList;
+    FSearch: TSearch;
+    FSearchAllAreas: TList<TBCEditorLinesArea>;
+    FSearchBackwards: Boolean;
+    FSearchPosition: TBCEditorLinesPosition;
+    FSearchResult: TFindResult;
     FSelArea: TBCEditorLinesArea;
     FSortOrder: TBCEditorSortOrder;
     FState: TState;
@@ -265,20 +288,25 @@ type
     function GetTextIn(const AArea: TBCEditorLinesArea): string;
     function GetTextLength(): Integer;
     procedure InternalClear(const AClearUndo: Boolean); overload;
+    procedure JobExecuted();
+    function JobIsRunning(): Boolean; overload; {$IFNDEF Debug} inline; {$ENDIF}
+    function JobIsRunning(const AJobs: TJobThread.TJobs): Boolean; overload; {$IFNDEF Debug} inline; {$ENDIF}
     procedure MarksChanged(ASender: TObject); {$IFNDEF Debug} inline; {$ENDIF}
     procedure ReplaceText(const AArea: TBCEditorLinesArea; const AText: string;
       const AUndoType: TUndoItem.TType); overload;
-    function ScanSyncEdit(const AHighlighter: TBCEditorHighlighter;
-      const ATerminated: TBCEditorInterruptFunc;
+    function ScanSearch(const ATerminated: TBCEditorTerminatedFunc;
+      const AJobThread: TJobThread): Boolean;
+    function ScanSyncEdit(const ATerminated: TBCEditorTerminatedFunc;
       const ACheckAvailable: Boolean): Boolean;
     procedure SetCaretPosition(const AValue: TBCEditorLinesPosition);
     procedure SetModified(const AValue: Boolean);
     procedure SetSelArea(AValue: TBCEditorLinesArea);
+    procedure StartJob(const AJob: TJobThread.TJob; const AExecuted: TJobThread.TExecutedProc);
     function SyncEditItemIn(const AArea: TBCEditorLinesArea): Boolean;
     procedure QuickSort(ALeft, ARight: Integer; ACompare: TCompare);
   protected
-    function ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter;
-      const AExecuted: TThreadProcedure): Boolean;
+    procedure ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter;
+      const AExecuted: TJobThread.TExecutedProc);
     function CharIndexOf(const APosition: TBCEditorLinesPosition): Integer; overload; inline;
     function CharIndexOf(const APosition: TBCEditorLinesPosition;
       const ARelativePosition: TBCEditorLinesPosition): Integer; overload;
@@ -308,7 +336,7 @@ type
     procedure ReplaceText(const AArea: TBCEditorLinesArea;
       const AText: string); overload;
     function ScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
-      const AInterrupted: TBCEditorInterruptFunc;
+      const ATerminated: TBCEditorTerminatedFunc;
       const APosition: TBCEditorLinesPosition;
       out AOpenArea, ACloseArea: TBCEditorLinesArea): Boolean;
     procedure SetBackground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
@@ -321,8 +349,11 @@ type
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer; ACompare: TCompare = nil);
+    procedure StartSearch(const ASearch: TSearch; const APosition: TBCEditorLinesPosition;
+      const AExecuted: TJobThread.TExecutedProc);
+    procedure StartSearchAll(const ASearch: TSearch; const AExecuted: TJobThread.TExecutedProc);
     function SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
-      const AInterrupted: TBCEditorInterruptFunc): Boolean;
+      const ATerminated: TBCEditorTerminatedFunc): Boolean;
     function SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
     procedure TerminateJob();
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
@@ -357,6 +388,7 @@ type
     property OnUpdated: TChangeEvent read FOnUpdated write FOnUpdated;
     property Options: TOptions read FOptions write FOptions;
     property RedoList: TUndoList read FRedoList;
+    property SearchAllAreas: TList<TBCEditorLinesArea> read FSearchAllAreas;
     property SelArea: TBCEditorLinesArea read FSelArea write SetSelArea;
     property SortOrder: TBCEditorSortOrder read FSortOrder write FSortOrder;
     property State: TState read FState;
@@ -376,14 +408,13 @@ type
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil); override;
   end;
 
+function IsCombiningDiacriticalMark(const AChar: Char): Boolean;
+
 implementation {***************************************************************}
 
 uses
   Windows,
   Math, StrUtils, SysConst;
-
-resourcestring
-  SBCEditorPatternContainsWordBreakChar = 'Pattern contains word break character';
 
 function HasLineBreak(const AText: string): Boolean;
 var
@@ -399,6 +430,16 @@ begin
   Result := False;
 end;
 
+function IsCombiningDiacriticalMark(const AChar: Char): Boolean;
+begin
+  case Word(AChar) of
+    $0300..$036F, $1DC0..$1DFF, $20D0..$20FF:
+      Result := True
+  else
+    Result := False;
+  end;
+end;
+
 { TBCEditorLines.TJobThread ********************************************}
 
 constructor TBCEditorLines.TJobThread.Create(const ALines: TBCEditorLines);
@@ -407,13 +448,11 @@ begin
 
   FLines := ALines;
 
-  FCriticalSection := TCriticalSection.Create();
   FEvent := TEvent.Create(nil, False, True, '');
 end;
 
 destructor TBCEditorLines.TJobThread.Destroy();
 begin
-  FCriticalSection.Free();
   FEvent.Free();
 
   inherited;
@@ -425,21 +464,18 @@ begin
   begin
     case (FJob) of
       tjActivateSyncEdit:
-        FLines.ScanSyncEdit(FLines.FHighlighter, Terminated, False);
+        FLines.ScanSyncEdit(Terminated, False);
+      tjSearch,
+      tjSearchAll:
+        FLines.ScanSearch(Terminated, Self);
     end;
     if (not Terminated) then
     begin
-      if (Assigned(FExecuted)) then
-        Synchronize(Executed);
       FEvent.ResetEvent();
+      if (Assigned(FExecuted)) then
+        Synchronize(FLines.JobExecuted);
     end;
   end;
-end;
-
-procedure TBCEditorLines.TJobThread.Executed();
-begin
-  if (not Terminated) then
-    FExecuted();
 end;
 
 function TBCEditorLines.TJobThread.IsRunning(): Boolean;
@@ -449,10 +485,18 @@ end;
 
 function TBCEditorLines.TJobThread.IsRunning(const AJob: TJob): Boolean;
 begin
-  Result := IsRunning() and (FJob = AJob);
+  Result := IsRunning([AJob]);
 end;
 
-procedure TBCEditorLines.TJobThread.Run(const AJob: TJob; const AExecuted: TThreadProcedure);
+function TBCEditorLines.TJobThread.IsRunning(const AJobs: TJobs): Boolean;
+begin
+  Assert(AJobs <> []);
+
+  Result := IsRunning() and (FJob in AJobs);
+end;
+
+procedure TBCEditorLines.TJobThread.Run(const AJob: TJob;
+  const AExecuted: TExecutedProc);
 begin
   FJob := AJob;
   FExecuted := AExecuted;
@@ -469,9 +513,7 @@ end;
 
 function TBCEditorLines.TJobThread.Terminated(): Boolean;
 begin
-  FCriticalSection.Enter();
   Result := inherited Terminated;
-  FCriticalSection.Leave();
 end;
 
 { TBCEditorLines.TMark ********************************************************}
@@ -566,6 +608,7 @@ var
   LIndex: Integer;
 begin
   Assert((BOFPosition <= AArea.BeginPosition) and (AArea.BeginPosition <= AArea.EndPosition) and (AArea.EndPosition <= ALines.EOFPosition));
+  Assert(APattern <> '');
 
   inherited Create();
 
@@ -591,6 +634,9 @@ begin
     CharLowerBuff(PChar(FPattern), Length(FPattern));
   end;
   FReplaceText := AReplaceText;
+
+  if (FPattern = '') then
+    FErrorMessage := SBCEditorPatternIsEmpty;
 
   if (FEngine = eNormal) then
   begin
@@ -622,24 +668,29 @@ function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
 begin
   Assert((FArea.BeginPosition <= APosition) and (APosition <= FArea.EndPosition));
 
-  case (FEngine) of
-    eNormal: Result := FindNormal(APosition, AFoundLength);
-    eLinesRegExpr: Result := FindLinesRegEx(APosition, AFoundLength);
-    eTextRegExpr: Result := FindTextRegEx(APosition, AFoundLength);
-    else raise ERangeError.Create('FEngine: ' + IntToStr(Ord(FEngine)));
-  end;
-
-  if (Result) then
-    // if this fails, there is a bug in the FindXxx routine
-    if (FBackwards) then
-      Assert(FFoundPosition >= FArea.BeginPosition)
-    else
-      Assert(FFoundPosition <= FArea.EndPosition);
-
-  if (Result) then
+  if (FErrorMessage <> '') then
+    Result := False
+  else
   begin
-    APosition := FFoundPosition;
-    AFoundLength := FFoundLength;
+    case (FEngine) of
+      eNormal: Result := FindNormal(APosition, AFoundLength);
+      eLinesRegExpr: Result := FindLinesRegEx(APosition, AFoundLength);
+      eTextRegExpr: Result := FindTextRegEx(APosition, AFoundLength);
+      else raise ERangeError.Create('FEngine: ' + IntToStr(Ord(FEngine)));
+    end;
+
+    if (Result) then
+      // if this fails, there is a bug in the FindXxx routine
+      if (FBackwards) then
+        Assert(FFoundPosition >= FArea.BeginPosition)
+      else
+        Assert(FFoundPosition <= FArea.EndPosition);
+
+    if (Result) then
+    begin
+      APosition := FFoundPosition;
+      AFoundLength := FFoundLength;
+    end;
   end;
 end;
 
@@ -839,6 +890,11 @@ begin
     FFoundPosition := FLines.PositionOf(LFoundPosition);
     FFoundLength := LMatch.Length;
   end;
+end;
+
+function TBCEditorLines.TSearch.GetRegExpr(): Boolean;
+begin
+  Result := FEngine in [eLinesRegExpr, eTextRegExpr];
 end;
 
 procedure TBCEditorLines.TSearch.Replace();
@@ -1102,21 +1158,19 @@ begin
     Result := - Result;
 end;
 
-function TBCEditorLines.ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter;
-  const AExecuted: TThreadProcedure): Boolean;
+procedure TBCEditorLines.ActivateSyncEdit(const AHighlighter: TBCEditorHighlighter;
+  const AExecuted: TJobThread.TExecutedProc);
 begin
-  Result := not SelArea.IsEmpty();
-  if (Result) then
+  if (not SelArea.IsEmpty()) then
   begin
     FSyncEditArea := FSelArea;
     SelArea := LinesArea(CaretPosition, CaretPosition);
+
     Include(FState, lsSyncEdit);
 
     FHighlighter := AHighlighter;
 
-    if (not Assigned(FJobThread)) then
-      FJobThread := TJobThread.Create(Self);
-    FJobThread.Run(tjActivateSyncEdit, AExecuted);
+    StartJob(tjActivateSyncEdit, AExecuted);
 
     if (Assigned(FOnSyncEditChange)) then
       FOnSyncEditChange(Self);
@@ -1129,6 +1183,7 @@ begin
     Result := -1
   else
   begin
+    TerminateJob();
     DeactivateSyncEdit();
 
     Result := Count;
@@ -1183,8 +1238,10 @@ procedure TBCEditorLines.Clear();
 begin
   if (CanModify) then
   begin
+    TerminateJob();
     FBookmarks.Clear();
     FMarks.Clear();
+    FSearchAllAreas.Clear();
     DeactivateSyncEdit();
 
     InternalClear(True);
@@ -1249,6 +1306,7 @@ begin
   FOnUpdated := nil;
   FOptions := DefaultOptions;
   FRedoList := TUndoList.Create(Self);
+  FSearchAllAreas := TList<TBCEditorLinesArea>.Create();
   FSelArea := LinesArea(BOFPosition, BOFPosition);
   FSyncEditArea := InvalidLinesArea;
   FSyncEditItems := TList<TSyncEditItem>.Create();
@@ -1260,8 +1318,7 @@ procedure TBCEditorLines.DeactivateSyncEdit();
 begin
   if (lsSyncEdit in FState) then
   begin
-    if (Assigned(FJobThread) and FJobThread.IsRunning(tjActivateSyncEdit)) then
-      TerminateJob();
+    TerminateJob();
 
     Exclude(FState, lsSyncEdit);
 
@@ -1284,6 +1341,7 @@ var
 begin
   if (CanModify) then
   begin
+    TerminateJob();
     DeactivateSyncEdit();
 
     Assert((0 <= ALine) and (ALine < Count));
@@ -1344,6 +1402,9 @@ var
 begin
   if (CanModify) then
   begin
+    TerminateJob();
+    DeactivateSyncEdit();
+
     LArea := LinesArea(Min(ABeginPosition, AEndPosition), Max(ABeginPosition, AEndPosition));
 
     Assert((BOFPosition <= LArea.BeginPosition) and (LArea.EndPosition <= EOFPosition));
@@ -1408,8 +1469,11 @@ begin
 
   FBookmarks.Free();
   FItems.Free();
+  if (Assigned(FJobThread)) then
+    FJobThread.Free();
   FMarks.Free();
   FRedoList.Free();
+  FSearchAllAreas.Free();
   FSyncEditItems.Free();
   FUndoList.Free();
 
@@ -1424,6 +1488,9 @@ begin
     FOnDeleting(Self, ALine);
 
   Items.Delete(ALine);
+
+  FModified := True;
+  FSearchAllAreas.Clear();
 
   if (Count = 0) then
     CaretPosition := BOFPosition
@@ -1720,7 +1787,9 @@ begin
 
   if (LModified and not (lsInserting in State)) then
   begin
+    FSearchAllAreas.Clear();
     FModified := True;
+
     if (Assigned(FOnUpdated)) then
       FOnUpdated(Self, ALine);
   end;
@@ -1750,6 +1819,9 @@ var
 begin
   if (CanModify and (List.Count > 0)) then
   begin
+    TerminateJob();
+    DeactivateSyncEdit();
+
     if (List = UndoList) then
     begin
       Include(FState, lsUndo);
@@ -1885,7 +1957,7 @@ end;
 function TBCEditorLines.GetCanModify(): Boolean;
 begin
   Result := not (loReadOnly in FOptions)
-    and (not Assigned(FJobThread) or not FJobThread.IsRunning());
+    and not JobIsRunning([tjActivateSyncEdit, tjSearch]);
 end;
 
 function TBCEditorLines.GetCanRedo(): Boolean;
@@ -2051,6 +2123,7 @@ var
 begin
   if (CanModify) then
   begin
+    TerminateJob();
     DeactivateSyncEdit();
 
     LCaretPosition := CaretPosition;
@@ -2084,6 +2157,9 @@ var
 begin
   if (CanModify) then
   begin
+    TerminateJob();
+    DeactivateSyncEdit();
+
     LArea.BeginPosition := Min(ABeginPosition, AEndPosition);
     LArea.EndPosition := Max(ABeginPosition, AEndPosition);
 
@@ -2109,6 +2185,7 @@ var
 begin
   if (CanModify and not SyncEdit) then
   begin
+    TerminateJob();
     DeactivateSyncEdit();
 
     BeginUpdate();
@@ -2161,6 +2238,45 @@ begin
     [BCEDITOR_NONE_CHAR .. BCEDITOR_SPACE_CHAR]
     + BCEDITOR_WORD_BREAK_CHARACTERS
     + BCEDITOR_EXTRA_WORD_BREAK_CHARACTERS);
+end;
+
+procedure TBCEditorLines.JobExecuted();
+begin
+  Assert(Assigned(FJobThread) and not FJobThread.Terminated);
+
+  BeginUpdate();
+  try
+    case (FJobThread.FJob) of
+      tjActivateSyncEdit:
+        if (FSyncEditItems.Count > 0) then
+        begin
+          SetCaretPosition(FSyncEditItems[0].Area.BeginPosition);
+          SetSelArea(FSyncEditItems[0].Area);
+          if (Assigned(FJobThread.FExecuted)) then
+            FJobThread.FExecuted(nil);
+        end;
+      tjSearch,
+      tjSearchAll:
+        begin
+          if (Assigned(FJobThread.FExecuted)) then
+            FJobThread.FExecuted(@FSearchResult);
+        end;
+    end;
+  finally
+    EndUpdate();
+  end;
+
+  FState := FState - [lsScanningSearch, lsScanningSearchAll, lsScanningSyncEdit];
+end;
+
+function TBCEditorLines.JobIsRunning(): Boolean;
+begin
+  Result := Assigned(FJobThread) and FJobThread.IsRunning();
+end;
+
+function TBCEditorLines.JobIsRunning(const AJobs: TJobThread.TJobs): Boolean;
+begin
+  Result := Assigned(FJobThread) and FJobThread.IsRunning(AJobs);
 end;
 
 procedure TBCEditorLines.MarksChanged(ASender: TObject);
@@ -2251,6 +2367,7 @@ begin
 
   if (CanModify) then
   begin
+    TerminateJob();
     DeactivateSyncEdit();
 
     ReplaceText(LinesArea(BOLPosition[ALine], EOLPosition[ALine]), AText);
@@ -2413,6 +2530,8 @@ begin
   if (CanModify
     and (not AArea.IsEmpty() or (AText <> ''))) then
   begin
+    TerminateJob();
+
     BeginUpdate();
     try
       if (not SyncEdit) then
@@ -2590,7 +2709,7 @@ begin
 end;
 
 function TBCEditorLines.ScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
-  const AInterrupted: TBCEditorInterruptFunc;
+  const ATerminated: TBCEditorTerminatedFunc;
   const APosition: TBCEditorLinesPosition;
   out AOpenArea, ACloseArea: TBCEditorLinesArea): Boolean;
 var
@@ -2608,7 +2727,7 @@ begin
   Result := False;
 
   for LMatchingPair := 0 to AHighlighter.MatchingPairs.Count - 1 do
-    if (not Result and not AInterrupted()) then
+    if (not Result and not ATerminated()) then
     begin
       LSearchCloseToken := TBCEditorLines.TSearch.Create(Self,
         LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
@@ -2629,7 +2748,7 @@ begin
         LOpenArea.BeginPosition := LSearchOpenToken.Area.EndPosition;
 
         LPosition := LSearchOpenToken.Area.EndPosition;
-        while (Result and not AInterrupted()
+        while (Result and not ATerminated()
           and LSearchOpenToken.Find(LOpenArea.BeginPosition, LFoundLengthOpenToken)) do
         begin
           LSearchCloseToken.Free();
@@ -2663,7 +2782,7 @@ begin
     end;
 
   for LMatchingPair := 0 to AHighlighter.MatchingPairs.Count - 1 do
-    if (not Result and not AInterrupted()) then
+    if (not Result and not ATerminated()) then
     begin
       LSearchOpenToken := TBCEditorLines.TSearch.Create(Self,
         LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
@@ -2684,7 +2803,7 @@ begin
         LCloseArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
 
         LPosition := LSearchCloseToken.Area.BeginPosition;
-        while (not Result and not AInterrupted()
+        while (not Result and not ATerminated()
           and LSearchCloseToken.Find(LCloseArea.BeginPosition, LFoundLengthCloseToken)) do
         begin
           LSearchOpenToken.Free();
@@ -2724,8 +2843,60 @@ begin
   end;
 end;
 
-function TBCEditorLines.ScanSyncEdit(const AHighlighter: TBCEditorHighlighter;
-  const ATerminated: TBCEditorInterruptFunc;
+function TBCEditorLines.ScanSearch(const ATerminated: TBCEditorTerminatedFunc;
+  const AJobThread: TJobThread): Boolean;
+var
+  LFoundArea: TBCEditorLinesArea;
+  LFoundAreas: TList<TBCEditorLinesArea>;
+  LFoundLength: Integer;
+begin
+  FSearchResult.Backwards := FSearchBackwards;
+  FSearchResult.Area := InvalidLinesArea;
+
+  if (not (lsScanningSearchAll in FState)) then
+    LFoundAreas := nil
+  else
+    LFoundAreas := TList<TBCEditorLinesArea>.Create();
+
+  repeat
+    if (FSearch.Backwards) then
+      FSearchPosition := PositionOf(-1, FSearchPosition);
+
+    Result := FSearch.Find(FSearchPosition, LFoundLength);
+
+    if (Result) then
+    begin
+      LFoundArea.BeginPosition := FSearchPosition;
+      LFoundArea.EndPosition := PositionOf(LFoundLength, LFoundArea.BeginPosition);
+
+      if (FSearchResult.Area = InvalidLinesArea) then
+        FSearchResult.Area := LFoundArea;
+
+      if (lsScanningSearchAll in FState) then
+        if (FSearch.Backwards) then
+          LFoundAreas.Insert(0, LFoundArea)
+        else
+          LFoundAreas.Insert(LFoundAreas.Count, LFoundArea);
+    end;
+
+    if (Result and not FSearch.Backwards) then
+      FSearchPosition := PositionOf(1, FSearchPosition);
+  until (not Result or not (lsScanningSearchAll in FState));
+
+  FSearchResult.ErrorMessage := FSearch.ErrorMessage;
+  if (FSearchResult.ErrorMessage <> '') then
+    FSearchResult.Area := InvalidLinesArea;
+
+  if (lsScanningSearchAll in FState) then
+  begin
+    FSearchAllAreas.AddRange(LFoundAreas.ToArray);
+    LFoundAreas.Free();
+  end;
+
+  FreeAndNil(FSearch);
+end;
+
+function TBCEditorLines.ScanSyncEdit(const ATerminated: TBCEditorTerminatedFunc;
   const ACheckAvailable: Boolean): Boolean;
 type
   TWord = record
@@ -2738,7 +2909,7 @@ var
 
   function InsertIndex(const AWord: string; out AIndex: Integer): Boolean;
   type
-    Tstrcmp = function (lpString1, lpString2: PWideChar): Integer; stdcall;
+    Tstrcmp = function(lpString1, lpString2: PWideChar): Integer; stdcall;
   var
     Left: Integer;
     Mid: Integer;
@@ -2808,11 +2979,11 @@ begin
     LWord.Word := TextIn[LItem.Area];
 
     LIgnoreWord := CharInSet(LWord.Word[1], ['0' .. '9']);
-    for LKeyListIndex := 0 to AHighlighter.MainRules.KeyListCount - 1 do
+    for LKeyListIndex := 0 to FHighlighter.MainRules.KeyListCount - 1 do
       if (not Assigned(ATerminated) or not ATerminated()) then
         LIgnoreWord := LIgnoreWord
-          or not AHighlighter.MainRules.KeyList[LKeyListIndex].SyncEdit
-            and (AHighlighter.MainRules.KeyList[LKeyListIndex].KeyList.IndexOf(LWord.Word) >= 0);
+          or not FHighlighter.MainRules.KeyList[LKeyListIndex].SyncEdit
+            and (FHighlighter.MainRules.KeyList[LKeyListIndex].KeyList.IndexOf(LWord.Word) >= 0);
 
     if (not LIgnoreWord) then
     begin
@@ -2994,6 +3165,7 @@ var
 begin
   if (CanModify) then
   begin
+    TerminateJob();
     DeactivateSyncEdit();
 
     LOldCaretPosition := CaretPosition;
@@ -3081,6 +3253,9 @@ var
 begin
   if (CanModify) then
   begin
+    TerminateJob();
+    DeactivateSyncEdit();
+
     BeginUpdate();
     try
       if (AEndLine < Count - 1) then
@@ -3108,6 +3283,50 @@ begin
   end;
 end;
 
+procedure TBCEditorLines.StartJob(const AJob: TJobThread.TJob;
+  const AExecuted: TJobThread.TExecutedProc);
+begin
+  case (AJob) of
+    tjActivateSyncEdit: Include(FState, lsScanningSyncEdit);
+    tjSearch: Include(FState, lsScanningSearch);
+    tjSearchAll: Include(FState, lsScanningSearchAll);
+    else raise ERangeError.Create('AJob: ' + IntToStr(Ord(AJob)));
+  end;
+
+  TerminateJob();
+
+  if (not Assigned(FJobThread)) then
+    FJobThread := TJobThread.Create(Self);
+
+  FJobThread.Run(AJob, AExecuted);
+end;
+
+procedure TBCEditorLines.StartSearch(const ASearch: TSearch;
+  const APosition: TBCEditorLinesPosition; const AExecuted: TJobThread.TExecutedProc);
+begin
+  TerminateJob();
+
+  FSearch := ASearch;
+  FSearchBackwards := ASearch.Backwards;
+  FSearchPosition := APosition;
+  FSearchAllAreas.Clear();
+
+  StartJob(tjSearch, AExecuted);
+end;
+
+procedure TBCEditorLines.StartSearchAll(const ASearch: TSearch;
+  const AExecuted: TJobThread.TExecutedProc);
+begin
+  TerminateJob();
+
+  FSearch := ASearch;
+  FSearchBackwards := False;
+  FSearchPosition := BOFPosition;
+  FSearchAllAreas.Clear();
+
+  StartJob(tjSearchAll, AExecuted);
+end;
+
 function TBCEditorLines.SyncEditItemIn(const AArea: TBCEditorLinesArea): Boolean;
 var
   LIndex: Integer;
@@ -3128,11 +3347,12 @@ begin
 end;
 
 function TBCEditorLines.SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
-  const AInterrupted: TBCEditorInterruptFunc): Boolean;
+  const ATerminated: TBCEditorTerminatedFunc): Boolean;
 begin
   Assert(not (lsSyncEdit in FState));
 
-  Result := ScanSyncEdit(AHighlighter, AInterrupted, True);
+  FHighlighter := AHighlighter;
+  Result := ScanSyncEdit(ATerminated, True);
 end;
 
 function TBCEditorLines.SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
@@ -3152,12 +3372,14 @@ end;
 
 procedure TBCEditorLines.TerminateJob();
 begin
-  if (Assigned(FJobThread) and FJobThread.IsRunning(tjActivateSyncEdit)) then
+  if (Assigned(FJobThread) and FJobThread.IsRunning()) then
   begin
     FJobThread.Terminate();
     FJobThread.WaitFor();
     FJobThread.Free();
     FJobThread := nil;
+
+    FState := FState - [lsScanningSearch, lsScanningSearchAll, lsScanningSyncEdit];
   end;
 end;
 
