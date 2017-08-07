@@ -498,7 +498,7 @@ uses
   Types, IOUtils, TypInfo,
   GraphUtil,
   BCEditor.Editor, BCEditor.Language,
-  BCEditor.Editor.CompletionProposal;
+  BCEditor.Properties;
 
 resourcestring
   SBCEditorErrorInHighlighterParse = 'JSON parse error on line %d column %d: %s';

@@ -7,7 +7,7 @@ uses
   SysUtils, Classes,
   Graphics, Printers,
   BCEditor.Editor, BCEditor.Types, BCEditor.Highlighter,
-  BCEditor.Editor.Selection, BCEditor.PaintHelper;
+  BCEditor.Properties, BCEditor.PaintHelper;
 
 type
   TBCEditorPrinterInfo = class

@@ -461,21 +461,22 @@ end;
 procedure TBCEditorLines.TJobThread.Execute();
 begin
   while ((FEvent.WaitFor(INFINITE) = wrSignaled) and not Terminated) do
-  begin
-    case (FJob) of
-      tjActivateSyncEdit:
-        FLines.ScanSyncEdit(Terminated, False);
-      tjSearch,
-      tjSearchAll:
-        FLines.ScanSearch(Terminated, Self);
-    end;
     if (not Terminated) then
     begin
-      FEvent.ResetEvent();
-      if (Assigned(FExecuted)) then
-        Synchronize(FLines.JobExecuted);
+      case (FJob) of
+        tjActivateSyncEdit:
+          FLines.ScanSyncEdit(Terminated, False);
+        tjSearch,
+        tjSearchAll:
+          FLines.ScanSearch(Terminated, Self);
+      end;
+      if (not Terminated) then
+      begin
+        FEvent.ResetEvent();
+        if (Assigned(FExecuted)) then
+          Synchronize(FLines.JobExecuted);
+      end;
     end;
-  end;
 end;
 
 function TBCEditorLines.TJobThread.IsRunning(): Boolean;
@@ -619,10 +620,10 @@ begin
   FWholeWords := AWholeWords;
   if (not ARegExpr) then
     FEngine := eNormal
-  else if (Pos(ReplaceStr(ReplaceStr(FLines.LineBreak, #13, '\r'), #10, '\n'), APattern) > 0) then
-    FEngine := eTextRegExpr
+  else if ((Length(APattern) >= 1) and ((APattern[1] = '^') or (APattern[Length(APattern)] = '$'))) then
+    FEngine := eLinesRegExpr
   else
-    FEngine := eLinesRegExpr;
+    FEngine := eTextRegExpr;
   FBackwards := ABackwards;
   if (FCaseSensitive or (FEngine <> eNormal)) then
     FPattern := APattern
@@ -751,16 +752,20 @@ end;
 function TBCEditorLines.TSearch.FindNormal(const APosition: TBCEditorLinesPosition;
   const AFoundLength: Integer): Boolean;
 var
+  LLineBeginPos: PChar;
+  LLineCompPos: PChar;
   LLineEndPos: PChar;
-  LLineFirstChar: Integer;
   LLineLength: Integer;
   LLinePos: PChar;
   LLineText: string;
+  LPatternBeginPos: PChar;
   LPatternEndPos: PChar;
   LPatternLength: Integer;
   LPatternPos: PChar;
 begin
   LPatternLength := Length(FPattern);
+  LPatternBeginPos := @FPattern[1];
+  LPatternEndPos := @FPattern[LPatternLength];
 
   Result := False;
   if (LPatternLength > 0) then
@@ -771,14 +776,12 @@ begin
       and (FBackwards and (FFoundPosition > Max(FArea.BeginPosition, FLines.BOFPosition))
         or not FBackwards and (FFoundPosition < Min(FArea.EndPosition, FLines.EOFPosition)))) do
     begin
-      LLineFirstChar := 0;
-      if (FBackwards and (FFoundPosition.Line = FArea.BeginPosition.Line)) then
-        LLineFirstChar := Max(LLineFirstChar, FArea.BeginPosition.Char);
       LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
-      if (not FBackwards and (FFoundPosition.Line = FArea.EndPosition.Line)) then
+      if (FFoundPosition.Line = FArea.EndPosition.Line) then
         LLineLength := Min(LLineLength, FArea.EndPosition.Char + 1);
 
-      if (LLineLength > 0) then
+      if ((LLineLength >= LPatternLength)
+        and (0 <= FFoundPosition.Char) and (FFoundPosition.Char < LLineLength)) then
       begin
         if (FCaseSensitive) then
           LLineText := FLines.Items[FFoundPosition.Line].Text
@@ -787,40 +790,46 @@ begin
           // Since we modify LLineText with CharLowerBuff, we need a copy of the
           // string - not only a copy of the pointer to the string...
           LLineText := Copy(FLines.Items[FFoundPosition.Line].Text, 1, LLineLength);
-          CharLowerBuff(PChar(LLineText), Length(LLineText));
+          CharLowerBuff(PChar(LLineText), LLineLength);
         end;
 
-        if (FBackwards and (FFoundPosition.Char = Length(LLineText))) then
-          Dec(FFoundPosition.Char);
+        if (FFoundPosition.Line = FArea.BeginPosition.Line) then
+          LLineBeginPos := @LLineText[1 + FArea.BeginPosition.Char]
+        else
+          LLineBeginPos := @LLineText[1 + FFoundPosition.Char];
+        LLineEndPos := @LLineText[1 + LLineLength - LPatternLength];
+
+        if (FBackwards) then
+          LLinePos := LLineEndPos
+        else
+          LLinePos := LLineBeginPos;
 
         while (not Result
-          and (FBackwards and (FFoundPosition.Char >= LLineFirstChar)
-            or not FBackwards and (FFoundPosition.Char + LPatternLength <= LLineLength))) do
+          and (FBackwards and (LLinePos >= LLineBeginPos)
+            or not FBackwards and (LLinePos <= LLineEndPos))) do
         begin
-          LLinePos := @LLineText[1 + FFoundPosition.Char];
-          LLineEndPos := @LLineText[Length(LLineText)];
-
-          if ((LLineText[1 + FFoundPosition.Char] = FPattern[1])
+          if ((LLinePos^ = LPatternBeginPos^)
             and (not FWholeWords or not FLines.IsWordBreakChar(LLinePos^))) then
           begin
-            LPatternPos := @FPattern[1];
-            LPatternEndPos := @FPattern[LPatternLength];
+            LPatternPos := LPatternBeginPos;
+            LLineCompPos := LLinePos;
             while ((LPatternPos <= LPatternEndPos)
-              and (LLinePos <= LLineEndPos)
-              and (LPatternPos^ = LLinePos^)) do
+              and (LPatternPos^ = LLineCompPos^)) do
             begin
               Inc(LPatternPos);
-              Inc(LLinePos);
+              Inc(LLineCompPos);
             end;
             Result := LPatternPos > LPatternEndPos;
           end;
 
           if (not Result) then
             if (FBackwards) then
-              Dec(FFoundPosition.Char)
+              Dec(LLinePos)
             else
-              Inc(FFoundPosition.Char);
+              Inc(LLinePos);
         end;
+
+        FFoundPosition.Char := LLinePos - @LLineText[1];
       end;
 
       if (not Result) then
@@ -2245,6 +2254,8 @@ procedure TBCEditorLines.JobExecuted();
 begin
   Assert(Assigned(FJobThread) and not FJobThread.Terminated);
 
+  FState := FState - [lsScanningSearch, lsScanningSearchAll, lsScanningSyncEdit];
+
   BeginUpdate();
   try
     case (FJobThread.FJob) of
@@ -2266,8 +2277,6 @@ begin
   finally
     EndUpdate();
   end;
-
-  FState := FState - [lsScanningSearch, lsScanningSearchAll, lsScanningSyncEdit];
 end;
 
 function TBCEditorLines.JobIsRunning(): Boolean;
@@ -3402,4 +3411,3 @@ begin
 end;
 
 end.
-

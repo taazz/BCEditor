@@ -10,7 +10,52 @@ uses
 type
   TBCEditorArrayOfString = array of string;
 
-  TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
+  TBCEditorBreakType = (
+    btUnspecified,
+    btAny,
+    btTerm
+  );
+
+  TBCEditorCase = (cNone = -1, cUpper = 0, cLower = 1, cOriginal = 2);
+
+  TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
+
+  TBCEditorCodeFoldingOption = (
+    cfoFoldMultilineComments,
+    cfoHighlightFoldingLine,
+    cfoHighlightIndentGuides,
+    cfoShowTreeLine
+  );
+  TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
+
+  TBCEditorCompletionProposalOption = (
+    cpoAutoInvoke,
+    cpoAutoConstraints,
+    cpoAddHighlighterKeywords,
+    cpoCaseSensitive,
+    cpoFiltered,
+    cpoParseItemsFromText,
+    cpoResizeable,
+    cpoShowShadow,
+    cpoUseHighlighterColumnFont
+  );
+  TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
+
+  TBCEditorKeyCharType = (ctFoldOpen, ctFoldClose, ctSkipOpen, ctSkipClose);
+
+  TBCEditorSortOrder = (soAsc, soDesc);
+
+  TBCEditorLeftMarginLineNumberOption = (
+    lnoIntens,
+    lnoAfterLastLine
+  );
+  TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
+
+  TBCEditorLeftMarginBookMarkPanelOption = (
+    bpoToggleBookmarkByClick,
+    bpoToggleMarkByClick
+  );
+  TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
 
   TBCEditorOption = (
     eoAcceptFiles, { Allows the editor accept OLE file drops }
@@ -24,36 +69,30 @@ type
   );
   TBCEditorOptions = set of TBCEditorOption;
 
-  TBCEditorTextEntryMode = (temInsert, temOverwrite);
+  TBCEditorRangeItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
 
-  TBCEditorTabOption = (
-    toPreviousLineIndent,
-    toSelectedBlockIndent,
-    toTabsToSpaces
+  TBCEditorRangeType = (
+    ttUnspecified,
+    ttAddress,
+    ttAssemblerComment,
+    ttAssemblerReservedWord,
+    ttAttribute,
+    ttBlockComment,
+    ttCharacter,
+    ttDirective,
+    ttHexNumber,
+    ttHighlightedBlock,
+    ttHighlightedBlockSymbol,
+    ttLineComment,
+    ttMethod,
+    ttMethodName,
+    ttNumber,
+    ttReservedWord,
+    ttString,
+    ttSymbol
   );
 
-  TBCEditorSelectionOption = (
-    soExpandRealNumbers,
-    soToEndOfLine,
-    soTripleClickLineSelect
-  );
-
-  TBCEditorReplaceChanges = (
-    rcEngineUpdate
-  );
-
-  TBCEditorSearchOption = (
-    soBackwards,
-    soCaseSensitive,
-    soEntireScope,
-    soWholeWordsOnly,
-    soWrapAround
-  );
-  TBCEditorSyncEditOption = (
-    seoButton,
-    seoCaseSensitive
-  );
-  TBCEditorSyncEditOptions = set of TBCEditorSyncEditOption;
+  TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
 
   TBCEditorReplaceOption = (
     roCaseSensitive,
@@ -63,34 +102,54 @@ type
     roWholeWordsOnly,
     roWrapAround
   );
+  TBCEditorReplaceOptions = set of TBCEditorReplaceOption;
 
   TBCEditorSearchEngine = (
     seNormal,
     seRegularExpression
   );
 
-  TBCEditorSearchMapOption = (
-    moShowActiveLine
+  TBCEditorSearchOption = (
+    soBackwards,
+    soCaseSensitive,
+    soEntireScope,
+    soWholeWordsOnly,
+    soWrapAround
+  );
+  TBCEditorSearchOptions = set of TBCEditorSearchOption;
+
+  TBCEditorSelectionOption = (
+    soDoubleClickRealNumbers,
+    soHighlightWholeLine,
+    soTripleClickLineSelect
+  );
+  TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
+
+  TBCEditorSyncEditOption = (
+    seoButton,
+    seoCaseSensitive
+  );
+  TBCEditorSyncEditOptions = set of TBCEditorSyncEditOption;
+
+  TBCEditorTabOption = (
+    toPreviousLineIndent,
+    toSelectedBlockIndent,
+    toTabsToSpaces
+  );
+  TBCEditorTabOptions = set of TBCEditorTabOption;
+
+  TBCEditorTextEntryMode = (
+    temInsert,
+    temOverwrite
   );
 
-  TBCEditorCompletionProposalOption = (
-    cpoAutoInvoke,
-    cpoAutoConstraints,
-    cpoAddHighlighterKeywords,
-    cpoCaseSensitive,
-    cpoFiltered,
-    cpoParseItemsFromText,
-    cpoResizeable,
-    cpoShowShadow,
-    cpoUseHighlighterColumnFont
+  TBCEditorUndoOption = (
+    uoGroupUndo,
+    uoUndoAfterLoad,
+    uoUndoAfterSave
   );
+  TBCEditorUndoOptions = set of TBCEditorUndoOption;
 
-  TBCEditorLeftMarginBookMarkPanelOption = (
-    bpoToggleBookmarkByClick,
-    bpoToggleMarkByClick
-  );
-
-  PBCEditorLinesPosition = ^TBCEditorLinesPosition;
   TBCEditorLinesPosition = packed record
     Char: Integer;
     Line: Integer;
@@ -125,73 +184,6 @@ type
     class operator NotEqual(a, b: TBCEditorRowsPosition): Boolean; inline;
     function ToString(): string; inline;
   end;
-
-  TBCEditorBreakType = (
-    btUnspecified,
-    btAny,
-    btTerm
-  );
-  TBCEditorRangeType = (
-    ttUnspecified,
-    ttAddress,
-    ttAssemblerComment,
-    ttAssemblerReservedWord,
-    ttAttribute,
-    ttBlockComment,
-    ttCharacter,
-    ttDirective,
-    ttHexNumber,
-    ttHighlightedBlock,
-    ttHighlightedBlockSymbol,
-    ttLineComment,
-    ttMethod,
-    ttMethodName,
-    ttNumber,
-    ttReservedWord,
-    ttString,
-    ttSymbol
-  );
-
-  TBCEditorLeftMarginLineNumberOption = (
-    lnoIntens,
-    lnoAfterLastLine
-  );
-
-  TBCEditorSearchMapAlign = (saLeft, saRight);
-
-  TBCEditorUndoOption = (
-    uoGroupUndo,
-    uoUndoAfterLoad,
-    uoUndoAfterSave
-  );
-
-  TBCEditorCase = (cNone = -1, cUpper = 0, cLower = 1, cOriginal = 2);
-
-  TBCEditorKeyCharType = (ctFoldOpen, ctFoldClose, ctSkipOpen, ctSkipClose);
-
-  TBCEditorSortOrder = (soAsc, soDesc);
-
-  TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
-
-  TBCEditorCodeFoldingOption = (
-    cfoFoldMultilineComments,
-    cfoHighlightFoldingLine,
-    cfoHighlightIndentGuides,
-    cfoShowTreeLine
-  );
-
-  TBCEditorCodeFoldingOptions = set of TBCEditorCodeFoldingOption;
-  TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
-  TBCEditorLeftMarginLineNumberOptions = set of TBCEditorLeftMarginLineNumberOption;
-  TBCEditorSearchOptions = set of TBCEditorSearchOption;
-  TBCEditorSearchMapOptions = set of TBCEditorSearchMapOption;
-  TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
-  TBCEditorReplaceOptions = set of TBCEditorReplaceOption;
-  TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
-  TBCEditorTabOptions = set of TBCEditorTabOption;
-  TBCEditorUndoOptions = set of TBCEditorUndoOption;
-
-  TBCEditorRangeItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
 
   TBCEditorCaretChangedEvent = procedure(ASender: TObject; ACaretPos: TPoint) of object;
   TBCEditorContextHelpEvent = procedure(ASender: TObject; AWord: string) of object;

@@ -7,7 +7,7 @@ uses
   Classes, Types,
   Forms, Controls, Graphics, StdCtrls,
   BCEditor.Types,
-  BCEditor.Editor.CompletionProposal;
+  BCEditor.Properties;
 
 type
   TBCEditorCompletionProposalPopup = class(TCustomControl)
