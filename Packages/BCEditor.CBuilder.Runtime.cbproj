@@ -125,14 +125,8 @@
         <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
             <BuildOrder>2</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.ActiveLine.pas">
-            <BuildOrder>3</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.pas">
             <BuildOrder>7</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.CompletionProposal.pas">
-            <BuildOrder>8</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas">
             <BuildOrder>9</BuildOrder>
@@ -140,32 +134,8 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.KeyCommands.pas">
             <BuildOrder>12</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.LeftMargin.pas">
-            <BuildOrder>13</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.MatchingPair.pas">
-            <BuildOrder>15</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.pas">
             <BuildOrder>17</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Replace.pas">
-            <BuildOrder>19</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Search.pas">
-            <BuildOrder>22</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Selection.pas">
-            <BuildOrder>23</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.SpecialChars.pas">
-            <BuildOrder>24</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.SyncEdit.pas">
-            <BuildOrder>25</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.Tabs.pas">
-            <BuildOrder>26</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
             <BuildOrder>30</BuildOrder>
@@ -190,6 +160,9 @@
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Print.Preview.pas">
             <BuildOrder>38</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\Source\BCEditor.Properties.pas">
+            <BuildOrder>39</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Types.pas">
             <BuildOrder>40</BuildOrder>
