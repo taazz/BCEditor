@@ -2867,6 +2867,7 @@ begin
   else
     LPoint := RowsToClient(FRows.CaretPosition, True);
   Inc(LPoint.Y, FLineHeight);
+  LPoint := ClientToScreen(LPoint);
 
   FCompletionProposalPopup := TBCEditorCompletionProposalPopup.Create(Self);
   with FCompletionProposalPopup do
@@ -9151,13 +9152,22 @@ var
         LTokenPos := @LTokenText[1];
         LTokenEndPos := @LTokenText[Length(LTokenText)];
         while (LTokenPos <= LTokenEndPos) do
+        begin
           LSkipOpenKeyChars := LSkipOpenKeyChars + [LTokenPos^];
+          Inc(LTokenPos);
+        end;
 
         LTokenText := LSkipRegionItem.CloseToken;
-        LTokenPos := @LTokenText[1];
-        LTokenEndPos := @LTokenText[Length(LTokenText)];
-        while (LTokenPos <= LTokenEndPos) do
-          LSkipCloseKeyChars := LSkipCloseKeyChars + [LTokenPos^];
+        if (LTokenText <> '') then
+        begin
+          LTokenPos := @LTokenText[1];
+          LTokenEndPos := @LTokenText[Length(LTokenText)];
+          while (LTokenPos <= LTokenEndPos) do
+          begin
+            LSkipCloseKeyChars := LSkipCloseKeyChars + [LTokenPos^];
+            Inc(LTokenPos);
+          end;
+        end;
       end;
     end;
   end;
@@ -9219,7 +9229,6 @@ begin
 
           { Skip regions - Open }
           if (CharInSet(LLinePos^, LSkipOpenKeyChars)) then
-          begin
             for LIndex := 0 to FHighlighter.CompletionProposalSkipRegions.Count - 1 do
             begin
               LSkipRegionItem := FHighlighter.CompletionProposalSkipRegions[LIndex];
@@ -9251,7 +9260,6 @@ begin
                 { Skip region open not found, return pointer back }
               end;
             end;
-          end;
 
           if LOpenTokenSkipFoldRangeList.Count = 0 then
           begin
@@ -9266,7 +9274,7 @@ begin
               LWord := ''
             end;
           end;
-          LLinePos := LLineEndPos;
+          LLinePos := LLineEndPos + 1;
         end;
         if (Length(LWord) > 1) then
           if Pos(LWord + FLines.LineBreak, LWordList) = 0 then { No duplicates }
