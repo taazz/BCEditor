@@ -20,6 +20,7 @@ resourcestring
   SBCEditorSearchWrapAroundTitle = 'Search match not found';
   SBCEditorSearchWrapAroundForwards = 'Restart search from the beginning of the file?';
   SBCEditorSearchWrapAroundBackwards = 'Restart search from the ending of the file?';
+  SBCEditorTerminatedByUser = 'Terminated by user';
 
   { BCEditor.MacroRecorder }
   SBCEditorCannotRecord = 'Cannot record macro; already recording or playing';

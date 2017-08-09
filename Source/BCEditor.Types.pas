@@ -95,10 +95,12 @@ type
   TBCEditorReplaceAction = (raCancel, raSkip, raReplace, raReplaceAll);
 
   TBCEditorReplaceOption = (
+    roBackwards,
     roCaseSensitive,
     roEntireScope,
     roPrompt,
     roReplaceAll,
+    roSelection,
     roWholeWordsOnly,
     roWrapAround
   );
@@ -191,6 +193,7 @@ type
   TBCEditorKeyPressWEvent = procedure(ASender: TObject; var AKey: Char) of object;
   TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;
   TBCEditorMouseCursorEvent = procedure(ASender: TObject; const ALineCharPos: TBCEditorLinesPosition; var ACursor: TCursor) of object;
+  TBCEditorReplacePromptEvent = procedure(ASender: TObject; const AArea: TBCEditorLinesArea; const AReplaceText: string; var AAction: TBCEditorReplaceAction) of object;
 
   TBCEditorTerminatedFunc = function(): Boolean of object;
 

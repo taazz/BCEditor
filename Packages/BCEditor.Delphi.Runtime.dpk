@@ -37,7 +37,7 @@ contains
   BCEditor.Consts in '..\Source\BCEditor.Consts.pas',
   BCEditor.Editor in '..\Source\BCEditor.Editor.pas',
   BCEditor.Editor.CodeFolding in '..\Source\BCEditor.Editor.CodeFolding.pas',
-  BCEditor.Editor.CompletionProposal.PopupWindow in '..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas',
+  BCEditor.CompletionProposal in '..\Source\BCEditor.CompletionProposal.pas',
   BCEditor.Editor.KeyCommands in '..\Source\BCEditor.Editor.KeyCommands.pas',
   BCEditor.Export.HTML in '..\Source\BCEditor.Export.HTML.pas',
   BCEditor.Highlighter in '..\Source\BCEditor.Highlighter.pas',

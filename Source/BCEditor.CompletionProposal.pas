@@ -1,4 +1,4 @@
-unit BCEditor.Editor.CompletionProposal.PopupWindow;
+unit BCEditor.CompletionProposal;
 
 interface {********************************************************************}
 

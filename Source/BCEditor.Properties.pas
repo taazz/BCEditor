@@ -362,13 +362,10 @@ type
     property Enabled: Boolean read FEnabled write SetEnabled default True;
   end;
 
-  TBCEditorReplacePromptEvent = procedure(ASender: TObject; const APattern, AReplaceText: string; var AAction: TBCEditorReplaceAction) of object;
-
   TBCEditorReplace = class(TPersistent)
   strict private const
     DefaultOptions = [];
   strict private
-    FArea: TBCEditorLinesArea;
     FEngine: TBCEditorSearchEngine;
     FOnChange: TNotifyEvent;
     FOptions: TBCEditorReplaceOptions;
@@ -378,7 +375,6 @@ type
     procedure SetOptions(const AValue: TBCEditorReplaceOptions);
     procedure DoChange();
   protected
-    property Area: TBCEditorLinesArea read FArea write FArea;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     procedure Assign(ASource: TPersistent); override;
@@ -1344,7 +1340,6 @@ constructor TBCEditorReplace.Create();
 begin
   inherited;
 
-  FArea := InvalidLinesArea;
   FEngine := seNormal;
   FOptions := DefaultOptions;
 end;

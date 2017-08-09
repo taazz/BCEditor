@@ -127,10 +127,10 @@
         <PackageImport Include="xmlrtl.bpi">
             <BuildOrder>5</BuildOrder>
         </PackageImport>
-        <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
+        <DelphiCompile Include="..\Source\BCEditor.CompletionProposal.pas">
             <BuildOrder>9</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.CompletionProposal.PopupWindow.pas">
+        <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
             <BuildOrder>15</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.KeyCommands.pas">
