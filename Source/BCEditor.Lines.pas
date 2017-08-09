@@ -950,6 +950,16 @@ begin
   else
     FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition),
       FRegEx.Replace(FLines.TextIn[LinesArea(FFoundPosition, LEndPosition)], FPattern, FReplaceText, FRegExOptions), True);
+
+  if (LEndPosition.Line > FFoundPosition.Line) then
+    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char, FArea.EndPosition.Line - (LEndPosition.Line - FFoundPosition.Line))
+  else if (LEndPosition.Line = FArea.EndPosition.Line) then
+    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char - (LEndPosition.Char - FFoundPosition.Char), FArea.EndPosition.Char);
+
+  if (FLines.CaretPosition.Line > FFoundPosition.Line) then
+    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char, FArea.EndPosition.Line + (FLines.CaretPosition.Line - FFoundPosition.Line))
+  else if (FLines.CaretPosition.Line = FArea.EndPosition.Line) then
+    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char + (FLines.CaretPosition.Char - FFoundPosition.Char), FArea.EndPosition.Char);
 end;
 
 { TBCEditorLines.TWordSearch **************************************************}
