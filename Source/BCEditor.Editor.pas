@@ -900,6 +900,12 @@ var
   GImmEnabled: Boolean;
   GPadding: Integer;
 
+function EnumFontsFamiliesProc(var lpelf: TEnumLogFont; var lpntm: TNewTextMetric;
+  FontType: Integer; lParam: LPARAM): Integer; stdcall;
+begin;
+  Result := Integer(lpelf.elfLogFont.lfPitchAndFamily and FIXED_PITCH <> 0);
+end;
+
 { TCustomBCEditor.TDropData ***************************************************}
 
 function TCustomBCEditor.TDropData.Clone(out Enum: IEnumFormatEtc): HResult;
@@ -1518,11 +1524,7 @@ begin
       and ((LRow <= AEndRow) or (AEndRow < 0) and not ATerminated())) do
     begin
       if (FLines.Items[LLine].FirstRow = GRowToInsert) then
-      begin
         Inc(LRow, InsertLineIntoRows(ATerminated, LLine, LRow));
-        FLastBuiltLine := LLine;
-      end;
-      FLastBuiltLine := LLine;
       Inc(LLine);
 
       if (AEndRow < 0) then
@@ -2459,6 +2461,8 @@ begin
 
     for LLine := ALine to FLines.Count - 1 do
       FLines.SetRow(LLine, FLines.Items[LLine].FirstRow - LDeletedRows, FLines.Items[LLine].RowCount);
+
+    Dec(FLastBuiltLine);
   end;
 end;
 
@@ -5089,6 +5093,7 @@ begin
     for LLine := ALine + 1 to FLines.Count - 1 do
       if (FLines.Items[LLine].FirstRow >= 0) then
         FLines.SetRow(LLine, FLines.Items[LLine].FirstRow + Result, FLines.Items[LLine].RowCount);
+    Inc(FLastBuiltLine);
   end;
 end;
 
@@ -5387,7 +5392,7 @@ procedure TCustomBCEditor.LineDeleting(ASender: TObject; const ALine: Integer);
 var
   LRow: Integer;
 begin
-  if (ALine < FLastBuiltLine) then
+  if (ALine <= FLastBuiltLine) then
   begin
     LRow := FLines.Items[ALine].FirstRow + FLines.Items[ALine].RowCount;
     for LRow := LRow to FRows.Count - 1 do
@@ -5416,7 +5421,9 @@ procedure TCustomBCEditor.LineInserted(ASender: TObject; const ALine: Integer);
 var
   LRow: Integer;
 begin
-  if (ALine < FLastBuiltLine) then
+  if (FRows.Count = 0) then
+    InvalidateRows()
+  else if (ALine <= FLastBuiltLine) then
   begin
     SetLinesBeginRanges(ALine);
 
@@ -5574,7 +5581,7 @@ var
   LNewRowCount: Integer;
   LOldRowCount: Integer;
 begin
-  if ((ALine < FLastBuiltLine) or (ALine = FLines.Count - 1)) then
+  if (ALine <= FLastBuiltLine) then
   begin
     SetLinesBeginRanges(ALine);
 
@@ -6090,6 +6097,11 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
             LRect.Top,
             LOptions, LRect, PChar(LText), Length(LText), nil);
         end;
+      cjMouseDown:
+        if ((MouseCapture in [mcNone, mcLineNumbers])
+          and LRect.Contains(AMousePoint) and not FSyncEditButtonRect.Contains(AMousePoint)
+          and (ALine >= 0)) then
+          SetCaretAndSelection(FLines.BOLPosition[ALine + 1], LinesArea(FLines.BOLPosition[ALine], FLines.BOLPosition[ALine + 1]));
       cjMouseMove:
         if ((MouseCapture in [mcNone, mcLineNumbers])
           and LRect.Contains(AMousePoint) and not FSyncEditButtonRect.Contains(AMousePoint)) then
@@ -6117,6 +6129,9 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
           and (csOpaque in ControlStyle)) then
         begin
           if (ARow < FRows.Count) then
+          begin
+            if (ALine >= FLines.Count) then
+              Write; {$MESSAGE 'Nils'}
             case (FLines.Items[ALine].State) of
               lsModified:
                 if (FLeftMargin.Colors.LineStateModified <> clNone) then
@@ -6138,6 +6153,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
                 else
                   FPaintHelper.BackgroundColor := Color;
             end
+          end
           else
             if (FLeftMargin.Colors.Background <> clNone) then
               FPaintHelper.BackgroundColor := FLeftMargin.Colors.Background
@@ -9686,12 +9702,6 @@ begin
         or (LHorzScrollInfo.nMax >= Integer(LHorzScrollInfo.nPage)));
 
   FState := FState - [esScrollBarsInvalid];
-end;
-
-function EnumFontsFamiliesProc(var lpelf: TEnumLogFont; var lpntm: TNewTextMetric;
-  FontType: Integer; lParam: LPARAM): Integer; stdcall;
-begin;
-  Result := Integer(lpelf.elfLogFont.lfPitchAndFamily and FIXED_PITCH <> 0);
 end;
 
 procedure TCustomBCEditor.WMChar(var AMessage: TWMChar);

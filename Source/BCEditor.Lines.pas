@@ -2619,14 +2619,14 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
     end;
 
     case (AUndoType) of
-      utInsert: LArea := LinesArea(AArea.BeginPosition, InvalidLinesPosition);
+      utInsert: LArea := LinesArea(AArea.BeginPosition, Result);
       utReplace: LArea := LinesArea(AArea.BeginPosition, Result);
       utBackspace,
-      utDelete: LArea := AArea;
+      utDelete: LArea := LinesArea(AArea.BeginPosition, InvalidLinesPosition);
       else raise ERangeError.Create('UndoType: ' + IntToStr(Ord(AUndoType)));
     end;
 
-    UndoList.Push(utReplace, LCaretPosition, LSelArea,
+    UndoList.Push(AUndoType, LCaretPosition, LSelArea,
       LArea, LText);
   end;
 
