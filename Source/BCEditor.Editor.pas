@@ -6130,8 +6130,6 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
         begin
           if (ARow < FRows.Count) then
           begin
-            if (ALine >= FLines.Count) then
-              Write; {$MESSAGE 'Nils'}
             case (FLines.Items[ALine].State) of
               lsModified:
                 if (FLeftMargin.Colors.LineStateModified <> clNone) then
