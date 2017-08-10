@@ -66,7 +66,7 @@ type
     TClientJob = (cjTokenWidth, cjPaint, cjMouseDown, cjMouseDouble, cjMouseTriple,
       cjMouseMove, cjMouseUp, cjHint, cjScrolling);
 
-    TIdleJob = (ijBuildRows, ijUpdateScrollBars, ijScanMatchingPair, ijSyncEditAvailable);
+    TIdleJob = (ijBuildRows, ijUpdateScrollBars);
     TIdleJobs = set of TIdleJob;
 
     TMouseCapture = (mcNone, mcSyncEditButton, mcMarks, mcLineNumbers,
@@ -251,8 +251,6 @@ type
     FMarksPanelPopupMenu: TPopupMenu;
     FMarksPanelRect: TRect;
     FMarksPanelWidth: Integer;
-    FMatchedPairCloseArea: TBCEditorLinesArea;
-    FMatchedPairOpenArea: TBCEditorLinesArea;
     FMatchingPair: TBCEditorMatchingPair;
     FMaxDigitWidth: Integer;
     FMinusSignWidth: Integer;
@@ -311,7 +309,6 @@ type
     FSpecialCharsSpaceText: string;
     FState: TState;
     FSyncEdit: TBCEditorSyncEdit;
-    FSyncEditAvailable: Boolean;
     FSyncEditButtonHotBitmap: TGPCachedBitmap;
     FSyncEditButtonNormalBitmap: TGPCachedBitmap;
     FSyncEditButtonPressedBitmap: TGPCachedBitmap;
@@ -338,7 +335,7 @@ type
     function AskSearchWrapAround(): Boolean;
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarksChanged(ASender: TObject);
-    procedure BuildRows(const ACanvas: TCanvas; const AEndRow: Integer);
+    procedure BuildRows(const ATerminated: TBCEditorTerminatedFunc; const AEndRow: Integer = -1);
     function ClientToLines(const X, Y: Integer; const AForCaret: Boolean = False): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
     function ClientToRows(const X, Y: Integer; const AForCaret: Boolean = False): TBCEditorRowsPosition;
     procedure CMSysFontChanged(var AMessage: TMessage); message CM_SYSFONTCHANGED;
@@ -441,7 +438,8 @@ type
     function IdleTerminated(): Boolean;
     procedure InsertLine();
     procedure InsertLineIntoRows(const ALine: Integer; const ANewLine: Boolean); overload;
-    function InsertLineIntoRows(const ALine: Integer; const ARow: Integer): Integer; overload;
+    function InsertLineIntoRows(const ATerminated: TBCEditorTerminatedFunc;
+      const ALine: Integer; const ARow: Integer): Integer; overload;
     procedure InvalidateCaret();
     procedure InvalidateCodeFolding();
     procedure InvalidateOverlays();
@@ -466,11 +464,13 @@ type
     procedure LinesSyncEditChanged(ASender: TObject);
     procedure MarksChanged(ASender: TObject);
     procedure MatchingPairChanged(ASender: TObject);
+    procedure MatchingPairScanned(const AData: Pointer);
     procedure MoveCaretAndSelection(const ABeforeLinesPosition, AAfterLinesPosition: TBCEditorLinesPosition;
       const ASelect: Boolean);
     procedure MoveCaretHorizontally(const AColumns: Integer; const ASelect: Boolean);
     procedure MoveCaretVertically(const ARows: Integer; const ASelect: Boolean);
     function NextWordPosition(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
+    function NotTerminated(): Boolean; inline;
     function PreviousWordPosition(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     function ProcessClient(const AJob: TClientJob;
       const APaintVar: PPaintVar; const AClipRect: TRect;
@@ -494,7 +494,6 @@ type
     function RowsToText(ARowsPosition: TBCEditorRowsPosition;
       const AVisibleOnly: Boolean = False): TPoint;
     procedure ScanCodeFolding();
-    function ScanMatchingPair(const AInterrupted: TBCEditorTerminatedFunc): Boolean;
     procedure ScrollToCaret();
     procedure SearchChanged(ASender: TObject);
     procedure SetActiveLine(const AValue: TBCEditorActiveLine);
@@ -537,6 +536,7 @@ type
     procedure SpecialCharsChanged(ASender: TObject);
     procedure SyncEditActivated(const AData: Pointer);
     procedure SyncEditChanged(ASender: TObject);
+    procedure SyncEditChecked(const AData: Pointer);
     procedure TabsChanged(ASender: TObject);
     function TokenColumns(const AText: PChar; const ALength, AColumn: Integer): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function TokenWidth(const AText: PChar; const ALength: Integer;
@@ -1490,16 +1490,18 @@ begin
     InvalidateRect(FMarksPanelRect);
 end;
 
-procedure TCustomBCEditor.BuildRows(const ACanvas: TCanvas;
-   const AEndRow: Integer);
+procedure TCustomBCEditor.BuildRows(const ATerminated: TBCEditorTerminatedFunc;
+  const AEndRow: Integer = -1);
 var
   LCodeFolding: Integer;
+  LLastUpdateScrollBars: Integer;
   LLine: Integer;
   LRange: TBCEditorCodeFolding.TRanges.TRange;
   LRow: Integer;
+  LTickCount: Integer;
 begin
   Include(FState, esBuildingRows);
-  FPaintHelper.BeginDrawing(ACanvas);
+  FPaintHelper.BeginDrawing(Canvas);
   try
     for LCodeFolding := 0 to FAllCodeFoldingRanges.AllCount - 1 do
     begin
@@ -1509,18 +1511,29 @@ begin
           FLines.SetRow(LLine, -1, 0);
     end;
 
+    LLastUpdateScrollBars := 0;
     LRow := FRows.Count;
     LLine := FLastBuiltLine + 1;
     while ((LLine < FLines.Count)
-      and ((AEndRow < 0) or (LRow <= AEndRow))) do
+      and ((LRow <= AEndRow) or (AEndRow < 0) and not ATerminated())) do
     begin
       if (FLines.Items[LLine].FirstRow = GRowToInsert) then
       begin
-        Inc(LRow, InsertLineIntoRows(LLine, LRow));
+        Inc(LRow, InsertLineIntoRows(ATerminated, LLine, LRow));
         FLastBuiltLine := LLine;
       end;
       FLastBuiltLine := LLine;
       Inc(LLine);
+
+      if (AEndRow < 0) then
+      begin
+        LTickCount := GetTickCount();
+        if (LTickCount >= LLastUpdateScrollBars + GClientRefreshTime) then
+        begin
+          LLastUpdateScrollBars := LTickCount;
+          UpdateScrollBars();
+        end;
+      end;
     end;
   finally
     FPaintHelper.EndDrawing();
@@ -1668,7 +1681,7 @@ var
   LWidths: array of Integer;
   LX: Integer;
 begin
-  LRow := Max(0, TopRow + Y div LineHeight);
+  LRow := Max(0, FTopRow + Y div LineHeight);
 
   if (X <= FTextRect.Left) then
     Result := RowsPosition(0, LRow)
@@ -2191,8 +2204,6 @@ begin
   FInsertPos := InvalidPos;
   FInsertPosBitmap := nil;
   FInsertPosCache := nil;
-  FMatchedPairOpenArea := InvalidLinesArea;
-  FMatchedPairCloseArea := InvalidLinesArea;
   FMouseCapture := mcNone;
   FNoParentNotify := False;
   FLastCursorPoint := Point(-1, -1);
@@ -2289,7 +2300,6 @@ begin
   { Sync edit }
   FSyncEdit := TBCEditorSyncEdit.Create();
   FSyncEdit.OnChange := SyncEditChanged;
-  FSyncEditAvailable := False;
   { FLeftMargin }
   FLeftMargin := TBCEditorLeftMargin.Create(Self);
   FLeftMargin.OnChange := LeftMarginChanged;
@@ -2974,7 +2984,7 @@ var
   LSearch: TBCEditorLines.TSearch;
   LSearchArea: TBCEditorLinesArea;
 begin
-  if (not FLines.SelArea.IsEmpty()) then
+  if ((soSelection in FSearch.Options) and not FLines.SelArea.IsEmpty()) then
     FFindArea := FLines.SelArea
   else
     FFindArea := FLines.Area;
@@ -3006,8 +3016,9 @@ begin
     Search.Pattern);
 
   FLines.StartSearch(LSearch, FFindPosition, False, True, FindExecuted);
-  Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   UpdateCursor();
+
+  Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
 end;
 
 function TCustomBCEditor.DoFindForward(const APosition: TBCEditorLinesPosition;
@@ -3319,10 +3330,10 @@ begin
   case (ACommand) of
     ecPageTop,
     ecSelectionPageTop:
-      LNewRow := TopRow;
+      LNewRow := FTopRow;
     ecPageBottom,
     ecSelectionPageBottom:
-      LNewRow := TopRow + FUsableRows - 1;
+      LNewRow := FTopRow + FUsableRows - 1;
     else raise ERangeError.Create('ACommand: ' + IntToStr(Ord(ACommand)));
   end;
 
@@ -3344,14 +3355,12 @@ var
   LSearch: TBCEditorLines.TSearch;
   LSearchPosition: TBCEditorLinesPosition;
 begin
-  if ((roSelection in FReplace.Options)) then
+  if ((roSelection in FReplace.Options) and not FLines.SelArea.IsEmpty()) then
     LArea := FLines.SelArea
   else
     LArea := FLines.Area;
-  if (not (roEntireScope in FReplace.Options)) then
-    if ((roSelection in FReplace.Options) and not FLines.SelArea.Contains(FLines.CaretPosition)) then
-      LArea := InvalidLinesArea
-    else if (roBackwards in FReplace.Options) then
+  if (not (roEntireScope in FReplace.Options) and not (roSelection in FReplace.Options)) then
+    if (roBackwards in FReplace.Options) then
       LArea.EndPosition := FLines.CaretPosition
     else
       LArea.BeginPosition := FLines.CaretPosition;
@@ -3366,12 +3375,16 @@ begin
 
     if (FLines.Count = 0) then
       LSearchPosition := FLines.BOFPosition
-    else
+    else if (not (roSelection in FReplace.Options)) then
     begin
       LSearchPosition := FLines.CaretPosition;
       LSearchPosition.Line := Min(LSearchPosition.Line, FLines.Count - 1);
       LSearchPosition.Char := Min(LSearchPosition.Char, Length(FLines[LSearchPosition.Line]));
-    end;
+    end
+    else if (roBackwards in FReplace.Options) then
+      LSearchPosition := FLines.SelArea.EndPosition
+    else
+      LSearchPosition := FLines.SelArea.BeginPosition;
 
     FLines.StartSearch(LSearch, LSearchPosition, roReplaceAll in FReplace.Options, True, ReplaceExecuted);
   end;
@@ -3491,10 +3504,11 @@ begin
     ecActivateSyncEdit:
       begin
         FLines.ActivateSyncEdit(FHighlighter, SyncEditActivated);
-        Sleep(GClientRefreshTime); // If activation is fast enough, prevent double painting
-
         UpdateCursor();
+
         InvalidateText();
+
+        Sleep(GClientRefreshTime); // If activation is fast enough, prevent double painting
       end;
     ecDeactivateSyncEdit:
       begin
@@ -4010,7 +4024,7 @@ end;
 
 procedure TCustomBCEditor.EMGetThumb(var AMessage: TMessage);
 begin
-  AMessage.Result := TopRow * FLineHeight;
+  AMessage.Result := FTopRow * FLineHeight;
 end;
 
 procedure TCustomBCEditor.EMLineFromChar(var AMessage: TMessage);
@@ -4320,11 +4334,15 @@ begin
     FSearch.Options := FSearch.Options - [soBackwards]
   else
     FSearch.Options := FSearch.Options + [soBackwards];
-  FSearch.Options := FSearch.Options - [soEntireScope];
   if (frMatchCase in TFindDialog(Sender).Options) then
     FSearch.Options := FSearch.Options + [soCaseSensitive]
   else
     FSearch.Options := FSearch.Options - [soCaseSensitive];
+  FSearch.Options := FSearch.Options - [soEntireScope];
+  if (FLines.SelArea.IsEmpty()) then
+    FSearch.Options := FSearch.Options - [soSelection]
+  else
+    FSearch.Options := FSearch.Options + [soSelection];
   if (frWholeWord in TFindDialog(Sender).Options) then
     FSearch.Options := FSearch.Options + [soWholeWordsOnly]
   else
@@ -4766,13 +4784,9 @@ end;
 
 procedure TCustomBCEditor.Idle();
 // Will be executed after painting
-var
-  LLastUpdateScrollBars: Integer;
-  LTickCount: Integer;
 begin
-  LLastUpdateScrollBars := 0;
   FIdleTerminated := False;
-  while ((FPendingJobs <> []) and not FIdleTerminated) do
+  while (not FIdleTerminated and (FPendingJobs <> [])) do
   begin
     if (ijUpdateScrollBars in FPendingJobs) then
     begin
@@ -4780,34 +4794,10 @@ begin
         UpdateScrollBars();
       Exclude(FPendingJobs, ijUpdateScrollBars);
     end
-    else if (ijScanMatchingPair in FPendingJobs) then
-    begin
-      if (esMatchedPairInvalid in FState) then
-        ScanMatchingPair(IdleTerminated);
-      if (not FIdleTerminated) then
-        Exclude(FPendingJobs, ijScanMatchingPair);
-    end
-    else if (ijSyncEditAvailable in FPendingJobs) then
-    begin
-      if (esSyncEditInvalid in FState) then
-      begin
-        FSyncEditAvailable := FLines.SyncEditAvailable(FHighlighter, IdleTerminated);
-        if (FSyncEditAvailable) then
-          InvalidateSyncEditButton();
-      end;
-      if (not FIdleTerminated) then
-        Exclude(FPendingJobs, ijSyncEditAvailable);
-    end
     else if (ijBuildRows in FPendingJobs) then
     begin
       Exclude(FPendingJobs, ijBuildRows);
-      BuildRows(Canvas, FRows.Count);
-      LTickCount := GetTickCount();
-      if (LTickCount >= LLastUpdateScrollBars + GClientRefreshTime) then
-      begin
-        LLastUpdateScrollBars := GetTickCount();
-        UpdateScrollBars();
-      end;
+      BuildRows(IdleTerminated);
     end
     else
     begin
@@ -4881,7 +4871,7 @@ begin
     else
       LRow := FRows.Count;
 
-    LInsertedRows := InsertLineIntoRows(ALine, LRow);
+    LInsertedRows := InsertLineIntoRows(NotTerminated, ALine, LRow);
 
     if (not (esCaretInvalid in FState)
       and (FLines.CaretPosition.Line >= ALine)) then
@@ -4896,7 +4886,8 @@ begin
   end;
 end;
 
-function TCustomBCEditor.InsertLineIntoRows(const ALine: Integer; const ARow: Integer): Integer;
+function TCustomBCEditor.InsertLineIntoRows(const ATerminated: TBCEditorTerminatedFunc;
+  const ALine: Integer; const ARow: Integer): Integer;
 // Long lines will be splitted into multiple parts to proceed the painting
 // faster.
 const
@@ -4913,6 +4904,7 @@ var
   LRowPartList: TList<TRow.TPart>;
   LRowParts: TRow.TParts;
   LRowWidth: Integer;
+  LTerminated: Boolean;
   LToken: TBCEditorHighlighter.TTokenFind;
   LTokenBeginPos: PChar;
   LTokenEndPos: PChar;
@@ -4925,6 +4917,7 @@ var
 begin
   FPaintHelper.BeginDrawing(Canvas);
   try
+    LTerminated := False;
     LRowPart.Char := 0;
     LRowPartList := nil;
     if (not FWordWrap) then
@@ -4953,28 +4946,37 @@ begin
             LRowPart.Char := LToken.Char;
             LRowPart.Column := LColumn;
             LRowPart.Left := LRowWidth;
+
+            LTerminated := ATerminated();
           end;
 
           Inc(LRowWidth, TokenWidth(LToken.Text, LToken.Length, LColumn, LToken));
           Inc(LColumn, TokenColumns(LToken.Text, LToken.Length, LColumn));
-        until (not FHighlighter.FindNextToken(LToken));
+        until (LTerminated or not FHighlighter.FindNextToken(LToken));
 
         if (Assigned(LRowPartList)) then
           LRowPartList.Add(LRowPart);
       end;
 
-      if (not Assigned(LRowPartList)) then
-        FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
-          Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, nil)
+      if (LTerminated) then
+        Result := 0
       else
       begin
-        SetLength(LRowParts, LRowPartList.Count);
-        Move(LRowPartList.List[0], LRowParts[0], LRowPartList.Count * SizeOf(LRowParts[0]));
-        FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
-          Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, LRowParts);
-        LRowPartList.Free();
+        if (not Assigned(LRowPartList)) then
+          FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
+            Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, nil)
+        else
+        begin
+          SetLength(LRowParts, LRowPartList.Count);
+          Move(LRowPartList.List[0], LRowParts[0], LRowPartList.Count * SizeOf(LRowParts[0]));
+          FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
+            Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, LRowParts);
+        end;
+        Result := 1;
       end;
-      Result := 1;
+
+      if (Assigned(LRowPartList)) then
+        LRowPartList.Free();
     end
     else
     begin
@@ -5010,6 +5012,8 @@ begin
             LRowLength := LToken.Length;
             LRowWidth := LTokenWidth;
             LColumn := TokenColumns(LToken.Text, LToken.Length, LColumn);
+
+            LTerminated := ATerminated();
           end
           else
           begin
@@ -5059,23 +5063,33 @@ begin
                 LColumn := TokenColumns(PChar(LTokenRowText), Length(LTokenRowText), LColumn);
               end;
             until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth < FTextRect.Width));
-          end;
-        until (not FHighlighter.FindNextToken(LToken));
 
-      if ((LRowLength > 0) or (FLines.Items[ALine].Text = '')) then
+            LTerminated := ATerminated();
+          end;
+        until (LTerminated or not FHighlighter.FindNextToken(LToken));
+
+      if (not LTerminated and ((LRowLength > 0) or (FLines.Items[ALine].Text = ''))) then
       begin
         FRows.Insert(LRow, LFlags + [rfLastRowOfLine], ALine, LChar, LRowLength, LColumn, LRowWidth, LBeginRange, nil);
         Inc(LRow);
       end;
       Result := LRow - ARow;
     end;
+  finally
+    FPaintHelper.EndDrawing();
+  end;
 
+  if (LTerminated) then
+  begin
+    for LRow := ARow to ARow + Result - 1 do
+      FRows.Delete(ARow);
+  end
+  else
+  begin
     FLines.SetRow(ALine, ARow, Result);
     for LLine := ALine + 1 to FLines.Count - 1 do
       if (FLines.Items[LLine].FirstRow >= 0) then
         FLines.SetRow(LLine, FLines.Items[LLine].FirstRow + Result, FLines.Items[LLine].RowCount);
-  finally
-    FPaintHelper.EndDrawing();
   end;
 end;
 
@@ -5119,9 +5133,10 @@ end;
 
 procedure TCustomBCEditor.InvalidateMatchingPair();
 begin
-  Include(FState, esMatchedPairInvalid);
+  InvalidateText(FLines.MatchedPairOpenArea.BeginPosition.Line);
+  InvalidateText(FLines.MatchedPairCloseArea.BeginPosition.Line);
 
-  ProcessIdle(ijScanMatchingPair);
+  Include(FState, esMatchedPairInvalid);
 end;
 
 procedure TCustomBCEditor.InvalidateOverlays();
@@ -5168,10 +5183,7 @@ end;
 procedure TCustomBCEditor.InvalidateSyncEdit();
 begin
   if (FSyncEdit.Enabled and not FLines.SyncEdit and not FLines.SelArea.IsEmpty()) then
-  begin
     Include(FState, esSyncEditInvalid);
-    ProcessIdle(ijSyncEditAvailable);
-  end;
 end;
 
 procedure TCustomBCEditor.InvalidateSyncEditButton();
@@ -5489,6 +5501,7 @@ begin
         InvalidateText(LLine);
   end;
 
+  InvalidateSyncEditButton();
   InvalidateSyncEdit();
 
   if (UpdateCount > 0) then
@@ -5502,7 +5515,6 @@ procedure TCustomBCEditor.LinesSyncEditChanged(ASender: TObject);
 var
   LLine: Integer;
 begin
-  FSyncEditAvailable := False;
   for LLine := FLines.SyncEditArea.BeginPosition.Line to FLines.SyncEditArea.EndPosition.Line do
     InvalidateText(LLine);
   InvalidateSyncEditButton();
@@ -5613,6 +5625,14 @@ end;
 procedure TCustomBCEditor.MatchingPairChanged(ASender: TObject);
 begin
   InvalidateMatchingPair();
+end;
+
+procedure TCustomBCEditor.MatchingPairScanned(const AData: Pointer);
+begin
+  InvalidateText(FLines.MatchedPairOpenArea.BeginPosition.Line);
+  InvalidateText(FLines.MatchedPairCloseArea.BeginPosition.Line);
+
+  Exclude(FState, esMatchedPairInvalid);
 end;
 
 procedure TCustomBCEditor.MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
@@ -5829,9 +5849,14 @@ begin
     ACommand := ecNone;
 end;
 
+function TCustomBCEditor.NotTerminated(): Boolean;
+begin
+  Result := False;
+end;
+
 procedure TCustomBCEditor.Paint();
 begin
-//  Perform(WM_PAINT, 0, 0);
+  Perform(WM_PAINT, 0, 0);
 end;
 
 procedure TCustomBCEditor.PasteFromClipboard();
@@ -6229,10 +6254,10 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
     if (FLines.SyncEdit) then
     begin
       LRow := LinesToRows(FLines.SyncEditArea.BeginPosition).Row;
-      LRow := Max(LRow, TopRow);
-      LRow := Min(LRow, TopRow + FUsableRows);
+      LRow := Max(LRow, FTopRow);
+      LRow := Min(LRow, FTopRow + FUsableRows);
     end
-    else if (FSyncEditAvailable and not FLines.SelArea.IsEmpty()) then
+    else if (lsSyncEditAvailable in FLines.State) then
       LRow := LinesToRows(FLines.SelArea.EndPosition).Row
     else
       LRow := -1;
@@ -6242,7 +6267,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
     else
     begin
       FSyncEditButtonRect.Left := 2 * GetSystemMetrics(SM_CXEDGE);
-      FSyncEditButtonRect.Top := (LRow - TopRow) * FLineHeight;
+      FSyncEditButtonRect.Top := (LRow - FTopRow) * FLineHeight;
       FSyncEditButtonRect.Right := FSyncEditButtonRect.Left + GetSystemMetrics(SM_CXSMICON);
       FSyncEditButtonRect.Bottom := FSyncEditButtonRect.Top +  GetSystemMetrics(SM_CYSMICON);
 
@@ -6840,8 +6865,8 @@ begin
             until ((APaintVar^.SearchResultIndex = FLines.FoundAreas.Count)
               or (FLines.FoundAreas[APaintVar^.SearchResultIndex].BeginPosition > LEndPosition));
 
-          ApplyPart(FMatchedPairOpenArea, ptMatchingPair);
-          ApplyPart(FMatchedPairCloseArea, ptMatchingPair);
+          ApplyPart(FLines.MatchedPairOpenArea, ptMatchingPair);
+          ApplyPart(FLines.MatchedPairCloseArea, ptMatchingPair);
 
           if (not APaintVar^.SelArea.IsEmpty()) then
             ApplyPart(APaintVar^.SelArea, ptSelection);
@@ -7326,6 +7351,10 @@ begin
     FReplace.Options := FReplace.Options + [roReplaceAll]
   else
     FReplace.Options := FReplace.Options - [roReplaceAll];
+  if (FLines.SelArea.IsEmpty()) then
+    FReplace.Options := FReplace.Options - [roSelection]
+  else
+    FReplace.Options := FReplace.Options + [roSelection];
   if (frWholeWord in TReplaceDialog(ASender).Options) then
     FReplace.Options := FReplace.Options + [roWholeWordsOnly]
   else
@@ -7359,7 +7388,7 @@ begin
   begin
     InvalidateRows();
     if (FVisibleRows > 0) then
-      BuildRows(Canvas, FTopRow + FVisibleRows);
+      BuildRows(nil, FTopRow + FVisibleRows);
   end;
 
   UpdateMetrics();
@@ -8357,36 +8386,6 @@ begin
   end;
 end;
 
-function TCustomBCEditor.ScanMatchingPair(const AInterrupted: TBCEditorTerminatedFunc): Boolean;
-begin
-  Assert(esMatchedPairInvalid in FState);
-
-  InvalidateText(FMatchedPairOpenArea.BeginPosition.Line);
-  InvalidateText(FMatchedPairCloseArea.BeginPosition.Line);
-
-  FMatchedPairOpenArea := InvalidLinesArea;
-  FMatchedPairCloseArea := InvalidLinesArea;
-
-  Result := False;
-
-  if (FMatchingPair.Enabled) then
-  begin
-    if (FLines.ValidPosition(FLines.CaretPosition)) then
-      Result := FLines.ScanMatchingPair(FHighlighter, AInterrupted, FLines.CaretPosition, FMatchedPairOpenArea, FMatchedPairCloseArea);
-
-    if (not Result
-      and (FLines.CaretPosition.Line < FLines.Count)
-      and (0 < FLines.CaretPosition.Char) and (FLines.CaretPosition.Char <= Length(FLines[FLines.CaretPosition.Line]))) then
-      Result := FLines.ScanMatchingPair(FHighlighter, AInterrupted, LinesPosition(FLines.CaretPosition.Char - 1, FLines.CaretPosition.Line), FMatchedPairOpenArea, FMatchedPairCloseArea);
-
-    if (Result) then
-    begin
-      InvalidateText(FMatchedPairOpenArea.BeginPosition.Line);
-      InvalidateText(FMatchedPairCloseArea.BeginPosition.Line);
-    end;
-  end;
-end;
-
 procedure TCustomBCEditor.ScrollToCaret();
 var
   LCaretTextPos: TPoint;
@@ -9265,6 +9264,12 @@ begin
   end;
 end;
 
+procedure TCustomBCEditor.SyncEditChecked(const AData: Pointer);
+begin
+  if (lsSyncEditAvailable in FLines.State) then
+    InvalidateSyncEditButton();
+end;
+
 procedure TCustomBCEditor.TabsChanged(ASender: TObject);
 begin
   if (FWordWrap) then
@@ -9373,12 +9378,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.UMFreeCompletionProposalPopup(var AMessage: TMessage);
-begin
-  if (Assigned(FCompletionProposalPopup)) then
-    FreeAndNil(FCompletionProposalPopup);
-end;
-
 procedure TCustomBCEditor.UMFindAllAreas(var AMessage: TMessage);
 var
   LSearch: TBCEditorLines.TSearch;
@@ -9393,6 +9392,7 @@ begin
     FFindState := fsAllAreas;
 
     FLines.StartSearch(LSearch, FLines.BOFPosition, True, False, FindExecuted);
+
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;
 end;
@@ -9421,8 +9421,15 @@ begin
     FFindState := fsWrappedAround;
 
     FLines.StartSearch(LSearch, FFindPosition, False, True, FindExecuted);
+
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;
+end;
+
+procedure TCustomBCEditor.UMFreeCompletionProposalPopup(var AMessage: TMessage);
+begin
+  if (Assigned(FCompletionProposalPopup)) then
+    FreeAndNil(FCompletionProposalPopup);
 end;
 
 procedure TCustomBCEditor.Undo();
@@ -9554,7 +9561,7 @@ begin
     begin
       DeleteLineFromRows(ALine);
 
-      InsertLineIntoRows(ALine, LRow);
+      InsertLineIntoRows(NotTerminated, ALine, LRow);
     end;
   end;
 end;
@@ -10438,12 +10445,6 @@ var
   LPaintStruct: TPaintStruct;
   LPaintVar: TPaintVar;
 begin
-  if (esMatchedPairInvalid in FState) then
-  begin
-    FMatchedPairOpenArea := InvalidLinesArea;
-    FMatchedPairCloseArea := InvalidLinesArea;
-  end;
-
   BeginPaint(WindowHandle, LPaintStruct);
   try
     if (not LPaintStruct.rcPaint.IsEmpty()) then
@@ -10512,7 +10513,7 @@ begin
         end;
 
         if ((FRows.Count = 0) and (FLines.Count > 0)) then
-          BuildRows(Canvas, TopRow + FVisibleRows);
+          BuildRows(NotTerminated, FTopRow + FVisibleRows);
 
         if (FState * [esScrollBarsInvalid, esSizeChanged] <> []) then
           UpdateScrollBars();
@@ -10522,6 +10523,20 @@ begin
           if (not FNoParentNotify) then
             SendMessage(FParentWnd, WM_COMMAND, EN_UPDATE shl 16 + FDlgCtrlID and $FFFF, LPARAM(WindowHandle));
           Exclude(FState, esTextUpdated);
+        end;
+
+        if (esSyncEditInvalid in FState) then
+        begin
+          if (FSyncEdit.Enabled) then
+            FLines.CheckSyncEdit(FHighlighter, SyncEditChecked);
+          Exclude(FState, esSyncEditInvalid);
+        end;
+
+        if (esMatchedPairInvalid in FState) then
+        begin
+          if (FMatchingPair.Enabled and (FHighlighter.MatchingPairs.Count > 0)) then
+            FLines.StartScanMatchingPair(FHighlighter, MatchingPairScanned);
+          Exclude(FState, esMatchedPairInvalid);
         end;
 
         if (esSyncEditOverlaysInvalid in FState) then
@@ -10683,9 +10698,13 @@ begin
     tiScroll:
       ProcessClient(cjMouseMove, nil, FTextRect, mbLeft, [], FCursorPoint);
     tiIdle:
-      if (not PeekMessage(LMsg, FFormWnd, 0, 0, PM_NOREMOVE)) then
+      if (not PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)) then
       begin
+        if (PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)) then
+          Write;
         KillTimer(WindowHandle, Msg.TimerID);
+        if (PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)) then
+          Write;
         Idle();
       end;
     tiCompletionProposal:

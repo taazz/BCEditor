@@ -115,6 +115,7 @@ type
     soBackwards,
     soCaseSensitive,
     soEntireScope,
+    soSelection,
     soWholeWordsOnly,
     soWrapAround
   );

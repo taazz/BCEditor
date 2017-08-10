@@ -12,7 +12,7 @@ type
   private type
     TJobThread = class(TThread)
     protected type
-      TJob = (tjActivateSyncEdit, tjSearch);
+      TJob = (tjActivateSyncEdit, tjCheckSyncEdit, tjScanMatchingPair, tjSearch);
       TJobs = set of TJob;
       TExecutedProc = procedure(const AData: Pointer) of object;
     private
@@ -71,10 +71,10 @@ type
     TOptions = set of TOption;
 
     TState = set of (lsLoading, lsSaving, lsInserting, lsSearching,
-      lsScanningSyncEdit,
+      lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair,
       lsDontTrim, lsUndo, lsRedo, lsBlockModify,
       lsCaretChanged, lsSelChanged,
-      lsSearch, lsSyncEdit);
+      lsSyncEditAvailable, lsSyncEdit);
 
     TTask = (ltActivateSyncEdit);
 
@@ -252,6 +252,8 @@ type
     FItems: TLines;
     FJobThread: TJobThread;
     FMarks: TMarkList;
+    FMatchedPairCloseArea: TBCEditorLinesArea;
+    FMatchedPairOpenArea: TBCEditorLinesArea;
     FModified: Boolean;
     FOldCaretPosition: TBCEditorLinesPosition;
     FOldSelArea: TBCEditorLinesArea;
@@ -318,6 +320,7 @@ type
       const AExecuteAllways: Boolean); overload;
     procedure ReplaceText(const AArea: TBCEditorLinesArea; const AText: string;
       const AUndoType: TUndoItem.TType; const AExecuteAllways: Boolean = False); overload;
+    procedure ScanMatchingPair(const ATerminated: TBCEditorTerminatedFunc);
     function ScanSyncEdit(const ATerminated: TBCEditorTerminatedFunc;
       const ACheckAvailable: Boolean): Boolean;
     procedure SetCaretPosition(const AValue: TBCEditorLinesPosition);
@@ -334,6 +337,8 @@ type
     function CharIndexOf(const APosition: TBCEditorLinesPosition;
       const ARelativePosition: TBCEditorLinesPosition): Integer; overload;
     procedure ClearUndo();
+    procedure CheckSyncEdit(const AHighlighter: TBCEditorHighlighter;
+      const AExecuted: TJobThread.TExecutedProc);
     function CompareStrings(const S1, S2: string): Integer; override;
     procedure DeactivateSyncEdit(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DeleteIndent(ABeginPosition, AEndPosition: TBCEditorLinesPosition;
@@ -358,10 +363,6 @@ type
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure ReplaceText(const AArea: TBCEditorLinesArea;
       const AText: string); overload; {$IFNDEF Debug} inline; {$ENDIF}
-    function ScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
-      const ATerminated: TBCEditorTerminatedFunc;
-      const APosition: TBCEditorLinesPosition;
-      out AOpenArea, ACloseArea: TBCEditorLinesArea): Boolean;
     procedure SetBackground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetBeginRange(const ALine: Integer; const AValue: Pointer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
@@ -372,6 +373,8 @@ type
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
     procedure Sort(const ABeginLine, AEndLine: Integer; ACompare: TCompare = nil);
+    procedure StartScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
+      const AExecuted: TJobThread.TExecutedProc);
     procedure StartSearch(const ASearch: TSearch; const APosition: TBCEditorLinesPosition;
       const ASearchAll, ABlockModify: Boolean; const AExecuted: TJobThread.TExecutedProc);
     function SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
@@ -395,6 +398,8 @@ type
     property FoundAreas: TList<TBCEditorLinesArea> read FFoundAreas;
     property Items: TLines read FItems;
     property Marks: TMarkList read FMarks;
+    property MatchedPairCloseArea: TBCEditorLinesArea read FMatchedPairCloseArea;
+    property MatchedPairOpenArea: TBCEditorLinesArea read FMatchedPairOpenArea;
     property Modified: Boolean read FModified write SetModified;
     property LineArea[Line: Integer]: TBCEditorLinesArea read GetLineArea;
     property OnAfterUpdate: TNotifyEvent read FOnAfterUpdate write FOnAfterUpdate;
@@ -493,6 +498,10 @@ begin
       case (FJob) of
         tjActivateSyncEdit:
           FLines.ScanSyncEdit(Terminated, False);
+        tjCheckSyncEdit:
+          FLines.ScanSyncEdit(Terminated, True);
+        tjScanMatchingPair:
+          FLines.ScanMatchingPair(Terminated);
         tjSearch:
           FLines.Search(Terminated, Self);
       end;
@@ -808,10 +817,14 @@ begin
     begin
       LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
       if (FFoundPosition.Line = FArea.EndPosition.Line) then
-        LLineLength := Min(LLineLength, FArea.EndPosition.Char + 1);
+        if (FBackwards) then
+          LLineLength := Min(LLineLength, FFoundPosition.Char)
+        else
+          LLineLength := Min(LLineLength, FArea.EndPosition.Char);
 
       if ((LLineLength >= LPatternLength)
-        and (0 <= FFoundPosition.Char) and (FFoundPosition.Char < LLineLength)) then
+        and (FBackwards and (0 < FFoundPosition.Char) and (FFoundPosition.Char <= LLineLength)
+          or not FBackwards and (0 <= FFoundPosition.Char) and (FFoundPosition.Char < LLineLength))) then
       begin
         if (FCaseSensitive) then
           LLineText := FLines.Items[FFoundPosition.Line].Text
@@ -823,7 +836,7 @@ begin
           CharLowerBuff(PChar(LLineText), LLineLength);
         end;
 
-        if (FFoundPosition.Line = FArea.BeginPosition.Line) then
+        if (FBackwards and (FFoundPosition.Line = FArea.BeginPosition.Line)) then
           LLineBeginPos := @LLineText[1 + FArea.BeginPosition.Char]
         else
           LLineBeginPos := @LLineText[1 + FFoundPosition.Char];
@@ -1295,14 +1308,29 @@ begin
   end;
 end;
 
+procedure TBCEditorLines.CheckSyncEdit(const AHighlighter: TBCEditorHighlighter;
+  const AExecuted: TJobThread.TExecutedProc);
+begin
+  if (SelArea.IsEmpty()) then
+    AExecuted(nil)
+  else
+  begin
+    FHighlighter := AHighlighter;
+
+    StartJob(tjCheckSyncEdit, False, AExecuted);
+  end;
+end;
+
 procedure TBCEditorLines.Clear();
 begin
   if (CanModify) then
   begin
     TerminateJob();
     FBookmarks.Clear();
-    FMarks.Clear();
     FFoundAreas.Clear();
+    FMarks.Clear();
+    FMatchedPairOpenArea := InvalidLinesArea;
+    FMatchedPairCloseArea := InvalidLinesArea;
     DeactivateSyncEdit();
 
     InternalClear(True);
@@ -1554,6 +1582,8 @@ begin
 
   FModified := True;
   FFoundAreas.Clear();
+  FMatchedPairOpenArea := InvalidLinesArea;
+  FMatchedPairCloseArea := InvalidLinesArea;
 
   if (Count = 0) then
     CaretPosition := BOFPosition
@@ -1852,6 +1882,8 @@ begin
   begin
     FModified := True;
     FFoundAreas.Clear();
+    FMatchedPairOpenArea := InvalidLinesArea;
+    FMatchedPairCloseArea := InvalidLinesArea;
 
     if (Assigned(FOnUpdated)) then
       FOnUpdated(Self, ALine);
@@ -2322,19 +2354,24 @@ procedure TBCEditorLines.JobExecuted();
 begin
   Assert(Assigned(FJobThread) and not FJobThread.Terminated);
 
-  FState := FState - [lsSearching, lsScanningSyncEdit, lsBlockModify];
+  FState := FState - [lsSearching, lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair, lsBlockModify];
 
   BeginUpdate();
   try
     case (FJobThread.FJob) of
       tjActivateSyncEdit:
-        if (FSyncEditItems.Count > 0) then
         begin
           SetCaretPosition(FSyncEditItems[0].Area.BeginPosition);
           SetSelArea(FSyncEditItems[0].Area);
           if (Assigned(FJobThread.FExecuted)) then
             FJobThread.FExecuted(nil);
         end;
+      tjCheckSyncEdit:
+        begin
+          if (Assigned(FJobThread.FExecuted)) then
+            FJobThread.FExecuted(nil);
+        end;
+      tjScanMatchingPair,
       tjSearch:
         begin
           if (Assigned(FJobThread.FExecuted)) then
@@ -2798,139 +2835,153 @@ begin
   end;
 end;
 
-function TBCEditorLines.ScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
-  const ATerminated: TBCEditorTerminatedFunc;
-  const APosition: TBCEditorLinesPosition;
-  out AOpenArea, ACloseArea: TBCEditorLinesArea): Boolean;
-var
-  LBeginPosition: TBCEditorLinesPosition;
-  LCloseArea: TBCEditorLinesArea;
-  LDeep: Integer;
-  LFoundLengthCloseToken: Integer;
-  LFoundLengthOpenToken: Integer;
-  LMatchingPair: Integer;
-  LOpenArea: TBCEditorLinesArea;
-  LPosition: TBCEditorLinesPosition;
-  LSearchCloseToken: TBCEditorLines.TSearch;
-  LSearchOpenToken: TBCEditorLines.TSearch;
-begin
-  Result := False;
+procedure TBCEditorLines.ScanMatchingPair(const ATerminated: TBCEditorTerminatedFunc);
 
-  for LMatchingPair := 0 to AHighlighter.MatchingPairs.Count - 1 do
-    if (not Result and not ATerminated()) then
-    begin
-      LSearchCloseToken := TBCEditorLines.TSearch.Create(Self,
-        LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
-          LinesPosition(Min(Length(Items[APosition.Line].Text), APosition.Char + Length(AHighlighter.MatchingPairs[LMatchingPair].CloseToken) - 1), APosition.Line)),
-        False, False, False, False, AHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-      LBeginPosition := LSearchCloseToken.Area.BeginPosition;
-      if (LSearchCloseToken.Find(LBeginPosition, LFoundLengthCloseToken)) then
-      begin
-        LCloseArea.BeginPosition := LBeginPosition;
-        LCloseArea.EndPosition := PositionOf(LFoundLengthCloseToken, LCloseArea.BeginPosition);
-
-        LDeep := 0;
-
-        LSearchOpenToken := TBCEditorLines.TSearch.Create(Self,
-          LinesArea(BOFPosition,
-            PositionOf(- 1, LCloseArea.BeginPosition)),
-          False, False, False, True, AHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-        LOpenArea.BeginPosition := LSearchOpenToken.Area.EndPosition;
-
-        LPosition := LSearchOpenToken.Area.EndPosition;
-        while (Result and not ATerminated()
-          and LSearchOpenToken.Find(LOpenArea.BeginPosition, LFoundLengthOpenToken)) do
-        begin
-          LSearchCloseToken.Free();
-          LSearchCloseToken := TBCEditorLines.TSearch.Create(Self,
-            LinesArea(LSearchOpenToken.Area.BeginPosition,
-              LCloseArea.BeginPosition),
-            False, False, False, True, AHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-
-          if (LSearchCloseToken.Find(LPosition, LFoundLengthCloseToken)
-            and (LPosition > LOpenArea.BeginPosition)) then
-          begin
-            Inc(LDeep);
-            LPosition := PositionOf(-1, LPosition);
-            LOpenArea.BeginPosition := LPosition;
-          end
-          else if (LDeep > 0) then
-          begin
-            Dec(LDeep);
-            LPosition := PositionOf(-1, LOpenArea.BeginPosition);
-            LOpenArea.BeginPosition := LPosition;
-          end
-          else
-          begin
-            LOpenArea.EndPosition := PositionOf(LFoundLengthOpenToken, LOpenArea.BeginPosition);
-            Result := True;
-          end;
-        end;
-        LSearchOpenToken.Free();
-      end;
-      LSearchCloseToken.Free();
-    end;
-
-  for LMatchingPair := 0 to AHighlighter.MatchingPairs.Count - 1 do
-    if (not Result and not ATerminated()) then
-    begin
-      LSearchOpenToken := TBCEditorLines.TSearch.Create(Self,
-        LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LMatchingPair].CloseToken)), APosition.Line),
-          LinesPosition(Min(Length(Items[APosition.Line].Text), Min(Length(Items[APosition.Line].Text), APosition.Char + Length(AHighlighter.MatchingPairs[LMatchingPair].OpenToken) - 1)), APosition.Line)),
-        False, False, False, False, AHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-      LBeginPosition := LSearchOpenToken.Area.BeginPosition;
-      if (LSearchOpenToken.Find(LBeginPosition, LFoundLengthOpenToken)) then
-      begin
-        LOpenArea.BeginPosition := LBeginPosition;
-        LOpenArea.EndPosition := PositionOf(1, LOpenArea.BeginPosition);
-
-        LDeep := 0;
-
-        LSearchCloseToken := TBCEditorLines.TSearch.Create(Self,
-          LinesArea(LOpenArea.EndPosition,
-            EOFPosition),
-          False, False, False, False, AHighlighter.MatchingPairs[LMatchingPair].CloseToken);
-        LCloseArea.BeginPosition := LSearchCloseToken.Area.BeginPosition;
-
-        LPosition := LSearchCloseToken.Area.BeginPosition;
-        while (not Result and not ATerminated()
-          and LSearchCloseToken.Find(LCloseArea.BeginPosition, LFoundLengthCloseToken)) do
-        begin
-          LSearchOpenToken.Free();
-          LSearchOpenToken := TBCEditorLines.TSearch.Create(Self,
-            LinesArea(LSearchCloseToken.Area.BeginPosition,
-              LCloseArea.BeginPosition),
-            False, False, False, False, AHighlighter.MatchingPairs[LMatchingPair].OpenToken);
-
-          if (LSearchOpenToken.Find(LPosition, LFoundLengthOpenToken)
-            and (LPosition < LCloseArea.BeginPosition)) then
-          begin
-            Inc(LDeep);
-            LPosition := PositionOf(1, LPosition);
-            LCloseArea.BeginPosition := LPosition;
-          end
-          else if (LDeep > 0) then
-          begin
-            Dec(LDeep);
-            LPosition := PositionOf(1, LCloseArea.BeginPosition);
-            LCloseArea.BeginPosition := LPosition;
-          end
-          else
-          begin
-            LCloseArea.EndPosition := PositionOf(LFoundLengthCloseToken, LCloseArea.BeginPosition);
-            Result := True;
-          end;
-        end;
-        LSearchCloseToken.Free();
-      end;
-      LSearchOpenToken.Free()
-    end;
-
-  if (Result) then
+  function ScanAt(const AHighlighter: TBCEditorHighlighter;
+    const ATerminated: TBCEditorTerminatedFunc;
+    const APosition: TBCEditorLinesPosition;
+    out AOpenArea, ACloseArea: TBCEditorLinesArea): Boolean;
+  var
+    LBeginPosition: TBCEditorLinesPosition;
+    LCloseTokenArea: TBCEditorLinesArea;
+    LCloseTokenFoundLength: Integer;
+    LCloseTokenSearch: TBCEditorLines.TSearch;
+    LDeep: Integer;
+    LIndex: Integer;
+    LOpenTokenArea: TBCEditorLinesArea;
+    LOpenTokenFoundLength: Integer;
+    LOpenTokenSearch: TBCEditorLines.TSearch;
+    LPosition: TBCEditorLinesPosition;
   begin
-    AOpenArea := LOpenArea;
-    ACloseArea := LCloseArea;
+    Result := False;
+
+    for LIndex := 0 to AHighlighter.MatchingPairs.Count - 1 do
+      if (not Result and not ATerminated()) then
+      begin
+        LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
+          LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LIndex].CloseToken)), APosition.Line),
+            LinesPosition(Min(Length(Items[APosition.Line].Text), APosition.Char + Length(AHighlighter.MatchingPairs[LIndex].CloseToken)), APosition.Line)),
+          False, False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
+        LBeginPosition := LCloseTokenSearch.Area.BeginPosition;
+        if (LCloseTokenSearch.Find(LBeginPosition, LCloseTokenFoundLength)) then
+        begin
+          LCloseTokenArea.BeginPosition := LBeginPosition;
+          LCloseTokenArea.EndPosition := PositionOf(LCloseTokenFoundLength, LCloseTokenArea.BeginPosition);
+
+          LDeep := 0;
+
+          LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
+            LinesArea(BOFPosition,
+              LCloseTokenArea.BeginPosition),
+            False, False, False, True, AHighlighter.MatchingPairs[LIndex].OpenToken);
+          LOpenTokenArea.BeginPosition := LOpenTokenSearch.Area.EndPosition;
+
+          LPosition := LOpenTokenSearch.Area.EndPosition;
+          while (not Result and not ATerminated()
+            and LOpenTokenSearch.Find(LOpenTokenArea.BeginPosition, LOpenTokenFoundLength)) do
+          begin
+            LCloseTokenSearch.Free();
+            LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
+              LinesArea(LOpenTokenSearch.Area.BeginPosition,
+                LPosition),
+              False, False, False, True, AHighlighter.MatchingPairs[LIndex].CloseToken);
+
+            if (LCloseTokenSearch.Find(LPosition, LCloseTokenFoundLength)
+              and (LPosition > LOpenTokenArea.BeginPosition)) then
+            begin
+              Inc(LDeep);
+              LOpenTokenArea.BeginPosition := LPosition;
+            end
+            else if (LDeep > 0) then
+            begin
+              Dec(LDeep);
+              LPosition := LOpenTokenArea.BeginPosition;
+              LOpenTokenArea.BeginPosition := LPosition;
+            end
+            else
+            begin
+              LOpenTokenArea.EndPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenArea.BeginPosition);
+              Result := True;
+            end;
+          end;
+          LOpenTokenSearch.Free();
+        end;
+        LCloseTokenSearch.Free();
+      end;
+
+    for LIndex := 0 to AHighlighter.MatchingPairs.Count - 1 do
+      if (not Result and not ATerminated()) then
+      begin
+        LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
+          LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LIndex].CloseToken)), APosition.Line),
+            LinesPosition(Min(Length(Items[APosition.Line].Text), Min(Length(Items[APosition.Line].Text), APosition.Char + Length(AHighlighter.MatchingPairs[LIndex].OpenToken))), APosition.Line)),
+          False, False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
+        LBeginPosition := LOpenTokenSearch.Area.BeginPosition;
+        if (LOpenTokenSearch.Find(LBeginPosition, LOpenTokenFoundLength)) then
+        begin
+          LOpenTokenArea.BeginPosition := LBeginPosition;
+          LOpenTokenArea.EndPosition := PositionOf(1, LOpenTokenArea.BeginPosition);
+
+          LDeep := 0;
+
+          LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
+            LinesArea(LOpenTokenArea.EndPosition,
+              EOFPosition),
+            False, False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
+          LCloseTokenArea.BeginPosition := LCloseTokenSearch.Area.BeginPosition;
+
+          LPosition := LCloseTokenSearch.Area.BeginPosition;
+          while (not Result and not ATerminated()
+            and LCloseTokenSearch.Find(LCloseTokenArea.BeginPosition, LCloseTokenFoundLength)) do
+          begin
+            LOpenTokenSearch.Free();
+            LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
+              LinesArea(LPosition,
+                LCloseTokenSearch.Area.EndPosition),
+              False, False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
+
+            if (LOpenTokenSearch.Find(LPosition, LOpenTokenFoundLength)
+              and (LPosition < LCloseTokenArea.BeginPosition)) then
+            begin
+              Inc(LDeep);
+              LPosition := PositionOf(1, LPosition);
+              LCloseTokenArea.BeginPosition := LPosition;
+            end
+            else if (LDeep > 0) then
+            begin
+              Dec(LDeep);
+              LPosition := PositionOf(1, LCloseTokenArea.BeginPosition);
+              LCloseTokenArea.BeginPosition := LPosition;
+            end
+            else
+            begin
+              LCloseTokenArea.EndPosition := PositionOf(LCloseTokenFoundLength, LCloseTokenArea.BeginPosition);
+              Result := True;
+            end;
+          end;
+          LCloseTokenSearch.Free();
+        end;
+        LOpenTokenSearch.Free()
+      end;
+
+    if (Result) then
+    begin
+      AOpenArea := LOpenTokenArea;
+      ACloseArea := LCloseTokenArea;
+    end;
   end;
+
+var
+  LFound: Boolean;
+begin
+  LFound := False;
+  if (ValidPosition(CaretPosition)) then
+    LFound := ScanAt(FHighlighter, ATerminated, CaretPosition, FMatchedPairOpenArea, FMatchedPairCloseArea);
+
+  if (not LFound
+    and (CaretPosition.Line < Count)
+    and (0 < CaretPosition.Char) and (CaretPosition.Char <= Length(Items[CaretPosition.Line].Text))) then
+    ScanAt(FHighlighter, ATerminated, LinesPosition(CaretPosition.Char - 1, CaretPosition.Line), FMatchedPairOpenArea, FMatchedPairCloseArea);
 end;
 
 function TBCEditorLines.ScanSyncEdit(const ATerminated: TBCEditorTerminatedFunc;
@@ -3056,7 +3107,13 @@ begin
   LWords.Free();
 
   if (ACheckAvailable) then
+  begin
     FSyncEditItems.Clear();
+    if (Result) then
+      Include(FState, lsSyncEditAvailable);
+  end
+  else
+    Assert(FSyncEditItems.Count > 0);
 end;
 
 function TBCEditorLines.Search(const ATerminated: TBCEditorTerminatedFunc;
@@ -3167,6 +3224,9 @@ var
 begin
   Assert(BOFPosition <= AValue);
 
+  FMatchedPairOpenArea := InvalidLinesArea;
+  FMatchedPairCloseArea := InvalidLinesArea;
+
   LValue := AValue;
   if (not (loBeyondEndOfLine in FOptions)) then
     if (LValue.Line < Count) then
@@ -3258,6 +3318,8 @@ var
   LValue: TBCEditorLinesArea;
 begin
   Assert(BOFPosition <= AValue.BeginPosition);
+
+  Exclude(FState, lsSyncEditAvailable);
 
   LValue := AValue;
   if (LValue.BeginPosition.Line < Count) then
@@ -3414,6 +3476,8 @@ procedure TBCEditorLines.StartJob(const AJob: TJobThread.TJob;
 begin
   case (AJob) of
     tjActivateSyncEdit: Include(FState, lsScanningSyncEdit);
+    tjCheckSyncEdit: Include(FState, lsCheckingSyncEdit);
+    tjScanMatchingPair: Include(FState, lsScanningMatchingPair);
     tjSearch: Include(FState, lsSearching);
     else raise ERangeError.Create('AJob: ' + IntToStr(Ord(AJob)));
   end;
@@ -3427,6 +3491,19 @@ begin
     Include(FState, lsBlockModify);
 
   FJobThread.Run(AJob, AExecuted);
+end;
+
+procedure TBCEditorLines.StartScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
+  const AExecuted: TJobThread.TExecutedProc);
+begin
+  if (FSelArea.IsEmpty()) then
+  begin
+    TerminateJob();
+
+    FHighlighter := AHighlighter;
+
+    StartJob(tjScanMatchingPair, False, AExecuted);
+  end;
 end;
 
 procedure TBCEditorLines.StartSearch(const ASearch: TSearch;
@@ -3495,7 +3572,7 @@ begin
     FJobThread.Free();
     FJobThread := nil;
 
-    FState := FState - [lsSearching, lsScanningSyncEdit, lsBlockModify];
+    FState := FState - [lsSearching, lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair, lsBlockModify];
   end;
 end;
 
