@@ -404,7 +404,7 @@ type
     procedure EMSetTabStop(var AMessage: TMessage); message EM_SETTABSTOPS;
     procedure EMUndo(var AMessage: TMessage); message EM_UNDO;
     procedure ExpandCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
-    procedure FindDialogClosing(Sender: TObject);
+    procedure FindDialogClose(Sender: TObject);
     procedure FindDialogFind(Sender: TObject);
     procedure FindExecuted(const AData: Pointer);
     function FindHookedCommandEvent(const AHookedCommandEvent: TBCEditorHookedCommandEvent): Integer;
@@ -2491,6 +2491,8 @@ end;
 
 destructor TCustomBCEditor.Destroy();
 begin
+  FLines.TerminateJob();
+
   if Assigned(FCompletionProposalPopup) then
     FCompletionProposalPopup.Free();
   { Do not use FreeAndNil, it first nil and then frees causing problems with code accessing FHookedCommandHandlers
@@ -3445,7 +3447,7 @@ begin
       if (soWholeWordsOnly in FSearch.Options) then
         FFindDialog.Options := FFindDialog.Options + [frWholeWord];
       FFindDialog.OnFind := FindDialogFind;
-      FFindDialog.OnClose := FindDialogClosing;
+      FFindDialog.OnClose := FindDialogClose;
     end;
 
     FHideSelectionBeforeSearch := HideSelection;
@@ -3473,7 +3475,7 @@ begin
         FReplaceDialog.Options := FReplaceDialog.Options + [frReplaceAll];
       if (roWholeWordsOnly in FReplace.Options) then
         FReplaceDialog.Options := FReplaceDialog.Options + [frWholeWord];
-      FReplaceDialog.OnClose := FindDialogClosing;
+      FReplaceDialog.OnClose := FindDialogClose;
       FReplaceDialog.OnFind := ReplaceDialogFind;
       FReplaceDialog.OnReplace := ReplaceDialogReplace;
     end;
@@ -4321,7 +4323,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.FindDialogClosing(Sender: TObject);
+procedure TCustomBCEditor.FindDialogClose(Sender: TObject);
 begin
   HideSelection := FHideSelectionBeforeSearch;
 end;
@@ -4790,9 +4792,9 @@ begin
   begin
     if (ijUpdateScrollBars in FPendingJobs) then
     begin
+      Exclude(FPendingJobs, ijUpdateScrollBars);
       if (esScrollBarsInvalid in FState) then
         UpdateScrollBars();
-      Exclude(FPendingJobs, ijUpdateScrollBars);
     end
     else if (ijBuildRows in FPendingJobs) then
     begin
@@ -4800,14 +4802,11 @@ begin
       BuildRows(IdleTerminated);
     end
     else
-    begin
-      // If this happens, add the job before
-      Assert(False);
       FPendingJobs := [];
-    end;
 
     FIdleTerminated := FIdleTerminated or IdleTerminated();
   end;
+
   if (FIdleTerminated) then
     SetTimer(WindowHandle, tiIdle, 10, nil);
 end;
@@ -10700,11 +10699,7 @@ begin
     tiIdle:
       if (not PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)) then
       begin
-        if (PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)) then
-          Write;
         KillTimer(WindowHandle, Msg.TimerID);
-        if (PeekMessage(LMsg, 0, 0, 0, PM_NOREMOVE)) then
-          Write;
         Idle();
       end;
     tiCompletionProposal:
