@@ -71,7 +71,7 @@ type
     TIdleJob = (ijBuildRows, ijUpdateScrollBars);
     TIdleJobs = set of TIdleJob;
 
-    TMouseCapture = (mcNone, mcSyncEditButton, mcMarks, mcLineNumbers,
+    TMouseCapture = (mcNone, mcSyncEditButton, mcMarks,
       mcLineState, mcCodeFolding, mcText, mcScrolling);
 
     TState = set of (esCaretInvalid, esCodeFoldingInvalid, esScrollBarsInvalid,
@@ -201,6 +201,7 @@ type
     FCaretVisible: Boolean;
     FCaretWidth: Integer;
     FChainedEditor: TCustomBCEditor;
+    FClientRect: TRect;
     FCodeFolding: TBCEditorCodeFolding;
     FCodeFoldingCollapsedBitmap: TGPCachedBitmap;
     FCodeFoldingCollapsedMarkWidth: Integer;
@@ -342,7 +343,7 @@ type
     procedure ActiveLineChanged(Sender: TObject);
     procedure AfterLinesUpdate(Sender: TObject);
     procedure AskReplaceText(ASender: TObject; const AArea: TBCEditorLinesArea;
-      const AReplaceText: string; var AAction: TBCEditorReplaceAction);
+      const ABackwards: Boolean; const AReplaceText: string; var AAction: TBCEditorReplaceAction);
     function AskSearchWrapAround(): Boolean;
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarksChanged(ASender: TObject);
@@ -591,6 +592,7 @@ type
     procedure WMSettingChange(var AMessage: TWMSettingChange); message WM_SETTINGCHANGE;
     procedure WMSetText(var AMessage: TWMSetText); message WM_SETTEXT;
     procedure WMStyleChanged(var AMessage: TWMStyleChanged); message WM_STYLECHANGED;
+    procedure WMSysChar(var AMessage: TMessage); message WM_SYSCHAR;
     procedure WMTimer(var Msg: TWMTimer); message WM_TIMER;
     procedure WMUndo(var AMessage: TWMUndo); message WM_UNDO;
     procedure WMVScroll(var AMessage: TWMScroll); message WM_VSCROLL;
@@ -1355,7 +1357,7 @@ begin
     FHintWindow.Color := clInfoBk;
   end;
 
-  LRect := FHintWindow.CalcHintRect(ClientWidth, AHint, nil);
+  LRect := FHintWindow.CalcHintRect(FClientRect.Width, AHint, nil);
   LRect.Offset(X, Y);
 
   FHintWindow.ActivateHint(LRect, AHint);
@@ -1423,13 +1425,13 @@ begin
 end;
 
 procedure TCustomBCEditor.AskReplaceText(ASender: TObject; const AArea: TBCEditorLinesArea;
-  const AReplaceText: string; var AAction: TBCEditorReplaceAction);
+  const ABackwards: Boolean; const AReplaceText: string; var AAction: TBCEditorReplaceAction);
 begin
   Assert(ASender is TBCEditorLines.TSearch);
 
   Include(FState, esCenterCaret);
   try
-    if (TBCEditorLines.TSearch(ASender).Backwards) then
+    if (ABackwards) then
       SetCaretAndSelection(AArea.BeginPosition, AArea)
     else
       SetCaretAndSelection(AArea.EndPosition, AArea);
@@ -1438,7 +1440,7 @@ begin
   end;
 
   if (Assigned(FOnReplacePrompt)) then
-    FOnReplacePrompt(Self, AArea, AReplaceText, FReplaceAction)
+    FOnReplacePrompt(Self, AArea, ABackwards, AReplaceText, FReplaceAction)
   else
     case (MessageBox(WindowHandle, PChar(Format(SBCEditorReplaceTextPrompt, [AReplaceText])), PChar(SBCEditorMessageQuestion), MB_ICONQUESTION or MB_YESNOCANCEL)) of
       ID_YES:
@@ -1571,7 +1573,7 @@ begin
   else
     InvalidateScrollBars();
 
-  FOldClientRect := ClientRect;
+  FOldClientRect := FClientRect;
 end;
 
 procedure TCustomBCEditor.CaretChanged(ASender: TObject);
@@ -1835,9 +1837,9 @@ begin
     if (Canvas.HandleAllocated) then
     begin
       FDoubleBufferBitmap := TBitmap.Create();
-      FDoubleBufferBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, ClientWidth, ClientHeight);
+      FDoubleBufferBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, FClientRect.Width, FClientRect.Height);
       FDoubleBufferOverlayBitmap := TBitmap.Create();
-      FDoubleBufferOverlayBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, ClientWidth, ClientHeight);
+      FDoubleBufferOverlayBitmap.Handle := CreateCompatibleBitmap(Canvas.Handle, FClientRect.Width, FClientRect.Height);
     end;
     FDoubleBufferUpdateRect := Rect(-1, -1, -1, -1);
     Include(FState, esDoubleBufferInvalid);
@@ -3075,10 +3077,10 @@ begin
 
   LSearch := TBCEditorLines.TSearch.Create(FLines,
     LSearchArea,
-    soCaseSensitive in FSearch.Options, soWholeWordsOnly in FSearch.Options, Search.Engine = seRegularExpression, soBackwards in FSearch.Options,
+    soCaseSensitive in FSearch.Options, soWholeWordsOnly in FSearch.Options, Search.Engine = seRegularExpression,
     Search.Pattern);
 
-  FLines.StartSearch(LSearch, FFindPosition, False, True, FindExecuted);
+  FLines.StartSearch(LSearch, FFindPosition, False, True, soBackwards in FSearch.Options, FindExecuted);
   UpdateCursor();
 
   Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
@@ -3310,7 +3312,7 @@ end;
 function TCustomBCEditor.DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean;
 begin
   if (esScrolling in FState) then
-    ProcessClient(cjMouseDown, 0, nil, ClientRect, mbMiddle, [], FScrollingPoint);
+    ProcessClient(cjMouseDown, 0, nil, FClientRect, mbMiddle, [], FScrollingPoint);
 
   Result := inherited;
 
@@ -3332,7 +3334,7 @@ end;
 function TCustomBCEditor.DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean;
 begin
   if (esScrolling in FState) then
-    ProcessClient(cjMouseDown, 0, nil, ClientRect, mbMiddle, [], FScrollingPoint);
+    ProcessClient(cjMouseDown, 0, nil, FClientRect, mbMiddle, [], FScrollingPoint);
 
   Result := inherited;
 
@@ -3437,7 +3439,7 @@ begin
   begin
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       LArea,
-      roCaseSensitive in FReplace.Options, roWholeWordsOnly in FReplace.Options, FReplace.Engine = seRegularExpression, False,
+      roCaseSensitive in FReplace.Options, roWholeWordsOnly in FReplace.Options, FReplace.Engine = seRegularExpression,
       FReplace.Pattern,
       sjFindAndReplace, FReplace.ReplaceText, roPrompt in FReplace.Options);
 
@@ -3454,7 +3456,7 @@ begin
     else
       LSearchPosition := FLines.SelArea.BeginPosition;
 
-    FLines.StartSearch(LSearch, LSearchPosition, roReplaceAll in FReplace.Options, True, ReplaceExecuted);
+    FLines.StartSearch(LSearch, LSearchPosition, roReplaceAll in FReplace.Options, True, roBackwards in FReplace.Options, ReplaceExecuted);
   end;
 end;
 
@@ -5201,7 +5203,7 @@ end;
 
 procedure TCustomBCEditor.InvalidateClient();
 begin
-  InvalidateRect(ClientRect);
+  InvalidateRect(FClientRect);
   InvalidateCaret();
 end;
 
@@ -5251,7 +5253,7 @@ var
 begin
   if (not ARect.IsEmpty()) then
   begin
-    LRect := TRect.Intersect(ARect, ClientRect);
+    LRect := TRect.Intersect(ARect, FClientRect);
 
     if (not LRect.IsEmpty()) then
     begin
@@ -5383,7 +5385,7 @@ begin
   end
   else if ((AKey = BCEDITOR_ESCAPE_KEY) and (esScrolling in FState)) then
   begin
-    ProcessClient(cjMouseDown, 0, nil, ClientRect, mbMiddle, [], FScrollingPoint);
+    ProcessClient(cjMouseDown, 0, nil, FClientRect, mbMiddle, [], FScrollingPoint);
     AKey := 0;
     Exit;
   end
@@ -5502,7 +5504,7 @@ begin
 
     LRow := FLines.Items[ALine].FirstRow;
     if ((FTopRow <= LRow) and (LRow < FTopRow + FVisibleRows)) then
-      InvalidateRect(Rect(0, LRow * FLineHeight, ClientWidth - 1, ClientHeight - 1));
+      InvalidateRect(Rect(0, LRow * FLineHeight, FClientRect.Width - 1, FClientRect.Height - 1));
 
     DeleteLineFromRows(ALine);
 
@@ -5534,7 +5536,7 @@ begin
     InvalidateCodeFolding();
     LRow := FLines.Items[ALine].FirstRow;
     if ((FTopRow <= LRow) and (LRow < FTopRow + FVisibleRows)) then
-      InvalidateRect(Rect(0, LRow * FLineHeight, ClientWidth - 1, ClientHeight - 1));
+      InvalidateRect(Rect(0, LRow * FLineHeight, FClientRect.Width - 1, FClientRect.Height - 1));
     InvalidateScrollBars();
   end;
 
@@ -5772,7 +5774,7 @@ begin
   else
     LAction := cjMouseDown;
 
-  ProcessClient(LAction, 0, nil, ClientRect, AButton, AShift, Point(X, Y));
+  ProcessClient(LAction, 0, nil, FClientRect, AButton, AShift, Point(X, Y));
 end;
 
 procedure TCustomBCEditor.MouseMove(AShift: TShiftState; X, Y: Integer);
@@ -5790,17 +5792,16 @@ begin
   inherited;
 
   if (PeekMessage(LMsg, WindowHandle, WM_MOUSEMOVE, WM_MOUSEMOVE, PM_NOREMOVE)
-    and (LMsg.Message = WM_MOUSEMOVE)
     and (KeysToShiftState(LMsg.wParam) = AShift)) then
-    // Do nothing - handle this message within the next equal message
+    // Do nothing - handle this message within the next same message
   else if (FLineHeight > 0) then
   begin
-    ProcessClient(cjMouseMove, 0, nil, ClientRect, mbLeft, AShift, FCursorPoint);
+    ProcessClient(cjMouseMove, 0, nil, FClientRect, mbLeft, AShift, FCursorPoint);
 
     if (not Assigned(FHintWindow)
       and (Point(X, Y) <> FLastCursorPoint)
       and (AShift * [ssLeft, ssRight, ssMiddle] = [])) then
-      if (ClientRect.Contains(Point(X, Y))) then
+      if (FClientRect.Contains(Point(X, Y))) then
         SetTimer(WindowHandle, tiShowHint, Application.HintPause, nil)
       else
         KillTimer(WindowHandle, tiShowHint);
@@ -5816,7 +5817,7 @@ begin
 
   inherited;
 
-  ProcessClient(cjMouseUp, 0, nil, ClientRect, AButton, AShift, Point(X, Y));
+  ProcessClient(cjMouseUp, 0, nil, FClientRect, AButton, AShift, Point(X, Y));
 
   if (not (esScrolling in FState)) then
     MouseCapture := mcNone;
@@ -5970,7 +5971,7 @@ end;
 
 procedure TCustomBCEditor.Paint();
 begin
-  PaintTo(Canvas.Handle, ClientRect);
+  PaintTo(Canvas.Handle, FClientRect);
 end;
 
 procedure TCustomBCEditor.PaintTo(const ADC: HDC; const ARect: TRect;
@@ -6571,10 +6572,9 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
           Result := True;
         end;
       cjMouseMove:
-        if ((MouseCapture in [mcNone, mcMarks])
+        if ((MouseCapture in [mcNone])
           and LRect.Contains(AMousePoint) and not FSyncEditButtonRect.Contains(AMousePoint)) then
         begin
-          MouseCapture := mcMarks;
           Cursor := crDefault;
           Result := True;
         end
@@ -6671,13 +6671,13 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
             LOptions, LRect, PChar(LText), Length(LText), nil);
         end;
       cjMouseDown:
-        if ((MouseCapture in [mcNone, mcLineNumbers])
+        if ((MouseCapture in [mcNone])
           and LRect.Contains(AMousePoint) and not FSyncEditButtonRect.Contains(AMousePoint)
           and (ALine >= 0)) then
-          SetCaretAndSelection(FLines.BOLPosition[ALine + 1], LinesArea(FLines.BOLPosition[ALine], FLines.BOLPosition[ALine + 1]));
+          AMousePoint.X := FLeftMarginWidth;
       cjMouseMove:
-        if ((MouseCapture in [mcNone, mcLineNumbers])
-          and LRect.Contains(AMousePoint) and not FSyncEditButtonRect.Contains(AMousePoint)) then
+        if ((MouseCapture in [mcNone])
+          and (LRect.Contains(AMousePoint) and not FSyncEditButtonRect.Contains(AMousePoint))) then
         begin
           Cursor := crDefault;
           Result := True;
@@ -6938,7 +6938,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
           SetTextPos(FTextPos); // Pleace TopRow to the top
           Result := True;
         end
-        else if (Rect(FLeftMarginWidth, 0, ClientWidth, ClientHeight).Contains(AMousePoint)
+        else if (Rect(FLeftMarginWidth, 0, FClientRect.Width, FClientRect.Height).Contains(AMousePoint)
           and (AButton = mbMiddle)) then
         begin
           FScrollingPoint := AMousePoint;
@@ -6973,13 +6973,13 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
 var
   LBeginRange: TBCEditorHighlighter.TRange;
   LChar: Integer;
-  LClientWidth: Integer;
   LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
   LColumn: Integer;
   LLeft: Integer;
   LLength: Integer;
   LLine: Integer;
-  LRect: TRect;
+  LMouseRect: TRect;
+  LRowRect: TRect;
   LRow: Integer;
   LText: PChar;
   LTextClipRect: TRect;
@@ -7008,21 +7008,31 @@ begin
       and FScrollingEnabled) then
       Result := Result or ProcessScrolling();
 
-    LClientWidth := ClientWidth;
-    LRect.Left := 0;
-    LRect.Top := - FTextPos.Y mod FLineHeight - FLineHeight;
-    LRect.Right := LClientWidth;
-    LRect.Bottom := LRect.Top + FLineHeight;
+    LRowRect.Left := 0;
+    LRowRect.Top := - FTextPos.Y mod FLineHeight - FLineHeight;
+    LRowRect.Right := FClientRect.Width;
+    LRowRect.Bottom := LRowRect.Top + FLineHeight;
 
     if (not (AJob in [cjPaintOverlays])) then
       for LRow := FTopRow to FTopRow + FVisibleRows do
         if (not Result) then
         begin
-          Inc(LRect.Top, FLineHeight);
-          Inc(LRect.Bottom, FLineHeight);
+          Inc(LRowRect.Top, FLineHeight);
+          Inc(LRowRect.Bottom, FLineHeight);
 
-          if ((AJob = cjPaint) and LRect.IntersectsWith(AClipRect)
-            or (AJob <> cjPaint) and LRect.Contains(AMousePoint)) then
+          LMouseRect := LRowRect;
+          if (MouseCapture <> mcNone) then
+          begin
+            LMouseRect.Left := Min(LMouseRect.Left, AMousePoint.X);
+            LMouseRect.Right := Max(LMouseRect.Right, AMousePoint.X);
+            if (LRow = FTopRow) then
+              LMouseRect.Top := Min(LMouseRect.Top, AMousePoint.Y);
+            if (LRow = FTopRow + FVisibleRows) then
+              LMouseRect.Bottom := Max(LMouseRect.Bottom, AMousePoint.Y);
+          end;
+
+          if ((AJob = cjPaint) and LRowRect.IntersectsWith(AClipRect)
+            or (AJob <> cjPaint) and LMouseRect.Contains(AMousePoint)) then
           begin
             if (LRow < FRows.Count) then
               LLine := FRows.Items[LRow].Line
@@ -7030,19 +7040,19 @@ begin
               LLine := -1;
 
             if (FLeftMargin.Marks.Visible) then
-              Result := Result or ProcessMarks(LRect, LLine, LRow);
+              Result := Result or ProcessMarks(LRowRect, LLine, LRow);
 
             if (FLeftMargin.LineNumbers.Visible) then
-              Result := Result or ProcessLineNumber(LRect, LLine, LRow);
+              Result := Result or ProcessLineNumber(LRowRect, LLine, LRow);
 
             if (FLeftMargin.LineState.Visible) then
-              Result := Result or ProcessLineState(LRect, LLine, LRow);
+              Result := Result or ProcessLineState(LRowRect, LLine, LRow);
 
             if (FCodeFolding.Visible) then
-              Result := Result or ProcessCodeFolding(LRect, LLine, LRow);
+              Result := Result or ProcessCodeFolding(LRowRect, LLine, LRow);
 
             if (FLeftMarginWidth > 0) then
-              Result := Result or ProcessLeftMarginBorder(LRect, LLine, LRow);
+              Result := Result or ProcessLeftMarginBorder(LRowRect, LLine, LRow);
 
             if (not Result) then
             begin
@@ -7066,7 +7076,7 @@ begin
                   if (GetFindTokenData(LRow, LLeft, LBeginRange, LText, LLength, LChar, LColumn)
                     and FHighlighter.FindFirstToken(LBeginRange, LText, LLength, LChar, LToken)) then
                   begin
-                    Dec(LRect.Left, FTextPos.X - LLeft);
+                    Dec(LRowRect.Left, FTextPos.X - LLeft);
 
                     if (Assigned(APaintVar)) then
                     begin
@@ -7084,7 +7094,7 @@ begin
                     end;
 
                     repeat
-                      Result := Result or ProcessToken(AJob, APaintVar, LTextClipRect, AButton, AShift, AMousePoint, LRect,
+                      Result := Result or ProcessToken(AJob, APaintVar, LTextClipRect, AButton, AShift, AMousePoint, LRowRect,
                         LinesPosition(FRows.Items[LRow].Char + LToken.Char, LLine),
                         RowsPosition(LColumn, LRow),
                         LToken.Text, LToken.Length,
@@ -7094,13 +7104,13 @@ begin
                         Inc(LColumn, FTabs.Width - LColumn div FTabs.Width)
                       else
                         Inc(LColumn, LToken.Length);
-                    until ((LRect.Left > ClientWidth)
+                    until ((LRowRect.Left > FClientRect.Width)
                       or not FHighlighter.FindNextToken(LToken));
                   end
                   else
-                    Dec(LRect.Left, FTextPos.X);
+                    Dec(LRowRect.Left, FTextPos.X);
 
-                  if (LRect.Left <= ClientWidth) then
+                  if (LRowRect.Left <= FClientRect.Width) then
                   begin
                     if (not FCodeFolding.Visible
                       or not (rfFirstRowOfLine in FRows.Items[LRow].Flags)) then
@@ -7111,19 +7121,19 @@ begin
                       if (Assigned(LCodeFoldingRange) and (not LCodeFoldingRange.Collapsed or LCodeFoldingRange.ParentCollapsed)) then
                         LCodeFoldingRange := nil;
                     end;
-                    Result := Result or ProcessToken(AJob, APaintVar, LTextClipRect, AButton, AShift, AMousePoint, LRect,
+                    Result := Result or ProcessToken(AJob, APaintVar, LTextClipRect, AButton, AShift, AMousePoint, LRowRect,
                       FRows.EORPosition[LRow], RowsPosition(FRows.Items[LRow].Length, LRow),
                       nil, 0, nil, LCodeFoldingRange);
                   end;
                 end
                 else
-                  Result := ProcessToken(AJob, APaintVar, LTextClipRect, AButton, AShift, AMousePoint, LRect,
+                  Result := ProcessToken(AJob, APaintVar, LTextClipRect, AButton, AShift, AMousePoint, LRowRect,
                     FRows.BORPosition[LRow], RowsPosition(0, LRow),
                     nil, 0);
               end;
 
-              LRect.Left := 0;
-              LRect.Right := LClientWidth;
+              LRowRect.Left := 0;
+              LRowRect.Right := FClientRect.Width;
             end;
           end;
         end;
@@ -7977,7 +7987,7 @@ procedure TCustomBCEditor.Resize();
 begin
   inherited;
 
-  if (FWordWrap and (ClientWidth <> FOldClientRect.Width) and (FRows.Count > 0)) then
+  if (FWordWrap and (FClientRect.Width <> FOldClientRect.Width) and (FRows.Count > 0)) then
   begin
     InvalidateRows();
     if (FVisibleRows > 0) then
@@ -9980,12 +9990,12 @@ begin
   begin
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      soCaseSensitive in FSearch.Options, soWholeWordsOnly in FSearch.Options, Search.Engine = seRegularExpression, False,
+      soCaseSensitive in FSearch.Options, soWholeWordsOnly in FSearch.Options, Search.Engine = seRegularExpression,
       Search.Pattern);
     FFindArea := InvalidLinesArea;
     FFindState := fsAllAreas;
 
-    FLines.StartSearch(LSearch, FLines.BOFPosition, True, False, FindExecuted);
+    FLines.StartSearch(LSearch, FLines.BOFPosition, True, False, False, FindExecuted);
 
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;
@@ -10010,11 +10020,11 @@ begin
 
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      soCaseSensitive in FSearch.Options, soWholeWordsOnly in FSearch.Options, Search.Engine = seRegularExpression, soBackwards in FSearch.Options,
+      soCaseSensitive in FSearch.Options, soWholeWordsOnly in FSearch.Options, Search.Engine = seRegularExpression,
       Search.Pattern);
     FFindState := fsWrappedAround;
 
-    FLines.StartSearch(LSearch, FFindPosition, False, True, FindExecuted);
+    FLines.StartSearch(LSearch, FFindPosition, False, True, soBackwards in FSearch.Options, FindExecuted);
 
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;
@@ -10102,7 +10112,7 @@ begin
       and InvalidPoint(FCaretPos)) then
       FCaretPos := RowsToClient(FRows.CaretPosition, True);
 
-    LRect := ClientRect;
+    LRect := FClientRect;
     Inc(LRect.Left, FLeftMarginWidth);
     if (not LRect.Contains(FCaretPos)
       or not Focused() and not Assigned(FCompletionProposalPopup)) then
@@ -10162,31 +10172,33 @@ end;
 
 procedure TCustomBCEditor.UpdateMetrics();
 begin
+  FClientRect := ClientRect;
+
   FLeftMarginWidth := 0;
   if (FLeftMargin.Marks.Visible) then
   begin
-    FMarksPanelRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FMarksPanelWidth, ClientHeight);
+    FMarksPanelRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FMarksPanelWidth, FClientRect.Height);
     Inc(FLeftMarginWidth, FMarksPanelWidth);
   end
   else
     FMarksPanelRect := Rect(-1, -1, -1, -1);
   if (FLeftMargin.LineNumbers.Visible) then
   begin
-    FLineNumbersRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FLineNumbersWidth, ClientHeight);
+    FLineNumbersRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FLineNumbersWidth, FClientRect.Height);
     Inc(FLeftMarginWidth, FLineNumbersWidth);
   end
   else
     FLineNumbersRect := Rect(-1, -1, -1, -1);
   if (FLeftMargin.LineState.Visible) then
   begin
-    FLineStateRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FLineStateWidth, ClientHeight);
+    FLineStateRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FLineStateWidth, FClientRect.Height);
     Inc(FLeftMarginWidth, FLineStateWidth);
   end
   else
     FLineStateRect := Rect(-1, -1, -1, -1);
   if (FCodeFolding.Visible) then
   begin
-    FCodeFoldingRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FCodeFoldingWidth, ClientHeight);
+    FCodeFoldingRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FCodeFoldingWidth, FClientRect.Height);
     Inc(FLeftMarginWidth, FCodeFoldingWidth);
   end
   else
@@ -10194,12 +10206,12 @@ begin
   if (FLeftMarginWidth > 0) then
     Inc(FLeftMarginWidth, FLeftMarginBorderWidth);
 
-  FTextRect := Rect(FLeftMarginWidth, 0, ClientWidth, ClientHeight);
+  FTextRect := Rect(FLeftMarginWidth, 0, FClientRect.Width, FClientRect.Height);
 
   if (FLineHeight > 0) then
   begin
-    FUsableRows := Max(1, ClientHeight div FLineHeight);
-    if (ClientHeight = FUsableRows * FLineHeight) then
+    FUsableRows := Max(1, FClientRect.Height div FLineHeight);
+    if (FClientRect.Height = FUsableRows * FLineHeight) then
       FVisibleRows := FUsableRows
     else
       FVisibleRows := FUsableRows + 1;
@@ -10648,7 +10660,7 @@ end;
 procedure TCustomBCEditor.WMMouseHWheel(var AMessage: TWMMouseWheel);
 begin
   if (esScrolling in FState) then
-    ProcessClient(cjMouseDown, 0, nil, ClientRect, mbMiddle, [], FScrollingPoint);
+    ProcessClient(cjMouseDown, 0, nil, FClientRect, mbMiddle, [], FScrollingPoint);
 
   if (AMessage.WheelDelta < 0) then
     SetTextPos(FTextPos.X - FHorzScrollBarDivider * FSpaceWidth, FTextPos.Y)
@@ -10720,7 +10732,7 @@ begin
 
       if (esDoubleBufferInvalid in FState) then
       begin
-        PaintTo(FDoubleBufferBitmap.Canvas.Handle, ClientRect, False);
+        PaintTo(FDoubleBufferBitmap.Canvas.Handle, FClientRect, False);
         Exclude(FState, esDoubleBufferInvalid);
         FDoubleBufferUpdateRect := Rect(-1, -1, -1, -1);
       end
@@ -10789,7 +10801,7 @@ end;
 procedure TCustomBCEditor.WMPrint(var AMessage: TWMPrint);
 begin
   if (AMessage.Flags and PRF_CLIENT <> 0) then
-    PaintTo(AMessage.DC, ClientRect);
+    PaintTo(AMessage.DC, FClientRect);
 end;
 
 procedure TCustomBCEditor.WMSetCursor(var AMessage: TWMSetCursor);
@@ -10803,7 +10815,7 @@ begin
   begin
     GetCursorPos(LCursorPoint);
     LCursorPoint := ScreenToClient(LCursorPoint);
-    ProcessClient(cjMouseMove, 0, nil, ClientRect, mbLeft, [], LCursorPoint);
+    ProcessClient(cjMouseMove, 0, nil, FClientRect, mbLeft, [], LCursorPoint);
     AMessage.Result := LRESULT(TRUE);
   end
   else
@@ -10816,8 +10828,7 @@ begin
 
   NotifyParent(EN_SETFOCUS);
 
-  if (not Assigned(FCompletionProposalPopup)) then {$MESSAGE 'Nils'}
-    UpdateCaret();
+  UpdateCaret();
 
   if (HideSelection and not FLines.SelArea.IsEmpty()) then
     InvalidateText();
@@ -10872,6 +10883,14 @@ begin
   end;
 end;
 
+procedure TCustomBCEditor.WMSysChar(var AMessage: TMessage);
+begin
+  if (AMessage.LParam and (1 shl 29) <> 0) then
+    // Do nothing to prevent a beep sound
+  else
+    inherited;
+end;
+
 procedure TCustomBCEditor.WMTimer(var Msg: TWMTimer);
 var
   LMsg: TMsg;
@@ -10887,7 +10906,7 @@ begin
         KillTimer(WindowHandle, Msg.TimerID);
         if (ShowHint
           and not (esScrolling in FState)) then
-          ProcessClient(cjHint, 0, nil, ClientRect, mbLeft, [], FCursorPoint);
+          ProcessClient(cjHint, 0, nil, FClientRect, mbLeft, [], FCursorPoint);
       end;
     tiScrolling:
       ProcessClient(cjScrolling, 0, nil, FTextRect, mbLeft, [], FCursorPoint);
@@ -10952,12 +10971,12 @@ begin
 
           LHint := Format(SBCEditorScrollInfo, [LLine]);
 
-          LRect := FHintWindow.CalcHintRect(ClientWidth, LHint, nil);
-          LRect.Offset(ClientToScreen(Point(ClientWidth - LRect.Width, 0)));
+          LRect := FHintWindow.CalcHintRect(FClientRect.Width, LHint, nil);
+          LRect.Offset(ClientToScreen(Point(FClientRect.Width - LRect.Width, 0)));
 
           if (GetCursorPos(LCursorPos)) then
             LRect.Offset(0,
-              Min(ClientHeight - GetSystemMetrics(SM_CYVSCROLL), Max(GetSystemMetrics(SM_CYVSCROLL), ScreenToClient(LCursorPos).Y))
+              Min(FClientRect.Height - GetSystemMetrics(SM_CYVSCROLL), Max(GetSystemMetrics(SM_CYVSCROLL), ScreenToClient(LCursorPos).Y))
               - LRect.Height shr 1);
 
           FHintWindow.ActivateHint(LRect, LHint);
@@ -10981,9 +11000,6 @@ begin
         Windows.SetFocus(WindowHandle);
         if (not Focused) then Exit;
       end;
-    WM_SYSCHAR:
-      if (AMessage.lParam and (1 shl 29) <> 0) then
-        Exit; { Prevent beeping }
     WM_SETTEXT,
     WM_GETTEXT,
     WM_GETTEXTLENGTH:

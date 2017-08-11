@@ -104,7 +104,6 @@ type
       TJob = (sjFind, sjFindAndReplace);
     strict private
       FArea: TBCEditorLinesArea;
-      FBackwards: Boolean;
       FCaseSensitive: Boolean;
       FEngine: (eNormal, eLinesRegExpr, eTextRegExpr);
       FErrorMessage: string;
@@ -118,23 +117,26 @@ type
       FRegExOptions: TRegexOptions;
       FReplaceText: string;
       FWholeWords: Boolean;
-      function FindLinesRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
-      function FindNormal(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
-      function FindTextRegEx(const APosition: TBCEditorLinesPosition; const AFoundLength: Integer): Boolean;
+      function FindLinesRegEx(const APosition: TBCEditorLinesPosition;
+        const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
+      function FindNormal(const APosition: TBCEditorLinesPosition;
+        const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
+      function FindTextRegEx(const APosition: TBCEditorLinesPosition;
+        const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
       function GetRegExpr(): Boolean;
     protected
-      function Find(var APosition: TBCEditorLinesPosition; out AFoundLength: Integer): Boolean;
+      function Find(var APosition: TBCEditorLinesPosition;
+        const ABackwards: Boolean; out AFoundLength: Integer): Boolean;
       procedure Replace();
       property Lines: TBCEditorLines read FLines;
     public
       constructor Create(const ALines: TBCEditorLines;
         const AArea: TBCEditorLinesArea;
-        const ACaseSensitive, AWholeWords, ARegExpr, ABackwards: Boolean;
+        const ACaseSensitive, AWholeWords, ARegExpr: Boolean;
         const APattern: string;
         const AJob: TJob = sjFind; const AReplaceText: string = '';
         const APrompt: Boolean = False);
       property Area: TBCEditorLinesArea read FArea;
-      property Backwards: Boolean read FBackwards;
       property CaseSensitive: Boolean read FCaseSensitive;
       property ErrorMessage: string read FErrorMessage;
       property Job: TJob read FJob;
@@ -277,6 +279,7 @@ type
     FReplaceText: TReplaceTextParams;
     FSearch: TSearch;
     FSearchAll: Boolean;
+    FSearchBackwards: Boolean;
     FSearchPosition: TBCEditorLinesPosition;
     FSearchResult: TSearchResult;
     FSelArea: TBCEditorLinesArea;
@@ -377,7 +380,7 @@ type
     procedure StartScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
       const AExecuted: TJobThread.TExecutedProc);
     procedure StartSearch(const ASearch: TSearch; const APosition: TBCEditorLinesPosition;
-      const ASearchAll, ABlockModify: Boolean; const AExecuted: TJobThread.TExecutedProc);
+      const ABackwards, ASearchAll, ABlockModify: Boolean; const AExecuted: TJobThread.TExecutedProc);
     function SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
       const ATerminated: TBCEditorTerminatedFunc): Boolean;
     function SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
@@ -639,7 +642,7 @@ end;
 
 constructor TBCEditorLines.TSearch.Create(const ALines: TBCEditorLines;
   const AArea: TBCEditorLinesArea;
-  const ACaseSensitive, AWholeWords, ARegExpr, ABackwards: Boolean;
+  const ACaseSensitive, AWholeWords, ARegExpr: Boolean;
   const APattern: string;
   const AJob: TJob = sjFind; const AReplaceText: string = '';
   const APrompt: Boolean = False);
@@ -654,7 +657,6 @@ begin
   FLines := ALines;
 
   FArea := AArea;
-  FBackwards := ABackwards;
   FCaseSensitive := ACaseSensitive;
   if (not ARegExpr) then
     FEngine := eNormal
@@ -705,7 +707,7 @@ begin
 end;
 
 function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
-  out AFoundLength: Integer): Boolean;
+  const ABackwards: Boolean; out AFoundLength: Integer): Boolean;
 begin
   Assert((FArea.BeginPosition <= APosition) and (APosition <= FArea.EndPosition));
 
@@ -714,15 +716,15 @@ begin
   else
   begin
     case (FEngine) of
-      eNormal: Result := FindNormal(APosition, AFoundLength);
-      eLinesRegExpr: Result := FindLinesRegEx(APosition, AFoundLength);
-      eTextRegExpr: Result := FindTextRegEx(APosition, AFoundLength);
+      eNormal: Result := FindNormal(APosition, ABackwards, AFoundLength);
+      eLinesRegExpr: Result := FindLinesRegEx(APosition, ABackwards, AFoundLength);
+      eTextRegExpr: Result := FindTextRegEx(APosition, ABackwards, AFoundLength);
       else raise ERangeError.Create('FEngine: ' + IntToStr(Ord(FEngine)));
     end;
 
     if (Result) then
       // if this fails, there is a bug in the FindXxx routine
-      if (FBackwards) then
+      if (ABackwards) then
         Assert(FFoundPosition >= FArea.BeginPosition)
       else
         Assert(FFoundPosition <= FArea.EndPosition);
@@ -736,14 +738,14 @@ begin
 end;
 
 function TBCEditorLines.TSearch.FindLinesRegEx(const APosition: TBCEditorLinesPosition;
-  const AFoundLength: Integer): Boolean;
+  const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
 var
   LMatch: TMatch;
 begin
   FFoundPosition := APosition;
 
   Result := False;
-  if (FBackwards) then
+  if (ABackwards) then
     while (not Result and (FFoundPosition.Line >= 0)) do
     begin
       try
@@ -790,7 +792,7 @@ begin
 end;
 
 function TBCEditorLines.TSearch.FindNormal(const APosition: TBCEditorLinesPosition;
-  const AFoundLength: Integer): Boolean;
+  const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
 var
   LLineBeginPos: PChar;
   LLineCompPos: PChar;
@@ -813,19 +815,19 @@ begin
     FFoundPosition := APosition;
 
     while (not Result
-      and (FBackwards and (FFoundPosition > Max(FArea.BeginPosition, FLines.BOFPosition))
-        or not FBackwards and (FFoundPosition < Min(FArea.EndPosition, FLines.EOFPosition)))) do
+      and (ABackwards and (FFoundPosition > Max(FArea.BeginPosition, FLines.BOFPosition))
+        or not ABackwards and (FFoundPosition < Min(FArea.EndPosition, FLines.EOFPosition)))) do
     begin
       LLineLength := Length(FLines.Items[FFoundPosition.Line].Text);
       if (FFoundPosition.Line = FArea.EndPosition.Line) then
-        if (FBackwards) then
+        if (ABackwards) then
           LLineLength := Min(LLineLength, FFoundPosition.Char)
         else
           LLineLength := Min(LLineLength, FArea.EndPosition.Char);
 
       if ((LLineLength >= LPatternLength)
-        and (FBackwards and (0 < FFoundPosition.Char) and (FFoundPosition.Char <= LLineLength)
-          or not FBackwards and (0 <= FFoundPosition.Char) and (FFoundPosition.Char < LLineLength))) then
+        and (ABackwards and (0 < FFoundPosition.Char) and (FFoundPosition.Char <= LLineLength)
+          or not ABackwards and (0 <= FFoundPosition.Char) and (FFoundPosition.Char < LLineLength))) then
       begin
         if (FCaseSensitive) then
           LLineText := FLines.Items[FFoundPosition.Line].Text
@@ -837,20 +839,20 @@ begin
           CharLowerBuff(PChar(LLineText), LLineLength);
         end;
 
-        if (FBackwards and (FFoundPosition.Line = FArea.BeginPosition.Line)) then
+        if (ABackwards and (FFoundPosition.Line = FArea.BeginPosition.Line)) then
           LLineBeginPos := @LLineText[1 + FArea.BeginPosition.Char]
         else
           LLineBeginPos := @LLineText[1 + FFoundPosition.Char];
         LLineEndPos := @LLineText[1 + LLineLength - LPatternLength];
 
-        if (FBackwards) then
+        if (ABackwards) then
           LLinePos := LLineEndPos
         else
           LLinePos := LLineBeginPos;
 
         while (not Result
-          and (FBackwards and (LLinePos >= LLineBeginPos)
-            or not FBackwards and (LLinePos <= LLineEndPos))) do
+          and (ABackwards and (LLinePos >= LLineBeginPos)
+            or not ABackwards and (LLinePos <= LLineEndPos))) do
         begin
           if ((LLinePos^ = LPatternBeginPos^)
             and (not FWholeWords or not FLines.IsWordBreakChar(LLinePos^))) then
@@ -867,7 +869,7 @@ begin
           end;
 
           if (not Result) then
-            if (FBackwards) then
+            if (ABackwards) then
               Dec(LLinePos)
             else
               Inc(LLinePos);
@@ -877,7 +879,7 @@ begin
       end;
 
       if (not Result) then
-        if (FBackwards) then
+        if (ABackwards) then
         begin
           if (FFoundPosition.Line = 0) then
             FFoundPosition := LinesPosition(0, -1)
@@ -894,7 +896,7 @@ begin
 end;
 
 function TBCEditorLines.TSearch.FindTextRegEx(const APosition: TBCEditorLinesPosition;
-  const AFoundLength: Integer): Boolean;
+  const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
 var
   LFoundPosition: Integer;
   LInput: string;
@@ -905,7 +907,7 @@ begin
   LInput := FLines.Text;
   LFoundPosition := FLines.CharIndexOf(FFoundPosition);
 
-  if (FBackwards) then
+  if (ABackwards) then
   begin
     try
       LMatch := FRegEx.Match(LInput);
@@ -2866,9 +2868,9 @@ procedure TBCEditorLines.ScanMatchingPair(const ATerminated: TBCEditorTerminated
         LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
           LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LIndex].CloseToken)), APosition.Line),
             LinesPosition(Min(Length(Items[APosition.Line].Text), APosition.Char + Length(AHighlighter.MatchingPairs[LIndex].CloseToken)), APosition.Line)),
-          False, False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
+          False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
         LBeginPosition := LCloseTokenSearch.Area.BeginPosition;
-        if (LCloseTokenSearch.Find(LBeginPosition, LCloseTokenFoundLength)) then
+        if (LCloseTokenSearch.Find(LBeginPosition, False, LCloseTokenFoundLength)) then
         begin
           LCloseTokenArea.BeginPosition := LBeginPosition;
           LCloseTokenArea.EndPosition := PositionOf(LCloseTokenFoundLength, LCloseTokenArea.BeginPosition);
@@ -2878,20 +2880,20 @@ procedure TBCEditorLines.ScanMatchingPair(const ATerminated: TBCEditorTerminated
           LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
             LinesArea(BOFPosition,
               LCloseTokenArea.BeginPosition),
-            False, False, False, True, AHighlighter.MatchingPairs[LIndex].OpenToken);
+            False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
           LOpenTokenArea.BeginPosition := LOpenTokenSearch.Area.EndPosition;
 
           LPosition := LOpenTokenSearch.Area.EndPosition;
           while (not Result and not ATerminated()
-            and LOpenTokenSearch.Find(LOpenTokenArea.BeginPosition, LOpenTokenFoundLength)) do
+            and LOpenTokenSearch.Find(LOpenTokenArea.BeginPosition, True, LOpenTokenFoundLength)) do
           begin
             LCloseTokenSearch.Free();
             LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
               LinesArea(LOpenTokenSearch.Area.BeginPosition,
                 LPosition),
-              False, False, False, True, AHighlighter.MatchingPairs[LIndex].CloseToken);
+              False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
 
-            if (LCloseTokenSearch.Find(LPosition, LCloseTokenFoundLength)
+            if (LCloseTokenSearch.Find(LPosition, True, LCloseTokenFoundLength)
               and (LPosition > LOpenTokenArea.BeginPosition)) then
             begin
               Inc(LDeep);
@@ -2920,9 +2922,9 @@ procedure TBCEditorLines.ScanMatchingPair(const ATerminated: TBCEditorTerminated
         LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
           LinesArea(LinesPosition(Max(0, APosition.Char + 1 - Length(AHighlighter.MatchingPairs[LIndex].CloseToken)), APosition.Line),
             LinesPosition(Min(Length(Items[APosition.Line].Text), Min(Length(Items[APosition.Line].Text), APosition.Char + Length(AHighlighter.MatchingPairs[LIndex].OpenToken))), APosition.Line)),
-          False, False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
+          False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
         LBeginPosition := LOpenTokenSearch.Area.BeginPosition;
-        if (LOpenTokenSearch.Find(LBeginPosition, LOpenTokenFoundLength)) then
+        if (LOpenTokenSearch.Find(LBeginPosition, False, LOpenTokenFoundLength)) then
         begin
           LOpenTokenArea.BeginPosition := LBeginPosition;
           LOpenTokenArea.EndPosition := PositionOf(1, LOpenTokenArea.BeginPosition);
@@ -2932,20 +2934,20 @@ procedure TBCEditorLines.ScanMatchingPair(const ATerminated: TBCEditorTerminated
           LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
             LinesArea(LOpenTokenArea.EndPosition,
               EOFPosition),
-            False, False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
+            False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
           LCloseTokenArea.BeginPosition := LCloseTokenSearch.Area.BeginPosition;
 
           LPosition := LCloseTokenSearch.Area.BeginPosition;
           while (not Result and not ATerminated()
-            and LCloseTokenSearch.Find(LCloseTokenArea.BeginPosition, LCloseTokenFoundLength)) do
+            and LCloseTokenSearch.Find(LCloseTokenArea.BeginPosition, False, LCloseTokenFoundLength)) do
           begin
             LOpenTokenSearch.Free();
             LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
               LinesArea(LPosition,
                 LCloseTokenSearch.Area.EndPosition),
-              False, False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
+              False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
 
-            if (LOpenTokenSearch.Find(LPosition, LOpenTokenFoundLength)
+            if (LOpenTokenSearch.Find(LPosition, False, LOpenTokenFoundLength)
               and (LPosition < LCloseTokenArea.BeginPosition)) then
             begin
               Inc(LDeep);
@@ -3134,7 +3136,7 @@ begin
 
   try
     FSearchResult.Area := InvalidLinesArea;
-    FSearchResult.Backwards := FSearch.Backwards;
+    FSearchResult.Backwards := FSearchBackwards;
     FSearchResult.Count := 0;
 
     if (not FSearchAll) then
@@ -3148,10 +3150,10 @@ begin
       LReplaceAction := raReplaceAll;
 
     repeat
-      if (FSearch.Backwards) then
+      if (FSearchBackwards) then
         FSearchPosition := PositionOf(-1, FSearchPosition);
 
-      Result := FSearch.Find(FSearchPosition, LFoundLength);
+      Result := FSearch.Find(FSearchPosition, FSearchBackwards, LFoundLength);
 
       if (Result) then
       begin
@@ -3159,7 +3161,7 @@ begin
         LFoundArea.EndPosition := PositionOf(LFoundLength, LFoundArea.BeginPosition);
 
         if (Assigned(LFoundAreas)) then
-          if (FSearch.Backwards) then
+          if (FSearchBackwards) then
             LFoundAreas.Insert(0, LFoundArea)
           else
             LFoundAreas.Insert(LFoundAreas.Count, LFoundArea);
@@ -3174,7 +3176,7 @@ begin
         begin
           if (FSearch.Prompt
             and Assigned(FOnReplacePrompt) and (LReplaceAction <> raReplaceAll)) then
-            FOnReplacePrompt(FSearch, LFoundArea, FSearch.ReplaceText, LReplaceAction);
+            FOnReplacePrompt(FSearch, LFoundArea, FSearchBackwards, FSearch.ReplaceText, LReplaceAction);
           if (LReplaceAction in [raReplace, raReplaceAll]) then
           begin
             FSearch.Replace();
@@ -3185,7 +3187,7 @@ begin
         end;
       end;
 
-      if (Result and not FSearch.Backwards) then
+      if (Result and not FSearchBackwards) then
         FSearchPosition := PositionOf(1, FSearchPosition);
     until (ATerminated() or not Result or not FSearchAll or (LReplaceAction = raCancel));
 
@@ -3510,7 +3512,7 @@ begin
 end;
 
 procedure TBCEditorLines.StartSearch(const ASearch: TSearch;
-  const APosition: TBCEditorLinesPosition; const ASearchAll, ABlockModify: Boolean;
+  const APosition: TBCEditorLinesPosition; const ABackwards, ASearchAll, ABlockModify: Boolean;
   const AExecuted: TJobThread.TExecutedProc);
 begin
   TerminateJob();
