@@ -68,7 +68,6 @@ type
     procedure IncSize(const AWidth: Integer; const AHeight: Integer);
     procedure MouseWheel(AShift: TShiftState; AWheelDelta: Integer; AMousePos: TPoint);
     procedure SetOriginalSize;
-    procedure WndProc(var Msg: TMessage); override;
     property ActiveControl: TWinControl read FActiveControl;
     property CurrentString: string read FCurrentString write SetCurrentString;
     property Editor: TCustomControl read FEditor;
@@ -830,7 +829,7 @@ procedure TBCEditorCompletionProposalPopup.Show(Origin: TPoint);
 var
   LScreen: TPoint;
 begin
-  LScreen := ClientToScreen(Origin);
+  LScreen := FEditor.ClientToScreen(Origin);
   SetBounds(LScreen.X, LScreen.Y, Width, Height);
 
   SetWindowPos(Handle, HWND_TOP, 0, 0, 0, 0, SWP_SHOWWINDOW or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER);
@@ -911,16 +910,6 @@ begin
       TopLine := AMessage.Pos;
   end;
   Invalidate;
-end;
-
-procedure TBCEditorCompletionProposalPopup.WndProc(var Msg: TMessage);
-begin
-  if (Msg.Msg = WM_KEYDOWN) then
-    Write;
-  if (Msg.Msg = WM_SETFOCUS) then
-    Write;
-
-  inherited;
 end;
 
 end.

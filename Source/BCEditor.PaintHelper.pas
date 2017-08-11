@@ -32,21 +32,21 @@ type
   strict private
     FBackgroundColor: TColor;
     FBrush: TBrush;
-    FCanvas: TCanvas;
-    FDrawingCount: Integer;
     FForegroundColor: TColor;
+    FHandle: HDC;
+    FHandles: TStack<HDC>;
     FObjectFonts: TObjectFonts;
-    FSavedHandles: TStack<Integer>;
+    FSavedDCs: TStack<Integer>;
     FStyle: TFontStyles;
     procedure SetBackgroundColor(const AValue: TColor);
     procedure SetFont(const AValue: TFont);
     procedure SetForegroundColor(const AValue: TColor);
     procedure SetStyle(const AValue: TFontStyles);
   public
-    procedure BeginDrawing(const ACanvas: TCanvas);
+    procedure BeginDraw(const AHandle: HDC);
     constructor Create(const AFont: TFont);
     destructor Destroy(); override;
-    procedure EndDrawing();
+    procedure EndDraw();
     function ExtTextOut(X, Y: Integer; Options: Longint;
       Rect: TRect; Str: LPCWSTR; Count: Longint; Dx: PInteger): BOOL; {$IFNDEF Debug} inline; {$ENDIF}
     function FillRect(const ARect: TRect): BOOL; {$IFNDEF Debug} inline; {$ENDIF}
@@ -54,7 +54,6 @@ type
     function TextHeight(const AText: PChar; const ALength: Integer): Integer;
     function TextWidth(const AText: PChar; const ALength: Integer): Integer;
     property BackgroundColor: TColor read FBackgroundColor write SetBackgroundColor;
-    property Canvas: TCanvas read FCanvas;
     property ForegroundColor: TColor read FForegroundColor write SetForegroundColor;
     property Font: TFont write SetFont;
     property Style: TFontStyles read FStyle write SetStyle;
@@ -132,70 +131,73 @@ end;
 
 { TBCEditorPaintHelper ********************************************************}
 
-procedure TBCEditorPaintHelper.BeginDrawing(const ACanvas: TCanvas);
+procedure TBCEditorPaintHelper.BeginDraw(const AHandle: HDC);
 begin
-  Assert((FDrawingCount = 0) or (ACanvas = FCanvas));
+  Assert(AHandle <> 0);
 
-  if (FDrawingCount = 0) then
-    FCanvas := ACanvas;
-  Inc(FDrawingCount);
+  FHandles.Push(FHandle);
+  FSavedDCs.Push(SaveDC(FHandle));
 
-  FSavedHandles.Push(SaveDC(FCanvas.Handle));
+  FHandle := AHandle;
 
-  SelectObject(FCanvas.Handle, FObjectFonts.Items[FObjectFonts.Add(FStyle)].Handle);
-  SetTextColor(FCanvas.Handle, ColorToRGB(FForegroundColor));
-  SetBkColor(FCanvas.Handle, ColorToRGB(FBackgroundColor));
-  SetBkMode(FCanvas.Handle, TRANSPARENT);
+  SelectObject(FHandle, FObjectFonts.Items[FObjectFonts.Add(FStyle)].Handle);
+  SetTextColor(FHandle, ColorToRGB(FForegroundColor));
+  SetBkColor(FHandle, ColorToRGB(FBackgroundColor));
+  SetBkMode(FHandle, TRANSPARENT);
 end;
 
 constructor TBCEditorPaintHelper.Create(const AFont: TFont);
 begin
   inherited Create();
 
-  FBrush := TBrush.Create();
-  FObjectFonts := TObjectFonts.Create();
-  FSavedHandles := TStack<Integer>.Create();
-  FForegroundColor := clWindowText;
   FBackgroundColor := clWindow;
+  FBrush := TBrush.Create();
+  FForegroundColor := clWindowText;
+  FHandle := 0;
+  FHandles := TStack<HDC>.Create();
+  FObjectFonts := TObjectFonts.Create();
+  FSavedDCs := TStack<Integer>.Create();
   FStyle := [];
-  Font := AFont;
+  SetFont(AFont);
 end;
 
 destructor TBCEditorPaintHelper.Destroy();
 begin
   FBrush.Free();
+  FHandles.Free();
   FObjectFonts.Free();
-  FSavedHandles.Free();
+  FSavedDCs.Free();
 
   inherited;
 end;
 
-procedure TBCEditorPaintHelper.EndDrawing();
+procedure TBCEditorPaintHelper.EndDraw();
 begin
-  if (FDrawingCount > 0) then
-  begin
-    Dec(FDrawingCount);
-    RestoreDC(FCanvas.Handle, FSavedHandles.Pop());
-    if (FDrawingCount = 0) then
-      FCanvas := nil;
-  end;
+  Assert(FHandles.Count > 0);
+
+  FHandle := FHandles.Pop();
+  RestoreDC(FHandle, FSavedDCs.Pop());
 end;
 
 function TBCEditorPaintHelper.ExtTextOut(X, Y: Integer; Options: Longint;
   Rect: TRect; Str: LPCWSTR; Count: Longint; Dx: PInteger): BOOL;
 begin
-  Result := Windows.ExtTextOut(Canvas.Handle, X, Y, Options, @Rect, Str, Count, Dx);
+  Assert(FHandle <> 0);
+
+  Result := Windows.ExtTextOut(FHandle, X, Y, Options, @Rect, Str, Count, Dx);
 end;
 
 function TBCEditorPaintHelper.FillRect(const ARect: TRect): BOOL;
 begin
-  Result := Windows.ExtTextOut(Canvas.Handle, 0, 0, ETO_OPAQUE, ARect, '', 0, nil);
+  Assert(FHandle <> 0);
+
+  Result := Windows.ExtTextOut(FHandle, 0, 0, ETO_OPAQUE, ARect, '', 0, nil);
 end;
 
 function TBCEditorPaintHelper.FrameRect(const ARect: TRect; AColor: TColor): Integer;
 begin
   FBrush.Color := AColor;
-  Result := Windows.FrameRect(Canvas.Handle, ARect, FBrush.Handle);
+  Result := Windows.FrameRect(FHandle, ARect, FBrush.Handle);
 end;
 
 procedure TBCEditorPaintHelper.SetBackgroundColor(const AValue: TColor);
@@ -203,8 +205,8 @@ begin
   if (AValue <> FBackgroundColor) then
   begin
     FBackgroundColor := AValue;
-    if (Assigned(FCanvas)) then
-      SetBkColor(FCanvas.Handle, ColorToRGB(FBackgroundColor));
+    if (FHandle <> 0) then
+      SetBkColor(FHandle, ColorToRGB(FBackgroundColor));
   end;
 end;
 
@@ -222,8 +224,8 @@ begin
   if (AValue <> FForegroundColor) then
   begin
     FForegroundColor := AValue;
-    if (Assigned(FCanvas)) then
-      SetTextColor(FCanvas.Handle, ColorToRGB(FForegroundColor));
+    if (FHandle <> 0) then
+      SetTextColor(FHandle, ColorToRGB(FForegroundColor));
   end;
 end;
 
@@ -232,8 +234,8 @@ begin
   if (AValue <> FStyle) then
   begin
     FStyle := AValue;
-    if (Assigned(FCanvas)) then
-      SelectObject(FCanvas.Handle, FObjectFonts.Items[FObjectFonts.Add(FStyle)].Handle);
+    if (FHandle <> 0) then
+      SelectObject(FHandle, FObjectFonts.Items[FObjectFonts.Add(FStyle)].Handle);
   end;
 end;
 
@@ -241,9 +243,9 @@ function TBCEditorPaintHelper.TextHeight(const AText: PChar; const ALength: Inte
 var
   LSize: TSize;
 begin
-  Assert(Assigned(FCanvas));
+  Assert(FHandle <> 0);
 
-  if (not GetTextExtentPoint32(FCanvas.Handle, AText, ALength, LSize)) then
+  if (not GetTextExtentPoint32(FHandle, AText, ALength, LSize)) then
     RaiseLastOSError();
   Result := LSize.cy;
 end;
@@ -252,9 +254,9 @@ function TBCEditorPaintHelper.TextWidth(const AText: PChar; const ALength: Integ
 var
   LSize: TSize;
 begin
-  Assert(Assigned(FCanvas));
+  Assert(FHandle <> 0);
 
-  if (not GetTextExtentPoint32(FCanvas.Handle, AText, ALength, LSize)) then
+  if (not GetTextExtentPoint32(FHandle, AText, ALength, LSize)) then
     RaiseLastOSError();
   Result := LSize.cx;
 end;

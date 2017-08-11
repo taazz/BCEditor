@@ -25,7 +25,8 @@ const
   ecPageBottom = 14;
   ecEditorTop = 15;
   ecEditorBottom = 16;
-  ecGotoXY = 17;
+  ecShowGotoLine = 17;
+  ecGotoLine = 18;
   { Selection }
   ecSelection = 100;
   ecSelectionLeft = ecLeft + ecSelection;
@@ -42,7 +43,6 @@ const
   ecSelectionPageBottom = ecPageBottom + ecSelection;
   ecSelectionEditorTop = ecEditorTop + ecSelection;
   ecSelectionEditorBottom = ecEditorBottom + ecSelection;
-  ecSelectionGotoXY = ecGotoXY + ecSelection;
   ecSelectionWord = ecSelection + 21;
   ecSelectAll = ecSelection + 22;
   { Scrolling }
@@ -233,7 +233,8 @@ const
     (Value: ecPageBottom; Name: 'ecPageBottom'),
     (Value: ecEditorTop; Name: 'ecEditorTop'),
     (Value: ecEditorBottom; Name: 'ecEditorBottom'),
-    (Value: ecGotoXY; Name: 'ecGotoXY'),
+    (Value: ecShowGotoLine; Name: 'ecShowGotoLine'),
+    (Value: ecGotoLine; Name: 'ecGotoLine'),
     (Value: ecSelection; Name: 'ecSelection'),
     (Value: ecSelectionLeft; Name: 'ecSelectionLeft'),
     (Value: ecSelectionRight; Name: 'ecSelectionRight'),
@@ -249,7 +250,6 @@ const
     (Value: ecSelectionPageBottom; Name: 'ecSelectionPageBottom'),
     (Value: ecSelectionEditorTop; Name: 'ecSelectionEditorTop'),
     (Value: ecSelectionEditorBottom; Name: 'ecSelectionEditorBottom'),
-    (Value: ecSelectionGotoXY; Name: 'ecSelectionGotoXY'),
     (Value: ecSelectionWord; Name: 'ecSelectionWord'),
     (Value: ecSelectAll; Name: 'ecSelectAll'),
     (Value: ecScrollUp; Name: 'ecScrollUp'),
@@ -642,6 +642,7 @@ begin
   Add(ecSelectionLineEnd, [ssShift], VK_END);
   Add(ecEditorBottom, [ssCtrl], VK_END);
   Add(ecSelectionEditorBottom, [ssShift, ssCtrl], VK_END);
+  Add(ecShowGotoLine, [ssAlt], Ord('G'));
   { Insert key alone }
   Add(ecToggleMode, [], VK_INSERT);
   { Clipboard }

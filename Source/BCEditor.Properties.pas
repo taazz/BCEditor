@@ -388,7 +388,6 @@ type
 
   TBCEditorSearch = class(TPersistent)
   public type
-    TExecutedEvent = procedure(ASender: TObject; const AErrorMessage: string) of object;
     TWrapAroundEvent = function(ASender: TObject; const APattern: string; const ABackwards: Boolean): Boolean of object;
 
     THighlighter = class(TPersistent)
@@ -432,8 +431,6 @@ type
     FEngineType: TBCEditorSearchEngine;
     FHighlighter: THighlighter;
     FOnChange: TNotifyEvent;
-    FOnFind: TNotifyEvent;
-    FOnExecuted: TExecutedEvent;
     FOnWrapAround: TWrapAroundEvent;
     FOptions: TBCEditorSearchOptions;
     FPattern: string;
@@ -453,8 +450,6 @@ type
   published
     property Engine: TBCEditorSearchEngine read FEngineType write SetEngineType default seNormal;
     property Highlighter: THighlighter read FHighlighter write SetHighlighter;
-    property OnFind: TNotifyEvent read FOnFind write FOnFind;
-    property OnExecuted: TExecutedEvent read FOnExecuted write FOnExecuted;
     property OnWrapAround: TWrapAroundEvent read FOnWrapAround write FOnWrapAround;
     property Options: TBCEditorSearchOptions read FOptions write FOptions default DefaultOptions;
   end;
@@ -1482,7 +1477,6 @@ begin
 
   FEngineType := seNormal;
   FHighlighter := THighlighter.Create;
-  FOnExecuted := nil;
   FOptions := DefaultOptions;
 end;
 

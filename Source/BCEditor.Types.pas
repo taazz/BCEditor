@@ -190,6 +190,7 @@ type
 
   TBCEditorCaretChangedEvent = procedure(ASender: TObject; ACaretPos: TPoint) of object;
   TBCEditorContextHelpEvent = procedure(ASender: TObject; AWord: string) of object;
+  TBCEditorFindExecutedEvent = procedure(ASender: TObject; const AErrorMessage: string) of object;
   TBCEditorHintEvent = procedure(ASender: TObject; const AX, AY: Integer; const APos: TPoint; const AIndex: Integer; var AHint: string) of object;
   TBCEditorKeyPressWEvent = procedure(ASender: TObject; var AKey: Char) of object;
   TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;

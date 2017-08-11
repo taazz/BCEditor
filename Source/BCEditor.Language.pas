@@ -1,6 +1,6 @@
 unit BCEditor.Language;
 
-interface
+interface {********************************************************************}
 
 resourcestring
 
@@ -9,6 +9,8 @@ resourcestring
   SBCEditorMessageError = 'Error';
   SBCEditorMessageInformation = 'Information';
   SBCEditorMessageQuestion = 'Question';
+  SBCEditorOk = 'Ok';
+  SBCEditorCancel = 'Cancel';
 
   { BCEditor.Editor }
   SBCEditorCodeFoldingCollapsedMark = '%d Lines';
@@ -31,6 +33,10 @@ resourcestring
   { BCEditor.Print.Preview }
   SBCEditorPreviewScrollHint = 'Page: %d';
 
-implementation
+  { BCEditor.DGotoLine }
+  SBCEditorGotoLineCaption = 'Go to Line Number';
+  SBCEditorGotoLineLine = 'Enter new line number';
+
+implementation {***************************************************************}
 
 end.

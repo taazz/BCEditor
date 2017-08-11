@@ -1987,7 +1987,7 @@ var
   LTempText: string;
   LTokenText: string;
 begin
-  FPaintHelper.BeginDrawing(FCanvas);
+  FPaintHelper.BeginDraw(FCanvas.Handle);
   with FMargins do
     LClipRect := Rect(PixelLeft, PixelTop, PixelRight, PixelBottom);
 
@@ -2075,7 +2075,7 @@ begin
       LLines.Free;
     end
   end;
-  FPaintHelper.EndDrawing;
+  FPaintHelper.EndDraw;
 end;
 
 procedure TBCEditorPrint.WriteLine(const AText: string);

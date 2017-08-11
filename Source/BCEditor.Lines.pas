@@ -26,7 +26,7 @@ type
       function IsRunning(): Boolean; overload; {$IFNDEF Debug} inline; {$ENDIF}
       function IsRunning(const AJob: TJob): Boolean; overload; {$IFNDEF Debug} inline; {$ENDIF}
       function IsRunning(const AJobs: TJobs): Boolean; overload; {$IFNDEF Debug} inline; {$ENDIF}
-      procedure Run(const AJob: TJob; const AExecuted: TExecutedProc);
+      procedure Start(const AJob: TJob; const AExecuted: TExecutedProc);
       property Job: TJob read FJob;
     public
       constructor Create(const ALines: TBCEditorLines);
@@ -247,6 +247,7 @@ type
     FBookmarks: TMarkList;
     FCaretPosition: TBCEditorLinesPosition;
     FCaseSensitive: Boolean;
+    FFinal: Boolean;
     FFoundAreas: TList<TBCEditorLinesArea>;
     FHighlighter: TBCEditorHighlighter;
     FItems: TLines;
@@ -380,7 +381,7 @@ type
     function SyncEditAvailable(const AHighlighter: TBCEditorHighlighter;
       const ATerminated: TBCEditorTerminatedFunc): Boolean;
     function SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
-    procedure TerminateJob();
+    procedure TerminateJob(const AFinal: Boolean = False);
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure UndoGroupBreak();
     function ValidPosition(const APosition: TBCEditorLinesPosition): Boolean;
@@ -531,7 +532,7 @@ begin
   Result := IsRunning() and (FJob in AJobs);
 end;
 
-procedure TBCEditorLines.TJobThread.Run(const AJob: TJob;
+procedure TBCEditorLines.TJobThread.Start(const AJob: TJob;
   const AExecuted: TExecutedProc);
 begin
   FJob := AJob;
@@ -1285,7 +1286,7 @@ begin
   LLineBreakLength := Length(LineBreak);
 
   if (APosition.Line = ARelativePosition.Line) then
-    Result := ARelativePosition.Char - APosition.Char
+    Result := APosition.Char - ARelativePosition.Char
   else if (APosition < ARelativePosition) then
   begin
     Result := - ARelativePosition.Char - LLineBreakLength;
@@ -1379,6 +1380,7 @@ begin
   FBookmarks.OnChange := BookmarksChanged;
   FCaretPosition := BOFPosition;
   FCaseSensitive := False;
+  FFinal := False;
   FItems := TLines.Create();
   FJobThread := nil;
   FMarks := TMarkList.Create(Self);
@@ -2352,34 +2354,37 @@ end;
 
 procedure TBCEditorLines.JobExecuted();
 begin
-  Assert(Assigned(FJobThread) and not FJobThread.Terminated);
+  Assert(Assigned(FJobThread));
 
   FState := FState - [lsSearching, lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair, lsBlockModify];
 
-  BeginUpdate();
-  try
-    case (FJobThread.FJob) of
-      tjActivateSyncEdit:
-        begin
-          SetCaretPosition(FSyncEditItems[0].Area.BeginPosition);
-          SetSelArea(FSyncEditItems[0].Area);
-          if (Assigned(FJobThread.FExecuted)) then
-            FJobThread.FExecuted(nil);
-        end;
-      tjCheckSyncEdit:
-        begin
-          if (Assigned(FJobThread.FExecuted)) then
-            FJobThread.FExecuted(nil);
-        end;
-      tjScanMatchingPair,
-      tjSearch:
-        begin
-          if (Assigned(FJobThread.FExecuted)) then
-            FJobThread.FExecuted(@FSearchResult);
-        end;
+  if (not FJobThread.Terminated) then
+  begin
+    BeginUpdate();
+    try
+      case (FJobThread.FJob) of
+        tjActivateSyncEdit:
+          begin
+            SetCaretPosition(FSyncEditItems[0].Area.BeginPosition);
+            SetSelArea(FSyncEditItems[0].Area);
+            if (Assigned(FJobThread.FExecuted)) then
+              FJobThread.FExecuted(nil);
+          end;
+        tjCheckSyncEdit:
+          begin
+            if (Assigned(FJobThread.FExecuted)) then
+              FJobThread.FExecuted(nil);
+          end;
+        tjScanMatchingPair,
+        tjSearch:
+          begin
+            if (Assigned(FJobThread.FExecuted)) then
+              FJobThread.FExecuted(@FSearchResult);
+          end;
+      end;
+    finally
+      EndUpdate();
     end;
-  finally
-    EndUpdate();
   end;
 end;
 
@@ -3334,13 +3339,9 @@ begin
   if (LValue <> FSelArea) then
   begin
     BeginUpdate();
-    try
-      FSelArea := LValue;
-
-      Include(FState, lsSelChanged);
-    finally
-      EndUpdate();
-    end;
+    FSelArea := LValue;
+    Include(FState, lsSelChanged);
+    EndUpdate();
   end;
 end;
 
@@ -3474,6 +3475,8 @@ procedure TBCEditorLines.StartJob(const AJob: TJobThread.TJob;
   const ABlockModify: Boolean;
   const AExecuted: TJobThread.TExecutedProc);
 begin
+  Assert(not FFinal);
+
   case (AJob) of
     tjActivateSyncEdit: Include(FState, lsScanningSyncEdit);
     tjCheckSyncEdit: Include(FState, lsCheckingSyncEdit);
@@ -3490,7 +3493,7 @@ begin
   if (ABlockModify) then
     Include(FState, lsBlockModify);
 
-  FJobThread.Run(AJob, AExecuted);
+  FJobThread.Start(AJob, AExecuted);
 end;
 
 procedure TBCEditorLines.StartScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
@@ -3563,9 +3566,11 @@ begin
   end;
 end;
 
-procedure TBCEditorLines.TerminateJob();
+procedure TBCEditorLines.TerminateJob(const AFinal: Boolean = False);
 begin
-  if (Assigned(FJobThread) and FJobThread.IsRunning()) then
+  FFinal := AFinal;
+
+  if (Assigned(FJobThread) and (AFinal or FJobThread.IsRunning())) then
   begin
     FJobThread.Terminate();
     FJobThread.WaitFor();
