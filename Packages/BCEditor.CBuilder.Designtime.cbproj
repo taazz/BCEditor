@@ -145,6 +145,9 @@
         <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">
             <BuildOrder>36</BuildOrder>
         </DelphiCompile>
+        <DelphiCompile Include="..\Source\BCEditor.GotoLine.pas">
+            <BuildOrder>37</BuildOrder>
+        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Language.pas">
             <BuildOrder>38</BuildOrder>
         </DelphiCompile>

@@ -140,8 +140,11 @@
         <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
             <BuildOrder>30</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">
+        <DelphiCompile Include="..\Source\BCEditor.GotoLine.pas">
             <BuildOrder>31</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">
+            <BuildOrder>32</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Language.pas">
             <BuildOrder>33</BuildOrder>

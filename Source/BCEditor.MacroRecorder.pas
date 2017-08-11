@@ -309,7 +309,7 @@ function TBCBaseEditorMacroRecorder.CreateMacroEvent(ACommand: TBCEditorCommand)
 
 begin
   case ACommand of
-    ecGotoXY, ecSelectionGotoXY, ecSetBookmark1 .. ecSetBookmark9:
+    ecSetBookmark1 .. ecSetBookmark9:
       begin
         Result := TBCEditorPositionEvent.Create;
         TBCEditorPositionEvent(Result).Command := ACommand;

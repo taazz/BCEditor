@@ -41,6 +41,7 @@ contains
   BCEditor.Editor.KeyCommands in '..\Source\BCEditor.Editor.KeyCommands.pas',
   BCEditor.Export.HTML in '..\Source\BCEditor.Export.HTML.pas',
   BCEditor.Highlighter in '..\Source\BCEditor.Highlighter.pas',
+  BCEditor.GotoLine in '..\Source\BCEditor.GotoLine.pas',
   BCEditor.Language in '..\Source\BCEditor.Language.pas',
   BCEditor.Lines in '..\Source\BCEditor.Lines.pas',
   BCEditor.MacroRecorder in '..\Source\BCEditor.MacroRecorder.pas',
