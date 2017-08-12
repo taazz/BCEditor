@@ -129,11 +129,11 @@
         <DCCReference Include="..\Source\BCEditor.Consts.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.CodeFolding.pas"/>
+        <DCCReference Include="..\Source\BCEditor.Commands.pas"/>
         <DCCReference Include="..\Source\BCEditor.CompletionProposal.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.KeyCommands.pas"/>
         <DCCReference Include="..\Source\BCEditor.Export.HTML.pas"/>
-        <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
+        <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
         <DCCReference Include="..\Source\BCEditor.Language.pas"/>
         <DCCReference Include="..\Source\BCEditor.Lines.pas"/>
         <DCCReference Include="..\Source\BCEditor.MacroRecorder.pas"/>

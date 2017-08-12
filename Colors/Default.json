@@ -8,10 +8,6 @@
         "CodeFoldingFoldingLine": "$00CC9999",
         "CodeFoldingIndent": "$00CC9999",
         "CodeFoldingIndentHighlight": "$00CC9999",
-        "CompletionProposalBackground": "clWindow",
-        "CompletionProposalForeground": "clBlack",
-        "CompletionProposalSelectedBackground": "clHighlight",
-        "CompletionProposalSelectedText": "clHighlightText",
         "LeftMarginBackground": "$00F4F4F4",
         "LeftMarginLineNumbers": "$00CC9999",
         "LeftMarginLineStateModified": "clYellow",
@@ -24,7 +20,6 @@
         "SelectionForeground": "clWindow",
         "SpecialCharForeground": "clGrayText",
         "SyncEditBackground": "$00FAFFE6",
-        "SyncEditEditBorder": "clBlack",
         "SyncEditWordBorder": "$00A56D53"
       },
       "Fonts": {

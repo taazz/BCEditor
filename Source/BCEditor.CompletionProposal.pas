@@ -82,7 +82,7 @@ uses
   Windows,
   SysUtils, UITypes, Math,
   Themes, Dialogs,
-  BCEditor.Consts, BCEditor.Editor, BCEditor.Editor.KeyCommands, BCEditor.Lines;
+  BCEditor.Consts, BCEditor.Editor, BCEditor.Commands, BCEditor.Lines;
 
 type
   TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
@@ -486,11 +486,11 @@ begin
         if Length(FCurrentString) > 0 then
         begin
           CurrentString := Copy(FCurrentString, 1, Length(FCurrentString) - 1);
-          TCustomBCEditor(Editor).CommandProcessor(ecLeft, BCEDITOR_NONE_CHAR, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecLeft, nil);
         end
         else
         begin
-          TCustomBCEditor(Editor).CommandProcessor(ecLeft, BCEDITOR_NONE_CHAR, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecLeft, nil);
           Editor.SetFocus;
         end;
         FSendToEditor := False;
@@ -509,7 +509,7 @@ begin
         else
           Editor.SetFocus;
 
-        CommandProcessor(ecRight, BCEDITOR_NONE_CHAR, nil);
+        ProcessCommand(ecRight, nil);
         FSendToEditor := False;
       end;
     VK_PRIOR:
@@ -555,18 +555,18 @@ begin
         begin
           CurrentString := Copy(FCurrentString, 1, Length(FCurrentString) - 1);
 
-          TCustomBCEditor(Editor).CommandProcessor(ecBackspace, BCEDITOR_NONE_CHAR, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecBackspace, nil);
         end
         else
         begin
-          TCustomBCEditor(Editor).CommandProcessor(ecBackspace, BCEDITOR_NONE_CHAR, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecBackspace, nil);
           Editor.SetFocus;
         end;
         FSendToEditor := False;
       end;
     VK_DELETE:
       begin
-        TCustomBCEditor(Editor).CommandProcessor(ecDeleteChar, BCEDITOR_NONE_CHAR, nil);
+        TCustomBCEditor(Editor).ProcessCommand(ecDeleteChar, nil);
         FSendToEditor := False;
       end;
   end;
@@ -575,6 +575,8 @@ begin
 end;
 
 procedure TBCEditorCompletionProposalPopup.KeyPress(var Key: Char);
+var
+  LData: TBCEditorCDChar;
 begin
   case Key of
     BCEDITOR_CARRIAGE_RETURN:
@@ -594,7 +596,11 @@ begin
           OnKeyPress(Self, Key);
       end;
     BCEDITOR_BACKSPACE_CHAR:
-      TCustomBCEditor(Editor).CommandProcessor(ecChar, Key, nil);
+      begin
+        LData.Size := SizeOf(LData);
+        LData.Char := Key;
+        TCustomBCEditor(Editor).ProcessCommand(ecChar, @LData);
+      end;
   end;
   if (FSendToEditor) then
     PostMessage(TCustomBCEditor(Editor).Handle, WM_CHAR, WParam(Key), 0);
@@ -649,7 +655,7 @@ var
 begin
   with FBitmapBuffer do
   begin
-    Canvas.Brush.Color := FCompletionProposal.Colors.Background;
+    Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
     Height := 0;
     Width := ClientWidth;
     Height := ClientHeight;
@@ -695,14 +701,14 @@ begin
 
       if LIndex + TopLine = FSelectedLine then
       begin
-        Canvas.Brush.Color := FCompletionProposal.Colors.SelectedBackground;
-        Canvas.Pen.Color := FCompletionProposal.Colors.SelectedBackground;
+        Canvas.Brush.Color := TCustomBCEditor(FEditor).Colors.Selection.Background;
+        Canvas.Pen.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground;
         Canvas.Rectangle(LRect);
       end
       else
       begin
-        Canvas.Brush.Color := FCompletionProposal.Colors.Background;
-        Canvas.Pen.Color := FCompletionProposal.Colors.Background;
+        Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
+        Canvas.Pen.Color := TCustomBCEditor(FEditor).Color;
       end;
       LColumnWidth := 0;
       for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
@@ -714,9 +720,9 @@ begin
           Canvas.Font.Assign(LColumn.Font);
 
           if LIndex + TopLine = FSelectedLine then
-            Canvas.Font.Color := FCompletionProposal.Colors.SelectedText
+            Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
           else
-            Canvas.Font.Color := FCompletionProposal.Colors.Foreground;
+            Canvas.Font.Color := TCustomBCEditor(FEditor).Font.Color;
 
           if LItemIndex < LColumn.Items.Count then
           begin

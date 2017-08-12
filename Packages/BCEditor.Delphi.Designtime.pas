@@ -31,9 +31,6 @@ begin
 
   RegisterPropertyEditor(TypeInfo(Char), nil, '', TCharProperty);
   RegisterPropertyEditor(TypeInfo(TStrings), nil, '', TStringListProperty);
-  RegisterPropertyEditor(TypeInfo(TShortCut), TBCEditorCompletionProposal, '', TShortCutProperty);
-  RegisterPropertyEditor(TypeInfo(TShortCut), TBCEditorMacroRecorder, '', TShortCutProperty);
-  RegisterPropertyEditor(TypeInfo(TShortCut), TBCEditorSyncEdit, '', TShortCutProperty);
 end;
 
 end.

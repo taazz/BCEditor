@@ -130,11 +130,11 @@
         <DelphiCompile Include="..\Source\BCEditor.CompletionProposal.pas">
             <BuildOrder>9</BuildOrder>
         </DelphiCompile>
+        <DelphiCompile Include="..\Source\BCEditor.Commands.pas">
+            <BuildOrder>18</BuildOrder>
+        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
             <BuildOrder>15</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.KeyCommands.pas">
-            <BuildOrder>18</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.pas">
             <BuildOrder>22</BuildOrder>

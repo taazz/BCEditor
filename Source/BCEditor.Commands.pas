@@ -1,10 +1,11 @@
-unit BCEditor.Editor.KeyCommands;
+unit BCEditor.Commands;
 
 interface
 
 uses
-  Classes, SysUtils,
-  Menus;
+  Classes, SysUtils, Types,
+  Menus,
+  BCEditor.Types;
 
 const
   ecNone = 0;
@@ -26,7 +27,9 @@ const
   ecEditorTop = 15;
   ecEditorBottom = 16;
   ecShowGotoLine = 17;
-  ecGotoLine = 18;
+  ecLine = 18;
+  ecRow = 19;
+  ecLinePosition = 20;
   { Selection }
   ecSelection = 100;
   ecSelectionLeft = ecLeft + ecSelection;
@@ -45,6 +48,8 @@ const
   ecSelectionEditorBottom = ecEditorBottom + ecSelection;
   ecSelectionWord = ecSelection + 21;
   ecSelectAll = ecSelection + 22;
+  ecSelectionLine = ecSelection + 23;
+  ecSelectionPosition = ecSelection + 24;
   { Scrolling }
   ecScrollUp = 211;
   ecScrollDown = 212;
@@ -79,8 +84,6 @@ const
   ecGotoPreviousBookmark = 331;
   { CompletionProposal }
   ecCompletionProposal = 470;
-  { Help }
-  ecContextHelp = 490;
   { Deletion }
   ecBackspace = 501;
   ecDeleteChar = 502;
@@ -94,8 +97,7 @@ const
   ecReturn = 509;
   ecInsertLine = 510;
   ecChar = 511;
-  ecString = 512;
-  ecImeStr = 550;
+  ecText = 512;
   { Clipboard }
   ecUndo = 601;
   ecRedo = 602;
@@ -111,15 +113,21 @@ const
   ecUpperCase = 620;
   ecLowerCase = 621;
   { SyncEdit }
-  ecActivateSyncEdit = 701;
-  ecDeactivateSyncEdit = 702;
+  ecSyncEdit = 701;
+  { MacroRecorder }
+  ecRecordMacro = 720;
+  ecStopMacro = 721;
+  ecPlaybackMacro = 722;
+  ecStepMacro = 723;
   { Search }
   ecShowFind = 801;
   ecFindFirst = 802;
   ecFindNext = 803;
   ecFindPrevious = 804;
-  ecShowReplace = 805;
-  ecReplace = 806;
+  ecFindForeward = 805;
+  ecFindBackward = 806;
+  ecShowReplace = 807;
+  ecReplace = 808;
   { Comments }
   ecLineComment = 900;
   ecBlockComment = 901;
@@ -129,20 +137,99 @@ const
 type
   TBCEditorCommand = type Word;
 
-  TBCEditorHookedCommandEvent = procedure(ASender: TObject; AAfterProcessing: Boolean; var AHandled: Boolean;
-    var ACommand: TBCEditorCommand; var AChar: Char; Data: Pointer; AHandlerData: Pointer) of object;
-  TBCEditorProcessCommandEvent = procedure(ASender: TObject; var ACommand: TBCEditorCommand; const AChar: Char;
-    AData: Pointer) of object;
 
-  TBCEditorHookedCommandHandler = class(TObject)
-  strict private
-    FData: Pointer;
-    FEvent: TBCEditorHookedCommandEvent;
+  { Command Data }
+
+  PBCEditorCD = ^TBCEditorCD;
+  TBCEditorCD = packed record
+    Size: Int64; // Must be the first in EVERY command data!
+  end;
+
+  PBCEditorCDChar = ^TBCEditorCDChar;
+  TBCEditorCDChar = packed record
+    Size: Int64;
+    Char: Char;
+    Count: Int64;
+  end;
+
+  PBCEditorCDFind = ^TBCEditorCDFind;
+  TBCEditorCDFind = packed record
+    Size: Int64;
+    Options: TBCEditorFindOptions;
+  private
+    FPattern: PChar;
+    FPatternLength: Int64;
+    function GetPattern(): string;
   public
-    constructor Create(AEvent: TBCEditorHookedCommandEvent; AData: pointer);
-    function Equals(AEvent: TBCEditorHookedCommandEvent): Boolean; reintroduce;
-    property Data: Pointer read FData write FData;
-    property Event: TBCEditorHookedCommandEvent read FEvent write FEvent;
+    class function Create(const APattern: string;
+      const AOptions: TBCEditorFindOptions): PBCEditorCDFind; static;
+    procedure Free();
+    property Pattern: string read GetPattern;
+  end;
+
+  PBCEditorCDItem = ^TBCEditorCDItem;
+  TBCEditorCDItem = packed record
+    Size: Int64;
+    Item: Integer;
+    Selection: Boolean;
+  end;
+
+  PBCEditorCDPosition = ^TBCEditorCDPosition;
+  TBCEditorCDPosition = packed record
+    Size: Int64;
+    Pos: TPoint;
+    Selection: Boolean;
+  end;
+
+  PBCEditorCDReplace = ^TBCEditorCDReplace;
+  TBCEditorCDReplace = packed record
+    Size: Int64;
+    Options: TBCEditorReplaceOptions;
+    Pattern: PChar;
+    PatternLength: Int64;
+    ReplaceText: PChar;
+    ReplaceTextLength: Int64;
+    class function Create(const APattern, AReplaceText: string;
+      const AOptions: TBCEditorReplaceOptions): PBCEditorCDReplace; static;
+    class procedure Decode(const AData: PBCEditorCDReplace; var APattern, AReplaceText: string;
+      var AOptions: TBCEditorReplaceOptions); static;
+    procedure Free();
+  end;
+
+  PBCEditorCDSelection = ^TBCEditorCDSelection;
+  TBCEditorCDSelection = packed record
+    Size: Int64;
+    CaretPos: TPoint;
+    BeginPos: TPoint;
+    EndPos: TPoint;
+  end;
+
+  PBCEditorCDText = ^TBCEditorCDText;
+  TBCEditorCDText = packed record
+    Size: Int64;
+    Area: TBCEditorLinesArea;
+    Selection: Boolean;
+  private
+    FText: PChar;
+    FTextLength: Int64;
+    function GetText(): string;
+  public
+    class function Create(const AArea: TBCEditorLinesArea; const AText: string; const ASelection: Boolean): PBCEditorCDText; static;
+    procedure Free();
+    property Text: string read GetText;
+  end;
+
+  TBCEditorHookedCommandProc = procedure(const AEditor: Pointer; const ABefore: LongBool;
+    const ACommand: Integer; const AData: PBCEditorCD; var AHandled: LongBool; const AHandlerData: Pointer); stdcall;
+  TBCEditorHookedCommandObjectProc = procedure(ASender: TObject; const ABefore: Boolean;
+    const ACommand: TBCEditorCommand; const AData: PBCEditorCD; var AHandled: Boolean) of object;
+  TBCEditorProcessCommandEvent = procedure(ASender: TObject; const ACommand: TBCEditorCommand; const AData: PBCEditorCD; var AAllowed: Boolean) of object;
+
+  TBCEditorHookedCommandHandler = record
+    HandlerData: Pointer;
+    ObjectProc: TBCEditorHookedCommandObjectProc;
+    Proc: TBCEditorHookedCommandProc;
+    class operator Equal(a, b: TBCEditorHookedCommandHandler): Boolean; inline;
   end;
 
   TBCEditorKeyCommand = class(TCollectionItem)
@@ -177,7 +264,7 @@ type
 
   EBCEditorKeyCommandException = class(Exception);
 
-  TBCEditorKeyCommands = class(TCollection)
+  TBCEditorCommands = class(TCollection)
   strict private
     FOwner: TPersistent;
     function GetItem(AIndex: Integer): TBCEditorKeyCommand;
@@ -205,6 +292,7 @@ implementation
 
 uses
   Windows,
+  SysConst,
   BCEditor.Language;
 
 resourcestring
@@ -217,7 +305,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 98] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 105] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -234,7 +322,9 @@ const
     (Value: ecEditorTop; Name: 'ecEditorTop'),
     (Value: ecEditorBottom; Name: 'ecEditorBottom'),
     (Value: ecShowGotoLine; Name: 'ecShowGotoLine'),
-    (Value: ecGotoLine; Name: 'ecGotoLine'),
+    (Value: ecLine; Name: 'ecLine'),
+    (Value: ecRow; Name: 'ecRow'),
+    (Value: ecLinePosition; Name: 'ecLinePosition'),
     (Value: ecSelection; Name: 'ecSelection'),
     (Value: ecSelectionLeft; Name: 'ecSelectionLeft'),
     (Value: ecSelectionRight; Name: 'ecSelectionRight'),
@@ -251,6 +341,8 @@ const
     (Value: ecSelectionEditorTop; Name: 'ecSelectionEditorTop'),
     (Value: ecSelectionEditorBottom; Name: 'ecSelectionEditorBottom'),
     (Value: ecSelectionWord; Name: 'ecSelectionWord'),
+    (Value: ecSelectionLine; Name: 'ecSelectionLine'),
+    (Value: ecSelectionPosition; Name: 'ecSelectionPosition'),
     (Value: ecSelectAll; Name: 'ecSelectAll'),
     (Value: ecScrollUp; Name: 'ecScrollUp'),
     (Value: ecScrollDown; Name: 'ecScrollDown'),
@@ -281,7 +373,6 @@ const
     (Value: ecSetBookmark0; Name: 'ecSetBookmark9'),
     (Value: ecGotoNextBookmark; Name: 'ecGotoNextBookmark'),
     (Value: ecGotoPreviousBookmark; Name: 'ecGotoPreviousBookmark'),
-    (Value: ecContextHelp; Name: 'ecContextHelp'),
     (Value: ecBackspace; Name: 'ecBackspace'),
     (Value: ecDeleteChar; Name: 'ecDeleteChar'),
     (Value: ecDeleteWord; Name: 'ecDeleteWord'),
@@ -293,8 +384,7 @@ const
     (Value: ecReturn; Name: 'ecReturn'),
     (Value: ecInsertLine; Name: 'ecInsertLine'),
     (Value: ecChar; Name: 'ecChar'),
-    (Value: ecString; Name: 'ecString'),
-    (Value: ecImeStr; Name: 'ecImeStr'),
+    (Value: ecText; Name: 'ecText'),
     (Value: ecUndo; Name: 'ecUndo'),
     (Value: ecRedo; Name: 'ecRedo'),
     (Value: ecCopy; Name: 'ecCopy'),
@@ -306,12 +396,17 @@ const
     (Value: ecShiftTab; Name: 'ecShiftTab'),
     (Value: ecUpperCase; Name: 'ecUpperCase'),
     (Value: ecLowerCase; Name: 'ecLowerCase'),
-    (Value: ecActivateSyncEdit; Name: 'ecActivateSyncEdit'),
-    (Value: ecDeactivateSyncEdit; Name: 'ecDeactivateSyncEdit'),
+    (Value: ecSyncEdit; Name: 'ecSyncEdit'),
+    (Value: ecRecordMacro; Name: 'ecRecordMacro'),
+    (Value: ecStopMacro; Name: 'ecStopMacro'),
+    (Value: ecPlaybackMacro; Name: 'ecPlaybackMacro'),
+    (Value: ecStepMacro; Name: 'ecStepMacro'),
     (Value: ecShowFind; Name: 'ecShowFind'),
     (Value: ecFindFirst; Name: 'ecFindFirst'),
     (Value: ecFindNext; Name: 'ecFindNext'),
     (Value: ecFindPrevious; Name: 'ecFindPrevious'),
+    (Value: ecFindForeward; Name: 'ecFindForeward'),
+    (Value: ecFindBackward; Name: 'ecFindBackward'),
     (Value: ecShowReplace; Name: 'ecShowReplace'),
     (Value: ecReplace; Name: 'ecReplace'),
     (Value: ecLineComment; Name: 'ecLineComment'),
@@ -366,23 +461,101 @@ begin
     Result := IntToStr(ACommand);
 end;
 
-{ TBCEditorHookedCommandHandler }
+{ TBCEditorTextCommandData ****************************************************}
 
-constructor TBCEditorHookedCommandHandler.Create(AEvent: TBCEditorHookedCommandEvent; AData: pointer);
+class function TBCEditorCDText.Create(const AArea: TBCEditorLinesArea;
+  const AText: string; const ASelection: Boolean): PBCEditorCDText;
+var
+  LSize: Int64;
 begin
-  inherited Create;
-
-  FEvent := AEvent;
-  FData := AData;
+  LSize := SizeOf(TBCEditorCDText) + Length(AText) * SizeOf(Char);
+  GetMem(Result, LSize);
+  Result^.Size := LSize;
+  Result^.Area := AArea;
+  Result^.Selection := ASelection;
+  Result^.FText := @PAnsiChar(Result)[SizeOf(TBCEditorCDText)];
+  Result^.FTextLength := Length(AText);
+  MoveMemory(Result^.FText, PChar(AText), Length(AText) * SizeOf(Char));
 end;
 
-function TBCEditorHookedCommandHandler.Equals(AEvent: TBCEditorHookedCommandEvent): Boolean;
-var
-  LClassMethod, LParamMethod: TMethod;
+procedure TBCEditorCDText.Free();
 begin
-  LClassMethod := TMethod(FEvent);
-  LParamMethod := TMethod(AEvent);
-  Result := (LClassMethod.Code = LParamMethod.Code) and (LClassMethod.Data = LParamMethod.Data);
+  FreeMem(@Self);
+end;
+
+function TBCEditorCDText.GetText(): string;
+begin
+  SetString(Result, FText, FTextLength);
+end;
+
+{ TBCEditorFindCommandData ****************************************************}
+
+class function TBCEditorCDFind.Create(const APattern: string;
+  const AOptions: TBCEditorFindOptions): PBCEditorCDFind;
+var
+  LSize: Int64;
+begin
+  LSize := SizeOf(TBCEditorCDFind) + Length(APattern) * SizeOf(Char);
+  GetMem(Result, LSize);
+  Result^.Size := LSize;
+  Result^.Options := AOptions;
+  Result^.FPattern := @PAnsiChar(Result)[SizeOf(TBCEditorCDFind)];
+  Result^.FPatternLength := Length(APattern);
+  MoveMemory(Result^.FPattern, PChar(APattern), Length(APattern) * SizeOf(Char));
+end;
+
+procedure TBCEditorCDFind.Free();
+begin
+  FreeMem(@Self);
+end;
+
+function TBCEditorCDFind.GetPattern(): string;
+begin
+  SetString(Result, FPattern, FPatternLength);
+end;
+
+{ TBCEditorReplaceCommandData *************************************************}
+
+class procedure TBCEditorCDReplace.Decode(const AData: PBCEditorCDReplace;
+  var APattern, AReplaceText: string; var AOptions: TBCEditorReplaceOptions);
+begin
+  if (not Assigned(AData) or (AData^.Size < SizeOf(TBCEditorCDReplace))) then
+    raise ERangeError.Create(SRangeError);
+
+  SetString(APattern, AData^.Pattern, AData^.PatternLength);
+  SetString(AReplaceText, AData^.ReplaceText, AData^.ReplaceTextLength);
+  AOptions := AData^.Options;
+end;
+
+class function TBCEditorCDReplace.Create(const APattern, AReplaceText: string;
+  const AOptions: TBCEditorReplaceOptions): PBCEditorCDReplace;
+var
+  LSize: Int64;
+begin
+  LSize := SizeOf(TBCEditorCDReplace) + Length(APattern) * SizeOf(Char) + Length(AReplaceText) * SizeOf(Char);
+  GetMem(Result, LSize);
+  Result^.Size := LSize;
+  Result^.Options := AOptions;
+  Result^.Pattern := @PAnsiChar(Result)[SizeOf(TBCEditorCDReplace)];
+  Result^.PatternLength := Length(APattern);
+  Result^.ReplaceText := @PAnsiChar(Result)[SizeOf(TBCEditorCDReplace) + Length(APattern) * SizeOf(Char)];
+  Result^.ReplaceTextLength := Length(AReplaceText);
+  MoveMemory(Result^.Pattern, PChar(APattern), Length(APattern) * SizeOf(Char));
+  MoveMemory(Result^.ReplaceText, PChar(AReplaceText), Length(AReplaceText) * SizeOf(Char));
+end;
+
+procedure TBCEditorCDReplace.Free();
+begin
+  FreeMem(@Self);
+end;
+
+{ TBCEditorHookedCommandHandler ***********************************************}
+
+class operator TBCEditorHookedCommandHandler.Equal(a, b: TBCEditorHookedCommandHandler): Boolean;
+begin
+  Result := (a.HandlerData = b.HandlerData)
+    and (TMethod(a.ObjectProc) = TMethod(b.ObjectProc))
+    and (Pointer((@a.Proc)^) = Pointer((@b.Proc)^));
 end;
 
 { TBCEditorKeyCommand }
@@ -453,7 +626,7 @@ var
 begin
   if AValue <> 0 then
   begin
-    LDuplicate := TBCEditorKeyCommands(Collection).FindShortcuts(ShortCut, AValue);
+    LDuplicate := TBCEditorCommands(Collection).FindShortcuts(ShortCut, AValue);
     if (LDuplicate <> -1) and (LDuplicate <> Self.Index) then
       raise EBCEditorKeyCommandException.Create(SBCEditOrduplicateShortcut);
   end;
@@ -480,7 +653,7 @@ var
 begin
   if AValue <> 0 then
   begin
-    LDuplicate := TBCEditorKeyCommands(Collection).FindShortcuts(AValue, SecondaryShortCut);
+    LDuplicate := TBCEditorCommands(Collection).FindShortcuts(AValue, SecondaryShortCut);
     if (LDuplicate <> -1) and (LDuplicate <> Self.Index) then
       raise EBCEditorKeyCommandException.Create(SBCEditorDuplicateShortcut);
   end;
@@ -494,14 +667,9 @@ begin
   end;
 end;
 
-constructor TBCEditorKeyCommands.Create(AOwner: TPersistent);
-begin
-  inherited Create(TBCEditorKeyCommand);
+{ TBCEditorKeyCommands ********************************************************}
 
-  FOwner := AOwner;
-end;
-
-procedure TBCEditorKeyCommands.Add(const ACommand: TBCEditorCommand; const AShift: TShiftState; const AKey: Word);
+procedure TBCEditorCommands.Add(const ACommand: TBCEditorCommand; const AShift: TShiftState; const AKey: Word);
 var
   LNewKeystroke: TBCEditorKeyCommand;
 begin
@@ -511,14 +679,14 @@ begin
   LNewKeystroke.Command := ACommand;
 end;
 
-procedure TBCEditorKeyCommands.Assign(ASource: TPersistent);
+procedure TBCEditorCommands.Assign(ASource: TPersistent);
 var
   LIndex: Integer;
-  LKeyCommands: TBCEditorKeyCommands;
+  LKeyCommands: TBCEditorCommands;
 begin
-  if Assigned(ASource) and (ASource is TBCEditorKeyCommands) then
+  if Assigned(ASource) and (ASource is TBCEditorCommands) then
   begin
-    LKeyCommands := ASource as TBCEditorKeyCommands;
+    LKeyCommands := ASource as TBCEditorCommands;
     Self.Clear;
     for LIndex := 0 to LKeyCommands.Count - 1 do
       NewItem.Assign(LKeyCommands[LIndex]);
@@ -527,7 +695,14 @@ begin
     inherited Assign(ASource);
 end;
 
-function TBCEditorKeyCommands.FindCommand(ACommand: TBCEditorCommand): Integer;
+constructor TBCEditorCommands.Create(AOwner: TPersistent);
+begin
+  inherited Create(TBCEditorKeyCommand);
+
+  FOwner := AOwner;
+end;
+
+function TBCEditorCommands.FindCommand(ACommand: TBCEditorCommand): Integer;
 var
   LIndex: Integer;
 begin
@@ -537,7 +712,7 @@ begin
     Exit(LIndex);
 end;
 
-function TBCEditorKeyCommands.FindKeyCode(AKeycode: Word; AShift: TShiftState): Integer;
+function TBCEditorCommands.FindKeyCode(AKeycode: Word; AShift: TShiftState): Integer;
 var
   LIndex: Integer;
   LKeyCommand: TBCEditorKeyCommand;
@@ -551,7 +726,7 @@ begin
   end;
 end;
 
-function TBCEditorKeyCommands.FindKeyCodes(AKeyCode: Word; AShift: TShiftState; ASecondaryKeyCode: Word; ASecondaryShift: TShiftState): Integer;
+function TBCEditorCommands.FindKeyCodes(AKeyCode: Word; AShift: TShiftState; ASecondaryKeyCode: Word; ASecondaryShift: TShiftState): Integer;
 var
   LIndex: Integer;
   LKeyCommand: TBCEditorKeyCommand;
@@ -566,7 +741,7 @@ begin
   end;
 end;
 
-function TBCEditorKeyCommands.FindShortcut(AShortCut: TShortCut): Integer;
+function TBCEditorCommands.FindShortcut(AShortCut: TShortCut): Integer;
 var
   LIndex: Integer;
 begin
@@ -576,7 +751,7 @@ begin
     Exit(LIndex);
 end;
 
-function TBCEditorKeyCommands.FindShortcuts(AShortCut, ASecondaryShortCut: TShortCut): Integer;
+function TBCEditorCommands.FindShortcuts(AShortCut, ASecondaryShortCut: TShortCut): Integer;
 var
   LIndex: Integer;
   LKeyCommand: TBCEditorKeyCommand;
@@ -590,24 +765,22 @@ begin
   end;
 end;
 
-function TBCEditorKeyCommands.GetItem(AIndex: Integer): TBCEditorKeyCommand;
+function TBCEditorCommands.GetItem(AIndex: Integer): TBCEditorKeyCommand;
 begin
   Result := TBCEditorKeyCommand(inherited GetItem(AIndex));
 end;
 
-function TBCEditorKeyCommands.GetOwner: TPersistent;
+function TBCEditorCommands.GetOwner: TPersistent;
 begin
   Result := FOwner;
 end;
 
-{ TBCEditorKeyCommands }
-
-function TBCEditorKeyCommands.NewItem: TBCEditorKeyCommand;
+function TBCEditorCommands.NewItem(): TBCEditorKeyCommand;
 begin
   Result := TBCEditorKeyCommand(inherited Add);
 end;
 
-procedure TBCEditorKeyCommands.ResetDefaults;
+procedure TBCEditorCommands.ResetDefaults();
 begin
   Clear;
 
@@ -666,8 +839,6 @@ begin
   Add(ecReturn, [ssShift], VK_RETURN);
   Add(ecTab, [], VK_TAB);
   Add(ecShiftTab, [ssShift], VK_TAB);
-  { Help }
-  Add(ecContextHelp, [], VK_F1);
   { Standard edit commands }
   Add(ecUndo, [ssCtrl], Ord('Z'));
   Add(ecRedo, [ssCtrl, ssShift], Ord('Z'));
@@ -711,19 +882,22 @@ begin
   { Comments }
   Add(ecLineComment, [ssCtrl], VK_OEM_2);
   Add(ecBlockComment, [ssCtrl, ssShift], VK_OEM_2);
+  { Completion Proposal }
+  Add(ecCompletionProposal, [ssCtrl], VK_SPACE);
+  { SyncEdit }
+  Add(ecSyncEdit, [ssCtrl, ssShift], Ord('J'));
+  { MacroRecorder }
+  Add(ecRecordMacro, [ssCtrl, ssShift], Ord('R'));
+  Add(ecPlaybackMacro, [ssCtrl, ssShift], Ord('P'));
 end;
 
-procedure TBCEditorKeyCommands.SetItem(AIndex: Integer; AValue: TBCEditorKeyCommand);
+procedure TBCEditorCommands.SetItem(AIndex: Integer; AValue: TBCEditorKeyCommand);
 begin
   inherited SetItem(AIndex, AValue);
 end;
 
 initialization
-
   RegisterIntegerConsts(TypeInfo(TBCEditorCommand), IdentToEditorCommand, EditorCommandToIdent);
-
 finalization
-
   UnregisterIntegerConsts(TypeInfo(TBCEditorCommand), IdentToEditorCommand, EditorCommandToIdent);
-
 end.

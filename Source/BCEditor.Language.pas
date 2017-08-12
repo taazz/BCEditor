@@ -24,12 +24,6 @@ resourcestring
   SBCEditorSearchWrapAroundBackwards = 'Restart search from the ending of the file?';
   SBCEditorTerminatedByUser = 'Terminated by user';
 
-  { BCEditor.MacroRecorder }
-  SBCEditorCannotRecord = 'Cannot record macro; already recording or playing';
-  SBCEditorCannotPlay = 'Cannot playback macro; already playing or recording';
-  SBCEditorCannotPause = 'Can only pause when recording';
-  SBCEditorCannotResume = 'Can only resume when paused';
-
   { BCEditor.Print.Preview }
   SBCEditorPreviewScrollHint = 'Page: %d';
 

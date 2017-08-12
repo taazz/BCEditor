@@ -122,6 +122,9 @@
         <PackageImport Include="vcldb.bpi">
             <BuildOrder>44</BuildOrder>
         </PackageImport>
+        <DelphiCompile Include="..\Source\BCEditor.Commands.pas">
+            <BuildOrder>12</BuildOrder>
+        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.CompletionProposal.pas">
             <BuildOrder>2</BuildOrder>
         </DelphiCompile>
@@ -131,7 +134,7 @@
         <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.pas">
             <BuildOrder>7</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.KeyCommands.pas">
+        <DelphiCompile Include="..\Source\BCEditor.Commands.pas">
             <BuildOrder>12</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Editor.pas">

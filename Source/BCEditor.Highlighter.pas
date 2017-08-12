@@ -2003,29 +2003,23 @@ begin
       if Assigned(LColorsObject) then
       begin
         Color := StringToColorDef(LColorsObject['Background'].Value, Color);
-        ActiveLine.Color := StringToColorDef(LColorsObject['ActiveLineBackground'].Value, ActiveLine.Color);
-        CodeFolding.Colors.Background := StringToColorDef(LColorsObject['CodeFoldingBackground'].Value, CodeFolding.Colors.Background);
-        CodeFolding.Colors.Foreground := StringToColorDef(LColorsObject['CodeFoldingFoldingLine'].Value, CodeFolding.Colors.Foreground);
-        CodeFolding.Colors.Indent := StringToColorDef(LColorsObject['CodeFoldingIndent'].Value, CodeFolding.Colors.Indent);
-        CodeFolding.Colors.IndentHighlight := StringToColorDef(LColorsObject['CodeFoldingIndentHighlight'].Value, CodeFolding.Colors.IndentHighlight);
-        CompletionProposal.Colors.Background := StringToColorDef(LColorsObject['CompletionProposalBackground'].Value, CompletionProposal.Colors.Background);
-        CompletionProposal.Colors.Foreground := StringToColorDef(LColorsObject['CompletionProposalForeground'].Value, CompletionProposal.Colors.Foreground);
-        CompletionProposal.Colors.SelectedBackground := StringToColorDef(LColorsObject['CompletionProposalSelectedBackground'].Value, CompletionProposal.Colors.SelectedBackground);
-        CompletionProposal.Colors.SelectedText := StringToColorDef(LColorsObject['CompletionProposalSelectedText'].Value, CompletionProposal.Colors.SelectedText);
-        LeftMargin.Colors.Background := StringToColorDef(LColorsObject['LeftMarginBackground'].Value, LeftMargin.Colors.Background);
-        LeftMargin.Colors.Foreground := StringToColorDef(LColorsObject['LeftMarginLineNumbers'].Value, LeftMargin.Colors.Foreground);
-        LeftMargin.Colors.BookmarkPanelBackground := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, LeftMargin.Colors.BookmarkPanelBackground);
-        LeftMargin.Colors.LineStateModified := StringToColorDef(LColorsObject['LeftMarginLineStateModified'].Value, LeftMargin.Colors.LineStateModified);
-        LeftMargin.Colors.LineStateLoaded := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, LeftMargin.Colors.LineStateLoaded);
-        MatchingPair.Color := StringToColorDef(LColorsObject['MatchingPairMatched'].Value, MatchingPair.Color);
-        Search.Highlighter.Colors.Background := StringToColorDef(LColorsObject['SearchHighlighterBackground'].Value, Search.Highlighter.Colors.Background);
-        Search.Highlighter.Colors.Foreground := StringToColorDef(LColorsObject['SearchHighlighterForeground'].Value, Search.Highlighter.Colors.Foreground);
-        Selection.Colors.Background := StringToColorDef(LColorsObject['SelectionBackground'].Value, Selection.Colors.Background);
-        Selection.Colors.Foreground := StringToColorDef(LColorsObject['SelectionForeground'].Value, Selection.Colors.Foreground);
-        SpecialChars.Color := StringToColorDef(LColorsObject['SpecialCharForeground'].Value, SpecialChars.Color);
-        SyncEdit.Colors.Background := StringToColorDef(LColorsObject['SyncEditBackground'].Value, SyncEdit.Colors.Background);
-        SyncEdit.Colors.EditBorder := StringToColorDef(LColorsObject['SyncEditEditBorder'].Value, SyncEdit.Colors.EditBorder);
-        SyncEdit.Colors.WordBorder := StringToColorDef(LColorsObject['SyncEditWordBorder'].Value, SyncEdit.Colors.WordBorder);
+        Colors.CurrentLine.Background := StringToColorDef(LColorsObject['ActiveLineBackground'].Value, Colors.CurrentLine.Background);
+        Colors.CodeFolding.Background := StringToColorDef(LColorsObject['CodeFoldingBackground'].Value, Colors.CodeFolding.Background);
+        Colors.CodeFolding.Foreground := StringToColorDef(LColorsObject['CodeFoldingFoldingLine'].Value, Colors.CodeFolding.Foreground);
+        Colors.Marks.Background := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, Colors.Marks.Background);
+        Colors.LineNumbers.Background := StringToColorDef(LColorsObject['LeftMarginBackground'].Value, Colors.LineNumbers.Background);
+        Colors.LineNumbers.Foreground := StringToColorDef(LColorsObject['LeftMarginLineNumbers'].Value, Colors.LineNumbers.Foreground);
+        Colors.LineState.Loaded := StringToColorDef(LColorsObject['LeftMarginBackground'].Value, Colors.LineState.Loaded);
+        Colors.LineState.Modified := StringToColorDef(LColorsObject['LeftMarginLineStateModified'].Value, Colors.LineState.Modified);
+        Colors.LineState.Saved := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, Colors.LineState.Saved);
+        Colors.MatchingPairs.Background := StringToColorDef(LColorsObject['MatchingPairMatched'].Value, Colors.MatchingPairs.Background);
+        Colors.FoundText.Background := StringToColorDef(LColorsObject['SearchHighlighterBackground'].Value, Colors.FoundText.Background);
+        Colors.FoundText.Foreground := StringToColorDef(LColorsObject['SearchHighlighterForeground'].Value, Colors.FoundText.Foreground);
+        Colors.Selection.Background := StringToColorDef(LColorsObject['SelectionBackground'].Value, Colors.Selection.Background);
+        Colors.Selection.Foreground := StringToColorDef(LColorsObject['SelectionForeground'].Value, Colors.Selection.Foreground);
+        Colors.SpecialChars.Foreground := StringToColorDef(LColorsObject['SpecialCharForeground'], Colors.SpecialChars.Foreground);
+        Colors.SyncEdit.Background := StringToColorDef(LColorsObject['SyncEditBackground'].Value, Colors.SyncEdit.Background);
+        Colors.SyncEdit.Overlays := StringToColorDef(LColorsObject['SyncEditWordBorder'].Value, Colors.SyncEdit.Overlays);
       end;
       LFontsObject := AEditorObject['Fonts'].ObjectValue;
       if Assigned(LFontsObject) then

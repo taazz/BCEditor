@@ -66,30 +66,6 @@ type
     TAllRanges = class;
     TSkipRegions = class;
 
-    TColors = class(TPersistent)
-    strict private
-      FBackground: TColor;
-      FForeground: TColor;
-      FIndent: TColor;
-      FIndentHighlight: TColor;
-      FOnChange: TBCEditorCodeFoldingChangeEvent;
-      procedure DoChange;
-      procedure SetBackground(const AValue: TColor);
-      procedure SetForeground(const AValue: TColor);
-      procedure SetIndent(const AValue: TColor);
-      procedure SetIndentHighlight(const AValue: TColor);
-    protected
-      property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write FOnChange;
-    public
-      constructor Create;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
-      property Foreground: TColor read FForeground write SetForeground default clLeftMarginForeground;
-      property Indent: TColor read FIndent write SetIndent default clIndent;
-      property IndentHighlight: TColor read FIndentHighlight write SetIndentHighlight default clIndentHighlight;
-    end;
-
     TRegion = class(TCollection)
     strict private
       FCloseToken: string;
@@ -214,14 +190,12 @@ type
   strict private const
     DefaultOptions = [cfoHighlightIndentGuides, cfoShowTreeLine];
   strict private
-    FColors: TColors;
     FDelayInterval: Cardinal;
     FMouseOverHint: Boolean;
     FOnChange: TBCEditorCodeFoldingChangeEvent;
     FOptions: TBCEditorCodeFoldingOptions;
     FVisible: Boolean;
     procedure DoChange;
-    procedure SetColors(const AValue: TColors);
     procedure SetOnChange(AValue: TBCEditorCodeFoldingChangeEvent);
     procedure SetOptions(AValue: TBCEditorCodeFoldingOptions);
     procedure SetVisible(const AValue: Boolean);
@@ -229,11 +203,9 @@ type
     property OnChange: TBCEditorCodeFoldingChangeEvent read FOnChange write SetOnChange;
   public
     constructor Create;
-    destructor Destroy; override;
     procedure Assign(ASource: TPersistent); override;
     procedure SetOption(const AOption: TBCEditorCodeFoldingOption; const AEnabled: Boolean);
   published
-    property Colors: TColors read FColors write SetColors;
     property DelayInterval: Cardinal read FDelayInterval write FDelayInterval default 300;
     property Options: TBCEditorCodeFoldingOptions read FOptions write SetOptions default DefaultOptions;
     property Visible: Boolean read FVisible write SetVisible default False;
@@ -243,75 +215,6 @@ implementation {***************************************************************}
 
 uses
   Math;
-
-{ TBCEditorCodeFolding.TColors *************************************************}
-
-constructor TBCEditorCodeFolding.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clLeftMarginBackground;
-  FForeground := clLeftMarginForeground;
-  FIndent := clIndent;
-  FIndentHighlight := clIndentHighlight;
-end;
-
-procedure TBCEditorCodeFolding.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TColors then
-  with ASource as TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FForeground := FForeground;
-    Self.FIndent := FIndent;
-    Self.FIndentHighlight := FIndentHighlight;
-    Self.DoChange;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorCodeFolding.TColors.DoChange;
-begin
-  if Assigned(FOnChange) then
-    FOnChange(fcRefresh);
-end;
-
-procedure TBCEditorCodeFolding.TColors.SetBackground(const AValue: TColor);
-begin
-  if FBackground <> AValue then
-  begin
-    FBackground := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorCodeFolding.TColors.SetForeground(const AValue: TColor);
-begin
-  if FForeground <> AValue then
-  begin
-    FForeground := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorCodeFolding.TColors.SetIndent(const AValue: TColor);
-begin
-  if FIndent <> AValue then
-  begin
-    FIndent := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorCodeFolding.TColors.SetIndentHighlight(const AValue: TColor);
-begin
-  if FIndentHighlight <> AValue then
-  begin
-    FIndentHighlight := AValue;
-    DoChange;
-  end;
-end;
 
 { TBCEditorCodeFolding.TRegion.TItem ******************************************}
 
@@ -650,17 +553,9 @@ begin
 
   FVisible := False;
   FOptions := DefaultOptions;
-  FColors := TColors.Create;
   FDelayInterval := 300;
 
   FMouseOverHint := False;
-end;
-
-destructor TBCEditorCodeFolding.Destroy;
-begin
-  FColors.Free;
-
-  inherited;
 end;
 
 procedure TBCEditorCodeFolding.Assign(ASource: TPersistent);
@@ -670,7 +565,6 @@ begin
   begin
     Self.FVisible := FVisible;
     Self.FOptions := FOptions;
-    Self.FColors.Assign(FColors);
     if Assigned(Self.OnChange) then
       Self.OnChange(fcRescan);
   end
@@ -684,15 +578,9 @@ begin
     FOnChange(fcRefresh);
 end;
 
-procedure TBCEditorCodeFolding.SetColors(const AValue: TColors);
-begin
-  FColors.Assign(AValue);
-end;
-
 procedure TBCEditorCodeFolding.SetOnChange(AValue: TBCEditorCodeFoldingChangeEvent);
 begin
   FOnChange := AValue;
-  FColors.OnChange := AValue;
 end;
 
 procedure TBCEditorCodeFolding.SetOption(const AOption: TBCEditorCodeFoldingOption; const AEnabled: Boolean);

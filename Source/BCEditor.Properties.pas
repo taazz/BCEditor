@@ -8,24 +8,6 @@ uses
   BCEditor.Consts, BCEditor.Types;
 
 type
-  TBCEditorActiveLine = class(TPersistent)
-  strict private
-    FColor: TColor;
-    FOnChange: TNotifyEvent;
-    FVisible: Boolean;
-    procedure DoChange();
-    procedure SetColor(const AValue: TColor);
-    procedure SetVisible(const AValue: Boolean);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    constructor Create();
-    procedure Assign(ASource: TPersistent); override;
-  published
-    property Color: TColor read FColor write SetColor default clActiveLineBackground;
-    property Visible: Boolean read FVisible write SetVisible default True;
-  end;
-
   TBCEditorCompletionProposalCloseEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
   TBCEditorCompletionProposalPopupWindowValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
 
@@ -139,22 +121,6 @@ type
 
   TBCEditorCompletionProposal = class(TPersistent)
   type
-    TColors = class(TPersistent)
-    strict private
-      FBackground: TColor;
-      FForeground: TColor;
-      FSelectedBackground: TColor;
-      FSelectedText: TColor;
-    public
-      constructor Create;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Background: TColor read FBackground write FBackground default clWindow;
-      property Foreground: TColor read FForeground write FForeground default clWindowText;
-      property SelectedBackground: TColor read FSelectedBackground write FSelectedBackground default clHighlight;
-      property SelectedText: TColor read FSelectedText write FSelectedText default clHighlightText;
-    end;
-
     TTrigger = class(TPersistent)
     strict private
       FChars: string;
@@ -173,11 +139,8 @@ type
     DefaultCloseChars = '()[]. ';
     DefaultOptions = [cpoAutoConstraints, cpoAddHighlighterKeywords, cpoFiltered,
       cpoParseItemsFromText, cpoUseHighlighterColumnFont];
-    DefaultSecondaryShortCut = 0;
-    DefaultShortCut = 16416; // (Ctrl+Space)
   strict private
     FCloseChars: string;
-    FColors: TBCEditorCompletionProposal.TColors;
     FColumns: TBCEditorCompletionProposalColumns;
     FCompletionColumnIndex: Integer;
     FConstraints: TSizeConstraints;
@@ -185,8 +148,6 @@ type
     FImages: TCustomImageList;
     FOptions: TBCEditorCompletionProposalOptions;
     FOwner: TComponent;
-    FSecondaryShortCut: TShortCut;
-    FShortCut: TShortCut;
     FTrigger: TBCEditorCompletionProposal.TTrigger;
     FVisibleLines: Integer;
     FWidth: Integer;
@@ -201,45 +162,207 @@ type
     procedure SetOption(const AOption: TBCEditorCompletionProposalOption; const AEnabled: Boolean);
   published
     property CloseChars: string read FCloseChars write FCloseChars;
-    property Colors: TBCEditorCompletionProposal.TColors read FColors write FColors;
     property Columns: TBCEditorCompletionProposalColumns read FColumns write FColumns;
     property CompletionColumnIndex: Integer read FCompletionColumnIndex write FCompletionColumnIndex default 0;
     property Constraints: TSizeConstraints read FConstraints write FConstraints;
     property Enabled: Boolean read FEnabled write FEnabled default True;
     property Images: TCustomImageList read FImages write SetImages;
     property Options: TBCEditorCompletionProposalOptions read FOptions write FOptions default DefaultOptions;
-    property SecondaryShortCut: TShortCut read FSecondaryShortCut write FSecondaryShortCut default DefaultSecondaryShortCut;
-    property ShortCut: TShortCut read FShortCut write FShortCut default DefaultShortCut;
     property Trigger: TBCEditorCompletionProposal.TTrigger read FTrigger write FTrigger;
     property VisibleLines: Integer read FVisibleLines write FVisibleLines default 8;
     property Width: Integer read FWidth write FWidth default 260;
   end;
 
-  TBCEditorLeftMargin = class(TPersistent)
+  TBCEditorColors = class(TPersistent)
   type
-    TColors = class(TPersistent)
-    strict private
+    TCodeFolding = class(TPersistent)
+    private
       FBackground: TColor;
-      FBookmarkPanelBackground: TColor;
+      FColors: TBCEditorColors;
       FForeground: TColor;
-      FLineStateModified: TColor;
-      FLineStateLoaded: TColor;
+      procedure SetBackground(AValue: TColor);
+      procedure SetForeground(AValue: TColor);
     public
-      constructor Create();
       procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write FBackground default clLeftMarginBackground;
-      property BookmarkPanelBackground: TColor read FBookmarkPanelBackground write FBookmarkPanelBackground default clBtnFace;
-      property Foreground: TColor read FForeground write FForeground default clLeftMarginForeground;
-      property LineStateModified: TColor read FLineStateModified write FLineStateModified default clYellow;
-      property LineStateLoaded: TColor read FLineStateLoaded write FLineStateLoaded default clLime;
+      property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
+      property Foreground: TColor read FForeground write SetForeground default clLeftMarginForeground;
     end;
 
+    TCurrentLine = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      procedure SetBackground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clActiveLineBackground;
+    end;
+
+    TFoundText = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      FForeground: TColor;
+      procedure SetBackground(AValue: TColor);
+      procedure SetForeground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clSearchHighlighter;
+      property Foreground: TColor read FForeground write SetForeground default clWindowText;
+    end;
+
+    TLineNumbers = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      FForeground: TColor;
+      procedure SetBackground(AValue: TColor);
+      procedure SetForeground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
+      property Foreground: TColor read FForeground write SetForeground default clLeftMarginForeground;
+    end;
+
+    TLineState = class(TPersistent)
+    private
+      FColors: TBCEditorColors;
+      FModified: TColor;
+      FLoaded: TColor;
+      FSaved: TColor;
+      procedure SetModified(AValue: TColor);
+      procedure SetLoaded(AValue: TColor);
+      procedure SetSaved(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Modified: TColor read FModified write SetModified default clYellow;
+      property Loaded: TColor read FLoaded write SetLoaded default clLeftMarginBackground;
+      property Saved: TColor read FSaved write SetSaved default clLime;
+    end;
+
+    TMarks = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      procedure SetBackground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clBtnFace;
+    end;
+
+    TMatchingPairs = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      procedure SetBackground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clMatchingPair;
+    end;
+
+    TSelection = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      FForeground: TColor;
+      procedure SetBackground(AValue: TColor);
+      procedure SetForeground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clSelectionColor;
+      property Foreground: TColor read FForeground write SetForeground default clHighlightText;
+    end;
+
+    TSpecialChars = class(TPersistent)
+    private
+      FForeground: TColor;
+      FColors: TBCEditorColors;
+      procedure SetForeground(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Foreground: TColor read FForeground write SetForeground default clSpecialChar;
+    end;
+
+    TSyncEdit = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      FOverlays: TColor;
+      procedure SetBackground(AValue: TColor);
+      procedure SetOverlays(AValue: TColor);
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clSyncEditBackground;
+      property Overlays: TColor read FOverlays write SetOverlays default clHighlight;
+    end;
+  private
+    FCodeFolding: TCodeFolding;
+    FCurrentLine: TCurrentLine;
+    FFoundText: TFoundText;
+    FLineNumbers: TLineNumbers;
+    FLineState: TLineState;
+    FMarks: TMarks;
+    FMatchingPairs: TMatchingPairs;
+    FOnChange: TNotifyEvent;
+    FSelection: TSelection;
+    FSpecialChars: TSpecialChars;
+    FSyncEdit: TSyncEdit;
+    procedure DoChange();
+    procedure SetCodeFolding(AValue: TCodeFolding);
+    procedure SetCurrentLine(AValue: TCurrentLine);
+    procedure SetFoundText(AValue: TFoundText);
+    procedure SetLineNumbers(AValue: TLineNumbers);
+    procedure SetLineState(AValue: TLineState);
+    procedure SetMarks(AValue: TMarks);
+    procedure SetMatchingPairs(AValue: TMatchingPairs);
+    procedure SetSelection(AValue: TSelection);
+    procedure SetSpecialChars(AValue: TSpecialChars);
+    procedure SetSyncEdit(AValue: TSyncEdit);
+  protected
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+  public
+    procedure Assign(ASource: TPersistent); override;
+    constructor Create();
+    destructor Destroy(); override;
+  published
+    property CodeFolding: TCodeFolding read FCodeFolding write SetCodeFolding;
+    property CurrentLine: TCurrentLine read FCurrentLine write SetCurrentLine;
+    property FoundText: TFoundText read FFoundText write SetFoundText;
+    property LineNumbers: TLineNumbers read FLineNumbers write SetLineNumbers;
+    property LineState: TLineState read FLineState write SetLineState;
+    property Marks: TMarks read FMarks write SetMarks;
+    property MatchingPairs: TMatchingPairs read FMatchingPairs write SetMatchingPairs;
+    property Selection: TSelection read FSelection write SetSelection;
+    property SpecialChars: TSpecialChars read FSpecialChars write SetSpecialChars;
+    property SyncEdit: TSyncEdit read FSyncEdit write SetSyncEdit;
+  end;
+
+  TBCEditorLeftMargin = class(TPersistent)
+  type
     TBookMarks = class(TPersistent)
     strict private
       FOnChange: TNotifyEvent;
       FOwner: TComponent;
-      FShortCuts: Boolean;
       FVisible: Boolean;
       procedure DoChange;
       procedure SetVisible(AValue: Boolean);
@@ -247,7 +370,6 @@ type
       constructor Create(AOwner: TComponent);
       procedure Assign(ASource: TPersistent); override;
     published
-      property ShortCuts: Boolean read FShortCuts write FShortCuts default True;
       property Visible: Boolean read FVisible write SetVisible default True;
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     end;
@@ -320,14 +442,12 @@ type
 
   strict private
     FBookMarks: TBookmarks;
-    FColors: TColors;
     FLineNumbers: TLineNumbers;
     FLineState: TLineState;
     FMarks: TMarks;
     FOnChange: TNotifyEvent;
     procedure DoChange();
     procedure SetBookMarks(const AValue: TBookmarks);
-    procedure SetColors(const AValue: TColors);
     procedure SetMarks(const AValue: TMarks);
     procedure SetOnChange(AValue: TNotifyEvent);
   protected
@@ -338,219 +458,9 @@ type
     procedure Assign(ASource: TPersistent); override;
   published
     property Bookmarks: TBCEditorLeftMargin.TBookmarks read FBookMarks write SetBookMarks;
-    property Colors: TColors read FColors write SetColors;
     property LineNumbers: TLineNumbers read FLineNumbers write FLineNumbers;
     property LineState: TLineState read FLineState write FLineState;
     property Marks: TMarks read FMarks write SetMarks;
-  end;
-
-  TBCEditorMatchingPair = class(TPersistent)
-  strict private
-    FColor: TColor;
-    FEnabled: Boolean;
-    FOnChange: TNotifyEvent;
-    procedure DoChange();
-    procedure SetColor(const AValue: TColor);
-    procedure SetEnabled(const AValue: Boolean);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    procedure Assign(ASource: TPersistent); override;
-    constructor Create();
-  published
-    property Color: TColor read FColor write SetColor default clMatchingPair;
-    property Enabled: Boolean read FEnabled write SetEnabled default True;
-  end;
-
-  TBCEditorReplace = class(TPersistent)
-  strict private const
-    DefaultOptions = [];
-  strict private
-    FEngine: TBCEditorSearchEngine;
-    FOnChange: TNotifyEvent;
-    FOptions: TBCEditorReplaceOptions;
-    FPattern: string;
-    FReplaceText: string;
-    procedure SetEngine(const AValue: TBCEditorSearchEngine);
-    procedure SetOptions(const AValue: TBCEditorReplaceOptions);
-    procedure DoChange();
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    procedure Assign(ASource: TPersistent); override;
-    constructor Create();
-    property Pattern: string read FPattern write FPattern;
-    property ReplaceText: string read FReplaceText write FReplaceText;
-  published
-    property Engine: TBCEditorSearchEngine read FEngine write SetEngine default seNormal;
-    property Options: TBCEditorReplaceOptions read FOptions write SetOptions default DefaultOptions;
-  end;
-
-  TBCEditorSearch = class(TPersistent)
-  public type
-    TWrapAroundEvent = function(ASender: TObject; const APattern: string; const ABackwards: Boolean): Boolean of object;
-
-    THighlighter = class(TPersistent)
-    type
-
-      TColors = class(TPersistent)
-      strict private
-        FBackground: TColor;
-        FForeground: TColor;
-        FOnChange: TNotifyEvent;
-        procedure DoChange;
-        procedure SetBackground(const AValue: TColor);
-        procedure SetForeground(const AValue: TColor);
-      public
-        constructor Create;
-        procedure Assign(ASource: TPersistent); override;
-      published
-        property Background: TColor read FBackground write SetBackground default clSearchHighlighter;
-        property Foreground: TColor read FForeground write SetForeground default clWindowText;
-        property OnChange: TNotifyEvent read FOnChange write FOnChange;
-      end;
-
-    strict private
-      FColors: TColors;
-      FOnChange: TNotifyEvent;
-      procedure DoChange;
-      procedure SetColors(const AValue: TColors);
-      procedure SetOnChange(AValue: TNotifyEvent);
-    public
-      constructor Create;
-      destructor Destroy; override;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Colors: TColors read FColors write SetColors;
-      property OnChange: TNotifyEvent read FOnChange write SetOnChange;
-    end;
-
-  strict private const
-    DefaultOptions = [];
-  strict private
-    FEngineType: TBCEditorSearchEngine;
-    FHighlighter: THighlighter;
-    FOnChange: TNotifyEvent;
-    FOnWrapAround: TWrapAroundEvent;
-    FOptions: TBCEditorSearchOptions;
-    FPattern: string;
-    FVisible: Boolean;
-    procedure SetEngineType(const AValue: TBCEditorSearchEngine);
-    procedure SetHighlighter(const AValue: THighlighter);
-    procedure SetOnChange(const AValue: TNotifyEvent);
-    procedure SetPattern(const AValue: string);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write SetOnChange;
-  public
-    procedure Assign(ASource: TPersistent); override;
-    constructor Create();
-    destructor Destroy(); override;
-    property Pattern: string read FPattern write SetPattern;
-    property Visible: Boolean read FVisible write FVisible;
-  published
-    property Engine: TBCEditorSearchEngine read FEngineType write SetEngineType default seNormal;
-    property Highlighter: THighlighter read FHighlighter write SetHighlighter;
-    property OnWrapAround: TWrapAroundEvent read FOnWrapAround write FOnWrapAround;
-    property Options: TBCEditorSearchOptions read FOptions write FOptions default DefaultOptions;
-  end;
-
-  TBCEditorSelection = class(TPersistent)
-  type
-    TColors = class(TPersistent)
-    strict private
-      FBackground: TColor;
-      FForeground: TColor;
-      FOnChange: TNotifyEvent;
-      procedure DoChange();
-      procedure SetBackground(AValue: TColor);
-      procedure SetForeground(AValue: TColor);
-    protected
-      property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    public
-      procedure Assign(ASource: TPersistent); override;
-      constructor Create();
-    published
-      property Background: TColor read FBackground write SetBackground default clSelectionColor;
-      property Foreground: TColor read FForeground write SetForeground default clHighLightText;
-    end;
-
-  strict private const
-    DefaultOptions = [soHighlightWholeLine, soTripleClickLineSelect];
-  strict private
-    FColors: TColors;
-    FOnChange: TNotifyEvent;
-    FOptions: TBCEditorSelectionOptions;
-    procedure DoChange();
-    procedure SetColors(const AValue: TColors);
-    procedure SetOptions(AValue: TBCEditorSelectionOptions);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    procedure Assign(ASource: TPersistent); override;
-    constructor Create();
-    destructor Destroy; override;
-  published
-    property Colors: TColors read FColors write SetColors;
-    property Options: TBCEditorSelectionOptions read FOptions write SetOptions default DefaultOptions;
-  end;
-
-  TBCEditorSpecialChars = class(TPersistent)
-  strict private
-    FColor: TColor;
-    FOnChange: TNotifyEvent;
-    FVisible: Boolean;
-    procedure DoChange;
-    procedure SetColor(const AValue: TColor);
-    procedure SetVisible(const AValue: Boolean);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    constructor Create();
-    procedure Assign(ASource: TPersistent); override;
-  published
-    property Color: TColor read FColor write SetColor default clSpecialChar;
-    property Visible: Boolean read FVisible write SetVisible default False;
-  end;
-
-  TBCEditorSyncEdit = class(TPersistent)
-  type
-
-    TColors = class(TPersistent)
-    strict private
-      FBackground: TColor;
-      FEditBorder: TColor;
-      FWordBorder: TColor;
-    public
-      constructor Create;
-      procedure Assign(ASource: TPersistent); override;
-    published
-      property Background: TColor read FBackground write FBackground default clSyncEditBackground;
-      property EditBorder: TColor read FEditBorder write FEditBorder default clWindowText;
-      property WordBorder: TColor read FWordBorder write FWordBorder default clHighlight;
-    end;
-
-  strict private const
-    DefaultOptions = [seoButton, seoCaseSensitive];
-    DefaultShortCut = 24650; // (Shift+Ctrl+J)
-  strict private
-    FColors: TBCEditorSyncEdit.TColors;
-    FEnabled: Boolean;
-    FOnChange: TNotifyEvent;
-    FOptions: TBCEditorSyncEditOptions;
-    FShortCut: TShortCut;
-    procedure DoChange(ASender: TObject);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    procedure Assign(ASource: TPersistent); override;
-    constructor Create();
-    destructor Destroy(); override;
-    procedure SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
-  published
-    property Colors: TColors read FColors write FColors;
-    property Enabled: Boolean read FEnabled write FEnabled default True;
-    property Options: TBCEditorSyncEditOptions read FOptions write FOptions default DefaultOptions;
-    property ShortCut: TShortCut read FShortCut write FShortCut default DefaultShortCut;
   end;
 
   TBCEditorTabs = class(TPersistent)
@@ -580,54 +490,6 @@ uses
   Windows,
   Math, SysUtils, Character,
   Menus;
-
-{ TBCEditorActiveLine.Create **************************************************}
-
-constructor TBCEditorActiveLine.Create();
-begin
-  inherited;
-
-  FColor := clActiveLineBackground;
-  FOnChange := nil;
-  FVisible := True;
-end;
-
-procedure TBCEditorActiveLine.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorActiveLine) then
-  with ASource as TBCEditorActiveLine do
-  begin
-    Self.FColor := FColor;
-    Self.FVisible := FVisible;
-    Self.DoChange();
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorActiveLine.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorActiveLine.SetColor(const AValue: TColor);
-begin
-  if FColor <> AValue then
-  begin
-    FColor := AValue;
-    DoChange();
-  end;
-end;
-
-procedure TBCEditorActiveLine.SetVisible(const AValue: Boolean);
-begin
-  if FVisible <> AValue then
-  begin
-    FVisible := AValue;
-    DoChange();
-  end;
-end;
 
 { TBCEditorCompletionProposalItems.TItem **************************************}
 
@@ -837,32 +699,6 @@ begin
   inherited SetItem(AIndex, AValue);
 end;
 
-{ TBCEditorCompletionProposal.TColors *****************************************}
-
-constructor TBCEditorCompletionProposal.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clWindow;
-  FForeground := clWindowText;
-  FSelectedBackground := clHighlight;
-  FSelectedText := clHighlightText;
-end;
-
-procedure TBCEditorCompletionProposal.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TBCEditorCompletionProposal.TColors then
-  with ASource as TBCEditorCompletionProposal.TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FForeground := FForeground;
-    Self.FSelectedBackground := FSelectedBackground;
-    Self.FSelectedText := FSelectedText;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
 { TBCEditorCompletionProposal.TTrigger ****************************************}
 
 constructor TBCEditorCompletionProposal.TTrigger.Create;
@@ -895,14 +731,11 @@ begin
 
   FOwner := AOwner;
   FCloseChars := DefaultCloseChars;
-  FColors := TColors.Create;
   FColumns := TBCEditorCompletionProposalColumns.Create(Self);
   FColumns.Add; { default column }
   FCompletionColumnIndex := 0;
   FEnabled := True;
   FOptions := DefaultOptions;
-  FSecondaryShortCut := DefaultSecondaryShortCut;
-  FShortCut := DefaultShortCut;
   FTrigger := TTrigger.Create;
   FVisibleLines := 8;
   FWidth := 260;
@@ -911,7 +744,6 @@ end;
 
 destructor TBCEditorCompletionProposal.Destroy;
 begin
-  FColors.Free;
   FTrigger.Free;
   FColumns.Free;
   FConstraints.Free;
@@ -925,13 +757,10 @@ begin
   with ASource as TBCEditorCompletionProposal do
   begin
     Self.FCloseChars := FCloseChars;
-    Self.FColors.Assign(FColors);
     Self.FColumns.Assign(FColumns);
     Self.FEnabled := FEnabled;
     Self.FImages := FImages;
     Self.FOptions := FOptions;
-    Self.FSecondaryShortCut := FSecondaryShortCut;
-    Self.FShortCut := FShortCut;
     Self.FTrigger.Assign(FTrigger);
     Self.FVisibleLines := FVisibleLines;
     Self.FWidth := FWidth;
@@ -968,31 +797,475 @@ begin
     Exclude(FOptions, AOption);
 end;
 
-{ TBCEditorLeftMargin.TColors *************************************************}
+{ TBCEditorColors.TCodeFolding ************************************************}
 
-procedure TBCEditorLeftMargin.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TBCEditorLeftMargin.TColors then
-  with ASource as TBCEditorLeftMargin.TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FBookmarkPanelBackground := FBookmarkPanelBackground;
-    Self.FLineStateModified := FLineStateModified;
-    Self.FLineStateLoaded := FLineStateLoaded;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorLeftMargin.TColors.Create();
+procedure TBCEditorColors.TCodeFolding.Assign(ASource: TPersistent);
 begin
   inherited;
 
+  FBackground := TBCEditorColors.TCodeFolding(ASource).FBackground;
+  FForeground := TBCEditorColors.TCodeFolding(ASource).FForeground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TCodeFolding.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
   FBackground := clLeftMarginBackground;
-  FBookmarkPanelBackground := clBtnFace;
   FForeground := clLeftMarginForeground;
-  FLineStateModified := clYellow;
-  FLineStateLoaded := clLime;
+end;
+
+procedure TBCEditorColors.TCodeFolding.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TCodeFolding.SetForeground(AValue: TColor);
+begin
+  if (AValue <> FForeground) then
+  begin
+    FForeground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TCurrentLine ************************************************}
+
+procedure TBCEditorColors.TCurrentLine.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TCurrentLine(ASource).FBackground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TCurrentLine.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clActiveLineBackground;
+end;
+
+procedure TBCEditorColors.TCurrentLine.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TFoundText ************************************************}
+
+procedure TBCEditorColors.TFoundText.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TFoundText(ASource).FBackground;
+  FForeground := TBCEditorColors.TFoundText(ASource).FForeground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TFoundText.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clSearchHighlighter;
+  FForeground := clWindowText;
+end;
+
+procedure TBCEditorColors.TFoundText.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TFoundText.SetForeground(AValue: TColor);
+begin
+  if (AValue <> FForeground) then
+  begin
+    FForeground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TLineNumbers ************************************************}
+
+procedure TBCEditorColors.TLineNumbers.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TLineNumbers(ASource).FBackground;
+  FForeground := TBCEditorColors.TLineNumbers(ASource).FForeground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TLineNumbers.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clLeftMarginBackground;
+  FForeground := clLeftMarginForeground;
+end;
+
+procedure TBCEditorColors.TLineNumbers.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TLineNumbers.SetForeground(AValue: TColor);
+begin
+  if (AValue <> FForeground) then
+  begin
+    FForeground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TLineState ************************************************}
+
+procedure TBCEditorColors.TLineState.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FModified := TBCEditorColors.TLineState(ASource).FModified;
+  FLoaded := TBCEditorColors.TLineState(ASource).FLoaded;
+  FSaved := TBCEditorColors.TLineState(ASource).FSaved;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TLineState.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FModified := clYellow;
+  FLoaded := clLeftMarginBackground;
+  FSaved := clLime;
+end;
+
+procedure TBCEditorColors.TLineState.SetModified(AValue: TColor);
+begin
+  if (AValue <> FModified) then
+  begin
+    FModified := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TLineState.SetLoaded(AValue: TColor);
+begin
+  if (AValue <> FLoaded) then
+  begin
+    FLoaded := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TLineState.SetSaved(AValue: TColor);
+begin
+  if (AValue <> FSaved) then
+  begin
+    FSaved := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TMarks ******************************************************}
+
+procedure TBCEditorColors.TMarks.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TMarks(ASource).FBackground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TMarks.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clBtnFace;
+end;
+
+procedure TBCEditorColors.TMarks.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TMatchingPairs ******************************************************}
+
+procedure TBCEditorColors.TMatchingPairs.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TMatchingPairs(ASource).FBackground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TMatchingPairs.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clMatchingPair;
+end;
+
+procedure TBCEditorColors.TMatchingPairs.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TSelection **************************************************}
+
+procedure TBCEditorColors.TSelection.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TSelection(ASource).FBackground;
+  FForeground := TBCEditorColors.TSelection(ASource).FForeground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TSelection.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FBackground := clSelectionColor;
+  FForeground := clHighlightText;
+end;
+
+procedure TBCEditorColors.TSelection.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TSelection.SetForeground(AValue: TColor);
+begin
+  if (AValue <> FForeground) then
+  begin
+    FForeground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TSpecialChars ************************************************}
+
+procedure TBCEditorColors.TSpecialChars.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FForeground := TBCEditorColors.TSpecialChars(ASource).FForeground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TSpecialChars.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FForeground := clSpecialChar;
+end;
+
+procedure TBCEditorColors.TSpecialChars.SetForeground(AValue: TColor);
+begin
+  if (AValue <> FForeground) then
+  begin
+    FForeground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors.TSyncEdit ************************************************}
+
+procedure TBCEditorColors.TSyncEdit.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FBackground := TBCEditorColors.TSyncEdit(ASource).FBackground;
+  FOverlays := TBCEditorColors.TSyncEdit(ASource).FOverlays;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TSyncEdit.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clSyncEditBackground;
+  FOverlays := clHighlight;
+end;
+
+procedure TBCEditorColors.TSyncEdit.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TSyncEdit.SetOverlays(AValue: TColor);
+begin
+  if (AValue <> FOverlays) then
+  begin
+    FOverlays := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+{ TBCEditorColors *************************************************************}
+
+procedure TBCEditorColors.Assign(ASource: TPersistent);
+begin
+  inherited;
+
+  FCodeFolding.Assign(TBCEditorColors(ASource).FCodeFolding);
+  FCurrentLine.Assign(TBCEditorColors(ASource).FCurrentLine);
+  FFoundText.Assign(TBCEditorColors(ASource).FFoundText);
+  FLineNumbers.Assign(TBCEditorColors(ASource).FLineNumbers);
+  FLineState.Assign(TBCEditorColors(ASource).FLineState);
+  FSelection.Assign(TBCEditorColors(ASource).FSelection);
+  FMarks.Assign(TBCEditorColors(ASource).FMarks);
+  FMatchingPairs.Assign(TBCEditorColors(ASource).FMatchingPairs);
+  FSpecialChars.Assign(TBCEditorColors(ASource).FSpecialChars);
+  FSyncEdit.Assign(TBCEditorColors(ASource).FSyncEdit);
+end;
+
+constructor TBCEditorColors.Create();
+begin
+  inherited;
+
+  FCodeFolding := TCodeFolding.Create(Self);
+  FCurrentLine := TCurrentLine.Create(Self);
+  FFoundText := TFoundText.Create(Self);
+  FLineNumbers := TLineNumbers.Create(Self);
+  FLineState := TLineState.Create(Self);
+  FMarks := TMarks.Create(Self);
+  FMatchingPairs := TMatchingPairs.Create(Self);
+  FSelection := TSelection.Create(Self);
+  FSpecialChars := TSpecialChars.Create(Self);
+  FSyncEdit := TSyncEdit.Create(Self);
+end;
+
+destructor TBCEditorColors.Destroy();
+begin
+  FCodeFolding.Free();
+  FCurrentLine.Free();
+  FFoundText.Free();
+  FLineNumbers.Free();
+  FLineState.Free();
+  FSelection.Free();
+  FMarks.Free();
+  FMatchingPairs.Free();
+  FSpecialChars.Free();
+  FSyncEdit.Free();
+
+  inherited;
+end;
+
+procedure TBCEditorColors.DoChange();
+begin
+  if (Assigned(FOnChange)) then
+    FOnChange(Self);
+end;
+
+procedure TBCEditorColors.SetCodeFolding(AValue: TCodeFolding);
+begin
+  FCodeFolding.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetCurrentLine(AValue: TCurrentLine);
+begin
+  FCurrentLine.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetFoundText(AValue: TFoundText);
+begin
+  FFoundText.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetLineNumbers(AValue: TLineNumbers);
+begin
+  FLineNumbers.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetLineState(AValue: TLineState);
+begin
+  FLineState.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetMarks(AValue: TMarks);
+begin
+  FMarks.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetMatchingPairs(AValue: TMatchingPairs);
+begin
+  FMatchingPairs.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetSelection(AValue: TSelection);
+begin
+  FSelection.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetSpecialChars(AValue: TSpecialChars);
+begin
+  FSpecialChars.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetSyncEdit(AValue: TSyncEdit);
+begin
+  FSyncEdit.Assign(AValue);
 end;
 
 { TBCEditorLeftMargin.TBookmarks **********************************************}
@@ -1002,7 +1275,6 @@ begin
   inherited Create;
 
   FOwner := AOwner;
-  FShortCuts := True;
   FVisible := True;
 end;
 
@@ -1011,7 +1283,6 @@ begin
   if Assigned(ASource) and (ASource is TBCEditorLeftMargin.TBookmarks) then
   with ASource as TBCEditorLeftMargin.TBookmarks do
   begin
-    Self.FShortCuts := FShortCuts;
     Self.FVisible := FVisible;
     if Assigned(Self.FOnChange) then
       Self.FOnChange(Self);
@@ -1203,8 +1474,6 @@ constructor TBCEditorLeftMargin.Create(AOwner: TComponent);
 begin
   inherited Create;
 
-  FColors := TColors.Create;
-
   FBookmarks := TBookmarks.Create(AOwner);
   FMarks := TMarks.Create(AOwner);
   FLineState := TLineState.Create;
@@ -1216,7 +1485,6 @@ destructor TBCEditorLeftMargin.Destroy();
 begin
   FBookmarks.Free();
   FMarks.Free();
-  FColors.Free();
   FLineState.Free();
   FLineNumbers.Free();
 
@@ -1230,7 +1498,6 @@ begin
   begin
     Self.FBookmarks.Assign(FBookmarks);
     Self.FMarks.Assign(FMarks);
-    Self.FColors.Assign(FColors);
     Self.FLineNumbers.Assign(FLineNumbers);
     Self.DoChange;
   end
@@ -1249,11 +1516,6 @@ begin
   FBookmarks.Assign(AValue);
 end;
 
-procedure TBCEditorLeftMargin.SetColors(const AValue: TColors);
-begin
-  FColors.Assign(AValue);
-end;
-
 procedure TBCEditorLeftMargin.SetMarks(const AValue: TMarks);
 begin
   FMarks.Assign(AValue);
@@ -1267,469 +1529,6 @@ begin
   FLineState.OnChange := AValue;
   FLineNumbers.OnChange := AValue;
   FMarks.OnChange := AValue;
-end;
-
-{ TBCEditorMatchingPair *******************************************************}
-
-procedure TBCEditorMatchingPair.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorMatchingPair) then
-  with ASource as TBCEditorMatchingPair do
-  begin
-    Self.FEnabled := FEnabled;
-    Self.FColor := FColor;
-    Self.DoChange();
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorMatchingPair.Create();
-begin
-  inherited;
-
-  FColor := clMatchingPair;
-  FEnabled := True;
-  FOnChange := nil;
-end;
-
-procedure TBCEditorMatchingPair.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorMatchingPair.SetColor(const AValue: TColor);
-begin
-  if (AValue <> FColor) then
-  begin
-    FColor := AValue;
-    DoChange();
-  end;
-end;
-
-procedure TBCEditorMatchingPair.SetEnabled(const AValue: Boolean);
-begin
-  if (AValue <> FEnabled) then
-  begin
-    FEnabled := AValue;
-    DoChange();
-  end;
-end;
-
-{ TBCEditorReplace ************************************************************}
-
-procedure TBCEditorReplace.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorReplace) then
-  with ASource as TBCEditorReplace do
-  begin
-    Self.FEngine := Engine;
-    Self.FOptions := Options;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorReplace.Create();
-begin
-  inherited;
-
-  FEngine := seNormal;
-  FOptions := DefaultOptions;
-end;
-
-procedure TBCEditorReplace.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorReplace.SetOptions(const AValue: TBCEditorReplaceOptions);
-begin
-  if (AValue <> FOptions) then
-  begin
-    FOptions := AValue;
-    DoChange();
-  end;
-end;
-
-procedure TBCEditorReplace.SetEngine(const AValue: TBCEditorSearchEngine);
-begin
-  if FEngine <> AValue then
-  begin
-    FEngine := AValue;
-    DoChange();
-  end;
-end;
-
-{ TBCEditorSearch.THighlighter.TColors ****************************************}
-
-constructor TBCEditorSearch.THighlighter.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clSearchHighlighter;
-  FForeground := clWindowText;
-end;
-
-procedure TBCEditorSearch.THighlighter.TColors.Assign(ASource: TPersistent);
-begin
-  if ASource is TColors then
-  with ASource as TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FForeground := FForeground;
-    Self.DoChange;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorSearch.THighlighter.TColors.DoChange;
-begin
-  if Assigned(FOnChange) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorSearch.THighlighter.TColors.SetBackground(const AValue: TColor);
-begin
-  if FBackground <> AValue then
-  begin
-    FBackground := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorSearch.THighlighter.TColors.SetForeground(const AValue: TColor);
-begin
-  if FForeground <> AValue then
-  begin
-    FForeground := AValue;
-    DoChange;
-  end;
-end;
-
-{ TBCEditorSearch.THighlighter **************************************************}
-
-constructor TBCEditorSearch.THighlighter.Create;
-begin
-  inherited;
-
-  FColors := TColors.Create;
-end;
-
-destructor TBCEditorSearch.THighlighter.Destroy;
-begin
-  FColors.Free;
-  inherited;
-end;
-
-procedure TBCEditorSearch.THighlighter.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is THighlighter) then
-  with ASource as THighlighter do
-  begin
-    Self.FColors.Assign(Colors);
-    Self.DoChange;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorSearch.THighlighter.DoChange;
-begin
-  if Assigned(FOnChange) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorSearch.THighlighter.SetColors(const AValue: TColors);
-begin
-  FColors.Assign(AValue);
-end;
-
-procedure TBCEditorSearch.THighlighter.SetOnChange(AValue: TNotifyEvent);
-begin
-  FOnChange := AValue;
-  FColors.OnChange := FOnChange;
-end;
-
-{ TBCEditorSearch *************************************************************}
-
-procedure TBCEditorSearch.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorSearch) then
-  with ASource as TBCEditorSearch do
-  begin
-    Self.FEngineType := FEngineType;
-    Self.FHighlighter.Assign(FHighlighter);
-    Self.FOptions := FOptions;
-    if (Assigned(FOnChange)) then
-      FOnChange(Self);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorSearch.Create();
-begin
-  inherited;
-
-  FEngineType := seNormal;
-  FHighlighter := THighlighter.Create;
-  FOptions := DefaultOptions;
-end;
-
-destructor TBCEditorSearch.Destroy();
-begin
-  FHighlighter.Free();
-
-  inherited;
-end;
-
-procedure TBCEditorSearch.SetEngineType(const AValue: TBCEditorSearchEngine);
-begin
-  if (FEngineType <> AValue) then
-  begin
-    FEngineType := AValue;
-    if (Assigned(FOnChange)) then
-      FOnChange(Self);
-  end;
-end;
-
-procedure TBCEditorSearch.SetHighlighter(const AValue: THighlighter);
-begin
-  FHighlighter.Assign(AValue);
-end;
-
-procedure TBCEditorSearch.SetOnChange(const AValue: TNotifyEvent);
-begin
-  FOnChange := AValue;
-  FHighlighter.OnChange := FOnChange;
-end;
-
-procedure TBCEditorSearch.SetPattern(const AValue: string);
-begin
-  if (AValue <> FPattern) then
-  begin
-    FPattern := AValue;
-    if (Assigned(FOnChange)) then
-      FOnChange(Self);
-  end;
-end;
-
-{ TBCEditorSelection.TColors **************************************************}
-
-procedure TBCEditorSelection.TColors.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorSelection.TColors) then
-    with ASource as TBCEditorSelection.TColors do
-    begin
-      Self.FBackground := FBackground;
-      Self.FForeground := FForeground;
-      DoChange();
-    end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorSelection.TColors.Create();
-begin
-  inherited;
-
-  FBackground := clSelectionColor;
-  FForeground := clHighLightText;
-end;
-
-procedure TBCEditorSelection.TColors.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorSelection.TColors.SetBackground(AValue: TColor);
-begin
-  if FBackground <> AValue then
-  begin
-    FBackground := AValue;
-    DoChange();
-  end;
-end;
-
-procedure TBCEditorSelection.TColors.SetForeground(AValue: TColor);
-begin
-  if FForeground <> AValue then
-  begin
-    FForeground := AValue;
-    DoChange();
-  end;
-end;
-
-{ TBCEditorSelection **********************************************************}
-
-procedure TBCEditorSelection.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorSelection) then
-  with ASource as TBCEditorSelection do
-  begin
-    Self.FColors.Assign(FColors);
-    Self.FOptions := FOptions;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorSelection.Create();
-begin
-  inherited;
-
-  FColors := TColors.Create();
-  FOptions := DefaultOptions;
-end;
-
-destructor TBCEditorSelection.Destroy();
-begin
-  FColors.Free();
-
-  inherited;
-end;
-
-procedure TBCEditorSelection.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorSelection.SetColors(const AValue: TBCEditorSelection.TColors);
-begin
-  FColors.Assign(AValue);
-  DoChange();
-end;
-
-procedure TBCEditorSelection.SetOptions(AValue: TBCEditorSelectionOptions);
-begin
-  if FOptions <> AValue then
-  begin
-    FOptions := AValue;
-    DoChange();
-  end;
-end;
-
-{ TBCEditorSpecialChars *******************************************************}
-
-constructor TBCEditorSpecialChars.Create();
-begin
-  inherited;
-
-  FColor := clSpecialChar;
-  FVisible := False;
-end;
-
-procedure TBCEditorSpecialChars.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorSpecialChars) then
-  with ASource as TBCEditorSpecialChars do
-  begin
-    Self.FColor := FColor;
-    Self.FVisible := FVisible;
-    Self.DoChange;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-procedure TBCEditorSpecialChars.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorSpecialChars.SetColor(const AValue: TColor);
-begin
-  if (AValue <> FColor) then
-  begin
-    FColor := AValue;
-    DoChange;
-  end;
-end;
-
-procedure TBCEditorSpecialChars.SetVisible(const AValue: Boolean);
-begin
-  if (AValue <> FVisible) then
-  begin
-    FVisible := AValue;
-    DoChange;
-  end;
-end;
-
-{ TBCEditorSyncEdit.TColors ***************************************************}
-
-constructor TBCEditorSyncEdit.TColors.Create;
-begin
-  inherited;
-
-  FBackground := clSyncEditBackground;
-  FEditBorder := clWindowText;
-  FWordBorder := clHighlight;
-end;
-
-procedure TBCEditorSyncEdit.TColors.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorSyncEdit.TColors) then
-  with ASource as TBCEditorSyncEdit.TColors do
-  begin
-    Self.FBackground := FBackground;
-    Self.FEditBorder := FEditBorder;
-    Self.FWordBorder := FWordBorder;
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-{ TBCEditorSyncEdit ***********************************************************}
-
-procedure TBCEditorSyncEdit.Assign(ASource: TPersistent);
-begin
-  if Assigned(ASource) and (ASource is TBCEditorSyncEdit) then
-  with ASource as TBCEditorSyncEdit do
-  begin
-    Self.Enabled := FEnabled;
-    Self.FShortCut := FShortCut;
-    Self.DoChange(Self);
-  end
-  else
-    inherited Assign(ASource);
-end;
-
-constructor TBCEditorSyncEdit.Create();
-begin
-  inherited Create();
-
-  FColors := TBCEditorSyncEdit.TColors.Create();
-  FEnabled := True;
-  FOptions := DefaultOptions;
-  FShortCut := DefaultShortCut;
-end;
-
-destructor TBCEditorSyncEdit.Destroy();
-begin
-  FColors.Free();
-
-  inherited;
-end;
-
-procedure TBCEditorSyncEdit.DoChange(ASender: TObject);
-begin
-  if Assigned(FOnChange) then
-    FOnChange(ASender);
-end;
-
-procedure TBCEditorSyncEdit.SetOption(const AOption: TBCEditorSyncEditOption; const AEnabled: Boolean);
-begin
-  if (AEnabled) then
-    Include(FOptions, AOption)
-  else
-    Exclude(FOptions, AOption);
 end;
 
 { TBCEditorTabs ***************************************************************}

@@ -59,12 +59,10 @@ const
   { Default colors }
   clSelectionColor = clHighlight;
   clSearchHighlighter = $0078AAFF;
-  clSearchInSelectionBackground = $00FCFDCD;
   clSpecialChar = clGrayText;
   clActiveLineBackground = $00E6FFFA;
   clLeftMarginBackground = $00F4F4F4;
   clLeftMarginForeground = $00CC9999;
-  clSearchMapActiveLine = $00F4F4F4;
   clIndentHighlight = $00CC9999;
   clIndent = $00CC9999;
   clMatchingPair = clAqua;
