@@ -20,15 +20,6 @@ begin
 
   UnlistPublishedProperty(TBCEditor, 'CustomHint');
   UnlistPublishedProperty(TBCEditor, 'Hint');
-  UnlistPublishedProperty(TBCEditor, 'ImeMode');
-  UnlistPublishedProperty(TBCEditor, 'ImeName');
-  UnlistPublishedProperty(TBCEditor, 'ParentColor');
-  UnlistPublishedProperty(TBCEditor, 'ParentCtl3D');
-  UnlistPublishedProperty(TBCEditor, 'ParentCustomHint');
-  UnlistPublishedProperty(TBCEditor, 'ParentFont');
-  UnlistPublishedProperty(TBCEditor, 'ParentShowHint');
-  UnlistPublishedProperty(TBCEditor, 'ShowHint');
-
   RegisterPropertyEditor(TypeInfo(Char), nil, '', TCharProperty);
   RegisterPropertyEditor(TypeInfo(TStrings), nil, '', TStringListProperty);
 end;

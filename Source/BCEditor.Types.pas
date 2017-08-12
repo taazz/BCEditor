@@ -192,7 +192,7 @@ type
   TBCEditorContextHelpEvent = procedure(ASender: TObject; AWord: string) of object;
   TBCEditorFindExecutedEvent = procedure(ASender: TObject; const AErrorMessage: string) of object;
   TBCEditorFindWrapAroundEvent = function(ASender: TObject; const APattern: string; const ABackwards: Boolean): Boolean of object;
-  TBCEditorHintEvent = procedure(ASender: TObject; const AX, AY: Integer; const APos: TPoint; const AIndex: Integer; var AHint: string) of object;
+  TBCEditorHintEvent = procedure(ASender: TObject; const AX, AY: Integer; const APos: TPoint; const ACharIndex: Integer; var AHint: string) of object;
   TBCEditorKeyPressWEvent = procedure(ASender: TObject; var AKey: Char) of object;
   TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;
   TBCEditorMouseCursorEvent = procedure(ASender: TObject; const ALineCharPos: TBCEditorLinesPosition; var ACursor: TCursor) of object;

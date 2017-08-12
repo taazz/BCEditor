@@ -25,7 +25,7 @@ type
     FItems: TStrings;
     FMargin: Integer;
     FOnClose: TBCEditorCompletionProposalCloseEvent;
-    FOnValidate: TBCEditorCompletionProposalPopupWindowValidateEvent;
+    FOnValidate: TBCEditorCompletionProposalValidateEvent;
     FOriginalHeight: Integer;
     FOriginalWidth: Integer;
     FPopupParent: TCustomForm;
@@ -59,6 +59,7 @@ type
     procedure Paint; override;
     procedure Show(Origin: TPoint); virtual;
     property OnClose: TBCEditorCompletionProposalCloseEvent read FOnClose write FOnClose;
+    property OnValidate: TBCEditorCompletionProposalValidateEvent read FOnValidate write FOnValidate;
   public
     constructor Create(const AEditor: TCustomControl); reintroduce;
     destructor Destroy; override;
@@ -86,6 +87,7 @@ uses
 
 type
   TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
+  TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
 
 { TBCEditorCompletionProposalPopupWindow **************************************}
 
@@ -128,7 +130,7 @@ begin
   FItems := TStringList.Create;
   FBitmapBuffer := Graphics.TBitmap.Create;
 
-  FOnValidate := HandleOnValidate;
+  FOnValidate := nil;
   OnDblClick := HandleDblClick;
 end;
 
@@ -386,54 +388,21 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
 var
-  LLine: string;
-  LTextPosition: TBCEditorLinesPosition;
-  LValue: string;
+  LData: PBCEditorCDText;
 begin
   with TCustomBCEditor(Editor) do
-  begin
-    BeginUpdate;
-    Lines.BeginUpdate();
-    try
-      LTextPosition := CaretPos;
-
-      if (SelLength = 0) then
-      begin
-        SelectionBeginPosition := LinesPosition(FCompletionStartChar, LTextPosition.Line);
-        if AEndToken = BCEDITOR_NONE_CHAR then
-        begin
-          LLine := Lines[LTextPosition.Line];
-          if (LTextPosition.Char < Length(LLine)) and IsWordBreakChar(LLine[1 + LTextPosition.Char]) then
-            SelectionEndPosition := LTextPosition
-          else
-            SelectionEndPosition := LinesPosition(WordEnd().Char, LTextPosition.Line)
-        end
-        else
-          SelectionEndPosition := LTextPosition;
+    if (FSelectedLine < Length(FItemIndexArray)) then
+    begin
+      Lines.BeginUpdate();
+      try
+        ProcessCommand(ecDeleteWord, nil);
+        LData := TBCEditorCDText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value, False);
+        ProcessCommand(ecText, PBCEditorCD(LData));
+        LData.Free();
+      finally
+        Lines.EndUpdate();
       end;
-
-      if FSelectedLine < Length(FItemIndexArray) then
-        LValue := GetItems[FItemIndexArray[FSelectedLine]].Value
-      else
-        LValue := SelText;
-
-      if Assigned(FOnClose) then
-        FOnClose(FEditor, LValue);
-
-      FValueSet := SelText <> LValue;
-      if FValueSet then
-        SelText := LValue;
-
-      if CanFocus then
-        SetFocus;
-
-      CaretPos := SelectionEndPosition;
-      SelectionBeginPosition := LinesPosition(CaretPos.X + 1, CaretPos.Y);
-    finally
-      Lines.EndUpdate();
-      EndUpdate;
     end;
-  end;
 end;
 
 procedure TBCEditorCompletionProposalPopup.Hide();
@@ -470,11 +439,14 @@ var
 begin
   FSendToEditor := True;
   case Key of
-    VK_RETURN, VK_TAB:
+    VK_TAB,
+    VK_RETURN:
       begin
-        if Assigned(FOnValidate) then
-          FOnValidate(Self, Shift, BCEDITOR_NONE_CHAR);
-          FSendToEditor := False;
+        if (Assigned(FOnValidate)) then
+          FOnValidate(Self, Shift, BCEDITOR_NONE_CHAR)
+        else
+          HandleOnValidate(Self, Shift, BCEDITOR_NONE_CHAR);
+        FSendToEditor := False;
       end;
     VK_ESCAPE:
       begin
@@ -580,7 +552,9 @@ var
 begin
   case Key of
     BCEDITOR_CARRIAGE_RETURN:
-      Editor.SetFocus;
+      begin
+        Editor.SetFocus;
+      end;
     BCEDITOR_SPACE_CHAR .. High(Char):
       begin
         if not (cpoAutoInvoke in FCompletionProposal.Options) then

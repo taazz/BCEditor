@@ -1,9 +1,9 @@
 unit BCEditor.Commands;
 
-interface
+interface {********************************************************************}
 
 uses
-  Classes, SysUtils, Types,
+  Classes, SysUtils, Types, Generics.Collections,
   Menus,
   BCEditor.Types;
 
@@ -27,9 +27,7 @@ const
   ecEditorTop = 15;
   ecEditorBottom = 16;
   ecShowGotoLine = 17;
-  ecLine = 18;
-  ecRow = 19;
-  ecLinePosition = 20;
+  ecPosition = 20;
   { Selection }
   ecSelection = 100;
   ecSelectionLeft = ecLeft + ecSelection;
@@ -48,8 +46,7 @@ const
   ecSelectionEditorBottom = ecEditorBottom + ecSelection;
   ecSelectionWord = ecSelection + 21;
   ecSelectAll = ecSelection + 22;
-  ecSelectionLine = ecSelection + 23;
-  ecSelectionPosition = ecSelection + 24;
+  ecUnselect = ecSelection + 23;
   { Scrolling }
   ecScrollUp = 211;
   ecScrollDown = 212;
@@ -83,7 +80,7 @@ const
   ecGotoNextBookmark = 330;
   ecGotoPreviousBookmark = 331;
   { CompletionProposal }
-  ecCompletionProposal = 470;
+  ecShowCompletionProposal = 470;
   { Deletion }
   ecBackspace = 501;
   ecDeleteChar = 502;
@@ -207,14 +204,13 @@ type
   PBCEditorCDText = ^TBCEditorCDText;
   TBCEditorCDText = packed record
     Size: Int64;
-    Area: TBCEditorLinesArea;
     Selection: Boolean;
   private
     FText: PChar;
     FTextLength: Int64;
     function GetText(): string;
   public
-    class function Create(const AArea: TBCEditorLinesArea; const AText: string; const ASelection: Boolean): PBCEditorCDText; static;
+    class function Create(const AText: string; const ASelection: Boolean): PBCEditorCDText; static;
     procedure Free();
     property Text: string read GetText;
   end;
@@ -262,8 +258,6 @@ type
     property ShortCut: TShortCut read GetShortCut write SetShortCut default 0;
   end;
 
-  EBCEditorKeyCommandException = class(Exception);
-
   TBCEditorCommands = class(TCollection)
   strict private
     FOwner: TPersistent;
@@ -288,7 +282,7 @@ type
 function IdentToEditorCommand(const AIdent: string; var ACommand: LongInt): Boolean;
 function EditorCommandToIdent(ACommand: LongInt; var AIdent: string): Boolean;
 
-implementation
+implementation {***************************************************************}
 
 uses
   Windows,
@@ -305,7 +299,7 @@ type
   end;
 
 const
-  EditorCommandStrings: array [0 .. 105] of TBCEditorCommandString = (
+  EditorCommandStrings: array [0 .. 101] of TBCEditorCommandString = (
     (Value: ecNone; Name: 'ecNone'),
     (Value: ecLeft; Name: 'ecLeft'),
     (Value: ecRight; Name: 'ecRight'),
@@ -322,9 +316,7 @@ const
     (Value: ecEditorTop; Name: 'ecEditorTop'),
     (Value: ecEditorBottom; Name: 'ecEditorBottom'),
     (Value: ecShowGotoLine; Name: 'ecShowGotoLine'),
-    (Value: ecLine; Name: 'ecLine'),
-    (Value: ecRow; Name: 'ecRow'),
-    (Value: ecLinePosition; Name: 'ecLinePosition'),
+    (Value: ecPosition; Name: 'ecPosition'),
     (Value: ecSelection; Name: 'ecSelection'),
     (Value: ecSelectionLeft; Name: 'ecSelectionLeft'),
     (Value: ecSelectionRight; Name: 'ecSelectionRight'),
@@ -341,8 +333,6 @@ const
     (Value: ecSelectionEditorTop; Name: 'ecSelectionEditorTop'),
     (Value: ecSelectionEditorBottom; Name: 'ecSelectionEditorBottom'),
     (Value: ecSelectionWord; Name: 'ecSelectionWord'),
-    (Value: ecSelectionLine; Name: 'ecSelectionLine'),
-    (Value: ecSelectionPosition; Name: 'ecSelectionPosition'),
     (Value: ecSelectAll; Name: 'ecSelectAll'),
     (Value: ecScrollUp; Name: 'ecScrollUp'),
     (Value: ecScrollDown; Name: 'ecScrollDown'),
@@ -411,7 +401,7 @@ const
     (Value: ecReplace; Name: 'ecReplace'),
     (Value: ecLineComment; Name: 'ecLineComment'),
     (Value: ecBlockComment; Name: 'ecBlockComment'),
-    (Value: ecCompletionProposal; Name: 'ecCompletionProposal')
+    (Value: ecShowCompletionProposal; Name: 'ecShowCompletionProposal')
   );
 
 function IdentToEditorCommand(const AIdent: string; var ACommand: LongInt): Boolean;
@@ -461,17 +451,15 @@ begin
     Result := IntToStr(ACommand);
 end;
 
-{ TBCEditorTextCommandData ****************************************************}
+{ TBCEditorCDText *************************************************************}
 
-class function TBCEditorCDText.Create(const AArea: TBCEditorLinesArea;
-  const AText: string; const ASelection: Boolean): PBCEditorCDText;
+class function TBCEditorCDText.Create(const AText: string; const ASelection: Boolean): PBCEditorCDText;
 var
   LSize: Int64;
 begin
   LSize := SizeOf(TBCEditorCDText) + Length(AText) * SizeOf(Char);
   GetMem(Result, LSize);
   Result^.Size := LSize;
-  Result^.Area := AArea;
   Result^.Selection := ASelection;
   Result^.FText := @PAnsiChar(Result)[SizeOf(TBCEditorCDText)];
   Result^.FTextLength := Length(AText);
@@ -488,7 +476,7 @@ begin
   SetString(Result, FText, FTextLength);
 end;
 
-{ TBCEditorFindCommandData ****************************************************}
+{ TBCEditorCDFind *************************************************************}
 
 class function TBCEditorCDFind.Create(const APattern: string;
   const AOptions: TBCEditorFindOptions): PBCEditorCDFind;
@@ -514,7 +502,7 @@ begin
   SetString(Result, FPattern, FPatternLength);
 end;
 
-{ TBCEditorReplaceCommandData *************************************************}
+{ TBCEditorCDReplace **********************************************************}
 
 class procedure TBCEditorCDReplace.Decode(const AData: PBCEditorCDReplace;
   var APattern, AReplaceText: string; var AOptions: TBCEditorReplaceOptions);
@@ -558,7 +546,7 @@ begin
     and (Pointer((@a.Proc)^) = Pointer((@b.Proc)^));
 end;
 
-{ TBCEditorKeyCommand }
+{ TBCEditorKeyCommand *********************************************************}
 
 procedure TBCEditorKeyCommand.Assign(ASource: TPersistent);
 begin
@@ -628,7 +616,7 @@ begin
   begin
     LDuplicate := TBCEditorCommands(Collection).FindShortcuts(ShortCut, AValue);
     if (LDuplicate <> -1) and (LDuplicate <> Self.Index) then
-      raise EBCEditorKeyCommandException.Create(SBCEditOrduplicateShortcut);
+      raise ERangeError.Create(SBCEditOrduplicateShortcut);
   end;
 
   Menus.ShortCutToKey(AValue, LNewKey, LNewShiftState);
@@ -655,7 +643,7 @@ begin
   begin
     LDuplicate := TBCEditorCommands(Collection).FindShortcuts(AValue, SecondaryShortCut);
     if (LDuplicate <> -1) and (LDuplicate <> Self.Index) then
-      raise EBCEditorKeyCommandException.Create(SBCEditorDuplicateShortcut);
+      raise ERangeError.Create(SBCEditorDuplicateShortcut);
   end;
 
   ShortCutToKey(AValue, LNewKey, LNewShiftState);
@@ -883,7 +871,7 @@ begin
   Add(ecLineComment, [ssCtrl], VK_OEM_2);
   Add(ecBlockComment, [ssCtrl, ssShift], VK_OEM_2);
   { Completion Proposal }
-  Add(ecCompletionProposal, [ssCtrl], VK_SPACE);
+  Add(ecShowCompletionProposal, [ssCtrl], VK_SPACE);
   { SyncEdit }
   Add(ecSyncEdit, [ssCtrl, ssShift], Ord('J'));
   { MacroRecorder }

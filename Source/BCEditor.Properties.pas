@@ -9,7 +9,7 @@ uses
 
 type
   TBCEditorCompletionProposalCloseEvent = procedure(Sender: TObject; var ASelectedItem: string) of object;
-  TBCEditorCompletionProposalPopupWindowValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
+  TBCEditorCompletionProposalValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
 
   TBCEditorCompletionProposalItems = class(TCollection)
     type
@@ -1070,6 +1070,8 @@ end;
 constructor TBCEditorColors.TSelection.Create(const AColors: TBCEditorColors);
 begin
   inherited Create();
+
+  FColors := AColors;
 
   FBackground := clSelectionColor;
   FForeground := clHighlightText;

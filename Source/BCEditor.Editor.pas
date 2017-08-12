@@ -181,8 +181,7 @@ type
 
   private const
     DefaultOptions = [eoAcceptFiles, eoAutoIndent, eoHighlightAllFoundTexts,
-      eoHighlightCurrentLine, eoHighlightMatchingPairs, eoMiddleClickScrolling,
-      eoShowSpecialChars];
+      eoHighlightCurrentLine, eoHighlightMatchingPairs, eoMiddleClickScrolling];
     DefaultSelectionOptions = [soHighlightWholeLine, soTripleClickLineSelect];
     DefaultSyncEditOptions = [seoShowButton, seoCaseSensitive];
     DefaultUndoOptions = [uoGroupUndo];
@@ -277,6 +276,7 @@ type
     FOnChange: TNotifyEvent;
     FOnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent;
     FOnCompletionProposalShow: TBCEditorCompletionProposalShowEvent;
+    FOnCompletionProposalValidate: TBCEditorCompletionProposalValidateEvent;
     FOnFindExecuted: TBCEditorFindExecutedEvent;
     FOnFindWrapAround: TBCEditorFindWrapAroundEvent;
     FOnHint: TBCEditorHintEvent;
@@ -352,10 +352,11 @@ type
     procedure DeleteLastWordOrBeginningOfLine(const ACommand: TBCEditorCommand);
     procedure DeleteLine;
     procedure DeleteLineFromRows(const ALine: Integer);
-    procedure DeleteWordOrEndOfLine(const ACommand: TBCEditorCommand);
     procedure DoBackspace();
     procedure DoBlockComment;
     procedure DoChar(const AData: PBCEditorCDChar);
+    procedure DoDeleteEndOfLine();
+    procedure DoDeleteWord();
     procedure DoEditorBottom(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoEditorTop(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoEndKey(const ASelectionCommand: Boolean);
@@ -364,14 +365,12 @@ type
     function DoFindForewards(const AData: PBCEditorCDFind): Boolean;
     procedure DoHomeKey(const ASelectionCommand: Boolean);
     procedure DoInsertText(const AText: string);
-    procedure DoLine(const AData: PBCEditorCDItem);
     procedure DoLineComment();
     procedure DoPageKey(const ACommand: TBCEditorCommand);
     procedure DoPageTopOrBottom(const ACommand: TBCEditorCommand);
     procedure DoPosition(const AData: PBCEditorCDPosition);
     procedure DoReplace(const AData: PBCEditorCDReplace);
     procedure DoReturnKey();
-    procedure DoRow(const AData: PBCEditorCDItem);
     procedure DoScroll(const ACommand: TBCEditorCommand);
     procedure DoSelectAll();
     procedure DoSelection(const AData: PBCEditorCDSelection);
@@ -382,6 +381,7 @@ type
     procedure DoTabKey(const ACommand: TBCEditorCommand);
     procedure DoText(const AData: PBCEditorCDText);
     procedure DoToggleSelectedCase(const ACommand: TBCEditorCommand);
+    procedure DoUnselect();
     procedure DoWordLeft(const ACommand: TBCEditorCommand);
     procedure DoWordRight(const ACommand: TBCEditorCommand);
     procedure EMCanUndo(var AMessage: TMessage); message EM_CANUNDO;
@@ -429,8 +429,6 @@ type
     function GetLineIndentLevel(const ALine: Integer): Integer;
     function GetModified(): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     function GetSearchResultCount(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
-    function GetSelectionBeginPosition(): TBCEditorLinesPosition;
-    function GetSelectionEndPosition(): TBCEditorLinesPosition;
     function GetSelLength(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function GetSelStart(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function GetSelText(): string;
@@ -520,9 +518,7 @@ type
     procedure SetReadOnly(const AValue: Boolean);
     procedure SetScrollBars(const AValue: UITypes.TScrollStyle);
     procedure SetSelectedWord;
-    procedure SetSelectionBeginPosition(const AValue: TBCEditorLinesPosition);
-    procedure SetSelectionEndPosition(const AValue: TBCEditorLinesPosition);
-    procedure SetSelectionOption(AValue: TBCEditorSelectionOptions);
+    procedure SetSelectionOptions(AValue: TBCEditorSelectionOptions);
     procedure SetSelLength(AValue: Integer);
     procedure SetSelStart(AValue: Integer);
     procedure SetSelText(const AValue: string);
@@ -664,11 +660,12 @@ type
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent read FOnCompletionProposalClose write FOnCompletionProposalClose;
     property OnCompletionProposalShow: TBCEditorCompletionProposalShowEvent read FOnCompletionProposalShow write FOnCompletionProposalShow;
+    property OnCompletionProposalValidate: TBCEditorCompletionProposalValidateEvent read FOnCompletionProposalValidate write FOnCompletionProposalValidate;
     property OnFindExecuted: TBCEditorFindExecutedEvent read FOnFindExecuted write FOnFindExecuted;
     property OnFindWrapAround: TBCEditorFindWrapAroundEvent read FOnFindWrapAround write FOnFindWrapAround;
     property OnHint: TBCEditorHintEvent read FOnHint write FOnHint;
     property OnKeyPress: TBCEditorKeyPressWEvent read FOnKeyPressW write FOnKeyPressW;
-    property OnMarksPanelClick: TBCEditorMarksPanelClick read FOnMarksPanelClick;
+    property OnMarksPanelClick: TBCEditorMarksPanelClick read FOnMarksPanelClick write FOnMarksPanelClick;
     property OnModified: TNotifyEvent read FOnModified write FOnModified;
     property OnReplacePrompt: TBCEditorReplacePromptEvent read FOnReplacePrompt write FOnReplacePrompt;
     property OnSelChanged: TNotifyEvent read FOnSelChanged write FOnSelChanged;
@@ -677,7 +674,7 @@ type
     property ParentColor default False;
     property ParentFont default False;
     property ScrollBars: UITypes.TScrollStyle read FScrollBars write SetScrollBars default ssBoth;
-    property SelectionOptions: TBCEditorSelectionOptions read FSelectionOptions write SetSelectionOption default DefaultSelectionOptions;
+    property SelectionOptions: TBCEditorSelectionOptions read FSelectionOptions write SetSelectionOptions default DefaultSelectionOptions;
     property SyncEditOptions: TBCEditorSyncEditOptions read FSyncEditOptions write SetSyncEditOptions default DefaultSyncEditOptions;
     property TabStop default True;
     property TextEntryMode: TBCEditorTextEntryMode read FTextEntryMode write FTextEntryMode default temInsert;
@@ -763,8 +760,6 @@ type
     property Modified: Boolean read GetModified write SetModified;
     property ReadOnly: Boolean read FReadOnly write SetReadOnly default False;
     property SearchResultCount: Integer read GetSearchResultCount;
-    property SelectionBeginPosition: TBCEditorLinesPosition read GetSelectionBeginPosition write SetSelectionBeginPosition;
-    property SelectionEndPosition: TBCEditorLinesPosition read GetSelectionEndPosition write SetSelectionEndPosition;
     property SelLength: Integer read GetSelLength write SetSelLength;
     property SelStart: Integer read GetSelStart write SetSelStart;
     property SelText: string read GetSelText write SetSelText;
@@ -2301,33 +2296,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DeleteWordOrEndOfLine(const ACommand: TBCEditorCommand);
-var
-  LEndPosition: TBCEditorLinesPosition;
-begin
-  if (FLines.CaretPosition.Line < FLines.Count) then
-  begin
-    case (ACommand) of
-      ecDeleteWord:
-        if ((FLines.CaretPosition.Char < Length(FLines.Items[FLines.CaretPosition.Line].Text))
-          and not IsWordBreakChar(FLines.Char[FLines.CaretPosition])) then
-        begin
-          LEndPosition := WordEnd(FLines.CaretPosition);
-          while ((LEndPosition.Char < Length(FLines.Items[LEndPosition.Line].Text)) and IsEmptyChar(FLines.Char[LEndPosition])) do
-            Inc(LEndPosition.Char);
-        end
-        else
-          LEndPosition := NextWordPosition(FLines.CaretPosition);
-      ecDeleteEndOfLine:
-        LEndPosition := FLines.EOLPosition[FLines.CaretPosition.Line];
-      else raise ERangeError.Create('ACommand: ' + IntToStr(Ord(ACommand)));
-    end;
-
-    if (LEndPosition > FLines.CaretPosition) then
-      FLines.DeleteText(LinesArea(FLines.CaretPosition, LEndPosition));
-  end;
-end;
-
 destructor TCustomBCEditor.Destroy();
 begin
   FLines.TerminateJob(True);
@@ -2720,6 +2688,7 @@ begin
     if LControl is TCustomForm then
       PopupParent := TCustomForm(LControl);
     OnClose := FOnCompletionProposalClose;
+    OnValidate := FOnCompletionProposalValidate;
     Assign(FCompletionProposal);
 
     LItems := TStringList.Create;
@@ -2747,13 +2716,31 @@ begin
       FOnCompletionProposalShow(Self, FCompletionProposal.Columns,
         LCurrentInput, LCanExecute);
     if LCanExecute then
-      Execute(LCurrentInput, LPoint)
+    begin
+      ProcessCommand(ecUnselect, nil);
+      Execute(LCurrentInput, LPoint);
+    end
     else
     begin
       FCompletionProposalPopup.Free;
       FCompletionProposalPopup := nil;
     end;
   end;
+end;
+
+procedure TCustomBCEditor.DoDeleteEndOfLine();
+begin
+  if (FLines.ValidPosition(FLines.CaretPosition)) then
+    FLines.DeleteText(LinesArea(FLines.CaretPosition, FLines.EOLPosition[FLines.CaretPosition.Line]));
+end;
+
+procedure TCustomBCEditor.DoDeleteWord();
+var
+  LArea: TBCEditorLinesArea;
+begin
+  LArea := FLines.WordArea[FLines.CaretPosition];
+  if (LArea <> InvalidLinesArea) then
+    FLines.DeleteText(LArea);
 end;
 
 procedure TCustomBCEditor.DoEditorBottom(const ACommand: TBCEditorCommand);
@@ -2961,15 +2948,7 @@ begin
   BeginUpdate();
   try
     if (not FLines.SelArea.IsEmpty()) then
-    begin
-      FLines.BeginUpdate();
-      try
-        SelText := AText;
-        FLines.CaretPosition := FLines.SelArea.EndPosition;
-      finally
-        FLines.EndUpdate();
-      end;
-    end
+      FLines.ReplaceText(FLines.SelArea, AText)
     else if ((FTextEntryMode = temOverwrite)
       and (FLines.CaretPosition.Line < FLines.Count)
       and (FLines.CaretPosition.Char < Length(FLines.Items[FLines.CaretPosition.Line].Text))) then
@@ -2979,14 +2958,6 @@ begin
   finally
     EndUpdate();
   end;
-end;
-
-procedure TCustomBCEditor.DoLine(const AData: PBCEditorCDItem);
-begin
-  if (not AData^.Selection) then
-    FLines.CaretPosition := FLines.BOLPosition[AData^.Item]
-  else
-    FLines.SelArea := FLines.LineArea[AData^.Item];
 end;
 
 procedure TCustomBCEditor.DoLineComment();
@@ -3214,14 +3185,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoRow(const AData: PBCEditorCDItem);
-begin
-  if (not AData^.Selection) then
-    FLines.CaretPosition := FRows.BORPosition[AData^.Item]
-  else
-    FLines.SelArea := FRows.RowArea[AData^.Item];
-end;
-
 procedure TCustomBCEditor.DoScroll(const ACommand: TBCEditorCommand);
 begin
   case (ACommand) of
@@ -3263,8 +3226,6 @@ begin
 end;
 
 procedure TCustomBCEditor.DoShowGotoLine();
-var
-  LData: TBCEditorCDItem;
 begin
   if (not Assigned(FGotoLineDialog)) then
     FGotoLineDialog := TGotoLineDialog.Create(Self);
@@ -3273,12 +3234,7 @@ begin
   FGotoLineDialog.Max := Max(1, FLines.Count) + FLeftMargin.LineNumbers.StartFrom;
   FGotoLineDialog.Line := FLines.CaretPosition.Line + FLeftMargin.LineNumbers.StartFrom;
   if (FGotoLineDialog.Execute()) then
-  begin
-    LData.Size := SizeOf(LData);
-    LData.Item := FGotoLineDialog.Line - FLeftMargin.LineNumbers.StartFrom;
-    LData.Selection := False;
-    ProcessCommand(ecLine, @LData);
-  end;
+    SetCaretPos(FLines.BOLPosition[FGotoLineDialog.Line - FLeftMargin.LineNumbers.StartFrom]);
 end;
 
 procedure TCustomBCEditor.DoShowReplace();
@@ -3469,12 +3425,15 @@ begin
 end;
 
 procedure TCustomBCEditor.DoText(const AData: PBCEditorCDText);
+var
+  LOldCaretPosition: TBCEditorLinesPosition;
 begin
   FLines.BeginUpdate();
   try
-    FLines.ReplaceText(AData^.Area, AData^.Text);
+    LOldCaretPosition := FLines.CaretPosition;
+    FLines.InsertText(FLines.CaretPosition, AData^.Text);
     if (AData.Selection) then
-      SetCaretAndSelection(FLines.CaretPosition, LinesArea(AData^.Area.BeginPosition, FLines.CaretPosition));
+      SetCaretAndSelection(FLines.CaretPosition, LinesArea(LOldCaretPosition, FLines.CaretPosition));
   finally
     FLines.EndUpdate();
   end;
@@ -3507,6 +3466,11 @@ end;
 procedure TCustomBCEditor.DoUndo();
 begin
   Undo();
+end;
+
+procedure TCustomBCEditor.DoUnselect();
+begin
+  FLines.SelArea := LinesArea(FLines.CaretPosition, FLines.CaretPosition);
 end;
 
 procedure TCustomBCEditor.DoWordLeft(const ACommand: TBCEditorCommand);
@@ -4404,16 +4368,6 @@ begin
   Result := FLines.FoundAreas.Count;
 end;
 
-function TCustomBCEditor.GetSelectionBeginPosition: TBCEditorLinesPosition;
-begin
-  Result := FLines.SelBeginPosition;
-end;
-
-function TCustomBCEditor.GetSelectionEndPosition: TBCEditorLinesPosition;
-begin
-  Result := FLines.SelEndPosition;
-end;
-
 function TCustomBCEditor.GetSelLength(): Integer;
 begin
   Result := FLines.CharIndexOf(FLines.SelArea.EndPosition, FLines.SelArea.BeginPosition);
@@ -5111,7 +5065,7 @@ begin
     and not (ssAlt in AShift) and not (ssCtrl in AShift)
     and (cpoAutoInvoke in FCompletionProposal.Options) and Chr(AKey).IsLetter) then
   begin
-    LCommand := ecCompletionProposal;
+    LCommand := ecShowCompletionProposal;
     if not (cpoAutoInvoke in FCompletionProposal.Options) then
     begin
       AKey := 0;
@@ -5378,7 +5332,7 @@ begin
         InvalidateRect(
           Rect(
             FTextRect.Left, Max(0, LBeginRow - FTopRow) * FLineHeight,
-            FTextRect.Right, (Min(FVisibleRows, LEndRow - FTopRow) + 1) * FLineHeight - 1))
+            FTextRect.Right, (Min(FVisibleRows, LEndRow - FTopRow) + 1) * FLineHeight))
       else
         InvalidateRect(
           Rect(
@@ -6611,7 +6565,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
   end;
 
 var
-  LData: TBCEditorCDItem;
+  LData: TBCEditorCDSelection;
   LBeginRange: TBCEditorHighlighter.TRange;
   LChar: Integer;
   LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
@@ -6703,9 +6657,10 @@ begin
                   and (LRow < FRows.Count)) then
                 begin
                   LData.Size := SizeOf(LData);
-                  LData.Item := LRow;
-                  LData.Selection := True;
-                  ProcessCommand(ecRow, @LData);
+                  LData.CaretPos := FRows.EORPosition[LRow];
+                  LData.BeginPos := FRows.BORPosition[LRow];
+                  LData.EndPos := FRows.EORPosition[LRow];
+                  ProcessCommand(ecSelection, @LData);
                   FLastDoubleClickTime := 0;
                   Result := True;
                 end;
@@ -6900,18 +6855,18 @@ begin
           SetSelectedWord;
         ecSelectAll:
           DoSelectAll();
-        ecLine:
-          DoLine(PBCEditorCDItem(AData));
-        ecRow:
-          DoRow(PBCEditorCDItem(AData));
-        ecLinePosition:
+        ecUnselect:
+          DoUnselect();
+        ecPosition:
           DoPosition(PBCEditorCDPosition(AData));
         ecBackspace:
           DoBackspace();
         ecDeleteChar:
           DeleteChar;
-        ecDeleteWord, ecDeleteEndOfLine:
-          DeleteWordOrEndOfLine(ACommand);
+        ecDeleteWord:
+          DoDeleteWord();
+        ecDeleteEndOfLine:
+          DoDeleteEndOfLine();
         ecDeleteLastWord, ecDeleteBeginningOfLine:
           DeleteLastWordOrBeginningOfLine(ACommand);
         ecDeleteLine:
@@ -6961,9 +6916,9 @@ begin
         ecUpperCase, ecLowerCase:
           DoToggleSelectedCase(ACommand);
         ecUndo:
-          Undo();
+          FLines.Undo();
         ecRedo:
-          Redo();
+          FLines.Redo();
         ecCut:
           CutToClipboard();
         ecCopy:
@@ -6991,7 +6946,7 @@ begin
           DoBlockComment;
         ecLineComment:
           DoLineComment;
-        ecCompletionProposal:
+        ecShowCompletionProposal:
           DoCompletionProposal();
         ecSyncEdit:
           DoSyncEdit();
@@ -7140,7 +7095,7 @@ var
     LData.Size := SizeOf(LData);
     LData.Pos := APosition;
     LData.Selection := ASelection;
-    ProcessCommand(ecLinePosition, @LData);
+    ProcessCommand(ecPosition, @LData);
   end;
 
 var
@@ -7285,7 +7240,7 @@ begin
         else if (APaintVar^.LineForegroundColor <> clNone) then
           LForegroundColor := APaintVar^.LineForegroundColor
         else if ((eoShowSpecialChars in FOptions)
-          and (LIsLineBreakToken or Assigned(LText) and CharInSet(LText^, [BCEDITOR_NONE_CHAR, BCEDITOR_TAB_CHAR, BCEDITOR_LINEFEED, BCEDITOR_CARRIAGE_RETURN, BCEDITOR_SPACE_CHAR]))) then
+          and (LIsLineBreakToken or Assigned(LText) and CharInSet(AText^, [BCEDITOR_NONE_CHAR, BCEDITOR_TAB_CHAR, BCEDITOR_LINEFEED, BCEDITOR_CARRIAGE_RETURN, BCEDITOR_SPACE_CHAR]))) then
           if (FColors.SpecialChars.Foreground <> clNone) then
             LForegroundColor := FColors.SpecialChars.Foreground
           else
@@ -8989,7 +8944,7 @@ begin
   LData.Size := SizeOf(LData);
   LData.Pos := AValue;
   LData.Selection := False;
-  ProcessCommand(ecLinePosition, @LData);
+  ProcessCommand(ecPosition, @LData);
 end;
 
 procedure TCustomBCEditor.SetCodeFolding(const AValue: TBCEditorCodeFolding);
@@ -9322,16 +9277,6 @@ begin
   SetWordBlock(FLines.CaretPosition);
 end;
 
-procedure TCustomBCEditor.SetSelectionBeginPosition(const AValue: TBCEditorLinesPosition);
-begin
-  FLines.SelArea := LinesArea(AValue, FLines.SelEndPosition);
-end;
-
-procedure TCustomBCEditor.SetSelectionEndPosition(const AValue: TBCEditorLinesPosition);
-begin
-  FLines.SelArea := LinesArea(FLines.SelBeginPosition, AValue);
-end;
-
 procedure TCustomBCEditor.SetSelLength(AValue: Integer);
 var
   LData: TBCEditorCDSelection;
@@ -9356,19 +9301,29 @@ end;
 
 procedure TCustomBCEditor.SetSelText(const AValue: string);
 var
-  LData: PBCEditorCDText;
+  LOldCaretPosition: TBCEditorLinesPosition;
 begin
   if (not FReadOnly) then
   begin
-    LData := TBCEditorCDText.Create(FLines.SelArea, AValue, True);
-    ProcessCommand(ecText, PBCEditorCD(LData));
-    LData^.Free();
+    LOldCaretPosition := FLines.CaretPosition;
+    FLines.BeginUpdate();
+    try
+      DoInsertText(AValue);
+      SetCaretAndSelection(FLines.CaretPosition, LinesArea(LOldCaretPosition, FLines.CaretPosition));
+    finally
+      FLines.EndUpdate();
+    end;
   end;
 end;
 
-procedure TCustomBCEditor.SetSelectionOption(AValue: TBCEditorSelectionOptions);
+procedure TCustomBCEditor.SetSelectionOptions(AValue: TBCEditorSelectionOptions);
 begin
-
+  if (AValue <> FSelectionOptions) then
+  begin
+    FSelectionOptions := AValue;
+    if (not FLines.SelArea.IsEmpty()) then
+      InvalidateText();
+  end;
 end;
 
 procedure TCustomBCEditor.SetSyncEditOptions(AValue: TBCEditorSyncEditOptions);
@@ -9535,8 +9490,8 @@ begin
 
   if (not FLines.SelArea.IsEmpty()) then
   begin
-    LSelectionBeginPosition := SelectionEndPosition;
-    LSelectionEndPosition := SelectionEndPosition;
+    LSelectionBeginPosition := FLines.SelArea.BeginPosition;
+    LSelectionEndPosition := FLines.SelArea.EndPosition;
 
     LBeginLine := LSelectionBeginPosition.Line;
     LEndLine := LSelectionEndPosition.Line;
@@ -10501,7 +10456,7 @@ begin
       { ImeCount is always the size in bytes, also for Unicode }
       SetLength(LText, LSize div SizeOf(Char));
       ImmGetCompositionString(LImc, GCS_RESULTSTR, PChar(LText), LSize);
-      LData := TBCEditorCDText.Create(LinesArea(FLines.CaretPosition, InvalidLinesPosition), LText, False);
+      LData := TBCEditorCDText.Create(LText, False);
       ProcessCommand(ecText, PBCEditorCD(LData));
       LData^.Free();
     finally

@@ -49,12 +49,13 @@ type
     property State: TState read FState;
   public
     procedure AddCommand(const ACommand: TBCEditorCommand; const AData: PBCEditorCD);
-    procedure AllowCommand(const ACommand: TBCEditorCommand);
+    procedure AllowCommandWhileRecording(const ACommand: TBCEditorCommand);
     procedure Clear();
     constructor Create(AOwner: TComponent); override;
     procedure DeleteCommand(const AIndex: Integer);
     destructor Destroy(); override;
-    procedure DisallowCommand(const ACommand: TBCEditorCommand);
+    procedure DisallowCommandWhileRecording(const ACommand: TBCEditorCommand);
+    procedure IgnoreCommand(const ACommand: TBCEditorCommand);
     procedure InsertCommand(const AIndex: Integer; const ACommand: TBCEditorCommand; const AData: PBCEditorCD);
     procedure LoadFromFile(const AFilename: string);
     procedure LoadFromStream(AStream: TStream; AClear: Boolean = True);
@@ -90,7 +91,7 @@ begin
   InsertCommand(FItems.Count, ACommand, AData);
 end;
 
-procedure TCustomBCEditorMacroRecorder.AllowCommand(const ACommand: TBCEditorCommand);
+procedure TCustomBCEditorMacroRecorder.AllowCommandWhileRecording(const ACommand: TBCEditorCommand);
 begin
   FDisallowedCommands.Remove(ACommand);
 end;
@@ -110,11 +111,13 @@ begin
   FDisallowedCommands := TList<TBCEditorCommand>.Create();
   FIgnoredCommands := TList<TBCEditorCommand>.Create();
 
-  DisallowCommand(ecCompletionProposal);
+  IgnoreCommand(ecShowGotoLine);
+  IgnoreCommand(ecShowFind);
+  IgnoreCommand(ecShowReplace);
+  IgnoreCommand(ecShowCompletionProposal);
 
-  FIgnoredCommands.Add(ecShowGotoLine);
-  FIgnoredCommands.Add(ecShowFind);
-  FIgnoredCommands.Add(ecShowReplace);
+  DisallowCommandWhileRecording(ecSelection);
+  DisallowCommandWhileRecording(ecPosition);
 end;
 
 procedure TCustomBCEditorMacroRecorder.DeleteCommand(const AIndex: Integer);
@@ -132,10 +135,16 @@ begin
   inherited;
 end;
 
-procedure TCustomBCEditorMacroRecorder.DisallowCommand(const ACommand: TBCEditorCommand);
+procedure TCustomBCEditorMacroRecorder.DisallowCommandWhileRecording(const ACommand: TBCEditorCommand);
 begin
   if (FDisallowedCommands.IndexOf(ACommand) < 0) then
     FDisallowedCommands.Add(ACommand);
+end;
+
+procedure TCustomBCEditorMacroRecorder.IgnoreCommand(const ACommand: TBCEditorCommand);
+begin
+  if (FIgnoredCommands.IndexOf(ACommand) < 0) then
+    FIgnoredCommands.Add(ACommand);
 end;
 
 procedure TCustomBCEditorMacroRecorder.EditorCommand(ASender: TObject; const ABefore: Boolean;
@@ -165,9 +174,6 @@ begin
           Step();
           AHandled := True;
         end;
-      else
-        if ((ASender = FEditor) and (FState = msRecording)) then
-          AHandled := AHandled or (FDisallowedCommands.IndexOf(ACommand) >= 0);
     end;
   end
   else

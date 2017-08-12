@@ -366,6 +366,9 @@ uses
   UITypes, Types, Math,
   BCEditor.Consts, BCEditor.Lines;
 
+type
+  TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
+
 const
   mmPerInch = 25.4;
   mmPerCm = 10;
@@ -2246,8 +2249,8 @@ begin
   FTabWidth := AValue.Tabs.Width;
   SetLines(AValue.Lines);
   FSelectionAvailable := AValue.SelLength <> 0;
-  FBlockBeginPosition := AValue.SelectionBeginPosition;
-  FBlockEndPosition := AValue.SelectionEndPosition;
+  FBlockBeginPosition := TBCEditorLines(AValue.Lines).SelArea.BeginPosition;
+  FBlockEndPosition := TBCEditorLines(AValue.Lines).SelArea.EndPosition;
 end;
 
 procedure TBCEditorPrint.LoadFromStream(AStream: TStream);

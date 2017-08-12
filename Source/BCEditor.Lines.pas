@@ -316,6 +316,7 @@ type
     function GetSyncEdit(): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     function GetTextIn(const AArea: TBCEditorLinesArea): string;
     function GetTextLength(): Integer;
+    function GetWordArea(APosition: TBCEditorLinesPosition): TBCEditorLinesArea;
     procedure InternalClear(const AClearUndo: Boolean); overload;
     procedure JobExecuted();
     procedure MarksChanged(ASender: TObject); {$IFNDEF Debug} inline; {$ENDIF}
@@ -432,6 +433,7 @@ type
     property TextIn[const Area: TBCEditorLinesArea]: string read GetTextIn;
     property TextLength: Integer read GetTextLength;
     property UndoList: TUndoList read FUndoList;
+    property WordArea[Position: TBCEditorLinesPosition]: TBCEditorLinesArea read GetWordArea;
   public
     function Add(const AText: string): Integer; override;
     procedure BeginUpdate();
@@ -2226,6 +2228,38 @@ begin
     Result := TextIn[LinesArea(BOFPosition, EOFPosition)];
   finally
     Exclude(FState, lsSaving);
+  end;
+end;
+
+function TBCEditorLines.GetWordArea(APosition: TBCEditorLinesPosition): TBCEditorLinesArea;
+var
+  LLineBeginPos: PChar;
+  LLineEndPos: PChar;
+  LLinePos: PChar;
+begin
+  if (not ValidPosition(APosition)
+    or (APosition.Char = Length(Items[APosition.Line].Text))) then
+    Result := InvalidLinesArea
+  else
+  begin
+    LLinePos := @Items[APosition.Line].Text[1 + APosition.Char];
+    if (IsWordBreakChar(LLinePos^)) then
+      Result := InvalidLinesArea
+    else
+    begin
+      LLineBeginPos := @Items[APosition.Line].Text[1];
+      LLineEndPos := @Items[APosition.Line].Text[Length(Items[APosition.Line].Text)];
+      while ((LLinePos >= LLineBeginPos) and not IsWordBreakChar(LLinePos^)) do
+        Dec(LLinePos);
+      Inc(LLinePos);
+      Result.BeginPosition := LinesPosition(LLinePos - LLineBeginPos, APosition.Line);
+      LLinePos := @Items[APosition.Line].Text[1 + APosition.Char];
+      while ((LLinePos < LLineEndPos) and not IsWordBreakChar(LLinePos[1])) do
+        Inc(LLinePos);
+      if (not IsWordBreakChar(LLinePos^)) then
+        Inc(LLinePos);
+      Result.EndPosition := LinesPosition(LLinePos - LLineBeginPos, APosition.Line);
+    end;
   end;
 end;
 
