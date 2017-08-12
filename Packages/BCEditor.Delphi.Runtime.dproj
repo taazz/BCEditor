@@ -126,8 +126,8 @@
         <DCCReference Include="vcl.dcp"/>
         <DCCReference Include="dbrtl.dcp"/>
         <DCCReference Include="vcldb.dcp"/>
+        <DCCReference Include="..\Source\BCEditor.pas"/>
         <DCCReference Include="..\Source\BCEditor.Consts.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.pas"/>
         <DCCReference Include="..\Source\BCEditor.Editor.CodeFolding.pas"/>
         <DCCReference Include="..\Source\BCEditor.Commands.pas"/>
         <DCCReference Include="..\Source\BCEditor.CompletionProposal.pas"/>

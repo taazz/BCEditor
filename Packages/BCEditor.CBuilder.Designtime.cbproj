@@ -127,6 +127,9 @@
         <PackageImport Include="xmlrtl.bpi">
             <BuildOrder>5</BuildOrder>
         </PackageImport>
+        <DelphiCompile Include="..\Source\BCEditor.pas">
+            <BuildOrder>22</BuildOrder>
+        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.CompletionProposal.pas">
             <BuildOrder>9</BuildOrder>
         </DelphiCompile>
@@ -135,9 +138,6 @@
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
             <BuildOrder>15</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.pas">
-            <BuildOrder>22</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
             <BuildOrder>35</BuildOrder>

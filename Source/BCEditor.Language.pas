@@ -12,7 +12,7 @@ resourcestring
   SBCEditorOk = 'Ok';
   SBCEditorCancel = 'Cancel';
 
-  { BCEditor.Editor }
+  { BCEditor }
   SBCEditorCodeFoldingCollapsedMark = '%d Lines';
   SBCEditorScrollInfo = 'Line: %d';
   SBCEditorPatternIsEmpty = 'Pattern is empty';

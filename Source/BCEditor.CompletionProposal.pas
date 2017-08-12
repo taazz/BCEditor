@@ -83,10 +83,10 @@ uses
   Windows,
   SysUtils, UITypes, Math,
   Themes, Dialogs,
-  BCEditor.Consts, BCEditor.Editor, BCEditor.Commands, BCEditor.Lines;
+  BCEditor.Consts, BCEditor, BCEditor.Commands, BCEditor.Lines;
 
 type
-  TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
+  TCustomBCEditor = class(BCEditor.TCustomBCEditor);
   TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
 
 { TBCEditorCompletionProposalPopupWindow **************************************}

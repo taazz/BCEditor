@@ -497,15 +497,14 @@ implementation {***************************************************************}
 uses
   Types, IOUtils, TypInfo,
   GraphUtil,
-  BCEditor.Editor, BCEditor.Language,
-  BCEditor.Properties;
+  BCEditor, BCEditor.Language, BCEditor.Properties;
 
 resourcestring
   SBCEditorErrorInHighlighterParse = 'JSON parse error on line %d column %d: %s';
   SBCEditorErrorInHighlighterImport = 'Error in highlighter import: %s';
 
 type
-  TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
+  TCustomBCEditor = class(BCEditor.TCustomBCEditor);
 
 function CaseNone(AChar: Char): Char;
 begin

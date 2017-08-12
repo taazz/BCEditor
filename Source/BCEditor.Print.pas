@@ -6,8 +6,7 @@ uses
   Windows,
   SysUtils, Classes,
   Graphics, Printers,
-  BCEditor.Editor, BCEditor.Types, BCEditor.Highlighter,
-  BCEditor.Properties, BCEditor.PaintHelper;
+  BCEditor, BCEditor.Types, BCEditor.Highlighter, BCEditor.Properties, BCEditor.PaintHelper;
 
 type
   TBCEditorPrinterInfo = class
@@ -246,7 +245,7 @@ type
     end;
 
   strict private type
-    TCustomBCEditor = class(BCEditor.Editor.TCustomBCEditor);
+    TCustomBCEditor = class(BCEditor.TCustomBCEditor);
   strict private
     FAbort: Boolean;
     FBlockBeginPosition: TBCEditorLinesPosition;

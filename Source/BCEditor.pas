@@ -1,4 +1,4 @@
-﻿unit BCEditor.Editor;
+﻿unit BCEditor;
 
 interface {********************************************************************}
 
@@ -434,8 +434,7 @@ type
     function GetSelText(): string;
     function GetText(): string; {$IFNDEF Debug} inline; {$ENDIF}
     function GetUndoOptions(): TBCEditorUndoOptions;
-    function GetWordAt(ALinesPos: TPoint): string; {$IFNDEF Debug} inline; {$ENDIF}
-    function GetWordAtLinesPosition(const ALinesPosition: TBCEditorLinesPosition): string;
+    function GetWordAt(ALinesPos: TPoint): string;
     procedure HighlighterChanged(ASender: TObject);
     function IndentText(const IndentCount: Integer): string;
     procedure Idle();
@@ -649,12 +648,26 @@ type
     property AfterProcessCommand: TBCEditorProcessCommandEvent read FAfterProcessCommand write FAfterProcessCommand;
     property BeforeProcessCommand: TBCEditorProcessCommandEvent read FBeforeProcessCommand write FBeforeProcessCommand;
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle default bsSingle;
+    property CanPaste: Boolean read GetCanPaste;
+    property CanRedo: Boolean read GetCanRedo;
+    property CanUndo: Boolean read GetCanUndo;
+    property CaretPos: TPoint read GetCaretPos write SetCaretPos;
+    property CharAt[Pos: TPoint]: Char read GetCharAt;
+    property CodeFolding: TBCEditorCodeFolding read FCodeFolding write SetCodeFolding;
     property Colors: TBCEditorColors read FColors write SetColors;
+    property Commands: TBCEditorCommands read FCommands write SetKeyCommands stored False;
+    property CompletionProposal: TBCEditorCompletionProposal read FCompletionProposal write FCompletionProposal;
     property Cursor: TCursor read GetCursor write SetCursor;
     property HideScrollBars: Boolean read FHideScrollBars write SetHideScrollBars default True;
     property HideSelection: Boolean read FHideSelection write SetHideSelection default True;
+    property Highlighter: TBCEditorHighlighter read FHighlighter;
+    property InsertPos: TPoint read FInsertPos write SetInsertPos;
+    property LeftMargin: TBCEditorLeftMargin read FLeftMargin write SetLeftMargin;
     property LineHeight: Integer read FLineHeight;
+    property Lines: TBCEditorLines read FLines;
+    property Marks: TBCEditorLines.TMarkList read GetMarks;
     property MarksPanelPopupMenu: TPopupMenu read FMarksPanelPopupMenu write FMarksPanelPopupMenu;
+    property Modified: Boolean read GetModified write SetModified;
     property MouseCapture: TMouseCapture read FMouseCapture write SetMouseCapture;
     property OnCaretChanged: TBCEditorCaretChangedEvent read FOnCaretChanged write FOnCaretChanged;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -673,10 +686,17 @@ type
     property PaintHelper: TBCEditorPaintHelper read FPaintHelper;
     property ParentColor default False;
     property ParentFont default False;
+    property ReadOnly: Boolean read FReadOnly write SetReadOnly default False;
     property ScrollBars: UITypes.TScrollStyle read FScrollBars write SetScrollBars default ssBoth;
+    property SearchResultCount: Integer read GetSearchResultCount;
     property SelectionOptions: TBCEditorSelectionOptions read FSelectionOptions write SetSelectionOptions default DefaultSelectionOptions;
+    property SelLength: Integer read GetSelLength write SetSelLength;
+    property SelStart: Integer read GetSelStart write SetSelStart;
+    property SelText: string read GetSelText write SetSelText;
     property SyncEditOptions: TBCEditorSyncEditOptions read FSyncEditOptions write SetSyncEditOptions default DefaultSyncEditOptions;
+    property Tabs: TBCEditorTabs read FTabs write SetTabs;
     property TabStop default True;
+    property Text: string read GetText write SetText;
     property TextEntryMode: TBCEditorTextEntryMode read FTextEntryMode write FTextEntryMode default temInsert;
     property TextPos: TPoint read FTextPos write SetTextPos;
     property TextRect: TRect read FTextRect;
@@ -686,6 +706,7 @@ type
     property VisibleRows: Integer read FVisibleRows;
     property WantReturns: Boolean read FWantReturns write SetWantReturns default True;
     property WantTabs: Boolean read FWantTabs write FWantTabs default True;
+    property WordAt[ATextPos: TPoint]: string read GetWordAt;
     property WordWrap: Boolean read FWordWrap write SetWordWrap default False;
   public
     procedure ActivateHint(const X, Y: Integer; const AHint: string);
@@ -744,35 +765,28 @@ type
     procedure UnregisterCommandHandler(const AProc: TBCEditorHookedCommandObjectProc); overload;
     procedure WndProc(var AMessage: TMessage); override;
     function WordAtCursor(): string; deprecated 'Use WordAt[CaretPos]'; // 2017-03-13
-    property CanPaste: Boolean read GetCanPaste;
-    property CanRedo: Boolean read GetCanRedo;
-    property CanUndo: Boolean read GetCanUndo;
-    property CaretPos: TPoint read GetCaretPos write SetCaretPos;
-    property CharAt[Pos: TPoint]: Char read GetCharAt;
-    property CodeFolding: TBCEditorCodeFolding read FCodeFolding write SetCodeFolding;
-    property Commands: TBCEditorCommands read FCommands write SetKeyCommands stored False;
-    property CompletionProposal: TBCEditorCompletionProposal read FCompletionProposal write FCompletionProposal;
-    property Highlighter: TBCEditorHighlighter read FHighlighter;
-    property InsertPos: TPoint read FInsertPos write SetInsertPos;
-    property LeftMargin: TBCEditorLeftMargin read FLeftMargin write SetLeftMargin;
-    property Lines: TBCEditorLines read FLines;
-    property Marks: TBCEditorLines.TMarkList read GetMarks;
-    property Modified: Boolean read GetModified write SetModified;
-    property ReadOnly: Boolean read FReadOnly write SetReadOnly default False;
-    property SearchResultCount: Integer read GetSearchResultCount;
-    property SelLength: Integer read GetSelLength write SetSelLength;
-    property SelStart: Integer read GetSelStart write SetSelStart;
-    property SelText: string read GetSelText write SetSelText;
-    property Tabs: TBCEditorTabs read FTabs write SetTabs;
-    property Text: string read GetText write SetText;
-    property WordAt[ATextPos: TPoint]: string read GetWordAt;
   end;
 
   TBCEditor = class(TCustomBCEditor)
   public
+    property CanPaste;
+    property CanRedo;
+    property CanUndo;
     property Canvas;
+    property CaretPos;
+    property CharAt;
+    property Highlighter;
+    property InsertPos;
     property Lines;
+    property Marks;
+    property Modified;
+    property SearchResultCount;
+    property SelLength;
+    property SelStart;
+    property SelText;
+    property Text;
     property TextEntryMode;
+    property WordAt;
   published
     property AfterProcessCommand;
     property Align;
@@ -4400,34 +4414,14 @@ begin
 end;
 
 function TCustomBCEditor.GetWordAt(ALinesPos: TPoint): string;
-begin
-  Result := GetWordAtLinesPosition(ALinesPos);
-end;
-
-function TCustomBCEditor.GetWordAtLinesPosition(const ALinesPosition: TBCEditorLinesPosition): string;
 var
-  LBeginPosition: TBCEditorLinesPosition;
-  LEndPosition: TBCEditorLinesPosition;
+  LArea: TBCEditorLinesArea;
 begin
-  if ((ALinesPosition.Line >= FLines.Count)
-    or (ALinesPosition.Char >= Length(FLines.Items[ALinesPosition.Line].Text))) then
+  LArea := FLines.WordArea[ALinesPos];
+  if (LArea = InvalidLinesArea) then
     Result := ''
   else
-  begin
-    LEndPosition := Min(ALinesPosition, FLines.EOLPosition[ALinesPosition.Line]);
-    if ((LEndPosition.Char > 0)
-      and not IsWordBreakChar(FLines.Char[LEndPosition])
-      and IsWordBreakChar(FLines.Char[LEndPosition])) then
-      Dec(LEndPosition.Char);
-    if (IsWordBreakChar(FLines.Char[LEndPosition])) then
-      Result := ''
-    else
-    begin
-      LBeginPosition := WordBegin(LEndPosition);
-      LEndPosition := WordEnd(LEndPosition);
-      Result := Copy(FLines.Items[LBeginPosition.Line].Text, 1 + LBeginPosition.Char, LEndPosition.Char - LBeginPosition.Char + 1);
-    end;
-  end;
+    Result := FLines.TextIn[LArea];
 end;
 
 function TCustomBCEditor.GiveFeedback(dwEffect: Longint): HResult;

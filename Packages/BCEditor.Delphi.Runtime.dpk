@@ -34,8 +34,8 @@ requires
   vcldb;
 
 contains
+  BCEditor in '..\Source\BCEditor.pas',
   BCEditor.Consts in '..\Source\BCEditor.Consts.pas',
-  BCEditor.Editor in '..\Source\BCEditor.Editor.pas',
   BCEditor.Editor.CodeFolding in '..\Source\BCEditor.Editor.CodeFolding.pas',
   BCEditor.Commands in '..\Source\BCEditor.Commands.pas',
   BCEditor.CompletionProposal in '..\Source\BCEditor.CompletionProposal.pas',

@@ -4,7 +4,7 @@ interface {********************************************************************}
 
 uses
   Classes,
-  BCEditor.Editor, BCEditor.Print, BCEditor.Print.Preview, BCEditor.MacroRecorder,
+  BCEditor, BCEditor.Print, BCEditor.Print.Preview, BCEditor.MacroRecorder,
   BCEditor.Properties;
 
 procedure Register();

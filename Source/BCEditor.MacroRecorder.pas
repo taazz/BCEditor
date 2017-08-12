@@ -4,7 +4,7 @@ interface {********************************************************************}
 
 uses
   Classes, SysUtils, Generics.Collections,
-  BCEditor.Editor, BCEditor.Commands;
+  BCEditor, BCEditor.Commands;
 
 type
   TCustomBCEditorMacroRecorder = class(TComponent)
@@ -80,6 +80,9 @@ type
 
 implementation {***************************************************************}
 
+uses
+  Windows;
+
 resourcestring
   SBCEditorCannotRecord = 'Cannot record macro: Already recording or playing';
   SBCEditorCannotPlay = 'Cannot play macro: Already recording or playing';
@@ -141,12 +144,6 @@ begin
     FDisallowedCommands.Add(ACommand);
 end;
 
-procedure TCustomBCEditorMacroRecorder.IgnoreCommand(const ACommand: TBCEditorCommand);
-begin
-  if (FIgnoredCommands.IndexOf(ACommand) < 0) then
-    FIgnoredCommands.Add(ACommand);
-end;
-
 procedure TCustomBCEditorMacroRecorder.EditorCommand(ASender: TObject; const ABefore: Boolean;
   const ACommand: TBCEditorCommand; const AData: PBCEditorCD; var AHandled: Boolean);
 begin
@@ -172,6 +169,12 @@ begin
         if (ASender = FEditor) then
         begin
           Step();
+          AHandled := True;
+        end;
+      else
+        if ((FState = msRecording) and (FDisallowedCommands.IndexOf(ACommand) >= 0)) then
+        begin
+          MessageBeep($FFFFFFFF);
           AHandled := True;
         end;
     end;
@@ -204,6 +207,12 @@ end;
 function TCustomBCEditorMacroRecorder.GetIsEmpty(): Boolean;
 begin
   Result := FItems.Count = 0;
+end;
+
+procedure TCustomBCEditorMacroRecorder.IgnoreCommand(const ACommand: TBCEditorCommand);
+begin
+  if (FIgnoredCommands.IndexOf(ACommand) < 0) then
+    FIgnoredCommands.Add(ACommand);
 end;
 
 procedure TCustomBCEditorMacroRecorder.InsertCommand(const AIndex: Integer;
