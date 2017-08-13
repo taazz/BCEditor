@@ -3040,9 +3040,9 @@ var
   type
     Tstrcmp = function(lpString1, lpString2: PWideChar): Integer; stdcall;
   var
-    Left: Integer;
-    Mid: Integer;
-    Right: Integer;
+    LLeft: Integer;
+    LMid: Integer;
+    LRight: Integer;
     strcmp: Tstrcmp;
   begin
     Assert(AWord <> '');
@@ -3054,19 +3054,19 @@ var
     else
       strcmp := lstrcmpi;
 
-    if ((LWords.Count = 0) or (strcmp(PChar(LWords.Items[LWords.Count - 1].Word), PChar(AWord)) < 0)) then
+    if ((LWords.Count = 0) or (Lstrcmp(PChar(LWords.Items[LWords.Count - 1].Word), PChar(AWord)) < 0)) then
       AIndex := LWords.Count
     else
     begin
-      Left := 0;
-      Right := LWords.Count - 1;
-      while (Left <= Right) do
+      LLeft := 0;
+      LRight := LWords.Count - 1;
+      while (LLeft <= LRight) do
       begin
-        Mid := (Right + Left) div 2;
-        case (strcmp(PChar(LWords.Items[Mid].Word), PChar(AWord))) of
-          -1: begin Left := Mid + 1;  AIndex := Mid + 1; end;
-          0: begin Result := False; AIndex := Mid; break; end;
-          1: begin Right := Mid - 1; AIndex := Mid; end;
+        LMid := (LRight + LLeft) div 2;
+        case (strcmp(PChar(LWords.Items[LMid].Word), PChar(AWord))) of
+          -1: begin LLeft := LMid + 1;  AIndex := LMid + 1; end;
+          0: begin Result := False; AIndex := LMid; break; end;
+          1: begin LRight := LMid - 1; AIndex := LMid; end;
         end;
       end;
     end;

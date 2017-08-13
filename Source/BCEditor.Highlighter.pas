@@ -34,20 +34,6 @@ type
       FontStyles: TFontStyles;
     end;
 
-    TInfo = class
-      Author: record
-        Comments: string;
-        Email: string;
-        Name: string;
-      end;
-      General: record
-        Date: string;
-        Sample: string;
-        Version: string;
-      end;
-      procedure Clear();
-    end;
-
     TAttribute = class(TPersistent)
     strict private
       procedure Changed; virtual;
@@ -92,7 +78,6 @@ type
       FElements: TList;
       FFileName: string;
       FHighlighter: TBCEditorHighlighter;
-      FInfo: TInfo;
       FName: string;
     protected
       property Highlighter: TBCEditorHighlighter read FHighlighter;
@@ -105,7 +90,6 @@ type
       procedure LoadFromResource(const ResName: string; const ResType: PChar);
       procedure LoadFromStream(AStream: TStream);
       property FileName: string read FFileName write FFileName;
-      property Info: TInfo read FInfo write FInfo;
       property Name: string read FName write FName;
       property Styles: TList read FElements write FElements;
     end;
@@ -383,7 +367,6 @@ type
       procedure ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion; ACodeFoldingObject: TJsonObject);
       procedure ImportColors(AJSONObject: TJsonObject);
       procedure ImportColorsEditorProperties(AEditorObject: TJsonObject);
-      procedure ImportColorsInfo(AInfoObject: TJsonObject);
       procedure ImportCompletionProposal(ACompletionProposalObject: TJsonObject);
       procedure ImportElements(AColorsObject: TJsonObject);
       procedure ImportHighlighter(AJSONObject: TJsonObject);
@@ -516,18 +499,6 @@ begin
   Result := AString;
 end;
 
-{ TBCEditorHighlighter.TInfo **************************************************}
-
-procedure TBCEditorHighlighter.TInfo.Clear();
-begin
-  Author.Comments := '';
-  Author.Email := '';
-  Author.Name := '';
-  General.Date := '';
-  General.Sample := '';
-  General.Version := '';
-end;
-
 { TBCEditorHighlighter.TAttribute *********************************************}
 
 procedure TBCEditorHighlighter.TAttribute.Assign(ASource: TPersistent);
@@ -651,14 +622,12 @@ begin
   FHighlighter := AHighlighter;
 
   FElements := TList.Create;
-  FInfo := TInfo.Create;
 end;
 
 destructor TBCEditorHighlighter.TColors.Destroy;
 begin
   Clear;
   FElements.Free;
-  FInfo.Free;
 
   inherited;
 end;
@@ -1983,7 +1952,6 @@ begin
   FHighlighter.Colors.Clear;
 
   LColorsObject := AJSONObject['Colors'];
-  ImportColorsInfo(LColorsObject['Info'].ObjectValue);
   ImportColorsEditorProperties(LColorsObject['Editor'].ObjectValue);
   ImportElements(AJSONObject['Colors'].ObjectValue);
 end;
@@ -2056,26 +2024,6 @@ begin
       raise EException.Create(Format(SBCEditorErrorInHighlighterParse, [E.LineNum, E.Column, E.Message]));
     on E: Exception do
       raise EException.Create(Format(SBCEditorErrorInHighlighterImport, [E.Message]));
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportColorsInfo(AInfoObject: TJsonObject);
-var
-  LHighlighterInfo: TInfo;
-  LObject: TJsonObject;
-begin
-  if Assigned(AInfoObject) then
-  begin
-    LHighlighterInfo := FHighlighter.Colors.Info;
-    { General }
-    LObject := AInfoObject['General'];
-    LHighlighterInfo.General.Version := LObject['Version'].Value;
-    LHighlighterInfo.General.Date := LObject['Date'].Value;
-    { Author }
-    LObject := AInfoObject['Author'];
-    LHighlighterInfo.Author.Name := LObject['Name'].Value;
-    LHighlighterInfo.Author.Email := LObject['Email'].Value;
-    LHighlighterInfo.Author.Comments := LObject['Comments'].Value;
   end;
 end;
 

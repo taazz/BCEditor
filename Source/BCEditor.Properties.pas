@@ -176,6 +176,9 @@ type
   TBCEditorColors = class(TPersistent)
   type
     TCodeFolding = class(TPersistent)
+    strict private const
+      DefaultBackground = $00F4F4F4;
+      DefaultForeground = $00CC9999;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -186,11 +189,13 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
-      property Foreground: TColor read FForeground write SetForeground default clLeftMarginForeground;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
     end;
 
     TCurrentLine = class(TPersistent)
+    strict private const
+      DefaultBackground = $00E6FFFA;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -199,10 +204,13 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clActiveLineBackground;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
     end;
 
     TFoundText = class(TPersistent)
+    strict private const
+      DefaultBackground = $0078AAFF;
+      DefaultForeground = clWindowText;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -213,11 +221,14 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clSearchHighlighter;
-      property Foreground: TColor read FForeground write SetForeground default clWindowText;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
     end;
 
     TLineNumbers = class(TPersistent)
+    strict private const
+      DefaultBackground = $00F4F4F4;
+      DefaultForeground = $00CC9999;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -228,11 +239,13 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clLeftMarginBackground;
-      property Foreground: TColor read FForeground write SetForeground default clLeftMarginForeground;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
     end;
 
     TLineState = class(TPersistent)
+    strict private const
+      DefaultBackground = $00F4F4F4;
     private
       FColors: TBCEditorColors;
       FModified: TColor;
@@ -246,7 +259,7 @@ type
       constructor Create(const AColors: TBCEditorColors);
     published
       property Modified: TColor read FModified write SetModified default clYellow;
-      property Loaded: TColor read FLoaded write SetLoaded default clLeftMarginBackground;
+      property Loaded: TColor read FLoaded write SetLoaded default DefaultBackground;
       property Saved: TColor read FSaved write SetSaved default clLime;
     end;
 
@@ -263,6 +276,8 @@ type
     end;
 
     TMatchingPairs = class(TPersistent)
+    strict private const
+      DefaultBackground = clAqua;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -271,10 +286,13 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clMatchingPair;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
     end;
 
     TSelection = class(TPersistent)
+    strict private const
+      DefaultBackground = clHighlight;
+      DefaultForeground = clHighlightText;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -285,11 +303,13 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clSelectionColor;
-      property Foreground: TColor read FForeground write SetForeground default clHighlightText;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
     end;
 
     TSpecialChars = class(TPersistent)
+    strict private const
+      DefaultForeground = clGrayText;
     private
       FForeground: TColor;
       FColors: TBCEditorColors;
@@ -298,10 +318,13 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Foreground: TColor read FForeground write SetForeground default clSpecialChar;
+      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
     end;
 
     TSyncEdit = class(TPersistent)
+    strict private const
+      DefaultBackground = $00FCFDCD;
+      DefaultOverlay = clHighlight;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
@@ -312,8 +335,8 @@ type
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clSyncEditBackground;
-      property Overlays: TColor read FOverlays write SetOverlays default clHighlight;
+      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Overlays: TColor read FOverlays write SetOverlays default DefaultOverlay;
     end;
   private
     FCodeFolding: TCodeFolding;
@@ -815,8 +838,8 @@ begin
 
   FColors := AColors;
 
-  FBackground := clLeftMarginBackground;
-  FForeground := clLeftMarginForeground;
+  FBackground := DefaultBackground;
+  FForeground := DefaultForeground;
 end;
 
 procedure TBCEditorColors.TCodeFolding.SetBackground(AValue: TColor);
@@ -854,7 +877,7 @@ begin
 
   FColors := AColors;
 
-  FBackground := clActiveLineBackground;
+  FBackground := DefaultBackground;
 end;
 
 procedure TBCEditorColors.TCurrentLine.SetBackground(AValue: TColor);
@@ -884,8 +907,8 @@ begin
 
   FColors := AColors;
 
-  FBackground := clSearchHighlighter;
-  FForeground := clWindowText;
+  FBackground := DefaultBackground;
+  FForeground := DefaultForeground;
 end;
 
 procedure TBCEditorColors.TFoundText.SetBackground(AValue: TColor);
@@ -924,8 +947,8 @@ begin
 
   FColors := AColors;
 
-  FBackground := clLeftMarginBackground;
-  FForeground := clLeftMarginForeground;
+  FBackground := DefaultBackground;
+  FForeground := DefaultForeground;
 end;
 
 procedure TBCEditorColors.TLineNumbers.SetBackground(AValue: TColor);
@@ -966,7 +989,7 @@ begin
   FColors := AColors;
 
   FModified := clYellow;
-  FLoaded := clLeftMarginBackground;
+  FLoaded := DefaultBackground;
   FSaved := clLime;
 end;
 
@@ -1043,7 +1066,7 @@ begin
 
   FColors := AColors;
 
-  FBackground := clMatchingPair;
+  FBackground := DefaultBackground;
 end;
 
 procedure TBCEditorColors.TMatchingPairs.SetBackground(AValue: TColor);
@@ -1073,8 +1096,8 @@ begin
 
   FColors := AColors;
 
-  FBackground := clSelectionColor;
-  FForeground := clHighlightText;
+  FBackground := DefaultBackground;
+  FForeground := DefaultForeground;
 end;
 
 procedure TBCEditorColors.TSelection.SetBackground(AValue: TColor);
@@ -1112,7 +1135,7 @@ begin
 
   FColors := AColors;
 
-  FForeground := clSpecialChar;
+  FForeground := DefaultForeground;
 end;
 
 procedure TBCEditorColors.TSpecialChars.SetForeground(AValue: TColor);
@@ -1142,8 +1165,8 @@ begin
 
   FColors := AColors;
 
-  FBackground := clSyncEditBackground;
-  FOverlays := clHighlight;
+  FBackground := DefaultBackground;
+  FOverlays := DefaultOverlay;
 end;
 
 procedure TBCEditorColors.TSyncEdit.SetBackground(AValue: TColor);

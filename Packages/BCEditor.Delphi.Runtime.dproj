@@ -136,7 +136,6 @@
         <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
         <DCCReference Include="..\Source\BCEditor.Language.pas"/>
         <DCCReference Include="..\Source\BCEditor.Lines.pas"/>
-        <DCCReference Include="..\Source\BCEditor.MacroRecorder.pas"/>
         <DCCReference Include="..\Source\BCEditor.PaintHelper.pas"/>
         <DCCReference Include="..\Source\BCEditor.Print.pas"/>
         <DCCReference Include="..\Source\BCEditor.Print.Preview.pas"/>

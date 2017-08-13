@@ -6,14 +6,13 @@ uses
   Messages,
   Classes, Types,
   Forms, Controls, Graphics, StdCtrls,
-  BCEditor.Types,
-  BCEditor.Properties;
+  BCEditor.Types, BCEditor.Properties;
 
 type
   TBCEditorCompletionProposalPopup = class(TCustomControl)
   strict private
     FAdjustCompletionStart: Boolean;
-    FBitmapBuffer: Graphics.TBitmap;
+    FDoubleBufferBitmap: Graphics.TBitmap;
     FCaseSensitive: Boolean;
     FCompletionProposal: TBCEditorCompletionProposal;
     FCompletionStartChar: Integer;
@@ -128,7 +127,7 @@ begin
   Visible := False;
 
   FItems := TStringList.Create;
-  FBitmapBuffer := Graphics.TBitmap.Create;
+  FDoubleBufferBitmap := Graphics.TBitmap.Create;
 
   FOnValidate := nil;
   OnDblClick := HandleDblClick;
@@ -161,7 +160,7 @@ begin
     FOnClose(FEditor, LSelectedItem);
   end;
 
-  FBitmapBuffer.Free;
+  FDoubleBufferBitmap.Free;
   SetLength(FItemIndexArray, 0);
   FItems.Free;
 
@@ -174,7 +173,7 @@ var
 
   procedure CalculateFormPlacement;
   begin
-    LPoint.X := APoint.X - FBitmapBuffer.Canvas.TextWidth(ACurrentString);
+    LPoint.X := APoint.X - FDoubleBufferBitmap.Canvas.TextWidth(ACurrentString);
     LPoint.Y := APoint.Y;
 
     ClientHeight := FItemHeight * FCompletionProposal.VisibleLines + FTitleHeight + 2;
@@ -233,7 +232,7 @@ var
         LMaxWidth := 0;
         for LIndex := 0 to LItems.Count - 1 do
         begin
-          LTempWidth := FBitmapBuffer.Canvas.TextWidth(LItems[LIndex].Value);
+          LTempWidth := FDoubleBufferBitmap.Canvas.TextWidth(LItems[LIndex].Value);
           if LTempWidth > LMaxWidth then
             LMaxWidth := LTempWidth;
         end;
@@ -342,8 +341,8 @@ begin
   for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
   begin
     LColumn := FCompletionProposal.Columns[LColumnIndex];
-    FBitmapBuffer.Canvas.Font.Assign(LColumn.Font);
-    LHeight := FBitmapBuffer.Canvas.TextHeight('X');
+    FDoubleBufferBitmap.Canvas.Font.Assign(LColumn.Font);
+    LHeight := FDoubleBufferBitmap.Canvas.TextHeight('X');
     if LHeight > Result then
       Result := LHeight;
   end;
@@ -367,8 +366,8 @@ begin
   for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
   begin
     LColumn := FCompletionProposal.Columns[LColumnIndex];
-    FBitmapBuffer.Canvas.Font.Assign(LColumn.Title.Font);
-    LHeight := FBitmapBuffer.Canvas.TextHeight('X');
+    FDoubleBufferBitmap.Canvas.Font.Assign(LColumn.Title.Font);
+    LHeight := FDoubleBufferBitmap.Canvas.TextHeight('X');
     if LHeight > Result then
       Result := LHeight;
   end;
@@ -387,18 +386,14 @@ begin
 end;
 
 procedure TBCEditorCompletionProposalPopup.HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
-var
-  LData: PBCEditorCDText;
 begin
   with TCustomBCEditor(Editor) do
     if (FSelectedLine < Length(FItemIndexArray)) then
     begin
       Lines.BeginUpdate();
       try
-        ProcessCommand(ecDeleteWord, nil);
-        LData := TBCEditorCDText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value, False);
-        ProcessCommand(ecText, PBCEditorCD(LData));
-        LData.Free();
+        ProcessCommand(ecDeleteWord);
+        ProcessCommand(ecText, TBCEditorCDText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value));
       finally
         Lines.EndUpdate();
       end;
@@ -458,11 +453,11 @@ begin
         if Length(FCurrentString) > 0 then
         begin
           CurrentString := Copy(FCurrentString, 1, Length(FCurrentString) - 1);
-          TCustomBCEditor(Editor).ProcessCommand(ecLeft, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecLeft);
         end
         else
         begin
-          TCustomBCEditor(Editor).ProcessCommand(ecLeft, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecLeft);
           Editor.SetFocus;
         end;
         FSendToEditor := False;
@@ -481,7 +476,7 @@ begin
         else
           Editor.SetFocus;
 
-        ProcessCommand(ecRight, nil);
+        ProcessCommand(ecRight);
         FSendToEditor := False;
       end;
     VK_PRIOR:
@@ -527,18 +522,18 @@ begin
         begin
           CurrentString := Copy(FCurrentString, 1, Length(FCurrentString) - 1);
 
-          TCustomBCEditor(Editor).ProcessCommand(ecBackspace, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecBackspace);
         end
         else
         begin
-          TCustomBCEditor(Editor).ProcessCommand(ecBackspace, nil);
+          TCustomBCEditor(Editor).ProcessCommand(ecBackspace);
           Editor.SetFocus;
         end;
         FSendToEditor := False;
       end;
     VK_DELETE:
       begin
-        TCustomBCEditor(Editor).ProcessCommand(ecDeleteChar, nil);
+        TCustomBCEditor(Editor).ProcessCommand(ecDeleteChar);
         FSendToEditor := False;
       end;
   end;
@@ -547,8 +542,6 @@ begin
 end;
 
 procedure TBCEditorCompletionProposalPopup.KeyPress(var Key: Char);
-var
-  LData: TBCEditorCDChar;
 begin
   case Key of
     BCEDITOR_CARRIAGE_RETURN:
@@ -570,11 +563,7 @@ begin
           OnKeyPress(Self, Key);
       end;
     BCEDITOR_BACKSPACE_CHAR:
-      begin
-        LData.Size := SizeOf(LData);
-        LData.Char := Key;
-        TCustomBCEditor(Editor).ProcessCommand(ecChar, @LData);
-      end;
+      TCustomBCEditor(Editor).ProcessCommand(ecChar, TBCEditorCDChar.Create(Key));
   end;
   if (FSendToEditor) then
     PostMessage(TCustomBCEditor(Editor).Handle, WM_CHAR, WParam(Key), 0);
@@ -627,7 +616,7 @@ var
   LLeft: Integer;
   LRect: TRect;
 begin
-  with FBitmapBuffer do
+  with FDoubleBufferBitmap do
   begin
     Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
     Height := 0;
@@ -715,7 +704,7 @@ begin
       LRect.Bottom := LRect.Top + FItemHeight;
     end;
   end;
-  Canvas.Draw(0, 0, FBitmapBuffer);
+  Canvas.Draw(0, 0, FDoubleBufferBitmap);
 end;
 
 procedure TBCEditorCompletionProposalPopup.SetCurrentString(const AValue: string);

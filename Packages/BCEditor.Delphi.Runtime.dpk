@@ -44,7 +44,6 @@ contains
   BCEditor.GotoLine in '..\Source\BCEditor.GotoLine.pas',
   BCEditor.Language in '..\Source\BCEditor.Language.pas',
   BCEditor.Lines in '..\Source\BCEditor.Lines.pas',
-  BCEditor.MacroRecorder in '..\Source\BCEditor.MacroRecorder.pas',
   BCEditor.PaintHelper in '..\Source\BCEditor.PaintHelper.pas',
   BCEditor.Print in '..\Source\BCEditor.Print.pas',
   BCEditor.Print.Preview in '..\Source\BCEditor.Print.Preview.pas',

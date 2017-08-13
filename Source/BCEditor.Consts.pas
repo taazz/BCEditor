@@ -21,7 +21,6 @@ const
   BCEDITOR_LINEFEED = #10;
   BCEDITOR_CARRIAGE_RETURN = #13;
   BCEDITOR_CARRIAGE_RETURN_KEY = 13;
-  BCEDITOR_ESCAPE = #27;
   BCEDITOR_ESCAPE_KEY = 27;
   BCEDITOR_SPACE_CHAR = #32;
   BCEDITOR_EXCLAMATION_MARK = #33;
@@ -56,27 +55,7 @@ const
   BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR = 'Editor';
   BCEDITOR_ATTRIBUTE_ELEMENT_COMMENT = 'Comment';
   BCEDITOR_ATTRIBUTE_ELEMENT_STRING = 'String';
-  { Default colors }
-  clSelectionColor = clHighlight;
-  clSearchHighlighter = $0078AAFF;
-  clSpecialChar = clGrayText;
-  clActiveLineBackground = $00E6FFFA;
-  clLeftMarginBackground = $00F4F4F4;
-  clLeftMarginForeground = $00CC9999;
-  clIndentHighlight = $00CC9999;
-  clIndent = $00CC9999;
-  clMatchingPair = clAqua;
-  clWordWrapIndicatorArrow = clNavy;
-  clWordWrapIndicatorLines = clBlack;
-  clSyncEditBackground = $00FCFDCD;
-  clBookmarkBorder = $00027397;
-  clBookmarkCover = $00B2E6FA;
-  clBookmarkRingLeft = $00929292;
-  clBookmarkRingMiddle = $00FCFCFC;
-  clBookmarkRingRight = $00BCBCBC;
-  clBookmarkNumber = $00027397;
-  clTransparent = clFuchsia;
-  { Resource file bitmaps }
+  { Resource file icons }
   BCEDITOR_SYNCEDIT = 'BCEDITORSYNCEDIT';
 
 var

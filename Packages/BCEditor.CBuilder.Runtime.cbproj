@@ -155,9 +155,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Lines.pas">
             <BuildOrder>34</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.MacroRecorder.pas">
-            <BuildOrder>35</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.PaintHelper.pas">
             <BuildOrder>36</BuildOrder>
         </DelphiCompile>
