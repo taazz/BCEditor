@@ -130,7 +130,7 @@
         <DCCReference Include="..\Source\BCEditor.Consts.pas"/>
         <DCCReference Include="..\Source\BCEditor.Commands.pas"/>
         <DCCReference Include="..\Source\BCEditor.CompletionProposal.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Export.HTML.pas"/>
+        <DCCReference Include="..\Source\BCEditor.ExportHTML.pas"/>
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
         <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
         <DCCReference Include="..\Source\BCEditor.Language.pas"/>

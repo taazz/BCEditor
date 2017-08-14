@@ -39,6 +39,21 @@ type
   );
   TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
 
+  TBCEditorOption = (
+    eoAutoIndent, { Will indent the caret on new lines with the same amount of leading white space as the preceding line }
+    eoBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
+    eoBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
+    eoDropFiles, { Allows the editor accept OLE file drops }
+    eoHighlightAllFoundTexts, { Highlight all found texts }
+    eoHighlightCurrentLine, { Highlights the background of the line with the caret }
+    eoHighlightMatchingPairs, { Highlights the background two matching pairs like quoters or brackets }
+    eoMiddleClickScrolling, { Scrolling by mouse move after wheel click. }
+    eoShowSpecialChars, { Shows special chars (#0, space, tab and line break) }
+    eoTrimTrailingLines, { Empty lines at the end of text will be removed while saving }
+    eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
+  );
+  TBCEditorOptions = set of TBCEditorOption;
+
   TBCEditorFindOption = (
     foBackwards,
     foCaseSensitive,
@@ -65,21 +80,6 @@ type
     bpoToggleMarkByClick
   );
   TBCEditorLeftMarginBookMarkPanelOptions = set of TBCEditorLeftMarginBookMarkPanelOption;
-
-  TBCEditorOption = (
-    eoAcceptFiles, { Allows the editor accept OLE file drops }
-    eoAutoIndent, { Will indent the caret on new lines with the same amount of leading white space as the preceding line }
-    eoBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
-    eoBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
-    eoHighlightAllFoundTexts, { Highlight all found texts }
-    eoHighlightCurrentLine, { Highlights the background of the line with the caret }
-    eoHighlightMatchingPairs, { Highlights the background two matching pairs like quoters or brackets }
-    eoMiddleClickScrolling, { Scrolling by mouse move after wheel click. }
-    eoShowSpecialChars, { Shows special chars (#0, space, tab and line break) }
-    eoTrimTrailingLines, { Empty lines at the end of text will be removed while saving }
-    eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
-  );
-  TBCEditorOptions = set of TBCEditorOption;
 
   TBCEditorRangeItemType = (ritUnspecified, ritMultiLineString, ritSingleLineString, ritMultiLineComment, ritSingleLineComment);
 

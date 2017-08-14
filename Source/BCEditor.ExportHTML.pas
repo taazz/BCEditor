@@ -1,6 +1,6 @@
-unit BCEditor.Export.HTML;
+unit BCEditor.ExportHTML;
 
-interface
+interface {********************************************************************}
 
 uses
   Classes, SysUtils,
@@ -31,12 +31,14 @@ type
     procedure SaveToStream(AStream: TStream; AEncoding: System.SysUtils.TEncoding);
   end;
 
-implementation
+implementation {***************************************************************}
 
 uses
   Windows,
   UITypes, StrUtils,
   BCEditor.Consts;
+
+{ TBCEditorExportHTML *********************************************************}
 
 constructor TBCEditorExportHTML.Create(ALines: BCEditor.Lines.TBCEditorLines;
   AHighlighter: TBCEditorHighlighter; AFont: TFont; const ATabWidth: Integer;

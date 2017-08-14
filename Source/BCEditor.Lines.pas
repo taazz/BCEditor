@@ -3584,7 +3584,7 @@ begin
   Assert(not (lsSyncEdit in FState));
 
   FHighlighter := AHighlighter;
-  Result := ScanSyncEdit(ATerminated, True);
+  Result := not (loReadOnly in FOptions) and ScanSyncEdit(ATerminated, True);
 end;
 
 function TBCEditorLines.SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;

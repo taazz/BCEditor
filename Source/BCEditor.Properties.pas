@@ -435,23 +435,23 @@ type
 
     TLineNumbers = class(TPersistent)
     strict private const
+      DefaultOffset = 1;
       DefaultOptions = [lnoIntens];
-      DefaultStartFrom = 1;
       DefaultVisible = True;
     strict private
       FLeftMargin: TBCEditorLeftMargin;
+      FOffset: Integer;
       FOptions: TBCEditorLeftMarginLineNumberOptions;
-      FStartFrom: Integer;
       FVisible: Boolean;
       procedure SetOptions(const AValue: TBCEditorLeftMarginLineNumberOptions);
-      procedure SetStartFrom(const AValue: Integer);
+      procedure SetOffset(const AValue: Integer);
       procedure SetVisible(const AValue: Boolean);
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const ALeftMargin: TBCEditorLeftMargin);
     published
+      property Offset: Integer read FOffset write SetOffset default DefaultOffset;
       property Options: TBCEditorLeftMarginLineNumberOptions read FOptions write SetOptions default DefaultOptions;
-      property StartFrom: Integer read FStartFrom write SetStartFrom default DefaultStartFrom;
       property Visible: Boolean read FVisible write SetVisible default DefaultVisible;
     end;
 
@@ -1439,7 +1439,7 @@ begin
   inherited;
 
   FOptions := TBCEditorLeftMargin.TLineNumbers(ASource).FOptions;
-  FStartFrom := TBCEditorLeftMargin.TLineNumbers(ASource).FStartFrom;
+  FOffset := TBCEditorLeftMargin.TLineNumbers(ASource).FOffset;
   FVisible := TBCEditorLeftMargin.TLineNumbers(ASource).FVisible;
 
   FLeftMargin.DoChange();
@@ -1452,7 +1452,7 @@ begin
   FLeftMargin := ALeftMargin;
 
   FOptions := DefaultOptions;
-  FStartFrom := DefaultStartFrom;
+  FOffset := DefaultOffset;
   FVisible := DefaultVisible;
 end;
 
@@ -1465,11 +1465,11 @@ begin
   end;
 end;
 
-procedure TBCEditorLeftMargin.TLineNumbers.SetStartFrom(const AValue: Integer);
+procedure TBCEditorLeftMargin.TLineNumbers.SetOffset(const AValue: Integer);
 begin
-  if (AValue <> FStartFrom) then
+  if (AValue <> FOffset) then
   begin
-    FStartFrom := Max(0, AValue);
+    FOffset := Max(0, AValue);
     FLeftMargin.DoChange();
   end;
 end;

@@ -139,7 +139,7 @@
         <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
             <BuildOrder>15</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
+        <DelphiCompile Include="..\Source\BCEditor.ExportHTML.pas">
             <BuildOrder>35</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">

@@ -223,7 +223,7 @@ type
     end;
 
   private const
-    DefaultOptions = [eoAcceptFiles, eoAutoIndent, eoHighlightAllFoundTexts,
+    DefaultOptions = [eoDropFiles, eoAutoIndent, eoHighlightAllFoundTexts,
       eoHighlightCurrentLine, eoHighlightMatchingPairs, eoMiddleClickScrolling];
     DefaultSelectionOptions = [soHighlightWholeLine, soTripleClickLineSelect];
     DefaultSyncEditOptions = [seoShowButton, seoCaseSensitive];
@@ -390,6 +390,7 @@ type
     procedure DoCutToClipboard();
     procedure DoDeleteToEOL();
     procedure DoDeleteWord();
+    procedure DoDropOLE(const AData: PBCEditorCommandDataDropOLE);
     procedure DoEOF(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoBOF(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoEndKey(const ASelectionCommand: Boolean);
@@ -883,7 +884,7 @@ uses
   ShellAPI, Imm, CommCtrl,
   Math, Types, Character, RegularExpressions, ComObj, SysConst,
   Clipbrd, Themes, ImgList,
-  BCEditor.Language, BCEditor.Export.HTML;
+  BCEditor.Language, BCEditor.ExportHTML;
 
 resourcestring
   SBCEditorLineIsNotVisible = 'Line %d is not visible';
@@ -2257,7 +2258,7 @@ begin
     Style := Style or LBorderStyles[FBorderStyle] or WS_CLIPCHILDREN or ES_AUTOHSCROLL or ES_AUTOVSCROLL;
     if (FReadOnly) then
       Style := Style or ES_READONLY;
-    if (eoAcceptFiles in FOptions) then
+    if (eoDropFiles in FOptions) then
       ExStyle := ExStyle or WS_EX_ACCEPTFILES;
 
     if (NewStyleControls and Ctl3D and (FBorderStyle = bsSingle)) then
@@ -2879,6 +2880,46 @@ begin
     FLines.DeleteText(LArea);
 end;
 
+procedure TCustomBCEditor.DoDropOLE(const AData: PBCEditorCommandDataDropOLE);
+var
+  LFilename: string;
+  LFormat: FORMATETC;
+  LLen: UINT;
+  LMedium: STGMEDIUM;
+  LOldPosition: TBCEditorLinesPosition;
+  LText: string;
+begin
+  LFormat.cfFormat := CF_UNICODETEXT;
+  LFormat.ptd := nil;
+  LFormat.dwAspect := DVASPECT_CONTENT;
+  LFormat.lindex := -1;
+  LFormat.tymed := TYMED_HGLOBAL;
+  if (AData^.dataObj.QueryGetData(LFormat) = S_OK) then
+  begin
+    OleCheck(AData^.dataObj.GetData(LFormat, LMedium));
+    SetString(LText, PChar(GlobalLock(LMedium.hGlobal)), GlobalSize(LMedium.hGlobal) div SizeOf(LText[1]));
+    FLines.CaretPosition := FInsertPos;
+    SelText := LText;
+  end
+  else
+  begin
+    LFormat.cfFormat := CF_HDROP;
+    LFormat.ptd := nil;
+    LFormat.dwAspect := DVASPECT_CONTENT;
+    LFormat.lindex := -1;
+    LFormat.tymed := TYMED_HGLOBAL;
+    OleCheck(AData^.dataObj.GetData(LFormat, LMedium));
+    LLen := DragQueryFile(LMedium.hGlobal, 0, nil, 0);
+    SetLength(LFilename, LLen + 1);
+    Assert(DragQueryFile(LMedium.hGlobal, 0, PChar(LFilename), LLen + 1) = LLen);
+    SetLength(LFilename, LLen);
+    LOldPosition := FInsertPos;
+    FLines.InsertFile(FInsertPos, LFilename);
+    SetCaretAndSelection(FLines.CaretPosition, LinesArea(LOldPosition, FLines.CaretPosition));
+    SetInsertPos(InvalidPos);
+  end;
+end;
+
 procedure TCustomBCEditor.DoEOF(const ACommand: TBCEditorCommand);
 begin
   if (FRows.Count = 0) then
@@ -3373,11 +3414,11 @@ begin
   if (not Assigned(FGotoLineDialog)) then
     FGotoLineDialog := TGotoLineDialog.Create(Self);
 
-  FGotoLineDialog.Min := FLeftMargin.LineNumbers.StartFrom;
-  FGotoLineDialog.Max := Max(1, FLines.Count) + FLeftMargin.LineNumbers.StartFrom;
-  FGotoLineDialog.Line := FLines.CaretPosition.Line + FLeftMargin.LineNumbers.StartFrom;
+  FGotoLineDialog.Min := FLeftMargin.LineNumbers.Offset;
+  FGotoLineDialog.Max := Max(1, FLines.Count) + FLeftMargin.LineNumbers.Offset;
+  FGotoLineDialog.Line := FLines.CaretPosition.Line + FLeftMargin.LineNumbers.Offset;
   if (FGotoLineDialog.Execute()) then
-    SetCaretPos(FLines.BOLPosition[FGotoLineDialog.Line - FLeftMargin.LineNumbers.StartFrom]);
+    SetCaretPos(FLines.BOLPosition[FGotoLineDialog.Line - FLeftMargin.LineNumbers.Offset]);
 end;
 
 procedure TCustomBCEditor.DoShowReplace();
@@ -3671,7 +3712,7 @@ procedure TCustomBCEditor.DragCanceled();
 begin
   inherited;
 
-  InsertPos := InvalidPos;
+  SetInsertPos(InvalidPos);
 end;
 
 procedure TCustomBCEditor.DragDrop(ASource: TObject; X, Y: Integer);
@@ -3680,7 +3721,7 @@ begin
   begin
     inherited;
 
-    InsertPos := InvalidPos;
+    SetInsertPos(InvalidPos);
   end;
 end;
 
@@ -3710,7 +3751,7 @@ begin
       LFormat.lindex := -1;
       LFormat.tymed := TYMED_HGLOBAL;
 
-      if (not (eoAcceptFiles in FOptions) or (dataObj.QueryGetData(LFormat) <> S_OK)) then
+      if (not (eoDropFiles in FOptions) or (dataObj.QueryGetData(LFormat) <> S_OK)) then
         Result := E_UNEXPECTED
       else
       begin
@@ -3726,7 +3767,7 @@ end;
 
 function TCustomBCEditor.DragLeave(): HResult;
 begin
-  InsertPos := InvalidPos;
+  SetInsertPos(InvalidPos);
 
   Result := S_OK;
 end;
@@ -3739,21 +3780,22 @@ begin
   if (FReadOnly
     or (pt.X <= FLeftMarginWidth)) then
   begin
-    InsertPos := InvalidPos;
+    SetInsertPos(InvalidPos);
     dwEffect := DROPEFFECT_NONE;
   end
   else
   begin
     LScreen := ScreenToClient(pt);
     LPosition := ClientToLines(LScreen.X, LScreen.Y);
-    if (FLines.SelArea.Contains(LPosition)) then
+    if (FLines.SelArea.Contains(LPosition)
+      or not ProcessCommand(ecAcceptDrop, TBCEditorCommandDataPosition.Create(LPosition))) then
     begin
-      InsertPos := InvalidPos;
+      SetInsertPos(InvalidPos);
       dwEffect := DROPEFFECT_NONE;
     end
     else
     begin
-      InsertPos := LPosition;
+      SetInsertPos(LPosition);
       if (grfKeyState and MK_CONTROL <> 0) then
         dwEffect := DROPEFFECT_COPY
       else if (grfKeyState and MK_SHIFT <> 0) then
@@ -3769,21 +3811,22 @@ end;
 
 procedure TCustomBCEditor.DragOver(ASource: TObject; X, Y: Integer;
   AState: TDragState; var AAccept: Boolean);
+var
+  LPosition: TBCEditorLinesPosition;
+  LScreen: TPoint;
 begin
-  if (FReadOnly) then
-    AAccept := False
-  else
+  LScreen := ScreenToClient(Point(X, Y));
+  LPosition := ClientToLines(LScreen.X, LScreen.Y);
+  AAccept := not FReadOnly and not ProcessCommand(ecAcceptDrop, TBCEditorCommandDataPosition.Create(LPosition));
+
+  if (AAccept) then
     inherited;
 end;
 
 function TCustomBCEditor.Drop(const dataObj: IDataObject; grfKeyState: Longint; pt: TPoint;
   var dwEffect: Longint): HResult;
 var
-  LFilename: string;
-  LFormat: FORMATETC;
-  LLen: UINT;
   LMedium: STGMEDIUM;
-  LOldPosition: TBCEditorLinesPosition;
   LText: string;
 begin
   if (dwEffect and (DROPEFFECT_COPY or DROPEFFECT_MOVE) = 0) then
@@ -3792,56 +3835,26 @@ begin
   begin
     LText := '';
 
-    if (grfKeyState and MK_CONTROL <> 0) then
-      dwEffect := DROPEFFECT_COPY
-    else if (grfKeyState and MK_SHIFT <> 0) then
-      dwEffect := DROPEFFECT_MOVE
-    else if (esDragging in FState) then
-      dwEffect := DROPEFFECT_MOVE
-    else
-      dwEffect := DROPEFFECT_COPY;
-
-    LFormat.cfFormat := CF_UNICODETEXT;
-    LFormat.ptd := nil;
-    LFormat.dwAspect := DVASPECT_CONTENT;
-    LFormat.lindex := -1;
-    LFormat.tymed := TYMED_HGLOBAL;
-    Result := dataObj.QueryGetData(LFormat);
-    if (Result = S_OK) then
-    begin
-      OleCheck(dataObj.GetData(LFormat, LMedium));
-      SetString(LText, PChar(GlobalLock(LMedium.hGlobal)), GlobalSize(LMedium.hGlobal) div SizeOf(LText[1]));
-      FLines.CaretPosition := InsertPos;
-      SelText := LText;
-    end
+    if (not ProcessCommand(ecDropOLE, TBCEditorCommandDataDropOLE.Create(FInsertPos, dataObj))) then
+      Result := E_UNEXPECTED
     else
     begin
-      LFormat.cfFormat := CF_HDROP;
-      LFormat.ptd := nil;
-      LFormat.dwAspect := DVASPECT_CONTENT;
-      LFormat.lindex := -1;
-      LFormat.tymed := TYMED_HGLOBAL;
-      Result := dataObj.QueryGetData(LFormat);
-      if (Result <> S_OK) then
-        Result := E_UNEXPECTED
+      if (grfKeyState and MK_CONTROL <> 0) then
+        dwEffect := DROPEFFECT_COPY
+      else if (grfKeyState and MK_SHIFT <> 0) then
+        dwEffect := DROPEFFECT_MOVE
+      else if (esDragging in FState) then
+        dwEffect := DROPEFFECT_MOVE
       else
-      begin
-        OleCheck(dataObj.GetData(LFormat, LMedium));
-        LLen := DragQueryFile(LMedium.hGlobal, 0, nil, 0);
-        SetLength(LFilename, LLen + 1);
-        Assert(DragQueryFile(LMedium.hGlobal, 0, PChar(LFilename), LLen + 1) = LLen);
-        SetLength(LFilename, LLen);
-        LOldPosition := InsertPos;
-        FLines.InsertFile(InsertPos, LFilename);
-        SetCaretAndSelection(FLines.CaretPosition, LinesArea(LOldPosition, FLines.CaretPosition));
-        InsertPos := InvalidPos;
-      end;
-    end;
+        dwEffect := DROPEFFECT_COPY;
 
-    if (not Assigned(LMedium.unkForRelease)) then
-      ReleaseStgMedium(LMedium)
-    else
-      IUnknown(LMedium.unkForRelease)._Release();
+      if (not Assigned(LMedium.unkForRelease)) then
+        ReleaseStgMedium(LMedium)
+      else
+        IUnknown(LMedium.unkForRelease)._Release();
+
+      Result := S_OK;
+    end;
 
     if (Result = S_OK) then
       Result := DragLeave();
@@ -6289,7 +6302,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
           if ((ARow = 0) and (FLines.Count = 0)) then
           begin
             FPaintHelper.Style := [];
-            LText := IntToStr(FLeftMargin.LineNumbers.StartFrom);
+            LText := IntToStr(FLeftMargin.LineNumbers.Offset);
             LWidth := FPaintHelper.TextWidth(PChar(LText), Length(LText));
           end
           else if ((ALine < 0) and not (lnoAfterLastLine in FLeftMargin.LineNumbers.Options)
@@ -6302,14 +6315,14 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
           else if (((FRows.Count = 0) or (rfFirstRowOfLine in FRows.Items[ARow].Flags))
             and ((ALine = 0)
               or (ALine = FLines.CaretPosition.Line)
-              or ((ALine + FLeftMargin.LineNumbers.StartFrom) mod 10 = 0)
+              or ((ALine + FLeftMargin.LineNumbers.Offset) mod 10 = 0)
               or not (lnoIntens in FLeftMargin.LineNumbers.Options))) then
           begin
             FPaintHelper.Style := [];
-            LText := IntToStr(ALine + FLeftMargin.LineNumbers.StartFrom);
+            LText := IntToStr(ALine + FLeftMargin.LineNumbers.Offset);
             LWidth := FPaintHelper.TextWidth(PChar(LText), Length(LText));
           end
-          else if ((ALine + FLeftMargin.LineNumbers.StartFrom) mod 5 = 0) then
+          else if ((ALine + FLeftMargin.LineNumbers.Offset) mod 5 = 0) then
           begin
             FPaintHelper.Style := [];
             LText := '-';
@@ -6693,7 +6706,7 @@ begin
             else
               LLine := -1;
 
-            if (FLeftMargin.Marks.Visible) then
+            if (FLeftMargin.Bookmarks.Visible or FLeftMargin.Marks.Visible) then
               Result := Result or ProcessMarks(LRowRect, LLine, LRow);
 
             if (FLeftMargin.LineNumbers.Visible) then
@@ -6882,6 +6895,8 @@ begin
 
         LHandled := True;
         case (ACommand) of
+          ecAcceptDrop:
+            ; // Do nothing, but LHandled should be True
           ecBackspace:
             DoBackspace();
           ecBlockComment:
@@ -6930,6 +6945,8 @@ begin
             DoDeleteWord();
           ecDown:
             MoveCaretVertically(1, ACommand = ecSelDown);
+          ecDropOLE:
+            DoDropOLE(PBCEditorCommandDataDropOLE(AData));
           ecEOF:
             DoEOF(ACommand);
           ecEOL:
@@ -7069,7 +7086,8 @@ begin
             DoWordLeft(ACommand);
           ecWordRight:
             DoWordRight(ACommand);
-          else LHandled := False;
+          else
+            LHandled := False;
         end;
       end;
 
@@ -9299,7 +9317,7 @@ begin
       FLines.Options := FLines.Options + [loBeyondEndOfFile]
     else
       FLines.Options := FLines.Options - [loBeyondEndOfFile];
-    if (eoAcceptFiles in FOptions) then
+    if (eoDropFiles in FOptions) then
       SetWindowLong(WindowHandle, GWL_EXSTYLE, GetWindowLong(WindowHandle, GWL_EXSTYLE) or WS_EX_ACCEPTFILES)
     else
       SetWindowLong(WindowHandle, GWL_EXSTYLE, GetWindowLong(WindowHandle, GWL_EXSTYLE) and not WS_EX_ACCEPTFILES);
@@ -9387,16 +9405,21 @@ end;
 
 procedure TCustomBCEditor.SetSyncEditOptions(AValue: TBCEditorSyncEditOptions);
 begin
-  if (seoCaseSensitive in FSyncEditOptions) then
-    FLines.Options := FLines.Options + [loSyncEditCaseSensitive]
-  else
-    FLines.Options := FLines.Options - [loSyncEditCaseSensitive];
-
-  if (FLines.SyncEdit) then
+  if (AValue <> FSyncEditOptions) then
   begin
-    FLines.SelArea := FLines.SyncEditArea;
-    ProcessCommand(ecSyncEdit); // Deactivate
-    ProcessCommand(ecSyncEdit); // Re-activate
+    FSyncEditOptions := AValue;
+
+    if (seoCaseSensitive in FSyncEditOptions) then
+      FLines.Options := FLines.Options + [loSyncEditCaseSensitive]
+    else
+      FLines.Options := FLines.Options - [loSyncEditCaseSensitive];
+
+    if (FLines.SyncEdit) then
+    begin
+      FLines.SelArea := FLines.SyncEditArea;
+      ProcessCommand(ecSyncEdit); // Deactivate
+      ProcessCommand(ecSyncEdit); // Re-activate
+    end;
   end;
 end;
 
@@ -10013,7 +10036,7 @@ begin
   FClientRect := ClientRect;
 
   FLeftMarginWidth := 0;
-  if (FLeftMargin.Marks.Visible) then
+  if (FLeftMargin.Bookmarks.Visible or FLeftMargin.Marks.Visible) then
   begin
     FMarksPanelRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FMarksPanelWidth, FClientRect.Height);
     Inc(FLeftMarginWidth, FMarksPanelWidth);
@@ -10677,9 +10700,9 @@ begin
   begin
     FNoParentNotify := AMessage.StyleStruct^.styleNew and WS_EX_NOPARENTNOTIFY <> 0;
     if (AMessage.StyleStruct^.styleNew and WS_EX_ACCEPTFILES = 0) then
-      SetOptions(FOptions - [eoAcceptFiles])
+      SetOptions(FOptions - [eoDropFiles])
     else
-      SetOptions(FOptions + [eoAcceptFiles]);
+      SetOptions(FOptions + [eoDropFiles]);
   end;
 end;
 
@@ -10765,9 +10788,9 @@ begin
           end;
 
           if (FTopRow < FRows.Count) then
-            LLine := FRows.Items[FTopRow].Line + FLeftMargin.LineNumbers.StartFrom
+            LLine := FRows.Items[FTopRow].Line + FLeftMargin.LineNumbers.Offset
           else
-            LLine := FTopRow - FRows.Count + FLines.Count  + FLeftMargin.LineNumbers.StartFrom;
+            LLine := FTopRow - FRows.Count + FLines.Count  + FLeftMargin.LineNumbers.Offset;
 
           LHint := Format(SBCEditorScrollInfo, [LLine]);
 

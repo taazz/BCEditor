@@ -38,7 +38,7 @@ contains
   BCEditor.Consts in '..\Source\BCEditor.Consts.pas',
   BCEditor.Commands in '..\Source\BCEditor.Commands.pas',
   BCEditor.CompletionProposal in '..\Source\BCEditor.CompletionProposal.pas',
-  BCEditor.Export.HTML in '..\Source\BCEditor.Export.HTML.pas',
+  BCEditor.ExportHTML in '..\Source\BCEditor.ExportHTML.pas',
   BCEditor.Highlighter in '..\Source\BCEditor.Highlighter.pas',
   BCEditor.GotoLine in '..\Source\BCEditor.GotoLine.pas',
   BCEditor.Language in '..\Source\BCEditor.Language.pas',

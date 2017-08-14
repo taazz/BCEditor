@@ -137,7 +137,7 @@
         <DelphiCompile Include="..\Source\BCEditor.Commands.pas">
             <BuildOrder>12</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Export.HTML.pas">
+        <DelphiCompile Include="..\Source\BCEditor.ExportHTML.pas">
             <BuildOrder>30</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.GotoLine.pas">
