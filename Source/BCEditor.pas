@@ -7,21 +7,13 @@ uses
   Classes, SysUtils, UITypes, StrUtils, Generics.Collections,
   Forms, StdActns, Controls, Graphics, StdCtrls, Dialogs, Consts,
   Menus,
-  BCEditor.Commands,
-  BCEditor.CompletionProposal,
-  BCEditor.Consts,
-  BCEditor.Editor.CodeFolding,
-  BCEditor.GotoLine,
-  BCEditor.Highlighter,
-  BCEditor.Lines,
-  BCEditor.PaintHelper,
-  BCEditor.Properties,
+  BCEditor.Commands, BCEditor.CompletionProposal, BCEditor.Consts,
+  BCEditor.GotoLine, BCEditor.Highlighter, BCEditor.Lines, BCEditor.Properties,
   BCEditor.Types;
 
 type
   TCustomBCEditor = class(TCustomControl, IDropSource, IDropTarget)
   private type
-    TBCEditorCodeFolding = class(BCEditor.Editor.CodeFolding.TBCEditorCodeFolding);
     TBCEditorColors = class(BCEditor.Properties.TBCEditorColors);
     TBCEditorCompletionProposal = class(BCEditor.Properties.TBCEditorCompletionProposal);
     TBCEditorCompletionProposalPopup = class(BCEditor.CompletionProposal.TBCEditorCompletionProposalPopup);
@@ -90,6 +82,56 @@ type
     public
       function Add(const AValue: TOverlay): Integer;
       constructor Create(const AEditor: TCustomBCEditor);
+    end;
+
+    TPaintHelper = class(TObject)
+    type
+
+      TObjectFont = packed record
+        Handle: HFont;
+        Style: TFontStyles;
+      end;
+
+      TObjectFonts = class(TList<TObjectFont>)
+      strict private
+        FFont: TFont;
+        procedure SetFont(const AValue: TFont);
+      public
+        function Add(const AStyle: TFontStyles): Integer;
+        procedure Clear();
+        constructor Create();
+        destructor Destroy(); override;
+        property Font: TFont read FFont write SetFont;
+      end;
+
+    strict private
+      FBackgroundColor: TColor;
+      FBrush: TBrush;
+      FForegroundColor: TColor;
+      FHandle: HDC;
+      FHandles: TStack<HDC>;
+      FObjectFonts: TObjectFonts;
+      FSavedDCs: TStack<Integer>;
+      FStyle: TFontStyles;
+      procedure SetBackgroundColor(const AValue: TColor);
+      procedure SetFont(const AValue: TFont);
+      procedure SetForegroundColor(const AValue: TColor);
+      procedure SetStyle(const AValue: TFontStyles);
+    public
+      procedure BeginDraw(const AHandle: HDC);
+      constructor Create(const AFont: TFont);
+      destructor Destroy(); override;
+      procedure EndDraw();
+      function ExtTextOut(X, Y: Integer; Options: Longint;
+        Rect: TRect; Str: LPCWSTR; Count: Longint; Dx: PInteger): BOOL; {$IFNDEF Debug} inline; {$ENDIF}
+      function FillRect(const ARect: TRect): BOOL; {$IFNDEF Debug} inline; {$ENDIF}
+      function FrameRect(const ARect: TRect; AColor: TColor): Integer; {$IFNDEF Debug} inline; {$ENDIF}
+      function TextHeight(const AText: PChar; const ALength: Integer): Integer;
+      function TextWidth(const AText: PChar; const ALength: Integer): Integer;
+      property BackgroundColor: TColor read FBackgroundColor write SetBackgroundColor;
+      property ForegroundColor: TColor read FForegroundColor write SetForegroundColor;
+      property Font: TFont write SetFont;
+      property Style: TFontStyles read FStyle write SetStyle;
     end;
 
     PPaintVar = ^TPaintVar;
@@ -190,18 +232,16 @@ type
     UM_FIND_WRAPAROUND = WM_USER + 1;
     UM_FREE_COMPLETIONPROPOSALPOPUP = WM_USER + 2;
   private
-    FAfterProcessCommand: TBCEditorProcessCommandEvent;
-    FAllCodeFoldingRanges: TBCEditorCodeFolding.TAllRanges;
-    FBeforeProcessCommand: TBCEditorProcessCommandEvent;
+    FAfterProcessCommand: TBCEditorAfterProcessCommandEvent;
+    FAllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges;
+    FBeforeProcessCommand: TBCEditorBeforeProcessCommandEvent;
     FBookmarkBitmaps: array[0 .. BCEDITOR_BOOKMARKS - 1] of TGPCachedBitmap;
     FBoldDotSignWidth: Integer;
     FBorderStyle: TBorderStyle;
     FCaretPos: TPoint; // Caret position in pixel - NOT related to CaretPos!
     FCaretVisible: Boolean;
     FCaretWidth: Integer;
-    FChainedEditor: TCustomBCEditor;
     FClientRect: TRect;
-    FCodeFolding: TBCEditorCodeFolding;
     FCodeFoldingCollapsedBitmap: TGPCachedBitmap;
     FCodeFoldingCollapsedMarkWidth: Integer;
     FCodeFoldingEndLineBitmap: TGPCachedBitmap;
@@ -243,7 +283,7 @@ type
     FLastCursorPoint: TPoint;
     FLastDoubleClickTime: Cardinal;
     FLastSearch: (lsFind, lsReplace);
-    FLastSearchData: TBytes;
+    FLastSearchData: TBCEditorCommandData;
     FLeftMargin: TBCEditorLeftMargin;
     FLeftMarginBorderWidth: Integer;
     FLeftMarginWidth: Integer;
@@ -266,11 +306,6 @@ type
     FOldCurrentLine: Integer;
     FOldSelArea: TBCEditorLinesArea;
     FOnCaretChanged: TBCEditorCaretChangedEvent;
-    FOnChainCaretMoved: TNotifyEvent;
-    FOnChainLinesCleared: TNotifyEvent;
-    FOnChainLinesDeleting: TBCEditorLines.TChangeEvent;
-    FOnChainLinesInserted: TBCEditorLines.TChangeEvent;
-    FOnChainLinesUpdated: TBCEditorLines.TChangeEvent;
     FOnChange: TNotifyEvent;
     FOnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent;
     FOnCompletionProposalShow: TBCEditorCompletionProposalShowEvent;
@@ -285,7 +320,7 @@ type
     FOptions: TBCEditorOptions;
     FOriginalLines: TBCEditorLines;
     FOverlays: TOverlays;
-    FPaintHelper: TBCEditorPaintHelper;
+    FPaintHelper: TCustomBCEditor.TPaintHelper;
     FParentWnd: HWND;
     FPendingJobs: TIdleJobs;
     FPopupMenu: HMENU;
@@ -331,7 +366,7 @@ type
     procedure AfterLinesUpdate(Sender: TObject);
     procedure AskReplaceText(ASender: TObject; const AArea: TBCEditorLinesArea;
       const ABackwards: Boolean; const AReplaceText: string; var AAction: TBCEditorReplaceAction);
-    function AskSearchWrapAround(const AData: PBCEditorCDFind): Boolean;
+    function AskSearchWrapAround(const AData: PBCEditorCommandDataFind): Boolean;
     procedure BeforeLinesUpdate(Sender: TObject);
     procedure BookmarksChanged(ASender: TObject);
     procedure BuildRows(const ATerminated: TBCEditorTerminatedFunc; const AEndRow: Integer = -1);
@@ -340,10 +375,9 @@ type
     procedure CMDoubleBufferedChanged(var AMessage: TMessage); message CM_DOUBLEBUFFEREDCHANGED;
     procedure CMSysFontChanged(var AMessage: TMessage); message CM_SYSFONTCHANGED;
     procedure CaretChanged(ASender: TObject);
-    function CodeFoldingCollapsableFoldRangeForLine(const ALine: Integer): TBCEditorCodeFolding.TRanges.TRange;
-    function CodeFoldingFoldRangeForLineTo(const ALine: Integer): TBCEditorCodeFolding.TRanges.TRange;
-    procedure CodeFoldingChanged(AEvent: TBCEditorCodeFoldingChanges);
-    procedure CollapseCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
+    function CodeFoldingCollapsableFoldRangeForLine(const ALine: Integer): TBCEditorCodeFoldingRanges.TRange;
+    function CodeFoldingFoldRangeForLineTo(const ALine: Integer): TBCEditorCodeFoldingRanges.TRange;
+    procedure CollapseCodeFoldingRange(const ARange: TBCEditorCodeFoldingRanges.TRange);
     procedure ColorsChanged(ASender: TObject);
     procedure DeleteChar;
     procedure DeleteLastWordOrBOL(const ACommand: TBCEditorCommand);
@@ -351,7 +385,7 @@ type
     procedure DeleteLineFromRows(const ALine: Integer);
     procedure DoBackspace();
     procedure DoBlockComment;
-    procedure DoChar(const AData: PBCEditorCDChar);
+    procedure DoChar(const AData: PBCEditorCommandDataChar);
     procedure DoCopyToClipboard();
     procedure DoCutToClipboard();
     procedure DoDeleteToEOL();
@@ -359,27 +393,27 @@ type
     procedure DoEOF(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoBOF(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoEndKey(const ASelectionCommand: Boolean);
-    function DoFindBackwards(const AData: PBCEditorCDFind): Boolean;
-    procedure DoFindFirst(const AData: PBCEditorCDFind);
-    function DoFindForewards(const AData: PBCEditorCDFind): Boolean;
+    function DoFindBackwards(const AData: PBCEditorCommandDataFind): Boolean;
+    procedure DoFindFirst(const AData: PBCEditorCommandDataFind);
+    function DoFindForewards(const AData: PBCEditorCommandDataFind): Boolean;
     procedure DoHomeKey(const ASelectionCommand: Boolean);
     procedure DoInsertText(const AText: string);
     procedure DoLineComment();
     procedure DoPageKey(const ACommand: TBCEditorCommand);
     procedure DoPageTopOrBottom(const ACommand: TBCEditorCommand);
-    procedure DoPosition(const AData: PBCEditorCDPosition);
-    procedure DoReplace(const AData: TBytes);
+    procedure DoPosition(const AData: PBCEditorCommandDataPosition);
+    procedure DoReplace(const AData: TBCEditorCommandData);
     procedure DoReturnKey();
     procedure DoScroll(const ACommand: TBCEditorCommand);
-    procedure DoScrollTo(const AData: TBytes);
+    procedure DoScrollTo(const AData: TBCEditorCommandData);
     procedure DoSelectAll();
-    procedure DoSelection(const AData: PBCEditorCDSelection);
+    procedure DoSelection(const AData: PBCEditorCommandDataSelection);
     procedure DoShowFind(const First: Boolean);
     procedure DoShowGotoLine();
     procedure DoShowReplace();
     procedure DoSetBookmark(const ACommand: TBCEditorCommand);
     procedure DoTabKey(const ACommand: TBCEditorCommand);
-    procedure DoText(const AData: PBCEditorCDText);
+    procedure DoText(const AData: PBCEditorCommandDataText);
     procedure DoToggleSelectedCase(const ACommand: TBCEditorCommand);
     procedure DoUnselect();
     procedure DoWordLeft(const ACommand: TBCEditorCommand);
@@ -411,7 +445,7 @@ type
     procedure EMSetSel(var AMessage: TMessage); message EM_SETSEL;
     procedure EMSetTabStop(var AMessage: TMessage); message EM_SETTABSTOPS;
     procedure EMUndo(var AMessage: TMessage); message EM_UNDO;
-    procedure ExpandCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
+    procedure ExpandCodeFoldingRange(const ARange: TBCEditorCodeFoldingRanges.TRange);
     procedure FindDialogClose(Sender: TObject);
     procedure FindDialogFind(Sender: TObject);
     procedure FindExecuted(const AData: Pointer);
@@ -461,7 +495,6 @@ type
     procedure LineInserted(ASender: TObject; const ALine: Integer);
     procedure LinesCleared(ASender: TObject);
     procedure LinesChanged();
-    procedure LinesHookChanged;
     procedure LinesLoaded(ASender: TObject);
     procedure LinesSelChanged(ASender: TObject);
     procedure LinesSyncEditChanged(ASender: TObject);
@@ -488,7 +521,7 @@ type
       const ARowsPosition: TBCEditorRowsPosition;
       const AText: PChar; const ALength: Integer;
       const AToken: TBCEditorHighlighter.PTokenFind = nil;
-      const ARange: TBCEditorCodeFolding.TRanges.TRange = nil): Boolean;
+      const ARange: TBCEditorCodeFoldingRanges.TRange = nil): Boolean;
     procedure ReplaceDialogFind(ASender: TObject);
     procedure ReplaceDialogReplace(ASender: TObject);
     procedure ReplaceExecuted(const AData: Pointer);
@@ -504,7 +537,6 @@ type
     procedure ScrollToCaret();
     procedure SetBorderStyle(const AValue: TBorderStyle);
     procedure SetCaretPos(const AValue: TPoint);
-    procedure SetCodeFolding(const AValue: TBCEditorCodeFolding);
     procedure SetColors(AValue: TBCEditorColors);
     procedure SetCursor(AValue: TCursor);
     procedure SetHideScrollBars(AValue: Boolean);
@@ -585,11 +617,6 @@ type
     function Drop(const dataObj: IDataObject; grfKeyState: Longint; pt: TPoint;
       var dwEffect: Longint): HResult; stdcall;
   protected
-    procedure ChainLinesCaretChanged(ASender: TObject);
-    procedure ChainLinesCleared(ASender: TObject);
-    procedure ChainLinesDeleting(ASender: TObject; const ALine: Integer);
-    procedure ChainLinesInserted(ASender: TObject; const ALine: Integer);
-    procedure ChainLinesUpdated(ASender: TObject; const ALine: Integer);
     procedure Change(); virtual;
     procedure ChangeScale(M, D: Integer); override;
     procedure ClearUndo();
@@ -644,16 +671,15 @@ type
     function WordBegin(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
     function WordEnd(): TBCEditorLinesPosition; overload; {$IFNDEF Debug} inline; {$ENDIF}
     function WordEnd(const ALinesPosition: TBCEditorLinesPosition): TBCEditorLinesPosition; overload;
-    property AllCodeFoldingRanges: TBCEditorCodeFolding.TAllRanges read FAllCodeFoldingRanges;
-    property AfterProcessCommand: TBCEditorProcessCommandEvent read FAfterProcessCommand write FAfterProcessCommand;
-    property BeforeProcessCommand: TBCEditorProcessCommandEvent read FBeforeProcessCommand write FBeforeProcessCommand;
+    property AllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges read FAllCodeFoldingRanges;
+    property AfterProcessCommand: TBCEditorAfterProcessCommandEvent read FAfterProcessCommand write FAfterProcessCommand;
+    property BeforeProcessCommand: TBCEditorBeforeProcessCommandEvent read FBeforeProcessCommand write FBeforeProcessCommand;
     property BorderStyle: TBorderStyle read FBorderStyle write SetBorderStyle default bsSingle;
     property CanPaste: Boolean read GetCanPaste;
     property CanRedo: Boolean read GetCanRedo;
     property CanUndo: Boolean read GetCanUndo;
     property CaretPos: TPoint read GetCaretPos write SetCaretPos;
     property CharAt[Pos: TPoint]: Char read GetCharAt;
-    property CodeFolding: TBCEditorCodeFolding read FCodeFolding write SetCodeFolding;
     property Colors: TBCEditorColors read FColors write SetColors;
     property CompletionProposal: TBCEditorCompletionProposal read FCompletionProposal write FCompletionProposal;
     property Cursor: TCursor read GetCursor write SetCursor;
@@ -681,7 +707,7 @@ type
     property OnReplacePrompt: TBCEditorReplacePromptEvent read FOnReplacePrompt write FOnReplacePrompt;
     property OnSelChanged: TNotifyEvent read FOnSelChanged write FOnSelChanged;
     property Options: TBCEditorOptions read FOptions write SetOptions default DefaultOptions;
-    property PaintHelper: TBCEditorPaintHelper read FPaintHelper;
+    property PaintHelper: TCustomBCEditor.TPaintHelper read FPaintHelper;
     property ParentColor default False;
     property ParentFont default False;
     property ReadOnly: Boolean read FReadOnly write SetReadOnly default False;
@@ -712,7 +738,6 @@ type
     procedure Assign(ASource: TPersistent); override;
     procedure BeginUndoBlock(); deprecated 'Use Lines.EndUpdate()'; // 2017-07-12
     procedure BeginUpdate();
-    procedure ChainEditor(AEditor: TCustomBCEditor);
     function CharIndexToPos(const ACharIndex: Integer): TPoint; {$IFNDEF Debug} inline; {$ENDIF}
     procedure Clear(); virtual; deprecated 'Use Lines.Clear()';
     function ClientToPos(const X, Y: Integer): TPoint; {$IFNDEF Debug} inline; {$ENDIF}
@@ -723,25 +748,22 @@ type
     constructor Create(AOwner: TComponent); override;
     procedure CutToClipboard();
     destructor Destroy(); override;
-    procedure DoRedo(); {$IFNDEF Debug} inline; {$ENDIF} deprecated 'Use Redo()'; // 2017-02-12
-    procedure DoUndo(); {$IFNDEF Debug} inline; {$ENDIF} deprecated 'Use Undo()'; // 2017-02-12
+    procedure DoRedo(); deprecated 'Use Redo()'; // 2017-02-12
+    procedure DoUndo(); deprecated 'Use Undo()'; // 2017-02-12
     procedure DragDrop(ASource: TObject; X, Y: Integer); override;
     procedure EndUndoBlock(); deprecated 'Use Lines.EndUpdate()'; // 2017-07-12
     procedure EndUpdate();
     function ExecuteAction(Action: TBasicAction): Boolean; override;
     procedure ExportToHTML(const AFileName: string; const ACharSet: string = ''; AEncoding: TEncoding = nil); overload;
     procedure ExportToHTML(AStream: TStream; const ACharSet: string = ''; AEncoding: TEncoding = nil); overload;
-    procedure HookEditorLines(ALines: TBCEditorLines; AUndo, ARedo: TBCEditorLines.TUndoList);
     procedure LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromFile'; // 2017-03-10
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromStream'; // 2017-03-10
-    procedure Notification(AComponent: TComponent; AOperation: TOperation); override;
     procedure PasteFromClipboard();
     function PosToCharIndex(const APos: TPoint): Integer;
-    function ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBytes = nil): Boolean;
+    function ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil): Boolean;
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure RegisterCommandHandler(const AProc: Pointer; const AHandlerData: Pointer); overload;
     procedure RegisterCommandHandler(const AProc: TBCEditorHookedCommandObjectProc); overload;
-    procedure RemoveChainedEditor;
     procedure SaveToFile(const AFileName: string; AEncoding: TEncoding = nil);
     procedure SaveToStream(AStream: TStream; AEncoding: TEncoding = nil);
     procedure SelectAll();
@@ -753,7 +775,6 @@ type
     function TextCaretPosition(): TBCEditorLinesPosition; deprecated 'Use CaretPos'; // 2017-02-12
     procedure ToggleSelectedCase(const ACase: TBCEditorCase = cNone);
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
-    procedure UnhookEditorLines;
     function UpdateAction(Action: TBasicAction): Boolean; override;
     procedure UnregisterCommandHandler(const AProc: Pointer;
       const AHandlerData: Pointer); overload;
@@ -788,7 +809,6 @@ type
     property Anchors;
     property BeforeProcessCommand;
     property BorderStyle;
-    property CodeFolding;
     property Color default clWindow;
     property Colors;
     property CompletionProposal;
@@ -1102,6 +1122,203 @@ begin
   FEditor := AEditor;
 end;
 
+{ TCustomBCEditor.TPaintHelper.TObjectFonts *******************************************}
+
+function TCustomBCEditor.TPaintHelper.TObjectFonts.Add(const AStyle: TFontStyles): Integer;
+const
+  CBolds: array [Boolean] of Integer = (400, 700);
+var
+  LFont: TObjectFont;
+  LIndex: Integer;
+  LLogFont: TLogFont;
+begin
+  Result := -1;
+
+  for LIndex := 0 to Count - 1 do
+    if (Items[LIndex].Style = AStyle) then
+      Result := LIndex;
+
+  if (Result < 0) then
+  begin
+    GetObject(FFont.Handle, SizeOf(LLogFont), @LLogFont);
+    LLogFont.lfWeight := CBolds[fsBold in AStyle];
+    LLogFont.lfItalic := Ord(BOOL(fsItalic in AStyle));
+    LLogFont.lfUnderline := Ord(BOOL(fsUnderline in AStyle));
+    LLogFont.lfStrikeOut := Ord(BOOL(fsStrikeOut in AStyle));
+    StrCopy(@LLogFont.lfFaceName[0], PChar(FFont.Name));
+    LFont.Handle := CreateFontIndirect(LLogFont);
+    LFont.Style := AStyle;
+    Result := inherited Add(LFont);
+  end;
+end;
+
+procedure TCustomBCEditor.TPaintHelper.TObjectFonts.Clear();
+var
+  LIndex: Integer;
+begin
+  for LIndex := 0 to Count - 1 do
+    DeleteObject(Items[LIndex].Handle);
+
+  inherited;
+end;
+
+constructor TCustomBCEditor.TPaintHelper.TObjectFonts.Create();
+begin
+  inherited;
+
+  FFont := nil;
+end;
+
+destructor TCustomBCEditor.TPaintHelper.TObjectFonts.Destroy();
+begin
+  Clear();
+
+  inherited;
+end;
+
+procedure TCustomBCEditor.TPaintHelper.TObjectFonts.SetFont(const AValue: TFont);
+begin
+  if (not Assigned(FFont)
+    or (AValue.Name <> FFont.Name)
+    or (AValue.Size <> FFont.Size)) then
+  begin
+    FFont := AValue;
+    Clear();
+  end;
+end;
+
+{ TCustomBCEditor.TPaintHelper ********************************************************}
+
+procedure TCustomBCEditor.TPaintHelper.BeginDraw(const AHandle: HDC);
+begin
+  Assert(AHandle <> 0);
+
+  FHandles.Push(FHandle);
+  FSavedDCs.Push(SaveDC(FHandle));
+
+  FHandle := AHandle;
+
+  SelectObject(FHandle, FObjectFonts.Items[FObjectFonts.Add(FStyle)].Handle);
+  SetTextColor(FHandle, ColorToRGB(FForegroundColor));
+  SetBkColor(FHandle, ColorToRGB(FBackgroundColor));
+  SetBkMode(FHandle, TRANSPARENT);
+end;
+
+constructor TCustomBCEditor.TPaintHelper.Create(const AFont: TFont);
+begin
+  inherited Create();
+
+  FBackgroundColor := clWindow;
+  FBrush := TBrush.Create();
+  FForegroundColor := clWindowText;
+  FHandle := 0;
+  FHandles := TStack<HDC>.Create();
+  FObjectFonts := TObjectFonts.Create();
+  FSavedDCs := TStack<Integer>.Create();
+  FStyle := [];
+  SetFont(AFont);
+end;
+
+destructor TCustomBCEditor.TPaintHelper.Destroy();
+begin
+  FBrush.Free();
+  FHandles.Free();
+  FObjectFonts.Free();
+  FSavedDCs.Free();
+
+  inherited;
+end;
+
+procedure TCustomBCEditor.TPaintHelper.EndDraw();
+begin
+  Assert(FHandles.Count > 0);
+
+  FHandle := FHandles.Pop();
+  RestoreDC(FHandle, FSavedDCs.Pop());
+end;
+
+function TCustomBCEditor.TPaintHelper.ExtTextOut(X, Y: Integer; Options: Longint;
+  Rect: TRect; Str: LPCWSTR; Count: Longint; Dx: PInteger): BOOL;
+begin
+  Assert(FHandle <> 0);
+
+  Result := Windows.ExtTextOut(FHandle, X, Y, Options, @Rect, Str, Count, Dx);
+end;
+
+function TCustomBCEditor.TPaintHelper.FillRect(const ARect: TRect): BOOL;
+begin
+  Assert(FHandle <> 0);
+
+  Result := Windows.ExtTextOut(FHandle, 0, 0, ETO_OPAQUE, ARect, '', 0, nil);
+end;
+
+function TCustomBCEditor.TPaintHelper.FrameRect(const ARect: TRect; AColor: TColor): Integer;
+begin
+  FBrush.Color := AColor;
+  Result := Windows.FrameRect(FHandle, ARect, FBrush.Handle);
+end;
+
+procedure TCustomBCEditor.TPaintHelper.SetBackgroundColor(const AValue: TColor);
+begin
+  if (AValue <> FBackgroundColor) then
+  begin
+    FBackgroundColor := AValue;
+    if (FHandle <> 0) then
+      SetBkColor(FHandle, ColorToRGB(FBackgroundColor));
+  end;
+end;
+
+procedure TCustomBCEditor.TPaintHelper.SetFont(const AValue: TFont);
+begin
+  Assert(Assigned(AValue));
+
+  FObjectFonts.Font := AValue;
+  ForegroundColor := AValue.Color;
+  Style := AValue.Style;
+end;
+
+procedure TCustomBCEditor.TPaintHelper.SetForegroundColor(const AValue: TColor);
+begin
+  if (AValue <> FForegroundColor) then
+  begin
+    FForegroundColor := AValue;
+    if (FHandle <> 0) then
+      SetTextColor(FHandle, ColorToRGB(FForegroundColor));
+  end;
+end;
+
+procedure TCustomBCEditor.TPaintHelper.SetStyle(const AValue: TFontStyles);
+begin
+  if (AValue <> FStyle) then
+  begin
+    FStyle := AValue;
+    if (FHandle <> 0) then
+      SelectObject(FHandle, FObjectFonts.Items[FObjectFonts.Add(FStyle)].Handle);
+  end;
+end;
+
+function TCustomBCEditor.TPaintHelper.TextHeight(const AText: PChar; const ALength: Integer): Integer;
+var
+  LSize: TSize;
+begin
+  Assert(FHandle <> 0);
+
+  if (not GetTextExtentPoint32(FHandle, AText, ALength, LSize)) then
+    RaiseLastOSError();
+  Result := LSize.cy;
+end;
+
+function TCustomBCEditor.TPaintHelper.TextWidth(const AText: PChar; const ALength: Integer): Integer;
+var
+  LSize: TSize;
+begin
+  Assert(FHandle <> 0);
+
+  if (not GetTextExtentPoint32(FHandle, AText, ALength, LSize)) then
+    RaiseLastOSError();
+  Result := LSize.cx;
+end;
+
 { TCustomBCEditor.TRows *******************************************************}
 
 procedure TCustomBCEditor.TRows.Add(const AFlags: TRow.TFlags; const ALine: Integer;
@@ -1400,7 +1617,7 @@ begin
     end;
 end;
 
-function TCustomBCEditor.AskSearchWrapAround(const AData: PBCEditorCDFind): Boolean;
+function TCustomBCEditor.AskSearchWrapAround(const AData: PBCEditorCommandDataFind): Boolean;
 var
   LHandle: THandle;
   LText: string;
@@ -1428,7 +1645,6 @@ begin
   if Assigned(ASource) and (ASource is TCustomBCEditor) then
     with ASource as TCustomBCEditor do
     begin
-      Self.FCodeFolding.Assign(FCodeFolding);
       Self.FCompletionProposal.Assign(FCompletionProposal);
       Self.FLeftMargin.Assign(FLeftMargin);
       Self.FTabs.Assign(FTabs);
@@ -1466,7 +1682,7 @@ var
   LCodeFolding: Integer;
   LLastUpdateScrollBars: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
   LRow: Integer;
   LTickCount: Integer;
 begin
@@ -1535,54 +1751,6 @@ begin
   else
     if (Assigned(FOnCaretChanged)) then
       FOnCaretChanged(Self, CaretPos);
-end;
-
-procedure TCustomBCEditor.ChainEditor(AEditor: TCustomBCEditor);
-begin
-  if Highlighter.FileName = '' then
-    Highlighter.LoadFromFile(AEditor.Highlighter.FileName);
-  if Highlighter.Colors.FileName = '' then
-    Highlighter.Colors.LoadFromFile(AEditor.Highlighter.Colors.FileName);
-
-  HookEditorLines(AEditor.FLines, AEditor.FLines.UndoList, AEditor.FLines.RedoList);
-  InvalidateCodeFolding();
-  FChainedEditor := AEditor;
-  AEditor.FreeNotification(Self);
-end;
-
-procedure TCustomBCEditor.ChainLinesCaretChanged(ASender: TObject);
-begin
-  if Assigned(FOnChainCaretMoved) then
-    FOnChainCaretMoved(ASender);
-  FOriginalLines.OnCaretChanged(ASender);
-end;
-
-procedure TCustomBCEditor.ChainLinesCleared(ASender: TObject);
-begin
-  if Assigned(FOnChainLinesCleared) then
-    FOnChainLinesCleared(ASender);
-  FOriginalLines.OnCleared(ASender);
-end;
-
-procedure TCustomBCEditor.ChainLinesDeleting(ASender: TObject; const ALine: Integer);
-begin
-  if Assigned(FOnChainLinesDeleting) then
-    FOnChainLinesDeleting(ASender, ALine);
-  FOriginalLines.OnDeleting(ASender, ALine);
-end;
-
-procedure TCustomBCEditor.ChainLinesInserted(ASender: TObject; const ALine: Integer);
-begin
-  if Assigned(FOnChainLinesInserted) then
-    FOnChainLinesInserted(ASender, ALine);
-  FOriginalLines.OnInserted(ASender, ALine);
-end;
-
-procedure TCustomBCEditor.ChainLinesUpdated(ASender: TObject; const ALine: Integer);
-begin
-  if Assigned(FOnChainLinesUpdated) then
-    FOnChainLinesUpdated(ASender, ALine);
-  FOriginalLines.OnUpdated(ASender, ALine);
 end;
 
 procedure TCustomBCEditor.Change();
@@ -1801,37 +1969,20 @@ begin
   inherited;
 end;
 
-procedure TCustomBCEditor.CodeFoldingChanged(AEvent: TBCEditorCodeFoldingChanges);
-begin
-  case (AEvent) of
-    fcEnabled:
-      if (not FCodeFolding.Visible) then
-        ExpandCodeFoldingLines()
-      else
-        InvalidateCodeFolding();
-    fcRescan:
-      begin
-        if FHighlighter.FileName <> '' then
-          FHighlighter.LoadFromFile(FHighlighter.FileName);
-        InvalidateCodeFolding();
-      end;
-  end;
-end;
-
-function TCustomBCEditor.CodeFoldingCollapsableFoldRangeForLine(const ALine: Integer): TBCEditorCodeFolding.TRanges.TRange;
+function TCustomBCEditor.CodeFoldingCollapsableFoldRangeForLine(const ALine: Integer): TBCEditorCodeFoldingRanges.TRange;
 var
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
 begin
-  LRange := TBCEditorCodeFolding.TRanges.TRange(FLines.Items[ALine].CodeFolding.BeginRange);
+  LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[ALine].CodeFolding.BeginRange);
   if (not Assigned(LRange) or not LRange.Collapsable()) then
     Result := nil
   else
     Result := LRange;
 end;
 
-function TCustomBCEditor.CodeFoldingFoldRangeForLineTo(const ALine: Integer): TBCEditorCodeFolding.TRanges.TRange;
+function TCustomBCEditor.CodeFoldingFoldRangeForLineTo(const ALine: Integer): TBCEditorCodeFoldingRanges.TRange;
 var
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
 begin
   Result := nil;
 
@@ -1847,7 +1998,7 @@ var
   LLastLine: Integer;
   LLevel: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
   LRangeLevel: Integer;
 begin
   if (not FLines.SelArea.IsEmpty()) then
@@ -1866,7 +2017,7 @@ begin
   LLevel := -1;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := TBCEditorCodeFolding.TRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
+    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
     if (Assigned(LRange)) then
     begin
       if (LLevel = -1) then
@@ -1886,7 +2037,7 @@ var
   LFirstLine: Integer;
   LLastLine: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
 begin
   if (AFirstLine >= 0) then
     LFirstLine := AFirstLine
@@ -1904,7 +2055,7 @@ begin
   Result := 0;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := TBCEditorCodeFolding.TRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
+    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
     if (Assigned(LRange) and not LRange.Collapsed and LRange.Collapsable) then
     begin
       CollapseCodeFoldingRange(LRange);
@@ -1915,7 +2066,7 @@ begin
   EndUpdate();
 end;
 
-procedure TCustomBCEditor.CollapseCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
+procedure TCustomBCEditor.CollapseCodeFoldingRange(const ARange: TBCEditorCodeFoldingRanges.TRange);
 var
   LBeginRow: Integer;
   LEndRow: Integer;
@@ -2039,9 +2190,7 @@ begin
   FColors := TBCEditorColors.Create();
   FColors.OnChange := ColorsChanged;
   { Code folding }
-  FAllCodeFoldingRanges := TBCEditorCodeFolding.TAllRanges.Create;
-  FCodeFolding := TBCEditorCodeFolding.Create;
-  FCodeFolding.OnChange := CodeFoldingChanged;
+  FAllCodeFoldingRanges := TBCEditorCodeFoldingAllRanges.Create;
   { Text buffer }
   FLines := TBCEditorLines(CreateLines());
   FOriginalLines := FLines;
@@ -2071,7 +2220,7 @@ begin
   Font.Size := Font.Size + 1;
   Font.OnChange := FontChanged;
   { Painting }
-  FPaintHelper := TBCEditorPaintHelper.Create(Font);
+  FPaintHelper := TCustomBCEditor.TPaintHelper.Create(Font);
   FOverlays := TOverlays.Create(Self);
   { Tabs }
   FTabs := TBCEditorTabs.Create;
@@ -2251,11 +2400,8 @@ begin
   FHookedCommandHandlers := nil;
   FLeftMargin.Free();
   FLeftMargin := nil; { Notification has a check }
-  if (Assigned(FChainedEditor) or (FLines <> FOriginalLines)) then
-    RemoveChainedEditor();
 
   FAllCodeFoldingRanges.Free();
-  FCodeFolding.Free();
   FCompletionProposal.Free();
   FColors.Free();
   if (Assigned(FDoubleBufferBitmap)) then
@@ -2301,7 +2447,7 @@ var
   LBackCounterLine: Integer;
   LLength: Integer;
   LNewCaretPosition: TBCEditorLinesPosition;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
   LSpaceCount1: Integer;
   LSpaceCount2: Integer;
   LVisualSpaceCount1: Integer;
@@ -2591,7 +2737,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoChar(const AData: PBCEditorCDChar);
+procedure TCustomBCEditor.DoChar(const AData: PBCEditorCommandDataChar);
 begin
   DoInsertText(AData^.Char);
 end;
@@ -2757,7 +2903,7 @@ begin
   MoveCaretAndSelection(LNewCaretPosition, ASelectionCommand);
 end;
 
-function TCustomBCEditor.DoFindBackwards(const AData: PBCEditorCDFind): Boolean;
+function TCustomBCEditor.DoFindBackwards(const AData: PBCEditorCommandDataFind): Boolean;
 var
   LFindResult: TBCEditorLines.TSearchResult;
   LIndex: Integer;
@@ -2813,7 +2959,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoFindFirst(const AData: PBCEditorCDFind);
+procedure TCustomBCEditor.DoFindFirst(const AData: PBCEditorCommandDataFind);
 var
   LSearch: TBCEditorLines.TSearch;
   LSearchArea: TBCEditorLinesArea;
@@ -2855,7 +3001,7 @@ begin
   Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
 end;
 
-function TCustomBCEditor.DoFindForewards(const AData: PBCEditorCDFind): Boolean;
+function TCustomBCEditor.DoFindForewards(const AData: PBCEditorCommandDataFind): Boolean;
 var
   LFindResult: TBCEditorLines.TSearchResult;
   LIndex: Integer;
@@ -3095,7 +3241,7 @@ begin
   MoveCaretAndSelection(LNewCaretPosition, ACommand in [ecSelBOP, ecSelEOP]);
 end;
 
-procedure TCustomBCEditor.DoPosition(const AData: PBCEditorCDPosition);
+procedure TCustomBCEditor.DoPosition(const AData: PBCEditorCommandDataPosition);
 begin
   MoveCaretAndSelection(AData^.Pos, AData^.Selection);
 end;
@@ -3105,10 +3251,10 @@ begin
   Redo();
 end;
 
-procedure TCustomBCEditor.DoReplace(const AData: TBytes);
+procedure TCustomBCEditor.DoReplace(const AData: TBCEditorCommandData);
 var
   LArea: TBCEditorLinesArea;
-  LData: PBCEditorCDReplace;
+  LData: PBCEditorCommandDataReplace;
   LSearch: TBCEditorLines.TSearch;
   LSearchPosition: TBCEditorLinesPosition;
 begin
@@ -3187,9 +3333,9 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoScrollTo(const AData: TBytes);
+procedure TCustomBCEditor.DoScrollTo(const AData: TBCEditorCommandData);
 var
-  LData: PBCEditorCDScrollTo;
+  LData: PBCEditorCommandDataScrollTo;
 begin
   LData := @AData[0];
 
@@ -3201,7 +3347,7 @@ begin
   SetCaretAndSelection(FLines.EOFPosition, FLines.Area);
 end;
 
-procedure TCustomBCEditor.DoSelection(const AData: PBCEditorCDSelection);
+procedure TCustomBCEditor.DoSelection(const AData: PBCEditorCommandDataSelection);
 begin
   SetCaretAndSelection(AData^.CaretPos, LinesArea(AData^.BeginPos, AData^.EndPos));
 end;
@@ -3421,7 +3567,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoText(const AData: PBCEditorCDText);
+procedure TCustomBCEditor.DoText(const AData: PBCEditorCommandDataText);
 var
   LOldCaretPosition: TBCEditorLinesPosition;
 begin
@@ -3929,7 +4075,7 @@ begin
   begin
     LSelArea.BeginPosition := FLines.PositionOf(Integer(AMessage.WParam));
     LSelArea.EndPosition := FLines.PositionOf(Integer(AMessage.LParam), LSelArea.BeginPosition);
-    ProcessCommand(ecSel, TBCEditorCDSelection.Create(LSelArea.EndPosition, LSelArea));
+    ProcessCommand(ecSel, TBCEditorCommandDataSelection.Create(LSelArea.EndPosition, LSelArea));
   end;
 end;
 
@@ -3969,7 +4115,7 @@ var
   LLastLine: Integer;
   LLevel: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
   LRangeLevel: Integer;
 begin
   if (not FLines.SelArea.IsEmpty()) then
@@ -3988,7 +4134,7 @@ begin
   LLevel := -1;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := TBCEditorCodeFolding.TRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
+    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
     if (Assigned(LRange)) then
     begin
       if LLevel = -1 then
@@ -4008,7 +4154,7 @@ var
   LFirstLine: Integer;
   LLastLine: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
 begin
   if (AFirstLine >= 0) then
     LFirstLine := AFirstLine
@@ -4024,7 +4170,7 @@ begin
   Result := 0;
   for LLine := LFirstLine to LLastLine do
   begin
-    LRange := TBCEditorCodeFolding.TRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
+    LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
     if (Assigned(LRange) and LRange.Collapsed) then
     begin
       ExpandCodeFoldingRange(LRange);
@@ -4033,7 +4179,7 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.ExpandCodeFoldingRange(const ARange: TBCEditorCodeFolding.TRanges.TRange);
+procedure TCustomBCEditor.ExpandCodeFoldingRange(const ARange: TBCEditorCodeFoldingRanges.TRange);
 var
   LBeginRow: Integer;
   LEndRow: Integer;
@@ -4137,7 +4283,7 @@ begin
     LOptions := LOptions - [foWholeWordsOnly];
 
   FLastSearch := lsFind;
-  FLastSearchData := TBCEditorCDFind.Create(TFindDialog(Sender).FindText, LOptions);
+  FLastSearchData := TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions);
   ProcessCommand(ecFindFirst, FLastSearchData);
 end;
 
@@ -4155,7 +4301,7 @@ begin
 
   if ((LSearchResult.Area = InvalidLinesArea)
     and (LSearchResult.ErrorMessage = '')) then
-    LSearchResult.ErrorMessage := Format(SBCEditorSearchNotFound, [PBCEditorCDFind(FLastSearchData)^.Pattern]);
+    LSearchResult.ErrorMessage := Format(SBCEditorSearchNotFound, [PBCEditorCommandDataFind(FLastSearchData)^.Pattern]);
 
   if (LSearchResult.Area <> InvalidLinesArea) then
   begin
@@ -4172,7 +4318,7 @@ begin
   UpdateCursor();
 
   if ((LSearchResult.Area = InvalidLinesArea)
-    and not (foEntireScope in PBCEditorCDFind(FLastSearchData)^.Options)
+    and not (foEntireScope in PBCEditorCommandDataFind(FLastSearchData)^.Options)
     and (not LSearchResult.Backwards and (FFindArea.BeginPosition > FLines.BOFPosition)
       or LSearchResult.Backwards and (FFindArea.EndPosition < FLines.EOFPosition))
     and (FFindState = fsRequested)) then
@@ -4478,33 +4624,6 @@ begin
   Include(FState, esHighlighterChanged);
 end;
 
-procedure TCustomBCEditor.HookEditorLines(ALines: TBCEditorLines; AUndo, ARedo: TBCEditorLines.TUndoList);
-var
-  LOldWordWrap: Boolean;
-begin
-  Assert(not Assigned(FChainedEditor));
-  Assert(FLines = FOriginalLines);
-
-  LOldWordWrap := FWordWrap;
-  WordWrap := False;
-
-  if Assigned(FChainedEditor) then
-    RemoveChainedEditor
-  else
-  if FLines <> FOriginalLines then
-    UnhookEditorLines;
-
-  FOnChainLinesCleared := ALines.OnCleared; ALines.OnCleared := ChainLinesCleared;
-  FOnChainLinesDeleting := ALines.OnDeleting; ALines.OnDeleting := ChainLinesDeleting;
-  FOnChainLinesInserted := ALines.OnInserted; ALines.OnInserted := ChainLinesInserted;
-  FOnChainLinesUpdated := ALines.OnUpdated; ALines.OnUpdated := ChainLinesUpdated;
-
-  FLines := ALines;
-  LinesHookChanged;
-
-  WordWrap := LOldWordWrap;
-end;
-
 procedure TCustomBCEditor.Idle();
 // Will be executed after painting
 begin
@@ -4569,7 +4688,7 @@ var
   LCodeFolding: Integer;
   LInsertedRows: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
   LRow: Integer;
 begin
   if (FRows.Count > 0) then
@@ -5000,7 +5119,8 @@ var
 begin
   inherited;
 
-  if (GBCEditorCommands.ShortCutToCommand(ShortCut(AKey, AShift), LCommand)) then
+  if (Assigned(BCEditorCommandManager)
+    and BCEditorCommandManager.TryShortCutToCommand(ShortCut(AKey, AShift), LCommand)) then
   begin
     Include(FState, esKeyHandled);
     if (ProcessCommand(LCommand)) then
@@ -5014,7 +5134,7 @@ begin
 
   if (not (esKeyHandled in FState)
     and (AKey <> #0)
-    and ProcessCommand(ecChar, TBCEditorCDChar.Create(AKey))) then
+    and ProcessCommand(ecChar, TBCEditorCommandDataChar.Create(AKey))) then
   begin
     AKey := #0;
 
@@ -5034,8 +5154,10 @@ end;
 
 procedure TCustomBCEditor.LeftMarginChanged(ASender: TObject);
 begin
+  ExpandCodeFoldingLines();
   Include(FState, esSizeChanged);
   UpdateMetrics();
+  InvalidateCodeFolding();
   InvalidateScrollBars();
   InvalidateClient();
 end;
@@ -5154,12 +5276,6 @@ begin
 
   InvalidateMatchingPair();
   InvalidateScrollBars();
-end;
-
-procedure TCustomBCEditor.LinesHookChanged;
-begin
-  InvalidateScrollBars();
-  InvalidateClient();
 end;
 
 procedure TCustomBCEditor.LinesLoaded(ASender: TObject);
@@ -5500,15 +5616,6 @@ begin
         Inc(Result.Char);
     end
   end;
-end;
-
-procedure TCustomBCEditor.Notification(AComponent: TComponent; AOperation: TOperation);
-begin
-  inherited;
-
-  if (AOperation = opRemove) then
-    if (AComponent = FChainedEditor) then
-      RemoveChainedEditor();
 end;
 
 procedure TCustomBCEditor.NotifyParent(const ANotification: Word);
@@ -6298,7 +6405,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
   function ProcessCodeFolding(var ARect: TRect; const ALine, ARow: Integer): Boolean;
   var
     LBitmap: TGPCachedBitmap;
-    LRange: TBCEditorCodeFolding.TRanges.TRange;
+    LRange: TBCEditorCodeFoldingRanges.TRange;
     LRect: TRect;
   begin
     Result := False;
@@ -6521,7 +6628,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
 var
   LBeginRange: TBCEditorHighlighter.TRange;
   LChar: Integer;
-  LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
+  LCodeFoldingRange: TBCEditorCodeFoldingRanges.TRange;
   LColumn: Integer;
   LLeft: Integer;
   LLength: Integer;
@@ -6595,7 +6702,7 @@ begin
             if (FLeftMargin.LineState.Visible) then
               Result := Result or ProcessLineState(LRowRect, LLine, LRow);
 
-            if (FCodeFolding.Visible) then
+            if (FLeftMargin.CodeFolding.Visible) then
               Result := Result or ProcessCodeFolding(LRowRect, LLine, LRow);
 
             if (FLeftMarginWidth > 0) then
@@ -6609,7 +6716,7 @@ begin
                   and (soTripleClickLineSelect in FSelectionOptions)
                   and (LRow < FRows.Count)) then
                 begin
-                  ProcessCommand(ecSel, TBCEditorCDSelection.Create(FRows.EORPosition[LRow], LinesArea(FRows.BORPosition[LRow], FRows.EORPosition[LRow])));
+                  ProcessCommand(ecSel, TBCEditorCommandDataSelection.Create(FRows.EORPosition[LRow], LinesArea(FRows.BORPosition[LRow], FRows.EORPosition[LRow])));
                   FLastDoubleClickTime := 0;
                   Result := True;
                 end;
@@ -6659,7 +6766,7 @@ begin
 
                   if (LRowRect.Left <= FClientRect.Width) then
                   begin
-                    if (not FCodeFolding.Visible
+                    if (not FLeftMargin.CodeFolding.Visible
                       or not (rfFirstRowOfLine in FRows.Items[LRow].Flags)) then
                       LCodeFoldingRange := nil
                     else
@@ -6705,7 +6812,7 @@ begin
   end;
 end;
 
-function TCustomBCEditor.ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBytes = nil): Boolean;
+function TCustomBCEditor.ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil): Boolean;
 var
   LAllow: Boolean;
   LCollapsedCount: Integer;
@@ -6733,7 +6840,7 @@ begin
     LHandled := False;
     if (LAllow) then
     begin
-      for LIndex := 0 to FHookedCommandHandlers.Count - 1 do
+      for LIndex := FHookedCommandHandlers.Count - 1 downto 0 do
         if (Assigned(FHookedCommandHandlers[LIndex].ObjectProc)) then
           FHookedCommandHandlers[LIndex].ObjectProc(Self, True, ACommand, AData, LHandled)
         else
@@ -6746,7 +6853,7 @@ begin
 
       if (not LHandled and (ACommand <> ecNone)) then
       begin
-        if (FCodeFolding.Visible) then
+        if (FLeftMargin.CodeFolding.Visible) then
           case (ACommand) of
             ecBackspace, ecDeleteChar, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
             ecClear, ecReturn, ecChar, ecText, ecCutToClipboard, ecPasteFromClipboard,
@@ -6804,7 +6911,7 @@ begin
           ecClear:
             FLines.Clear();
           ecChar:
-            DoChar(PBCEditorCDChar(AData));
+            DoChar(PBCEditorCommandDataChar(AData));
           ecCopyToClipboard:
             DoCopyToClipboard();
           ecCutToClipboard:
@@ -6830,25 +6937,25 @@ begin
           ecEOP:
             DoPageTopOrBottom(ACommand);
           ecFindFirst:
-            DoFindFirst(PBCEditorCDFind(AData));
+            DoFindFirst(PBCEditorCommandDataFind(AData));
           ecFindNext:
             if (FLastSearch = lsReplace) then
               DoReplace(FLastSearchData)
             else if (not Assigned(FLastSearchData)) then
               DoShowFind(True)
-            else if (foBackwards in PBCEditorCDFind(FLastSearchData)^.Options) then
-              DoFindBackwards(PBCEditorCDFind(FLastSearchData))
+            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
+              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData))
             else
-              DoFindForewards(PBCEditorCDFind(FLastSearchData));
+              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData));
           ecFindPrevious:
             if (FLastSearch = lsReplace) then
               DoReplace(FLastSearchData)
             else if (not Assigned(FLastSearchData)) then
               DoShowFind(True)
-            else if (foBackwards in PBCEditorCDFind(FLastSearchData)^.Options) then
-              DoFindForewards(PBCEditorCDFind(FLastSearchData))
+            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
+              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData))
             else
-              DoFindBackwards(PBCEditorCDFind(FLastSearchData));
+              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData));
           ecGotoBookmark1 ..
             ecGotoBookmark0: GotoBookmark(Ord(ACommand) - Ord(ecGotoBookmark1));
           ecGotoNextBookmark:
@@ -6874,7 +6981,7 @@ begin
           ecPasteFromClipboard:
             PasteFromClipboard();
           ecPosition:
-            DoPosition(PBCEditorCDPosition(AData));
+            DoPosition(PBCEditorCommandDataPosition(AData));
           ecRedo:
             FLines.Redo();
           ecReplace:
@@ -6894,7 +7001,7 @@ begin
           ecScrollUp:
             DoScroll(ACommand);
           ecSel:
-            DoSelection(PBCEditorCDSelection(AData));
+            DoSelection(PBCEditorCommandDataSelection(AData));
           ecSelBOF:
             DoBOF(ACommand);
           ecSelBOL:
@@ -6944,7 +7051,7 @@ begin
           ecTab:
             if (FWantTabs) then DoTabKey(ACommand);
           ecText:
-            DoText(PBCEditorCDText(AData));
+            DoText(PBCEditorCommandDataText(AData));
           ecToggleTextMode:
             if (FTextEntryMode = temInsert) then
               TextEntryMode := temOverwrite
@@ -6979,7 +7086,7 @@ begin
     end;
 
     if (Assigned(FAfterProcessCommand)) then
-      FAfterProcessCommand(Self, ACommand, AData, LAllow);
+      FAfterProcessCommand(Self, ACommand, AData);
 
     Result := LHandled;
   end;
@@ -7003,7 +7110,7 @@ function TCustomBCEditor.ProcessToken(const AJob: TClientJob;
   const ARowsPosition: TBCEditorRowsPosition;
   const AText: PChar; const ALength: Integer;
   const AToken: TBCEditorHighlighter.PTokenFind = nil;
-  const ARange: TBCEditorCodeFolding.TRanges.TRange = nil): Boolean;
+  const ARange: TBCEditorCodeFoldingRanges.TRange = nil): Boolean;
 var
   LEndPosition: TBCEditorLinesPosition;
 
@@ -7567,12 +7674,12 @@ begin
               end
               else if (LCollapsedMarkRect.Contains(AMousePoint)) then
               begin
-                ProcessCommand(ecPosition, TBCEditorCDPosition.Create(FLines.EOLPosition[ALinesPosition.Line], ssShift in AShift));
+                ProcessCommand(ecPosition, TBCEditorCommandDataPosition.Create(FLines.EOLPosition[ALinesPosition.Line], ssShift in AShift));
                 MouseCapture := mcText;
               end
               else
               begin
-                ProcessCommand(ecPosition, TBCEditorCDPosition.Create(LCursorPosition, ssShift in AShift));
+                ProcessCommand(ecPosition, TBCEditorCommandDataPosition.Create(LCursorPosition, ssShift in AShift));
                 MouseCapture := mcText;
               end;
           cjMouseDblClk:
@@ -7598,7 +7705,7 @@ begin
                 begin
                   if ((MouseCapture = mcText)
                     and not (esMouseDblClk in FState)) then
-                    ProcessCommand(ecPosition, TBCEditorCDPosition.Create(LCursorPosition, ssShift in AShift));
+                    ProcessCommand(ecPosition, TBCEditorCommandDataPosition.Create(LCursorPosition, ssShift in AShift));
                 end
                 else if ((Abs(FMouseDownPoint.X - AMousePoint.X) >= GetSystemMetrics(SM_CXDRAG))
                   or (Abs(FMouseDownPoint.Y - AMousePoint.Y) >= GetSystemMetrics(SM_CYDRAG))) then
@@ -7646,7 +7753,7 @@ begin
               if ((AButton = mbLeft)
                 and (esWaitForDrag in FState)) then
               begin
-                ProcessCommand(ecPosition, TBCEditorCDPosition.Create(LCursorPosition, ssShift in AShift));
+                ProcessCommand(ecPosition, TBCEditorCommandDataPosition.Create(LCursorPosition, ssShift in AShift));
                 Exclude(FState, esWaitForDrag);
               end;
             end;
@@ -7749,15 +7856,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.RemoveChainedEditor;
-begin
-  if Assigned(FChainedEditor) then
-    RemoveFreeNotification(FChainedEditor);
-  FChainedEditor := nil;
-
-  UnhookEditorLines;
-end;
-
 procedure TCustomBCEditor.ReplaceDialogFind(ASender: TObject);
 var
   LOptions: TBCEditorFindOptions;
@@ -7778,7 +7876,7 @@ begin
     LOptions := LOptions - [foWholeWordsOnly];
 
   FLastSearch := lsFind;
-  FLastSearchData := TBCEditorCDFind.Create(TReplaceDialog(ASender).FindText, LOptions);
+  FLastSearchData := TBCEditorCommandDataFind.Create(TReplaceDialog(ASender).FindText, LOptions);
   ProcessCommand(ecFindFirst, FLastSearchData);
 end;
 
@@ -7807,7 +7905,7 @@ begin
     LOptions := LOptions - [roWholeWordsOnly];
 
   FLastSearch := lsReplace;
-  FLastSearchData := TBCEditorCDReplace.Create(TReplaceDialog(ASender).FindText, TReplaceDialog(ASender).ReplaceText, LOptions);
+  FLastSearchData := TBCEditorCommandDataReplace.Create(TReplaceDialog(ASender).FindText, TReplaceDialog(ASender).ReplaceText, LOptions);
   ProcessCommand(ecReplace, FLastSearchData);
 end;
 
@@ -8044,9 +8142,9 @@ procedure TCustomBCEditor.ScanCodeFolding();
 var
   LIndex: Integer;
   LLine: Integer;
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
 begin
-  if (FCodeFolding.Visible) then
+  if (FLeftMargin.CodeFolding.Visible) then
   begin
     for LLine := 0 to FLines.Count - 1 do
     begin
@@ -8081,7 +8179,7 @@ begin
       end;
     end;
 
-    if (FCodeFolding.Visible) then
+    if (FLeftMargin.CodeFolding.Visible) then
       InvalidateRect(FCodeFoldingRect);
   end;
 end;
@@ -8092,10 +8190,10 @@ const
 var
   LBeginningOfLine: Boolean;
   LCodeFoldingRangeIndexList: TList;
-  LCurrentCodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+  LCurrentCodeFoldingRegion: TBCEditorCodeFoldingRegion;
   LFoldCount: Integer;
-  LFoldRanges: TBCEditorCodeFolding.TRanges;
-  LLastFoldRange: TBCEditorCodeFolding.TRanges.TRange;
+  LFoldRanges: TBCEditorCodeFoldingRanges;
+  LLastFoldRange: TBCEditorCodeFoldingRanges.TRange;
   LLine: Integer;
   LLineEndPos: PChar;
   LLinePos: PChar;
@@ -8149,7 +8247,7 @@ var
       Result := APText^ = LCurrentCodeFoldingRegion.EscapeChar;
   end;
 
-  function IsNextSkipChar(APText: PChar; ASkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem): Boolean;
+  function IsNextSkipChar(APText: PChar; ASkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem): Boolean;
   begin
     Result := False;
     if ASkipRegionItem.SkipIfNextCharIsNot <> BCEDITOR_NONE_CHAR then
@@ -8158,7 +8256,7 @@ var
 
   function SkipRegionsClose: Boolean;
   var
-    LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
+    LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
     LTokenEndPos: PChar;
     LTokenPos: PChar;
     LTokenText: string;
@@ -8199,7 +8297,7 @@ var
   var
     LCount: Integer;
     LIndex: Integer;
-    LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
+    LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
     LTokenEndPos: PChar;
     LTokenPos: PChar;
     LTokenText: string;
@@ -8266,7 +8364,7 @@ var
 
   procedure RegionItemsClose;
 
-    procedure SetCodeFoldingRangeToLine(ARange: TBCEditorCodeFolding.TRanges.TRange);
+    procedure SetCodeFoldingRangeToLine(ARange: TBCEditorCodeFoldingRanges.TRange);
     var
       LIndex: Integer;
     begin
@@ -8282,8 +8380,8 @@ var
     end;
 
   var
-    LCodeFoldingRange: TBCEditorCodeFolding.TRanges.TRange;
-    LCodeFoldingRangeLast: TBCEditorCodeFolding.TRanges.TRange;
+    LCodeFoldingRange: TBCEditorCodeFoldingRanges.TRange;
+    LCodeFoldingRangeLast: TBCEditorCodeFoldingRanges.TRange;
     LIndex: Integer;
     LIndexDecrease: Integer;
     LItemIndex: Integer;
@@ -8381,7 +8479,7 @@ var
     LArrayIndex: Integer;
     LIndex: Integer;
     LLineTempPos: PChar;
-    LRange: TBCEditorCodeFolding.TRanges.TRange;
+    LRange: TBCEditorCodeFoldingRanges.TRange;
     LRegionItem: TBCEditorCodeFoldingRegionItem;
     LSkipIfFoundAfterOpenToken: Boolean;
     LTokenEndPos: PChar;
@@ -8525,7 +8623,7 @@ var
                   end;
 
                   if LOpenTokenFoldRangeList.Count > 0 then
-                    LFoldRanges := TBCEditorCodeFolding.TRanges.TRange(LOpenTokenFoldRangeList.Last).SubCodeFoldingRanges
+                    LFoldRanges := TBCEditorCodeFoldingRanges.TRange(LOpenTokenFoldRangeList.Last).SubCodeFoldingRanges
                   else
                     LFoldRanges := FAllCodeFoldingRanges;
 
@@ -8553,7 +8651,7 @@ var
   function MultiHighlighterOpen: Boolean;
   var
     LChar: Char;
-    LCodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+    LCodeFoldingRegion: TBCEditorCodeFoldingRegion;
     LIndex: Integer;
     LTokenEndPos: PChar;
     LTokenPos: PChar;
@@ -8597,7 +8695,7 @@ var
   procedure MultiHighlighterClose;
   var
     LChar: Char;
-    LCodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+    LCodeFoldingRegion: TBCEditorCodeFoldingRegion;
     LIndex: Integer;
     LTokenEndPos: PChar;
     LTokenPos: PChar;
@@ -8644,7 +8742,7 @@ var
 
   function TagFolds: Boolean;
   var
-    LCodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+    LCodeFoldingRegion: TBCEditorCodeFoldingRegion;
     LIndex: Integer;
   begin
     Result := False;
@@ -8669,7 +8767,7 @@ var
     LTokenAttributes: string;
     LTokenAttributesBeginPos: PChar;
     LTokenName: string;
-    LRegion: TBCEditorCodeFolding.TRegion;
+    LRegion: TBCEditorCodeFoldingRegion;
   begin
     LText := FLines.Text;
     LTextBeginPos := @LText[1];
@@ -8732,7 +8830,7 @@ var
   end;
 
 var
-  LRange: TBCEditorCodeFolding.TRanges.TRange;
+  LRange: TBCEditorCodeFoldingRanges.TRange;
   LRow: Integer;
   LPreviousLine: Integer;
 begin
@@ -8755,7 +8853,7 @@ begin
     for LRow := 0 to FRows.Count - 1 do
     begin
       LLine := FRows.Items[LRow].Line;
-      LRange := TBCEditorCodeFolding.TRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
+      LRange := TBCEditorCodeFoldingRanges.TRange(FLines.Items[LLine].CodeFolding.BeginRange);
       if Assigned(LRange) and LRange.Collapsed then
       begin
         LPreviousLine := LLine;
@@ -8855,7 +8953,7 @@ begin
   LValue.Y := Max(0, LValue.Y);
 
   if (LValue <> FTextPos) then
-    ProcessCommand(ecScrollTo, TBCEditorCDScrollTo.Create(LValue));
+    ProcessCommand(ecScrollTo, TBCEditorCommandDataScrollTo.Create(LValue));
 end;
 
 procedure TCustomBCEditor.ScrollTo(AX, AY: Integer);
@@ -8967,14 +9065,7 @@ end;
 
 procedure TCustomBCEditor.SetCaretPos(const AValue: TPoint);
 begin
-  ProcessCommand(ecPosition, TBCEditorCDPosition.Create(AValue));
-end;
-
-procedure TCustomBCEditor.SetCodeFolding(const AValue: TBCEditorCodeFolding);
-begin
-  ExpandCodeFoldingLines();
-  FCodeFolding.Assign(AValue);
-  InvalidateCodeFolding();
+  ProcessCommand(ecPosition, TBCEditorCommandDataPosition.Create(AValue));
 end;
 
 procedure TCustomBCEditor.SetColors(AValue: TBCEditorColors);
@@ -9267,7 +9358,7 @@ end;
 procedure TCustomBCEditor.SetSelLength(AValue: Integer);
 begin
   ProcessCommand(ecSel,
-    TBCEditorCDSelection.Create(FLines.SelArea.BeginPosition,
+    TBCEditorCommandDataSelection.Create(FLines.SelArea.BeginPosition,
       LinesArea(FLines.SelArea.BeginPosition, FLines.PositionOf(AValue, FLines.SelArea.BeginPosition))));
 end;
 
@@ -9276,12 +9367,12 @@ var
   LCaretPosition: TBCEditorLinesPosition;
 begin
   LCaretPosition := FLines.PositionOf(AValue);
-  ProcessCommand(ecSel, TBCEditorCDSelection.Create(LCaretPosition, LinesArea(LCaretPosition, LCaretPosition)));
+  ProcessCommand(ecSel, TBCEditorCommandDataSelection.Create(LCaretPosition, LinesArea(LCaretPosition, LCaretPosition)));
 end;
 
 procedure TCustomBCEditor.SetSelText(const AValue: string);
 begin
-  ProcessCommand(ecText, TBCEditorCDText.Create(AValue, True, True));
+  ProcessCommand(ecText, TBCEditorCommandDataText.Create(AValue, True, True));
 end;
 
 procedure TCustomBCEditor.SetSelectionOptions(AValue: TBCEditorSelectionOptions);
@@ -9484,7 +9575,7 @@ function TCustomBCEditor.SplitTextIntoWords(AStringList: TStrings; const ACaseSe
 var
   LSkipCloseKeyChars: TBCEditorAnsiCharSet;
   LSkipOpenKeyChars: TBCEditorAnsiCharSet;
-  LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
 
   procedure AddKeyChars();
   var
@@ -9557,7 +9648,7 @@ begin
           { Skip regions - Close }
           if (LOpenTokenSkipFoldRangeList.Count > 0) and CharInSet(LLinePos^, LSkipCloseKeyChars) then
           begin
-            LTokenText := TBCEditorCodeFolding.TSkipRegions.TItem(LOpenTokenSkipFoldRangeList.Last).CloseToken;
+            LTokenText := TBCEditorCodeFoldingSkipRegions.TItem(LOpenTokenSkipFoldRangeList.Last).CloseToken;
             if (LTokenText <> '') then
             begin
               LTokenPos := @LTokenText[1];
@@ -9750,8 +9841,8 @@ begin
   begin
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      foCaseSensitive in PBCEditorCDFind(FLastSearchData)^.Options, foWholeWordsOnly in PBCEditorCDFind(FLastSearchData)^.Options, foRegExpr in PBCEditorCDFind(FLastSearchData)^.Options,
-      PBCEditorCDFind(FLastSearchData)^.Pattern);
+      foCaseSensitive in PBCEditorCommandDataFind(FLastSearchData)^.Options, foWholeWordsOnly in PBCEditorCommandDataFind(FLastSearchData)^.Options, foRegExpr in PBCEditorCommandDataFind(FLastSearchData)^.Options,
+      PBCEditorCommandDataFind(FLastSearchData)^.Pattern);
     FFindArea := InvalidLinesArea;
     FFindState := fsAllAreas;
 
@@ -9767,7 +9858,7 @@ var
 begin
   if (FFindArea <> InvalidLinesArea) then
   begin
-    if (foBackwards in PBCEditorCDFind(FLastSearchData)^.Options) then
+    if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
     begin
       FFindArea.BeginPosition := FFindPosition;
       FFindPosition := FLines.EOFPosition;
@@ -9780,11 +9871,11 @@ begin
 
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      foCaseSensitive in PBCEditorCDFind(FLastSearchData)^.Options, foWholeWordsOnly in PBCEditorCDFind(FLastSearchData)^.Options, foRegExpr in PBCEditorCDFind(FLastSearchData)^.Options,
-      PBCEditorCDFind(FLastSearchData)^.Pattern);
+      foCaseSensitive in PBCEditorCommandDataFind(FLastSearchData)^.Options, foWholeWordsOnly in PBCEditorCommandDataFind(FLastSearchData)^.Options, foRegExpr in PBCEditorCommandDataFind(FLastSearchData)^.Options,
+      PBCEditorCommandDataFind(FLastSearchData)^.Pattern);
     FFindState := fsWrappedAround;
 
-    FLines.StartSearch(LSearch, FFindPosition, False, True, foBackwards in PBCEditorCDFind(FLastSearchData)^.Options, FindExecuted);
+    FLines.StartSearch(LSearch, FFindPosition, False, True, foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options, FindExecuted);
 
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;
@@ -9799,28 +9890,6 @@ end;
 procedure TCustomBCEditor.Undo();
 begin
   ProcessCommand(ecUndo);
-end;
-
-procedure TCustomBCEditor.UnhookEditorLines;
-var
-  LOldWrap: Boolean;
-begin
-  Assert(not Assigned(FChainedEditor));
-  if FLines = FOriginalLines then
-    Exit;
-
-  LOldWrap := FWordWrap;
-  WordWrap := False;
-
-  FLines.OnCleared := FOnChainLinesCleared; FOnChainLinesCleared := nil;
-  FLines.OnDeleting := FOnChainLinesDeleting; FOnChainLinesDeleting := nil;
-  FLines.OnInserted := FOnChainLinesInserted; FOnChainLinesInserted := nil;
-  FLines.OnUpdated := FOnChainLinesUpdated; FOnChainLinesUpdated := nil;
-
-  FLines := FOriginalLines;
-  LinesHookChanged;
-
-  WordWrap := LOldWrap;
 end;
 
 procedure TCustomBCEditor.UnregisterCommandHandler(const AProc: Pointer;
@@ -9965,7 +10034,7 @@ begin
   end
   else
     FLineStateRect := Rect(-1, -1, -1, -1);
-  if (FCodeFolding.Visible) then
+  if (FLeftMargin.CodeFolding.Visible) then
   begin
     FCodeFoldingRect := Rect(FLeftMarginWidth, 0, FLeftMarginWidth + FCodeFoldingWidth, FClientRect.Height);
     Inc(FLeftMarginWidth, FCodeFoldingWidth);
@@ -10361,7 +10430,7 @@ begin
       { ImeCount is always the size in bytes, also for Unicode }
       SetLength(LText, LSize div SizeOf(Char));
       ImmGetCompositionString(LImc, GCS_RESULTSTR, PChar(LText), LSize);
-      ProcessCommand(ecText, TBCEditorCDText.Create(LText));
+      ProcessCommand(ecText, TBCEditorCommandDataText.Create(LText));
     finally
       ImmReleaseContext(WindowHandle, LImc);
     end;
@@ -10513,9 +10582,9 @@ begin
     and ((FRows.Count > 0) or not (esSizeChanged in FState))) then
     UpdateCaret();
 
-  if (FCodeFolding.Visible
+  if (FLeftMargin.CodeFolding.Visible
     and (esCodeFoldingInvalid in FState)) then
-    SetTimer(WindowHandle, tiCodeFolding, FCodeFolding.DelayInterval, nil);
+    SetTimer(WindowHandle, tiCodeFolding, FLeftMargin.CodeFolding.DelayInterval, nil);
 end;
 
 procedure TCustomBCEditor.WMPaste(var AMessage: TWMPaste);

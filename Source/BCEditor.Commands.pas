@@ -143,22 +143,24 @@ type
   );
 
 const
-  // User defined command classes must be eccUser + x
+  // User defined command classes must be eccUser + n
   eccUser = 100;
-  // User defined commands must be ecUser + x
+  // User defined commands must be ecUser + n
   ecUser = 10000;
 
 type
   { Command Data }
 
-  PBCEditorCDChar = ^TBCEditorCDChar;
-  TBCEditorCDChar = packed record
+  TBCEditorCommandData = TBytes;
+
+  PBCEditorCommandDataChar = ^TBCEditorCommandDataChar;
+  TBCEditorCommandDataChar = packed record
     Char: Char;
-    class function Create(const AChar: Char): TBytes; static;
+    class function Create(const AChar: Char): TBCEditorCommandData; static;
   end;
 
-  PBCEditorCDFind = ^TBCEditorCDFind;
-  TBCEditorCDFind = packed record
+  PBCEditorCommandDataFind = ^TBCEditorCommandDataFind;
+  TBCEditorCommandDataFind = packed record
     Options: TBCEditorFindOptions;
   private
     FPattern: PChar;
@@ -166,28 +168,28 @@ type
     function GetPattern(): string;
   public
     class function Create(const APattern: string;
-      const AOptions: TBCEditorFindOptions): TBytes; static;
+      const AOptions: TBCEditorFindOptions): TBCEditorCommandData; static;
     property Pattern: string read GetPattern;
   end;
 
-  PBCEditorCDMoveCaret = ^TBCEditorCDMoveCaret;
-  TBCEditorCDMoveCaret = packed record
+  PBCEditorCommandDataMoveCaret = ^TBCEditorCommandDataMoveCaret;
+  TBCEditorCommandDataMoveCaret = packed record
     X: Integer;
     Y: Integer;
     Selection: Boolean;
-    class function Create(const AX, AY: Integer; const ASelection: Boolean = False): TBytes; static;
+    class function Create(const AX, AY: Integer; const ASelection: Boolean = False): TBCEditorCommandData; static;
   end;
 
-  PBCEditorCDPosition = ^TBCEditorCDPosition;
-  TBCEditorCDPosition = packed record
+  PBCEditorCommandDataPosition = ^TBCEditorCommandDataPosition;
+  TBCEditorCommandDataPosition = packed record
     Pos: TPoint;
     Selection: Boolean;
     class function Create(const APosition: TBCEditorLinesPosition;
-      const ASelection: Boolean = False): TBytes; static;
+      const ASelection: Boolean = False): TBCEditorCommandData; static;
   end;
 
-  PBCEditorCDReplace = ^TBCEditorCDReplace;
-  TBCEditorCDReplace = packed record
+  PBCEditorCommandDataReplace = ^TBCEditorCommandDataReplace;
+  TBCEditorCommandDataReplace = packed record
   private
     FPattern: PChar;
     FPatternLength: Int64;
@@ -198,28 +200,28 @@ type
   public
     Options: TBCEditorReplaceOptions;
     class function Create(const APattern, AReplaceText: string;
-      const AOptions: TBCEditorReplaceOptions): TBytes; static;
+      const AOptions: TBCEditorReplaceOptions): TBCEditorCommandData; static;
     property Pattern: string read GetPattern;
     property ReplaceText: string read GetReplaceText;
   end;
 
-  PBCEditorCDScrollTo = ^TBCEditorCDScrollTo;
-  TBCEditorCDScrollTo = packed record
+  PBCEditorCommandDataScrollTo = ^TBCEditorCommandDataScrollTo;
+  TBCEditorCommandDataScrollTo = packed record
     Pos: TPoint;
-    class function Create(const APos: TPoint): TBytes; static;
+    class function Create(const APos: TPoint): TBCEditorCommandData; static;
   end;
 
-  PBCEditorCDSelection = ^TBCEditorCDSelection;
-  TBCEditorCDSelection = packed record
+  PBCEditorCommandDataSelection = ^TBCEditorCommandDataSelection;
+  TBCEditorCommandDataSelection = packed record
     CaretPos: TPoint;
     BeginPos: TPoint;
     EndPos: TPoint;
     class function Create(const ACaretPosition: TBCEditorLinesPosition;
-      const ASelArea: TBCEditorLinesArea): TBytes; static;
+      const ASelArea: TBCEditorLinesArea): TBCEditorCommandData; static;
   end;
 
-  PBCEditorCDText = ^TBCEditorCDText;
-  TBCEditorCDText = packed record
+  PBCEditorCommandDataText = ^TBCEditorCommandDataText;
+  TBCEditorCommandDataText = packed record
     Delete: Boolean;
     Selection: Boolean;
   private
@@ -228,17 +230,19 @@ type
     function GetText(): string;
   public
     class function Create(const AText: string; const ADelete: Boolean = False;
-      const ASelection: Boolean = False): TBytes; static;
+      const ASelection: Boolean = False): TBCEditorCommandData; static;
     property Text: string read GetText;
   end;
 
   TBCEditorHookedCommandProc = procedure(const AEditor: Pointer; const ABefore: LongBool;
-    const ACommand: Integer; const AData: TBytes; const ADataSize: Int64;
+    const ACommand: Integer; const AData: TBCEditorCommandData; const ADataSize: Int64;
     var AHandled: LongBool; const AHandlerData: Pointer); stdcall;
   TBCEditorHookedCommandObjectProc = procedure(ASender: TObject; const ABefore: Boolean;
-    const ACommand: TBCEditorCommand; const AData: TBytes; var AHandled: Boolean) of object;
-  TBCEditorProcessCommandEvent = procedure(ASender: TObject;
-    const ACommand: TBCEditorCommand; const AData: TBytes; var AAllowed: Boolean) of object;
+    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean) of object;
+  TBCEditorAfterProcessCommandEvent = procedure(ASender: TObject;
+    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData) of object;
+  TBCEditorBeforeProcessCommandEvent = procedure(ASender: TObject;
+    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AAllowed: Boolean) of object;
 
   TBCEditorHookedCommandHandler = record
     HandlerData: Pointer;
@@ -247,9 +251,9 @@ type
     class operator Equal(a, b: TBCEditorHookedCommandHandler): Boolean; inline;
   end;
 
-  TBCEditorCommands = class
-  private type
-    TCommand = record
+  TBCEditorCommandManager = class
+  type
+    TItem = record
       EnabledWhileRecording: Boolean;
       Command: TBCEditorCommand;
       CommandCategory: TBCEditorCommandCategory;
@@ -258,31 +262,40 @@ type
       ShortCuts: array of TShortCut;
     end;
   private
-    FCommands: TList<TCommand>;
+    FItems: TList<TItem>;
+    function EnabledWhileRecording(const ACommand: TBCEditorCommand): Boolean;
+    function GetCount(): Integer;
+    function GetItem(AIndex: Integer): TItem;
     function IndexOf(const ACommand: TBCEditorCommand): Integer; overload;
     function IndexOf(const AShortCut: TShortCut): Integer; overload;
     function InsertIndex(const ACommand: TBCEditorCommand; out AIndex: Integer): Boolean;
-  protected
-    function EnabledWhileRecording(const ACommand: TBCEditorCommand): Boolean;
     function Recordable(const ACommand: TBCEditorCommand): Boolean;
   public
     procedure AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
-    function CommandToCommandClass(const ACommand: TBCEditorCommand;
-      out ACommandCategory: TBCEditorCommandCategory): Boolean;
-    function CommandToIdent(const ACommand: TBCEditorCommand; out AIdent: string): Boolean;
-    function CommandToShortCut(const ACommand: TBCEditorCommand; out AShortCut: TShortCut): Boolean;
+    procedure Clear();
     constructor Create();
     destructor Destroy(); override;
     procedure RegisterCommand(const ACommand: TBCEditorCommand;
       const ACommandCategory: TBCEditorCommandCategory; const AIdent: string;
       const AShortCut: TShortCut = 0;
       const AEnabledWhileRecording: Boolean = True; const ARecordable: Boolean = True);
-    procedure ResetShortCuts();
-    function ShortCutToCommand(const AShortCut: TShortCut; out ACommand: TBCEditorCommand): Boolean;
+    procedure RemoveShortCut(const AShortCut: TShortCut);
+    procedure Reset();
+    function TryCommandToCommandCategory(const ACommand: TBCEditorCommand;
+      out ACommandCategory: TBCEditorCommandCategory): Boolean;
+    function TryCommandToIdent(const ACommand: TBCEditorCommand; out AIdent: string): Boolean;
+    function TryCommandToShortCut(const ACommand: TBCEditorCommand; out AShortCut: TShortCut): Boolean;
+    function TryShortCutToCommand(const AShortCut: TShortCut; out ACommand: TBCEditorCommand): Boolean;
+    procedure UnregisterCommand(const ACommand: TBCEditorCommand);
+    property Count: Integer read GetCount;
+    property Items[Index: Integer]: TItem read GetItem; default;
   end;
 
   TCustomBCEditorMacroRecorder = class(TComponent)
   private type
+    TAfterPlaybackStepEvent = procedure(ASender: TObject; const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData) of object;
+    TBeforePlaybackStepEvent = procedure(ASender: TObject; const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AAllow: Boolean) of object;
+
     TItem = record
       Command: TBCEditorCommand;
       DataPosition: Int64;
@@ -292,11 +305,17 @@ type
   type
     TCommand = record
       Command: TBCEditorCommand;
-      Data: TBytes;
+      Data: TBCEditorCommandData;
     end;
     TState = (msStopped, msStepped, msRecording, msPlaying);
 
   strict private
+    FAfterPlayback: TNotifyEvent;
+    FAfterRecord: TNotifyEvent;
+    FAfterPlaybackStep: TAfterPlaybackStepEvent;
+    FBeforePlayback: TNotifyEvent;
+    FBeforeRecord: TNotifyEvent;
+    FBeforePlaybackStep: TBeforePlaybackStepEvent;
     FCurrentCommand: Integer;
     FData: TBytesStream;
     FEditor: TCustomControl;
@@ -304,15 +323,22 @@ type
     FOnStateChange: TNotifyEvent;
     FState: TState;
     procedure EditorCommand(ASender: TObject; const ABefore: Boolean;
-      const ACommand: TBCEditorCommand; const AData: TBytes; var AHandled: Boolean);
+      const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean);
     function GetCommand(AIndex: Integer): TCommand;
     function GetCommandCount: Integer;
+    function GetData(const ACommand: Integer): TBCEditorCommandData;
     function GetIsEmpty(): Boolean;
     procedure SetEditor(AValue: TCustomControl);
     procedure SetState(AValue: TState);
-    function Step(const APlay: Boolean): Boolean; overload;
+    function PlaybackStep(const APlay: Boolean): Boolean; overload;
   protected
     procedure Notification(AComponent: TComponent; aOperation: TOperation); override;
+    property AfterPlayback: TNotifyEvent read FAfterPlayback write FAfterPlayback;
+    property AfterPlaybackStep: TAfterPlaybackStepEvent read FAfterPlaybackStep write FAfterPlaybackStep;
+    property AfterRecording: TNotifyEvent read FAfterRecord write FAfterRecord;
+    property BeforePlayback: TNotifyEvent read FBeforePlayback write FBeforePlayback;
+    property BeforePlaybackStep: TBeforePlaybackStepEvent read FBeforePlaybackStep write FBeforePlaybackStep;
+    property BeforeRecording: TNotifyEvent read FBeforeRecord write FBeforeRecord;
     property Editor: TCustomControl read FEditor write SetEditor;
     property CommandCount: Integer read GetCommandCount;
     property Commands[AIndex: Integer]: TCommand read GetCommand;
@@ -320,20 +346,20 @@ type
     property OnStateChange: TNotifyEvent read FOnStateChange write FOnStateChange;
     property State: TState read FState;
   public
-    procedure AddCommand(const ACommand: TBCEditorCommand; const AData: TBytes);
+    procedure AddCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData);
     procedure Clear();
     constructor Create(AOwner: TComponent); override;
     procedure DeleteCommand(const AIndex: Integer);
     destructor Destroy(); override;
     procedure InsertCommand(const AIndex: Integer; const ACommand: TBCEditorCommand;
-      const AData: TBytes);
+      const AData: TBCEditorCommandData);
     procedure LoadFromFile(const AFilename: string);
     procedure LoadFromStream(AStream: TStream; AClear: Boolean = True);
     procedure SaveToFile(const AFilename: string);
     procedure SaveToStream(AStream: TStream);
     procedure Playback();
     procedure StartRecord();
-    function Step(): Boolean; overload;
+    function PlaybackStep(): Boolean; overload;
     procedure Stop();
   end;
 
@@ -344,12 +370,18 @@ type
     property IsEmpty;
     property State;
   published
+    property AfterPlayback;
+    property AfterPlaybackStep;
+    property AfterRecording;
+    property BeforePlayback;
+    property BeforePlaybackStep;
+    property BeforeRecording;
     property Editor;
     property OnStateChange;
   end;
 
 var
-  GBCEditorCommands: TBCEditorCommands;
+  BCEditorCommandManager: TBCEditorCommandManager;
 
 implementation {***************************************************************}
 
@@ -363,44 +395,44 @@ resourcestring
   SBCEditorCannotPlay = 'Cannot play macro: Already recording or playing';
   SBCEditorNotTCustomBCEditor = 'Value must be a TCustomBCEditor class object';
 
-{ TBCEditorCDChar *************************************************************}
+{ TBCEditorCommandDataChar *************************************************************}
 
-class function TBCEditorCDChar.Create(const AChar: Char): TBytes;
+class function TBCEditorCommandDataChar.Create(const AChar: Char): TBCEditorCommandData;
 var
-  LData: TBCEditorCDChar;
+  LData: TBCEditorCommandDataChar;
 begin
   LData.Char := AChar;
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCDFind *************************************************************}
+{ TBCEditorCommandDataFind *************************************************************}
 
-class function TBCEditorCDFind.Create(const APattern: string;
-  const AOptions: TBCEditorFindOptions): TBytes;
+class function TBCEditorCommandDataFind.Create(const APattern: string;
+  const AOptions: TBCEditorFindOptions): TBCEditorCommandData;
 var
-  LData: PBCEditorCDFind;
+  LData: PBCEditorCommandDataFind;
   LSize: Int64;
 begin
-  LSize := SizeOf(TBCEditorCDFind) + Length(APattern) * SizeOf(Char);
+  LSize := SizeOf(TBCEditorCommandDataFind) + Length(APattern) * SizeOf(Char);
   SetLength(Result, LSize);
   LData := @Result[0];
   LData^.Options := AOptions;
-  LData^.FPattern := @PAnsiChar(Result)[SizeOf(TBCEditorCDFind)];
+  LData^.FPattern := @PAnsiChar(Result)[SizeOf(TBCEditorCommandDataFind)];
   LData^.FPatternLength := Length(APattern);
   MoveMemory(LData^.FPattern, PChar(APattern), Length(APattern) * SizeOf(Char));
 end;
 
-function TBCEditorCDFind.GetPattern(): string;
+function TBCEditorCommandDataFind.GetPattern(): string;
 begin
   SetString(Result, FPattern, FPatternLength);
 end;
 
-{ TBCEditorCDMoveCaret ********************************************************}
+{ TBCEditorCommandDataMoveCaret ********************************************************}
 
-class function TBCEditorCDMoveCaret.Create(const AX, AY: Integer;
-  const ASelection: Boolean = False): TBytes;
+class function TBCEditorCommandDataMoveCaret.Create(const AX, AY: Integer;
+  const ASelection: Boolean = False): TBCEditorCommandData;
 var
-  LData: TBCEditorCDMoveCaret;
+  LData: TBCEditorCommandDataMoveCaret;
 begin
   LData.X := AX;
   LData.Y := AY;
@@ -408,64 +440,64 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCDPosition *********************************************************}
+{ TBCEditorCommandDataPosition *********************************************************}
 
-class function TBCEditorCDPosition.Create(const APosition: TBCEditorLinesPosition;
-  const ASelection: Boolean = False): TBytes;
+class function TBCEditorCommandDataPosition.Create(const APosition: TBCEditorLinesPosition;
+  const ASelection: Boolean = False): TBCEditorCommandData;
 var
-  LData: TBCEditorCDPosition;
+  LData: TBCEditorCommandDataPosition;
 begin
   LData.Pos := APosition;
   LData.Selection := ASelection;
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCDReplace **********************************************************}
+{ TBCEditorCommandDataReplace **********************************************************}
 
-class function TBCEditorCDReplace.Create(const APattern, AReplaceText: string;
-  const AOptions: TBCEditorReplaceOptions): TBytes;
+class function TBCEditorCommandDataReplace.Create(const APattern, AReplaceText: string;
+  const AOptions: TBCEditorReplaceOptions): TBCEditorCommandData;
 var
-  LData: PBCEditorCDReplace;
+  LData: PBCEditorCommandDataReplace;
   LSize: Int64;
 begin
-  LSize := SizeOf(TBCEditorCDReplace) + Length(APattern) * SizeOf(Char) + Length(AReplaceText) * SizeOf(Char);
+  LSize := SizeOf(TBCEditorCommandDataReplace) + Length(APattern) * SizeOf(Char) + Length(AReplaceText) * SizeOf(Char);
   SetLength(Result, LSize);
   LData := @Result[0];
   LData^.Options := AOptions;
-  LData^.FPattern := @PAnsiChar(LData)[SizeOf(TBCEditorCDReplace)];
+  LData^.FPattern := @PAnsiChar(LData)[SizeOf(TBCEditorCommandDataReplace)];
   LData^.FPatternLength := Length(APattern);
-  LData^.FReplaceText := @PAnsiChar(LData)[SizeOf(TBCEditorCDReplace) + Length(APattern) * SizeOf(Char)];
+  LData^.FReplaceText := @PAnsiChar(LData)[SizeOf(TBCEditorCommandDataReplace) + Length(APattern) * SizeOf(Char)];
   LData^.FReplaceTextLength := Length(AReplaceText);
   MoveMemory(LData^.FPattern, PChar(APattern), Length(APattern) * SizeOf(Char));
   MoveMemory(LData^.FReplaceText, PChar(AReplaceText), Length(AReplaceText) * SizeOf(Char));
 end;
 
-function TBCEditorCDReplace.GetPattern(): string;
+function TBCEditorCommandDataReplace.GetPattern(): string;
 begin
   SetString(Result, FPattern, FPatternLength);
 end;
 
-function TBCEditorCDReplace.GetReplaceText(): string;
+function TBCEditorCommandDataReplace.GetReplaceText(): string;
 begin
   SetString(Result, FReplaceText, FReplaceTextLength);
 end;
 
-{ TBCEditorCDScrollTo ********************************************************}
+{ TBCEditorCommandDataScrollTo ********************************************************}
 
-class function TBCEditorCDScrollTo.Create(const APos: TPoint): TBytes;
+class function TBCEditorCommandDataScrollTo.Create(const APos: TPoint): TBCEditorCommandData;
 var
-  LData: TBCEditorCDScrollTo;
+  LData: TBCEditorCommandDataScrollTo;
 begin
   LData.Pos := APos;
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCDSelection ********************************************************}
+{ TBCEditorCommandDataSelection ********************************************************}
 
-class function TBCEditorCDSelection.Create(const ACaretPosition: TBCEditorLinesPosition;
-  const ASelArea: TBCEditorLinesArea): TBytes;
+class function TBCEditorCommandDataSelection.Create(const ACaretPosition: TBCEditorLinesPosition;
+  const ASelArea: TBCEditorLinesArea): TBCEditorCommandData;
 var
-  LData: TBCEditorCDSelection;
+  LData: TBCEditorCommandDataSelection;
 begin
   LData.CaretPos := ACaretPosition;
   LData.BeginPos := ASelArea.BeginPosition;
@@ -473,25 +505,25 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCDText *************************************************************}
+{ TBCEditorCommandDataText *************************************************************}
 
-class function TBCEditorCDText.Create(const AText: string; const ADelete: Boolean = False;
-  const ASelection: Boolean = False): TBytes;
+class function TBCEditorCommandDataText.Create(const AText: string; const ADelete: Boolean = False;
+  const ASelection: Boolean = False): TBCEditorCommandData;
 var
-  LData: PBCEditorCDText;
+  LData: PBCEditorCommandDataText;
   LSize: Int64;
 begin
-  LSize := SizeOf(TBCEditorCDText) + Length(AText) * SizeOf(Char);
+  LSize := SizeOf(TBCEditorCommandDataText) + Length(AText) * SizeOf(Char);
   SetLength(Result, LSize);
   LData := @Result[0];
   LData^.Delete := ADelete;
   LData^.Selection := ASelection;
-  LData^.FText := @PAnsiChar(LData)[SizeOf(TBCEditorCDText)];
+  LData^.FText := @PAnsiChar(LData)[SizeOf(TBCEditorCommandDataText)];
   LData^.FTextLength := Length(AText);
   MoveMemory(LData^.FText, PChar(AText), Length(AText) * SizeOf(Char));
 end;
 
-function TBCEditorCDText.GetText(): string;
+function TBCEditorCommandDataText.GetText(): string;
 begin
   SetString(Result, FText, FTextLength);
 end;
@@ -507,63 +539,44 @@ end;
 
 { TBCEditorCommands ***********************************************************}
 
-procedure TBCEditorCommands.AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
-begin
-
-end;
-
-function TBCEditorCommands.CommandToCommandClass(const ACommand: TBCEditorCommand;
-  out ACommandCategory: TBCEditorCommandCategory): Boolean;
+procedure TBCEditorCommandManager.AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
 var
   LIndex: Integer;
 begin
-  LIndex := IndexOf(ACommand);
-  Result := LIndex >= 0;
-  if (Result) then
-    ACommandCategory := FCommands[LIndex].CommandCategory;
-end;
-
-function TBCEditorCommands.CommandToIdent(const ACommand: TBCEditorCommand; out AIdent: string): Boolean;
-var
-  LIndex: Integer;
-begin
-  LIndex := IndexOf(ACommand);
-  Result := (LIndex >= 0) and (Length(FCommands[LIndex].ShortCuts) > 0);
-  if (Result) then
+  if (AShortCut > 0) then
   begin
-    AIdent := FCommands[LIndex].Ident;
-    if (AIdent = '') then
-      AIdent := IntToStr(Ord(ACommand));
+    RemoveShortCut(AShortCut);
+
+    LIndex := IndexOf(ACommand);
+    if (LIndex >= 0) then
+    begin
+      SetLength(FItems.List[LIndex].ShortCuts, Length(FItems.List[LIndex].ShortCuts) + 1);
+      FItems.List[LIndex].ShortCuts[Length(FItems.List[LIndex].ShortCuts) - 1] := AShortCut;
+    end;
   end;
 end;
 
-function TBCEditorCommands.CommandToShortCut(const ACommand: TBCEditorCommand;
-  out AShortCut: TShortCut): Boolean;
-var
-  LIndex: Integer;
+procedure TBCEditorCommandManager.Clear();
 begin
-  LIndex := IndexOf(ACommand);
-  Result := (LIndex >= 0) and (Length(FCommands[LIndex].ShortCuts) > 0);
-  if (Result) then
-    AShortCut := FCommands[LIndex].ShortCuts[0];
+  FItems.Clear();
 end;
 
-constructor TBCEditorCommands.Create();
+constructor TBCEditorCommandManager.Create();
 begin
   inherited;
 
-  FCommands := TList<TCommand>.Create();
-  ResetShortCuts();
+  FItems := TList<TItem>.Create();
+  Reset();
 end;
 
-destructor TBCEditorCommands.Destroy();
+destructor TBCEditorCommandManager.Destroy();
 begin
-  FCommands.Free();
+  FItems.Free();
 
   inherited;
 end;
 
-function TBCEditorCommands.EnabledWhileRecording(const ACommand: TBCEditorCommand): Boolean;
+function TBCEditorCommandManager.EnabledWhileRecording(const ACommand: TBCEditorCommand): Boolean;
 var
   LIndex: Integer;
 begin
@@ -571,28 +584,38 @@ begin
   if (LIndex < 0) then
     Result := False
   else
-    Result := FCommands[LIndex].EnabledWhileRecording;
+    Result := FItems[LIndex].EnabledWhileRecording;
 end;
 
-function TBCEditorCommands.IndexOf(const ACommand: TBCEditorCommand): Integer;
+function TBCEditorCommandManager.GetCount(): Integer;
+begin
+  Result := FItems.Count;
+end;
+
+function TBCEditorCommandManager.GetItem(AIndex: Integer): TItem;
+begin
+  Result := FItems[AIndex];
+end;
+
+function TBCEditorCommandManager.IndexOf(const ACommand: TBCEditorCommand): Integer;
 begin
   if (InsertIndex(ACommand, Result)) then
     Result := -1;
 end;
 
-function TBCEditorCommands.IndexOf(const AShortCut: TShortCut): Integer;
+function TBCEditorCommandManager.IndexOf(const AShortCut: TShortCut): Integer;
 var
   LIndex: Integer;
   LShortCutIndex: Integer;
 begin
-  for LIndex := 0 to FCommands.Count - 1 do
-    for LShortCutIndex := 0 to Length(FCommands[LIndex].ShortCuts) - 1 do
-      if (FCommands[LIndex].ShortCuts[LShortCutIndex] = AShortCut) then
+  for LIndex := 0 to FItems.Count - 1 do
+    for LShortCutIndex := 0 to Length(FItems[LIndex].ShortCuts) - 1 do
+      if (FItems[LIndex].ShortCuts[LShortCutIndex] = AShortCut) then
         Exit(LIndex);
   Result := -1;
 end;
 
-function TBCEditorCommands.InsertIndex(const ACommand: TBCEditorCommand; out AIndex: Integer): Boolean;
+function TBCEditorCommandManager.InsertIndex(const ACommand: TBCEditorCommand; out AIndex: Integer): Boolean;
 type
   Tstrcmp = function(lpString1, lpString2: PWideChar): Integer; stdcall;
 var
@@ -602,16 +625,16 @@ var
 begin
   Result := True;
 
-  if ((FCommands.Count = 0) or (ACommand > FCommands[FCommands.Count - 1].Command)) then
-    AIndex := FCommands.Count
+  if ((FItems.Count = 0) or (ACommand > FItems[FItems.Count - 1].Command)) then
+    AIndex := FItems.Count
   else
   begin
     LLeft := 0;
-    LRight := FCommands.Count - 1;
+    LRight := FItems.Count - 1;
     while (LLeft <= LRight) do
     begin
       LMid := (LRight + LLeft) div 2;
-      case (Sign(Ord(FCommands[FCommands.Count - 1].Command) - Ord(ACommand))) of
+      case (Sign(Ord(FItems[FItems.Count - 1].Command) - Ord(ACommand))) of
         -1: begin LLeft := LMid + 1;  AIndex := LMid + 1; end;
         0: begin Result := False; AIndex := LMid; break; end;
         1: begin LRight := LMid - 1; AIndex := LMid; end;
@@ -620,7 +643,7 @@ begin
   end;
 end;
 
-function TBCEditorCommands.Recordable(const ACommand: TBCEditorCommand): Boolean;
+function TBCEditorCommandManager.Recordable(const ACommand: TBCEditorCommand): Boolean;
 var
   LIndex: Integer;
 begin
@@ -628,17 +651,16 @@ begin
   if (LIndex < 0) then
     Result := False
   else
-    Result := FCommands[LIndex].Recordable;
+    Result := FItems[LIndex].Recordable;
 end;
 
-procedure TBCEditorCommands.RegisterCommand(const ACommand: TBCEditorCommand;
+procedure TBCEditorCommandManager.RegisterCommand(const ACommand: TBCEditorCommand;
   const ACommandCategory: TBCEditorCommandCategory; const AIdent: string;
   const AShortCut: TShortCut = 0; const AEnabledWhileRecording: Boolean = True;
   const ARecordable: Boolean = True);
 var
-  LCommand: TCommand;
+  LCommand: TItem;
   LIndex: Integer;
-  LInsertIndex: Integer;
 begin
   LCommand.Command := ACommand;
   LCommand.CommandCategory := ACommandCategory;
@@ -646,25 +668,37 @@ begin
   LCommand.EnabledWhileRecording := AEnabledWhileRecording;
   LCommand.Recordable := ARecordable;
 
-  if (InsertIndex(ACommand, LInsertIndex)) then
-    FCommands.Insert(LInsertIndex, LCommand)
+  if (InsertIndex(ACommand, LIndex)) then
+    FItems.Insert(LIndex, LCommand)
   else
-    FCommands.List[LInsertIndex] := LCommand;
+    FItems.List[LIndex] := LCommand;
 
+  AddShortCut(ACommand, AShortCut);
+end;
+
+procedure TBCEditorCommandManager.RemoveShortCut(const AShortCut: TShortCut);
+var
+  LCommandIndex: Integer;
+  LIndex: Integer;
+begin
   if (AShortCut > 0) then
   begin
-    repeat
-      LIndex := IndexOf(AShortCut);
-      if (LIndex >= 0) then
-        SetLength(FCommands.List[LIndex].ShortCuts, 0);
-    until (LIndex < 0);
-
-    SetLength(FCommands.List[LInsertIndex].ShortCuts, 1);
-    FCommands.List[LInsertIndex].ShortCuts[0] := AShortCut;
+    LCommandIndex := IndexOf(AShortCut);
+    if (LCommandIndex >= 0) then
+      for LIndex := 0 to Length(FItems.List[LCommandIndex].ShortCuts) - 1 do
+        if (FItems.List[LCommandIndex].ShortCuts[LIndex] = AShortCut) then
+        begin
+          if (LIndex > 0) then
+            Move(FItems.List[LCommandIndex].ShortCuts[LIndex],
+              FItems.List[LCommandIndex].ShortCuts[LIndex - 1],
+              SizeOf(FItems.List[LCommandIndex].ShortCuts[0]) * Length(FItems.List[LCommandIndex].ShortCuts) - LIndex + 1);
+          SetLength(FItems.List[LCommandIndex].ShortCuts, Length(FItems.List[LCommandIndex].ShortCuts) - 1);
+          break;
+        end;
   end;
 end;
 
-procedure TBCEditorCommands.ResetShortCuts();
+procedure TBCEditorCommandManager.Reset();
 begin
   RegisterCommand(ecCancel, eccState, 'ecCancel', ShortCut(VK_ESCAPE, []));
   RegisterCommand(ecInsertTextMode, eccState, 'ecInsertTextMode');
@@ -789,7 +823,43 @@ begin
   RegisterCommand(ecStopMacro, eccMacroRecorder, 'ecStopMacro');
 end;
 
-function TBCEditorCommands.ShortCutToCommand(const AShortCut: TShortCut;
+function TBCEditorCommandManager.TryCommandToCommandCategory(const ACommand: TBCEditorCommand;
+  out ACommandCategory: TBCEditorCommandCategory): Boolean;
+var
+  LIndex: Integer;
+begin
+  LIndex := IndexOf(ACommand);
+  Result := LIndex >= 0;
+  if (Result) then
+    ACommandCategory := FItems[LIndex].CommandCategory;
+end;
+
+function TBCEditorCommandManager.TryCommandToIdent(const ACommand: TBCEditorCommand; out AIdent: string): Boolean;
+var
+  LIndex: Integer;
+begin
+  LIndex := IndexOf(ACommand);
+  Result := (LIndex >= 0) and (Length(FItems[LIndex].ShortCuts) > 0);
+  if (Result) then
+  begin
+    AIdent := FItems[LIndex].Ident;
+    if (AIdent = '') then
+      AIdent := IntToStr(Ord(ACommand));
+  end;
+end;
+
+function TBCEditorCommandManager.TryCommandToShortCut(const ACommand: TBCEditorCommand;
+  out AShortCut: TShortCut): Boolean;
+var
+  LIndex: Integer;
+begin
+  LIndex := IndexOf(ACommand);
+  Result := (LIndex >= 0) and (Length(FItems[LIndex].ShortCuts) > 0);
+  if (Result) then
+    AShortCut := FItems[LIndex].ShortCuts[0];
+end;
+
+function TBCEditorCommandManager.TryShortCutToCommand(const AShortCut: TShortCut;
   out ACommand: TBCEditorCommand): Boolean;
 var
   LIndex: Integer;
@@ -797,12 +867,21 @@ begin
   LIndex := IndexOf(AShortCut);
   Result := LIndex >= 0;
   if (Result) then
-    ACommand := FCommands[LIndex].Command;
+    ACommand := FItems[LIndex].Command;
+end;
+
+procedure TBCEditorCommandManager.UnregisterCommand(const ACommand: TBCEditorCommand);
+var
+  LIndex: Integer;
+begin
+  LIndex := IndexOf(ACommand);
+  if (LIndex >= 0) then
+    FItems.Delete(LIndex);
 end;
 
 { TCustomBCEditorMacroRecorder ************************************************}
 
-procedure TCustomBCEditorMacroRecorder.AddCommand(const ACommand: TBCEditorCommand; const AData: TBytes);
+procedure TCustomBCEditorMacroRecorder.AddCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData);
 begin
   InsertCommand(FItems.Count, ACommand, AData);
 end;
@@ -835,11 +914,17 @@ begin
 end;
 
 procedure TCustomBCEditorMacroRecorder.EditorCommand(ASender: TObject; const ABefore: Boolean;
-  const ACommand: TBCEditorCommand; const AData: TBytes; var AHandled: Boolean);
+  const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean);
 begin
   if (ABefore) then
   begin
     case (ACommand) of
+      ecCancel:
+        if (FState = msRecording) then
+        begin
+          Stop();
+          AHandled := True;
+        end;
       ecRecordMacro:
         begin
           if (FState = msRecording) then
@@ -855,15 +940,17 @@ begin
         end;
       ecStepMacro:
         begin
-          Step();
+          PlaybackStep();
           AHandled := True;
         end;
       ecSyncEdit:
         AHandled := True;
       else
-        if ((FState = msRecording) and not GBCEditorCommands.EnabledWhileRecording(ACommand)) then
+        if ((FState = msRecording)
+          and Assigned(BCEditorCommandManager)
+          and not BCEditorCommandManager.EnabledWhileRecording(ACommand)) then
         begin
-          MessageBeep($FFFFFFFF);
+          MessageBeep(UINT(-1));
           AHandled := True;
         end;
     end;
@@ -876,7 +963,9 @@ begin
         ecPlaybackMacro,
         ecStepMacro: ;
         else
-          if ((State = msRecording) and GBCEditorCommands.Recordable(ACommand)) then
+          if ((State = msRecording)
+            and Assigned(BCEditorCommandManager)
+            and BCEditorCommandManager.Recordable(ACommand)) then
             AddCommand(ACommand, AData);
       end;
   end;
@@ -893,13 +982,21 @@ begin
   Result := FItems.Count;
 end;
 
+function TCustomBCEditorMacroRecorder.GetData(const ACommand: Integer): TBCEditorCommandData;
+begin
+  if (FItems[FCurrentCommand].DataSize = 0) then
+    Result := nil
+  else
+    Result := BytesOf(@PAnsiChar(FData.Memory)[FItems[ACommand].DataPosition], FItems[ACommand].DataSize);
+end;
+
 function TCustomBCEditorMacroRecorder.GetIsEmpty(): Boolean;
 begin
   Result := FItems.Count = 0;
 end;
 
 procedure TCustomBCEditorMacroRecorder.InsertCommand(const AIndex: Integer;
-  const ACommand: TBCEditorCommand; const AData: TBytes);
+  const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData);
 var
   LCommand: TItem;
 begin
@@ -960,7 +1057,7 @@ begin
   SetState(msPlaying);
   try
     while (FState = msPlaying) do
-      Step();
+      PlaybackStep();
   finally
     SetState(msStopped);
   end;
@@ -1009,9 +1106,28 @@ procedure TCustomBCEditorMacroRecorder.SetState(AValue: TState);
 begin
   if (AValue <> FState) then
   begin
+    case (FState) of
+      msRecording:
+        if (Assigned(FAfterRecord)) then
+          FAfterRecord(Self);
+      msPlaying:
+        if (Assigned(FAfterPlayback)) then
+          FAfterPlayback(Self);
+    end;
+
     FState := AValue;
-    if Assigned(OnStateChange) then
+
+    if (Assigned(OnStateChange)) then
       OnStateChange(Self);
+
+    case (FState) of
+      msRecording:
+        if (Assigned(FBeforeRecord)) then
+          FBeforeRecord(Self);
+      msPlaying:
+        if (Assigned(FBeforePlayback)) then
+          FBeforePlayback(Self);
+    end;
   end;
 end;
 
@@ -1024,14 +1140,20 @@ begin
   SetState(msRecording);
 end;
 
-function TCustomBCEditorMacroRecorder.Step(): Boolean;
+function TCustomBCEditorMacroRecorder.PlaybackStep(): Boolean;
 begin
-  Result := Step(False);
+  Result := True;
+
+  if (Assigned(FBeforePlaybackStep)) then
+    FBeforePlaybackStep(Self, FItems[FCurrentCommand].Command, GetData(FCurrentCommand), Result);
+
+  Result := Result and PlaybackStep(False);
+
+  if (Assigned(FAfterPlaybackStep)) then
+    FAfterPlaybackStep(Self, FItems[FCurrentCommand].Command, GetData(FCurrentCommand));
 end;
 
-function TCustomBCEditorMacroRecorder.Step(const APlay: Boolean): Boolean;
-var
-  LData: TBytes;
+function TCustomBCEditorMacroRecorder.PlaybackStep(const APlay: Boolean): Boolean;
 begin
   if ((FState = msRecording) or not APlay and (FState = msPlaying)) then
     raise ERangeError.Create(SBCEditorCannotPlay);
@@ -1039,11 +1161,7 @@ begin
   Result := FCurrentCommand < FItems.Count;
   if (Result) then
   begin
-    if (FItems[FCurrentCommand].DataSize = 0) then
-      LData := nil
-    else
-      LData := BytesOf(@PAnsiChar(FData.Memory)[FItems[FCurrentCommand].DataPosition], FItems[FCurrentCommand].DataSize);
-    TCustomBCEditor(FEditor).ProcessCommand(FItems[FCurrentCommand].Command, LData);
+    TCustomBCEditor(FEditor).ProcessCommand(FItems[FCurrentCommand].Command, GetData(FCurrentCommand));
     Inc(FCurrentCommand);
   end;
 
@@ -1062,7 +1180,7 @@ begin
 end;
 
 initialization
-  GBCEditorCommands := TBCEditorCommands.Create();
+  BCEditorCommandManager := TBCEditorCommandManager.Create();
 finalization
-  GBCEditorCommands.Free();
+  BCEditorCommandManager.Free();
 end.

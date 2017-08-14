@@ -18,8 +18,6 @@ type
 
   TBCEditorCase = (cNone = -1, cUpper = 0, cLower = 1, cOriginal = 2);
 
-  TBCEditorCodeFoldingChanges = (fcEnabled, fcRefresh, fcRescan);
-
   TBCEditorCodeFoldingOption = (
     cfoFoldMultilineComments,
     cfoHighlightFoldingLine,

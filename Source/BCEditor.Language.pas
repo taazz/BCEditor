@@ -24,9 +24,6 @@ resourcestring
   SBCEditorSearchWrapAroundBackwards = 'Restart search from the ending of the file?';
   SBCEditorTerminatedByUser = 'Terminated by user';
 
-  { BCEditor.Print.Preview }
-  SBCEditorPreviewScrollHint = 'Page: %d';
-
   { BCEditor.DGotoLine }
   SBCEditorGotoLineCaption = 'Go to Line Number';
   SBCEditorGotoLineLine = 'Enter new line number';

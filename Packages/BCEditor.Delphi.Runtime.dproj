@@ -128,7 +128,6 @@
         <DCCReference Include="vcldb.dcp"/>
         <DCCReference Include="..\Source\BCEditor.pas"/>
         <DCCReference Include="..\Source\BCEditor.Consts.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Editor.CodeFolding.pas"/>
         <DCCReference Include="..\Source\BCEditor.Commands.pas"/>
         <DCCReference Include="..\Source\BCEditor.CompletionProposal.pas"/>
         <DCCReference Include="..\Source\BCEditor.Export.HTML.pas"/>
@@ -136,9 +135,6 @@
         <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
         <DCCReference Include="..\Source\BCEditor.Language.pas"/>
         <DCCReference Include="..\Source\BCEditor.Lines.pas"/>
-        <DCCReference Include="..\Source\BCEditor.PaintHelper.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Print.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Print.Preview.pas"/>
         <DCCReference Include="..\Source\BCEditor.Properties.pas"/>
         <DCCReference Include="..\Source\BCEditor.Types.pas"/>
         <DCCReference Include="..\Source\JsonDataObjects.pas"/>

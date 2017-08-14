@@ -393,7 +393,7 @@ begin
       Lines.BeginUpdate();
       try
         ProcessCommand(ecDeleteWord);
-        ProcessCommand(ecText, TBCEditorCDText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value));
+        ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value));
       finally
         Lines.EndUpdate();
       end;
@@ -563,7 +563,7 @@ begin
           OnKeyPress(Self, Key);
       end;
     BCEDITOR_BACKSPACE_CHAR:
-      TCustomBCEditor(Editor).ProcessCommand(ecChar, TBCEditorCDChar.Create(Key));
+      TCustomBCEditor(Editor).ProcessCommand(ecChar, TBCEditorCommandDataChar.Create(Key));
   end;
   if (FSendToEditor) then
     PostMessage(TCustomBCEditor(Editor).Handle, WM_CHAR, WParam(Key), 0);

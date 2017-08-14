@@ -36,7 +36,6 @@ requires
 contains
   BCEditor in '..\Source\BCEditor.pas',
   BCEditor.Consts in '..\Source\BCEditor.Consts.pas',
-  BCEditor.Editor.CodeFolding in '..\Source\BCEditor.Editor.CodeFolding.pas',
   BCEditor.Commands in '..\Source\BCEditor.Commands.pas',
   BCEditor.CompletionProposal in '..\Source\BCEditor.CompletionProposal.pas',
   BCEditor.Export.HTML in '..\Source\BCEditor.Export.HTML.pas',
@@ -44,9 +43,6 @@ contains
   BCEditor.GotoLine in '..\Source\BCEditor.GotoLine.pas',
   BCEditor.Language in '..\Source\BCEditor.Language.pas',
   BCEditor.Lines in '..\Source\BCEditor.Lines.pas',
-  BCEditor.PaintHelper in '..\Source\BCEditor.PaintHelper.pas',
-  BCEditor.Print in '..\Source\BCEditor.Print.pas',
-  BCEditor.Print.Preview in '..\Source\BCEditor.Print.Preview.pas',
   BCEditor.Properties in '..\Source\BCEditor.Properties.pas',
   BCEditor.Types in '..\Source\BCEditor.Types.pas',
   JsonDataObjects in '..\Source\JsonDataObjects.pas';

@@ -6,9 +6,184 @@ uses
   Classes, SysUtils, Generics.Collections,
   Controls, Graphics, StdCtrls,
   JsonDataObjects,
-  BCEditor.Consts, BCEditor.Editor.CodeFolding, BCEditor.Types;
+  BCEditor.Consts, BCEditor.Types;
 
 type
+  TBCEditorCodeFoldingRegionItem = class(TCollectionItem)
+    strict private
+      FBeginWithBreakChar: Boolean;
+      FBreakCharFollows: Boolean;
+      FBreakIfNotFoundBeforeNextRegion: string;
+      FCloseAtNextToken: Boolean;
+      FCloseToken: string;
+      FCloseTokenBeginningOfLine: Boolean;
+      FCloseTokenLength: Integer;
+      FNoSubs: Boolean;
+      FOpenIsClose: Boolean;
+      FOpenToken: string;
+      FOpenTokenBeginningOfLine: Boolean;
+      FOpenTokenBreaksLine: Boolean;
+      FOpenTokenCanBeFollowedBy: string;
+      FOpenTokenEnd: string;
+      FOpenTokenLength: Integer;
+      FParentRegionItem: TBCEditorCodeFoldingRegionItem;
+      FSharedClose: Boolean;
+      FShowGuideLine: Boolean;
+      FSkipIfFoundAfterOpenTokenArray: TBCEditorArrayOfString;
+      FSkipIfFoundAfterOpenTokenArrayCount: Integer;
+      FTokenEndIsPreviousLine: Boolean;
+      procedure SetSkipIfFoundAfterOpenTokenArrayCount(const AValue: Integer);
+    public
+      constructor Create(ACollection: TCollection); override;
+      property BeginWithBreakChar: Boolean read FBeginWithBreakChar write FBeginWithBreakChar;
+      property BreakCharFollows: Boolean read FBreakCharFollows write FBreakCharFollows default True;
+      property BreakIfNotFoundBeforeNextRegion: string read FBreakIfNotFoundBeforeNextRegion write FBreakIfNotFoundBeforeNextRegion;
+      property CloseAtNextToken: Boolean read FCloseAtNextToken write FCloseAtNextToken;
+      property CloseToken: string read FCloseToken write FCloseToken;
+      property CloseTokenBeginningOfLine: Boolean read FCloseTokenBeginningOfLine write FCloseTokenBeginningOfLine default False;
+      property CloseTokenLength: Integer read FCloseTokenLength write FCloseTokenLength;
+      property NoSubs: Boolean read FNoSubs write FNoSubs default False;
+      property OpenIsClose: Boolean read FOpenIsClose write FOpenIsClose default False;
+      property OpenToken: string read FOpenToken write FOpenToken;
+      property OpenTokenBeginningOfLine: Boolean read FOpenTokenBeginningOfLine write FOpenTokenBeginningOfLine default False;
+      property OpenTokenBreaksLine: Boolean read FOpenTokenBreaksLine write FOpenTokenBreaksLine default False;
+      property OpenTokenCanBeFollowedBy: string read FOpenTokenCanBeFollowedBy write FOpenTokenCanBeFollowedBy;
+      property OpenTokenEnd: string read FOpenTokenEnd write FOpenTokenEnd;
+      property OpenTokenLength: Integer read FOpenTokenLength write FOpenTokenLength;
+      property ParentRegionItem: TBCEditorCodeFoldingRegionItem read FParentRegionItem write FParentRegionItem;
+      property SharedClose: Boolean read FSharedClose write FSharedClose default False;
+      property ShowGuideLine: Boolean read FShowGuideLine write FShowGuideLine default True;
+      property SkipIfFoundAfterOpenTokenArray: TBCEditorArrayOfString read FSkipIfFoundAfterOpenTokenArray write FSkipIfFoundAfterOpenTokenArray;
+      property SkipIfFoundAfterOpenTokenArrayCount: Integer read FSkipIfFoundAfterOpenTokenArrayCount write SetSkipIfFoundAfterOpenTokenArrayCount;
+      property TokenEndIsPreviousLine: Boolean read FTokenEndIsPreviousLine write FTokenEndIsPreviousLine default False;
+    end;
+
+  TBCEditorCodeFoldingRegions = array of Pointer;
+
+  TBCEditorCodeFoldingAllRanges = class;
+  TBCEditorCodeFoldingSkipRegions = class;
+
+  TBCEditorCodeFoldingRegion = class(TCollection)
+  strict private
+    FCloseToken: string;
+    FEscapeChar: Char;
+    FFoldTags: Boolean;
+    FOpenToken: string;
+    FSkipRegions: TBCEditorCodeFoldingSkipRegions;
+    FStringEscapeChar: Char;
+    function GetItem(AIndex: Integer): TBCEditorCodeFoldingRegionItem;
+  public
+    constructor Create(AItemClass: TCollectionItemClass);
+    destructor Destroy; override;
+    function Add(const AOpenToken: string; const ACloseToken: string): TBCEditorCodeFoldingRegionItem;
+    function Contains(const AOpenToken: string; const ACloseToken: string): Boolean;
+    property CloseToken: string read FCloseToken write FCloseToken;
+    property EscapeChar: Char read FEscapeChar write FEscapeChar default BCEDITOR_NONE_CHAR;
+    property FoldTags: Boolean read FFoldTags write FFoldTags default False;
+    property Items[AIndex: Integer]: TBCEditorCodeFoldingRegionItem read GetItem; default;
+    property OpenToken: string read FOpenToken write FOpenToken;
+    property SkipRegions: TBCEditorCodeFoldingSkipRegions read FSkipRegions;
+    property StringEscapeChar: Char read FStringEscapeChar write FStringEscapeChar default BCEDITOR_NONE_CHAR;
+  end;
+
+  TBCEditorCodeFoldingSkipRegions = class(TCollection)
+  type
+
+    TItem = class(TCollectionItem)
+    strict private
+      FCloseToken: string;
+      FOpenToken: string;
+      FRegionType: TBCEditorRangeItemType;
+      FSkipEmptyChars: Boolean;
+      FSkipIfNextCharIsNot: Char;
+    public
+      property OpenToken: string read FOpenToken write FOpenToken;
+      property CloseToken: string read FCloseToken write FCloseToken;
+      property RegionType: TBCEditorRangeItemType read FRegionType write FRegionType;
+      property SkipEmptyChars: Boolean read FSkipEmptyChars write FSkipEmptyChars;
+      property SkipIfNextCharIsNot: Char read FSkipIfNextCharIsNot write FSkipIfNextCharIsNot default BCEDITOR_NONE_CHAR;
+    end;
+
+  strict private
+    function GetSkipRegionItem(AIndex: Integer): TItem;
+  public
+    function Add(const AOpenToken, ACloseToken: string): TItem;
+    function Contains(const AOpenToken, ACloseToken: string): Boolean;
+    property SkipRegionItems[AIndex: Integer]: TItem read GetSkipRegionItem; default;
+  end;
+
+  TBCEditorCodeFoldingRanges = class(TPersistent)
+  type
+
+    TRange = class
+    strict private
+      FAllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges;
+      FBeginLine: Integer;
+      FCollapsed: Boolean;
+      FCollapsedBy: Integer;
+      FEndLine: Integer;
+      FFoldRangeLevel: Integer;
+      FIndentLevel: Integer;
+      FIsExtraTokenFound: Boolean;
+      FParentCollapsed: Boolean;
+      FRegionItem: TBCEditorCodeFoldingRegionItem;
+      FSubCodeFoldingRanges: TBCEditorCodeFoldingRanges;
+      FUndoListed: Boolean;
+    public
+      constructor Create;
+      destructor Destroy; override;
+      function Collapsable: Boolean;
+      procedure MoveBy(LineCount: Integer);
+      procedure MoveChildren(By: Integer);
+      procedure SetParentCollapsedOfSubCodeFoldingRanges(AParentCollapsed: Boolean; ACollapsedBy: Integer);
+      procedure Widen(LineCount: Integer);
+      property AllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges read FAllCodeFoldingRanges write FAllCodeFoldingRanges;
+      property BeginLine: Integer read FBeginLine write FBeginLine;
+      property Collapsed: Boolean read FCollapsed write FCollapsed default False;
+      property CollapsedBy: Integer read FCollapsedBy write FCollapsedBy;
+      property EndLine: Integer read FEndLine write FEndLine;
+      property FoldRangeLevel: Integer read FFoldRangeLevel write FFoldRangeLevel;
+      property IndentLevel: Integer read FIndentLevel write FIndentLevel;
+      property IsExtraTokenFound: Boolean read FIsExtraTokenFound write FIsExtraTokenFound default False;
+      property ParentCollapsed: Boolean read FParentCollapsed write FParentCollapsed;
+      property RegionItem: TBCEditorCodeFoldingRegionItem read FRegionItem write FRegionItem;
+      property SubCodeFoldingRanges: TBCEditorCodeFoldingRanges read FSubCodeFoldingRanges;
+      property UndoListed: Boolean read FUndoListed write FUndoListed default False;
+    end;
+
+  strict private
+    FList: TList;
+    function GetCount: Integer;
+    function GetItem(AIndex: Integer): TRange;
+  public
+    constructor Create;
+    destructor Destroy; override;
+    function Add(AAllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges; ABeginLine, AIndentLevel, AFoldRangeLevel: Integer;
+      ARegionItem: TBCEditorCodeFoldingRegionItem; AEndLine: Integer = 0): TRange;
+    procedure Clear;
+    property Count: Integer read GetCount;
+    property Items[AIndex: Integer]: TRange read GetItem; default;
+  end;
+
+  TBCEditorCodeFoldingAllRanges = class(TBCEditorCodeFoldingRanges)
+  strict private
+    FList: TObjectList<TBCEditorCodeFoldingRanges.TRange>;
+    function GetAllCount: Integer;
+    function GetItem(AIndex: Integer): TBCEditorCodeFoldingRanges.TRange;
+    procedure SetItem(AIndex: Integer; Value: TBCEditorCodeFoldingRanges.TRange);
+  public
+    constructor Create;
+    destructor Destroy; override;
+    procedure ClearAll;
+    procedure Delete(AIndex: Integer); overload;
+    procedure Delete(FoldRange: TBCEditorCodeFoldingRanges.TRange); overload;
+    procedure SetParentCollapsedOfSubCodeFoldingRanges(AFoldRange: TBCEditorCodeFoldingRanges.TRange);
+    procedure UpdateFoldRanges;
+    property AllCount: Integer read GetAllCount;
+    property Items[AIndex: Integer]: TBCEditorCodeFoldingRanges.TRange read GetItem write SetItem; default;
+    property List: TObjectList<TBCEditorCodeFoldingRanges.TRange> read FList;
+  end;
+
   TBCEditorHighlighter = class(TObject)
   type
     TAttribute = class;
@@ -362,9 +537,9 @@ type
       procedure ImportAttributes(AHighlighterAttribute: TAttribute; AAttributesObject: TJsonObject;
         const AElementPrefix: string);
       procedure ImportCodeFolding(ACodeFoldingObject: TJsonObject);
-      procedure ImportCodeFoldingFoldRegion(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion; ACodeFoldingObject: TJsonObject);
-      procedure ImportCodeFoldingOptions(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion; ACodeFoldingObject: TJsonObject);
-      procedure ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion; ACodeFoldingObject: TJsonObject);
+      procedure ImportCodeFoldingFoldRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion; ACodeFoldingObject: TJsonObject);
+      procedure ImportCodeFoldingOptions(ACodeFoldingRegion: TBCEditorCodeFoldingRegion; ACodeFoldingObject: TJsonObject);
+      procedure ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion; ACodeFoldingObject: TJsonObject);
       procedure ImportColors(AJSONObject: TJsonObject);
       procedure ImportColorsEditorProperties(AEditorObject: TJsonObject);
       procedure ImportCompletionProposal(ACompletionProposalObject: TJsonObject);
@@ -411,7 +586,7 @@ type
     FCodeFoldingRegions: TBCEditorCodeFoldingRegions;
     FColors: TColors;
     FComments: TComments;
-    FCompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions;
+    FCompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions;
     FEditor: TCustomControl;
     FFileName: string;
     FFilePath: string;
@@ -459,7 +634,7 @@ type
     property CodeFoldingRegions: TBCEditorCodeFoldingRegions read FCodeFoldingRegions write FCodeFoldingRegions;
     property Colors: TColors read FColors write FColors;
     property Comments: TComments read FComments write FComments;
-    property CompletionProposalSkipRegions: TBCEditorCodeFolding.TSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
+    property CompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
     property FileName: string read FFileName write SetFileName;
     property FilePath: string read FFilePath write FFilePath;
     property FoldCloseKeyChars: TBCEditorAnsiCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
@@ -497,6 +672,335 @@ end;
 function CaseStringNone(const AString: string): string;
 begin
   Result := AString;
+end;
+
+{ TBCEditorCodeFoldingRegion.TItem ********************************************}
+
+constructor TBCEditorCodeFoldingRegionItem.Create(ACollection: TCollection);
+begin
+  inherited Create(ACollection);
+
+  FSkipIfFoundAfterOpenTokenArrayCount := 0;
+  FBreakIfNotFoundBeforeNextRegion := '';
+  FCloseTokenBeginningOfLine := False;
+  FNoSubs := False;
+  FOpenIsClose := False;
+  FOpenTokenBeginningOfLine := False;
+  FOpenTokenBreaksLine := False;
+  FSharedClose := False;
+  FBreakCharFollows := True;
+end;
+
+procedure TBCEditorCodeFoldingRegionItem.SetSkipIfFoundAfterOpenTokenArrayCount(const AValue: Integer);
+begin
+  FSkipIfFoundAfterOpenTokenArrayCount := AValue;
+  SetLength(FSkipIfFoundAfterOpenTokenArray, AValue);
+end;
+
+{ TBCEditorCodeFoldingRegion **************************************************}
+
+constructor TBCEditorCodeFoldingRegion.Create(AItemClass: TCollectionItemClass);
+begin
+  inherited Create(AItemClass);
+
+  FSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
+  FEscapeChar := BCEDITOR_NONE_CHAR;
+  FStringEscapeChar := BCEDITOR_NONE_CHAR;
+  FFoldTags := False;
+end;
+
+destructor TBCEditorCodeFoldingRegion.Destroy;
+begin
+  FSkipRegions.Free;
+
+  inherited;
+end;
+
+function TBCEditorCodeFoldingRegion.Add(const AOpenToken: string; const ACloseToken: string): TBCEditorCodeFoldingRegionItem;
+begin
+  Result := TBCEditorCodeFoldingRegionItem(inherited Add);
+  with Result do
+  begin
+    OpenToken := AOpenToken;
+    OpenTokenLength := Length(AOpenToken);
+    CloseToken := ACloseToken;
+    CloseTokenLength := Length(ACloseToken);
+  end;
+end;
+
+function TBCEditorCodeFoldingRegion.Contains(const AOpenToken: string; const ACloseToken: string): Boolean;
+var
+  LIndex: Integer;
+  LItem: TBCEditorCodeFoldingRegionItem;
+begin
+  Result := False;
+  for LIndex := 0 to Count - 1 do
+  begin
+    LItem := Items[LIndex];
+    if (LItem.OpenToken = AOpenToken) and (LItem.CloseToken = ACloseToken) then
+      Exit(True);
+  end;
+end;
+
+function TBCEditorCodeFoldingRegion.GetItem(AIndex: Integer): TBCEditorCodeFoldingRegionItem;
+begin
+  Result := TBCEditorCodeFoldingRegionItem(inherited Items[AIndex]);
+end;
+
+{ TBCEditorCodeFoldingSkipRegions *********************************************}
+
+function TBCEditorCodeFoldingSkipRegions.Add(const AOpenToken, ACloseToken: string): TItem;
+begin
+  Result := TItem(inherited Add);
+  with Result do
+  begin
+    OpenToken := AOpenToken;
+    CloseToken := ACloseToken;
+  end;
+end;
+
+function TBCEditorCodeFoldingSkipRegions.Contains(const AOpenToken, ACloseToken: string): Boolean;
+var
+  LIndex: Integer;
+  LSkipRegion: TItem;
+begin
+  Result := False;
+  for LIndex := 0 to Count - 1 do
+  begin
+    LSkipRegion := SkipRegionItems[LIndex];
+    if (LSkipRegion.OpenToken = AOpenToken) and (LSkipRegion.CloseToken = ACloseToken) then
+      Exit(True);
+  end;
+end;
+
+function TBCEditorCodeFoldingSkipRegions.GetSkipRegionItem(AIndex: Integer): TItem;
+begin
+  Result := TItem(inherited Items[AIndex]);
+end;
+
+{ TBCEditorCodeFoldingRanges.TRange *******************************************}
+
+function TBCEditorCodeFoldingRanges.TRange.Collapsable: Boolean;
+begin
+  Result := (FBeginLine < FEndLine) or RegionItem.TokenEndIsPreviousLine and (FBeginLine = FEndLine);
+end;
+
+constructor TBCEditorCodeFoldingRanges.TRange.Create;
+begin
+  inherited;
+
+  FSubCodeFoldingRanges := TBCEditorCodeFoldingRanges.Create;
+  FCollapsed := False;
+  FCollapsedBy := -1;
+  FIsExtraTokenFound := False;
+  FUndoListed := False;
+end;
+
+destructor TBCEditorCodeFoldingRanges.TRange.Destroy;
+begin;
+  FSubCodeFoldingRanges.Clear;
+  FSubCodeFoldingRanges.Free;
+  FSubCodeFoldingRanges := nil;
+
+  inherited;
+end;
+
+procedure TBCEditorCodeFoldingRanges.TRange.MoveBy(LineCount: Integer);
+begin
+  Inc(FBeginLine, LineCount);
+  Inc(FEndLine, LineCount);
+end;
+
+procedure TBCEditorCodeFoldingRanges.TRange.MoveChildren(By: Integer);
+var
+  LCodeFoldingRange: TRange;
+  LIndex: Integer;
+begin
+  for LIndex := 0 to FSubCodeFoldingRanges.Count - 1 do
+  begin
+    LCodeFoldingRange := FSubCodeFoldingRanges[LIndex];
+    if Assigned(LCodeFoldingRange) then
+    begin
+      LCodeFoldingRange.MoveChildren(By);
+
+      with FAllCodeFoldingRanges.List do
+      if LCodeFoldingRange.FParentCollapsed then
+        Move(IndexOf(LCodeFoldingRange), IndexOf(LCodeFoldingRange) + By);
+    end;
+  end;
+end;
+
+procedure TBCEditorCodeFoldingRanges.TRange.SetParentCollapsedOfSubCodeFoldingRanges(AParentCollapsed: Boolean; ACollapsedBy: Integer);
+var
+  LCodeFoldingRange: TRange;
+  LIndex: Integer;
+begin
+  if Assigned(FSubCodeFoldingRanges) then
+  for LIndex := 0 to FSubCodeFoldingRanges.Count - 1 do
+  begin
+    LCodeFoldingRange := FSubCodeFoldingRanges[LIndex];
+    LCodeFoldingRange.SetParentCollapsedOfSubCodeFoldingRanges(AParentCollapsed, ACollapsedBy);
+
+    if (LCodeFoldingRange.FCollapsedBy = -1) or (LCodeFoldingRange.FCollapsedBy = ACollapsedBy) then
+    begin
+      LCodeFoldingRange.FParentCollapsed := AParentCollapsed;
+
+      if not AParentCollapsed then
+        LCodeFoldingRange.FCollapsedBy := -1
+      else
+        LCodeFoldingRange.FCollapsedBy := ACollapsedBy;
+    end;
+  end;
+end;
+
+procedure TBCEditorCodeFoldingRanges.TRange.Widen(LineCount: Integer);
+begin
+  Inc(FEndLine, LineCount);
+end;
+
+{ TBCEditorCodeFoldingRanges **************************************************}
+
+constructor TBCEditorCodeFoldingRanges.Create;
+begin
+  inherited;
+
+  FList := TList.Create;
+end;
+
+destructor TBCEditorCodeFoldingRanges.Destroy;
+begin
+  FList.Clear;
+  FList.Free;
+  FList := nil;
+
+  inherited;
+end;
+
+function TBCEditorCodeFoldingRanges.Add(AAllCodeFoldingRanges: TBCEditorCodeFoldingAllRanges; ABeginLine, AIndentLevel, AFoldRangeLevel: Integer;
+  ARegionItem: TBCEditorCodeFoldingRegionItem; AEndLine: Integer): TRange;
+begin
+  Result := TRange.Create;
+  with Result do
+  begin
+    BeginLine := ABeginLine;
+    EndLine := AEndLine;
+    IndentLevel := AIndentLevel;
+    FoldRangeLevel := AFoldRangeLevel;
+    AllCodeFoldingRanges := AAllCodeFoldingRanges;
+    RegionItem := ARegionItem;
+  end;
+  FList.Add(Result);
+  AAllCodeFoldingRanges.List.Add(Result);
+end;
+
+procedure TBCEditorCodeFoldingRanges.Clear;
+begin
+  FList.Clear;
+end;
+
+function TBCEditorCodeFoldingRanges.GetCount: Integer;
+begin
+  Result := FList.Count;
+end;
+
+function TBCEditorCodeFoldingRanges.GetItem(AIndex: Integer): TRange;
+begin
+  Result := FList[AIndex];
+end;
+
+{ TBCEditorCodeFoldingAllRanges ***********************************************}
+
+constructor TBCEditorCodeFoldingAllRanges.Create;
+begin
+  inherited;
+
+  FList := TObjectList<TBCEditorCodeFoldingRanges.TRange>.Create;
+end;
+
+destructor TBCEditorCodeFoldingAllRanges.Destroy;
+begin
+  FList.Free();
+
+  inherited;
+end;
+
+procedure TBCEditorCodeFoldingAllRanges.ClearAll;
+begin
+  Clear;
+  FList.Clear();
+end;
+
+procedure TBCEditorCodeFoldingAllRanges.Delete(AIndex: Integer);
+begin
+  FList.Delete(AIndex);
+end;
+
+procedure TBCEditorCodeFoldingAllRanges.Delete(FoldRange: TBCEditorCodeFoldingRanges.TRange);
+var
+  LIndex: Integer;
+begin
+  for LIndex := 0 to FList.Count - 1 do
+  if FList[LIndex] = FoldRange then
+  begin
+    TBCEditorCodeFoldingRanges.TRange(FList[LIndex]).Free;
+    FList[LIndex] := nil;
+    FList.Delete(LIndex);
+    Break;
+  end;
+end;
+
+function TBCEditorCodeFoldingAllRanges.GetAllCount: Integer;
+begin
+  Result := FList.Count;
+end;
+
+function TBCEditorCodeFoldingAllRanges.GetItem(AIndex: Integer): TBCEditorCodeFoldingRanges.TRange;
+begin
+  if Cardinal(AIndex) < Cardinal(FList.Count) then
+    Result := FList.List[AIndex]
+  else
+    Result := nil;
+end;
+
+procedure TBCEditorCodeFoldingAllRanges.SetItem(AIndex: Integer; Value: TBCEditorCodeFoldingRanges.TRange);
+begin
+  FList[AIndex] := Value;
+end;
+
+procedure TBCEditorCodeFoldingAllRanges.SetParentCollapsedOfSubCodeFoldingRanges(AFoldRange: TBCEditorCodeFoldingRanges.TRange);
+var
+  LFoldRange: TBCEditorCodeFoldingRanges.TRange;
+  LIndex: Integer;
+begin
+  for LIndex := 0 to AllCount - 1 do
+  begin
+    LFoldRange := GetItem(LIndex);
+    if LFoldRange = AFoldRange then
+      Continue;
+    if LFoldRange.BeginLine > AFoldRange.EndLine then
+      Break;
+    if (LFoldRange.EndLine > AFoldRange.EndLine) and (LFoldRange.EndLine <> AFoldRange.EndLine) then
+      LFoldRange.ParentCollapsed := True;
+  end;
+end;
+
+procedure TBCEditorCodeFoldingAllRanges.UpdateFoldRanges;
+var
+  LFoldRange: TBCEditorCodeFoldingRanges.TRange;
+  LIndex: Integer;
+begin
+  for LIndex := 0 to AllCount - 1 do
+  begin
+    LFoldRange := GetItem(LIndex);
+    if Assigned(LFoldRange) then
+      LFoldRange.ParentCollapsed := False;
+  end;
+  for LIndex := 0 to AllCount - 1 do
+  begin
+    LFoldRange := GetItem(LIndex);
+    if Assigned(LFoldRange) and not LFoldRange.ParentCollapsed then
+      SetParentCollapsedOfSubCodeFoldingRanges(LFoldRange);
+  end;
 end;
 
 { TBCEditorHighlighter.TAttribute *********************************************}
@@ -1745,7 +2249,7 @@ begin
     FHighlighter.CodeFoldingRangeCount := LCount;
     for i := 0 to LCount - 1 do
     begin
-      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFolding.TRegion.Create(TBCEditorCodeFoldingRegionItem);
+      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFoldingRegion.Create(TBCEditorCodeFoldingRegionItem);
       LCodeFoldingObject := LArray.Items[i].ObjectValue;
 
       ImportCodeFoldingOptions(FHighlighter.CodeFoldingRegions[i], LCodeFoldingObject);
@@ -1755,7 +2259,7 @@ begin
   end;
 end;
 
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingFoldRegion(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingFoldRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion;
   ACodeFoldingObject: TJsonObject);
 var
   LCloseToken: string;
@@ -1842,7 +2346,7 @@ begin
   end;
 end;
 
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingOptions(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingOptions(ACodeFoldingRegion: TBCEditorCodeFoldingRegion;
   ACodeFoldingObject: TJsonObject);
 var
   LCodeFoldingObject: TJsonObject;
@@ -1873,7 +2377,7 @@ begin
   end;
 end;
 
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFolding.TRegion;
+procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion;
   ACodeFoldingObject: TJsonObject);
 var
   LCloseToken: string;
@@ -1885,7 +2389,7 @@ var
   LOpenToken: string;
   LRegionItem: TBCEditorCodeFoldingRegionItem;
   LSkipRegionArray: TJsonArray;
-  LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
   LSkipRegionType: TBCEditorRangeItemType;
 begin
   if ACodeFoldingObject.Contains('SkipRegion') then
@@ -1920,7 +2424,7 @@ begin
       end;
 
       LSkipRegionType := StrToRegionType(LJsonDataValue.ObjectValue['RegionType'].Value);
-      if (LSkipRegionType = ritMultiLineComment) and (cfoFoldMultilineComments in TCustomBCEditor(FHighlighter.Editor).CodeFolding.Options) then
+      if (LSkipRegionType = ritMultiLineComment) and (cfoFoldMultilineComments in TCustomBCEditor(FHighlighter.Editor).LeftMargin.CodeFolding.Options) then
       begin
         LRegionItem := ACodeFoldingRegion.Add(LOpenToken, LCloseToken);
         LRegionItem.NoSubs := True;
@@ -2035,7 +2539,7 @@ var
   LJsonDataValue: PJsonDataValue;
   LJSONObject: TJsonObject;
   LSkipRegionArray: TJsonArray;
-  LSkipRegionItem: TBCEditorCodeFolding.TSkipRegions.TItem;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
 begin
   if not Assigned(ACompletionProposalObject) then
     Exit;
@@ -2403,7 +2907,7 @@ end;
 procedure TBCEditorHighlighter.Clear;
 var
   LIndex: Integer;
-  LRegion: BCEditor.Editor.CodeFolding.TBCEditorCodeFolding.TRegion;
+  LRegion: TBCEditorCodeFoldingRegion;
 begin
   FFoldOpenKeyChars := [];
   FFoldCloseKeyChars := [];
@@ -2440,7 +2944,7 @@ begin
 
   FComments := TComments.Create;
 
-  FCompletionProposalSkipRegions := TBCEditorCodeFolding.TSkipRegions.Create(TBCEditorCodeFolding.TSkipRegions.TItem);
+  FCompletionProposalSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
 
   FMainRules := TRange.Create;
   FMainRules.Parent := FMainRules;

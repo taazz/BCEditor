@@ -4,8 +4,7 @@ interface {********************************************************************}
 
 uses
   Classes,
-  BCEditor, BCEditor.Print, BCEditor.Print.Preview, BCEditor.Commands,
-  BCEditor.Properties;
+  BCEditor, BCEditor.Commands, BCEditor.Properties;
 
 procedure Register();
 
@@ -16,10 +15,13 @@ uses
 
 procedure Register;
 begin
-  RegisterComponents('BCEditor', [TBCEditor, TBCEditorPrint, TBCEditorPrintPreview, TBCEditorMacroRecorder]);
+  RegisterComponents('BCEditor', [TBCEditor, TBCEditorMacroRecorder]);
 
   UnlistPublishedProperty(TBCEditor, 'CustomHint');
+  UnlistPublishedProperty(TBCEditor, 'ParentCustomHint');
+  UnlistPublishedProperty(TBCEditor, 'ParentColor');
   UnlistPublishedProperty(TBCEditor, 'Hint');
+
   RegisterPropertyEditor(TypeInfo(Char), nil, '', TCharProperty);
   RegisterPropertyEditor(TypeInfo(TStrings), nil, '', TStringListProperty);
 end;

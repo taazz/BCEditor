@@ -134,9 +134,6 @@
         <DelphiCompile Include="..\Source\BCEditor.Consts.pas">
             <BuildOrder>9</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Editor.CodeFolding.pas">
-            <BuildOrder>7</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Commands.pas">
             <BuildOrder>12</BuildOrder>
         </DelphiCompile>
@@ -154,12 +151,6 @@
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Lines.pas">
             <BuildOrder>34</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.PaintHelper.pas">
-            <BuildOrder>36</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Print.pas">
-            <BuildOrder>37</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Print.Preview.pas">
             <BuildOrder>38</BuildOrder>
