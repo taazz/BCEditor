@@ -31,10 +31,10 @@ type
       function GetItem(AIndex: Integer): TItem;
       procedure SetItem(AIndex: Integer; AValue: TItem);
     protected
-      function GetOwner: TPersistent; override;
+      function GetOwner(): TPersistent; override;
     public
       constructor Create(AOwner: TPersistent);
-      function Add: TItem;
+      function Add(): TItem;
       function FindItemID(AID: Integer): TItem;
       function Insert(AIndex: Integer): TItem;
       property Items[AIndex: Integer]: TItem read GetItem write SetItem; default;
@@ -106,10 +106,10 @@ type
     function GetItem(AIndex: Integer): TColumn;
     procedure SetItem(AIndex: Integer; AValue: TColumn);
   protected
-    function GetOwner: TPersistent; override;
+    function GetOwner(): TPersistent; override;
   public
     constructor Create(AOwner: TPersistent);
-    function Add: TColumn;
+    function Add(): TColumn;
     function FindItemID(AID: Integer): TColumn;
     function Insert(AIndex: Integer): TColumn;
     property Items[AIndex: Integer]: TColumn read GetItem write SetItem; default;
@@ -122,11 +122,17 @@ type
   TBCEditorCompletionProposal = class(TPersistent)
   type
     TTrigger = class(TPersistent)
+    strict private const
+      DefaultChars = '.';
+      DefaultEnabled = False;
+      DefaultInterval = 1000;
     strict private
       FChars: string;
       FCompletionProposal: TBCEditorCompletionProposal;
       FEnabled: Boolean;
       FInterval: Integer;
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const ACompletionProposal: TBCEditorCompletionProposal);
@@ -138,8 +144,12 @@ type
 
   strict private const
     DefaultCloseChars = '()[]. ';
+    DefaultEnabled = True;
+    DefaultCompletionColumnIndex = 0;
     DefaultOptions = [cpoAutoConstraints, cpoAddHighlighterKeywords, cpoFiltered,
       cpoParseItemsFromText, cpoUseHighlighterColumnFont];
+    DefaultVisibleLines = 8;
+    DefaultWidth = 260;
   strict private
     FCloseChars: string;
     FColumns: TBCEditorCompletionProposalColumns;
@@ -149,12 +159,13 @@ type
     FImages: TCustomImageList;
     FOptions: TBCEditorCompletionProposalOptions;
     FOwner: TComponent;
-    FTrigger: TBCEditorCompletionProposal.TTrigger;
+    FTrigger: TTrigger;
     FVisibleLines: Integer;
     FWidth: Integer;
     procedure SetImages(const AValue: TCustomImageList);
   protected
-    function GetOwner: TPersistent; override;
+    function GetOwner(): TPersistent; override;
+    function IsStored(): Boolean;
   public
     constructor Create(AOwner: TComponent);
     destructor Destroy(); override;
@@ -163,89 +174,84 @@ type
   published
     property CloseChars: string read FCloseChars write FCloseChars;
     property Columns: TBCEditorCompletionProposalColumns read FColumns write FColumns;
-    property CompletionColumnIndex: Integer read FCompletionColumnIndex write FCompletionColumnIndex default 0;
+    property CompletionColumnIndex: Integer read FCompletionColumnIndex write FCompletionColumnIndex default DefaultCompletionColumnIndex;
     property Constraints: TSizeConstraints read FConstraints write FConstraints;
-    property Enabled: Boolean read FEnabled write FEnabled default True;
+    property Enabled: Boolean read FEnabled write FEnabled default DefaultEnabled;
     property Images: TCustomImageList read FImages write SetImages;
     property Options: TBCEditorCompletionProposalOptions read FOptions write FOptions default DefaultOptions;
     property Trigger: TBCEditorCompletionProposal.TTrigger read FTrigger write FTrigger;
-    property VisibleLines: Integer read FVisibleLines write FVisibleLines default 8;
-    property Width: Integer read FWidth write FWidth default 260;
+    property VisibleLines: Integer read FVisibleLines write FVisibleLines default DefaultVisibleLines;
+    property Width: Integer read FWidth write FWidth default DefaultWidth;
   end;
 
   TBCEditorColors = class(TPersistent)
   type
+    TActiveLine = class(TPersistent)
+    private
+      FBackground: TColor;
+      FColors: TBCEditorColors;
+      procedure SetBackground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Background: TColor read FBackground write SetBackground default clActiveLineBackground;
+    end;
+
     TCodeFolding = class(TPersistent)
-    strict private const
-      DefaultBackground = $00F4F4F4;
-      DefaultForeground = $00CC9999;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
       FForeground: TColor;
       procedure SetBackground(AValue: TColor);
       procedure SetForeground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
-      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
-    end;
-
-    TCurrentLine = class(TPersistent)
-    strict private const
-      DefaultBackground = $00E6FFFA;
-    private
-      FBackground: TColor;
-      FColors: TBCEditorColors;
-      procedure SetBackground(AValue: TColor);
-    public
-      procedure Assign(ASource: TPersistent); override;
-      constructor Create(const AColors: TBCEditorColors);
-    published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Background: TColor read FBackground write SetBackground default clCodeFoldingBackground;
+      property Foreground: TColor read FForeground write SetForeground default clCodeFoldingForeground;
     end;
 
     TFoundText = class(TPersistent)
-    strict private const
-      DefaultBackground = $0078AAFF;
-      DefaultForeground = clWindowText;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
       FForeground: TColor;
       procedure SetBackground(AValue: TColor);
       procedure SetForeground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
-      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
+      property Background: TColor read FBackground write SetBackground default clFoundTextBackground;
+      property Foreground: TColor read FForeground write SetForeground default clFoundTextForeground;
     end;
 
     TLineNumbers = class(TPersistent)
-    strict private const
-      DefaultBackground = $00F4F4F4;
-      DefaultForeground = $00CC9999;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
       FForeground: TColor;
       procedure SetBackground(AValue: TColor);
       procedure SetForeground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
-      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
+      property Background: TColor read FBackground write SetBackground default clLineNumbersBackground;
+      property Foreground: TColor read FForeground write SetForeground default clLineNumbersForeground;
     end;
 
     TLineState = class(TPersistent)
-    strict private const
-      DefaultBackground = $00F4F4F4;
     private
       FColors: TBCEditorColors;
       FModified: TColor;
@@ -254,13 +260,15 @@ type
       procedure SetModified(AValue: TColor);
       procedure SetLoaded(AValue: TColor);
       procedure SetSaved(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Modified: TColor read FModified write SetModified default clYellow;
-      property Loaded: TColor read FLoaded write SetLoaded default DefaultBackground;
-      property Saved: TColor read FSaved write SetSaved default clLime;
+      property Modified: TColor read FModified write SetModified default clLineStateModified;
+      property Loaded: TColor read FLoaded write SetLoaded default clLineStateLoaded;
+      property Saved: TColor read FSaved write SetSaved default clLineStateSaved;
     end;
 
     TMarks = class(TPersistent)
@@ -268,79 +276,79 @@ type
       FBackground: TColor;
       FColors: TBCEditorColors;
       procedure SetBackground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default clBtnFace;
+      property Background: TColor read FBackground write SetBackground default clMarksBackground;
     end;
 
     TMatchingPairs = class(TPersistent)
-    strict private const
-      DefaultBackground = clAqua;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
       procedure SetBackground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
+      property Background: TColor read FBackground write SetBackground default clMatchingPairBackground;
     end;
 
     TSelection = class(TPersistent)
-    strict private const
-      DefaultBackground = clHighlight;
-      DefaultForeground = clHighlightText;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
       FForeground: TColor;
       procedure SetBackground(AValue: TColor);
       procedure SetForeground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
-      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
+      property Background: TColor read FBackground write SetBackground default clSelectionBackground;
+      property Foreground: TColor read FForeground write SetForeground default clSelectionForeground;
     end;
 
     TSpecialChars = class(TPersistent)
-    strict private const
-      DefaultForeground = clGrayText;
     private
       FForeground: TColor;
       FColors: TBCEditorColors;
       procedure SetForeground(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Foreground: TColor read FForeground write SetForeground default DefaultForeground;
+      property Foreground: TColor read FForeground write SetForeground default clSpecialCharsForeground;
     end;
 
     TSyncEdit = class(TPersistent)
-    strict private const
-      DefaultBackground = $00FCFDCD;
-      DefaultOverlay = clHighlight;
     private
       FBackground: TColor;
       FColors: TBCEditorColors;
-      FOverlays: TColor;
+      FOverlay: TColor;
       procedure SetBackground(AValue: TColor);
       procedure SetOverlays(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
-      property Background: TColor read FBackground write SetBackground default DefaultBackground;
-      property Overlays: TColor read FOverlays write SetOverlays default DefaultOverlay;
+      property Background: TColor read FBackground write SetBackground default clSyncEditBackground;
+      property Overlay: TColor read FOverlay write SetOverlays default clSyncEditOverlay;
     end;
   private
     FCodeFolding: TCodeFolding;
-    FCurrentLine: TCurrentLine;
+    FActiveLine: TActiveLine;
     FFoundText: TFoundText;
     FLineNumbers: TLineNumbers;
     FLineState: TLineState;
@@ -352,7 +360,7 @@ type
     FSyncEdit: TSyncEdit;
     procedure DoChange();
     procedure SetCodeFolding(AValue: TCodeFolding);
-    procedure SetCurrentLine(AValue: TCurrentLine);
+    procedure SetActiveLine(AValue: TActiveLine);
     procedure SetFoundText(AValue: TFoundText);
     procedure SetLineNumbers(AValue: TLineNumbers);
     procedure SetLineState(AValue: TLineState);
@@ -362,6 +370,7 @@ type
     procedure SetSpecialChars(AValue: TSpecialChars);
     procedure SetSyncEdit(AValue: TSyncEdit);
   protected
+    function IsStored(): Boolean;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     procedure Assign(ASource: TPersistent); override;
@@ -369,7 +378,7 @@ type
     destructor Destroy(); override;
   published
     property CodeFolding: TCodeFolding read FCodeFolding write SetCodeFolding;
-    property CurrentLine: TCurrentLine read FCurrentLine write SetCurrentLine;
+    property ActiveLine: TActiveLine read FActiveLine write SetActiveLine;
     property FoundText: TFoundText read FFoundText write SetFoundText;
     property LineNumbers: TLineNumbers read FLineNumbers write SetLineNumbers;
     property LineState: TLineState read FLineState write SetLineState;
@@ -383,21 +392,27 @@ type
   TBCEditorLeftMargin = class(TPersistent)
   type
     TBookMarks = class(TPersistent)
+    strict private const
+      DefaultVisible = True;
     strict private
       FLeftMargin: TBCEditorLeftMargin;
       FVisible: Boolean;
       procedure SetVisible(AValue: Boolean);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const ALeftMargin: TBCEditorLeftMargin);
     published
-      property Visible: Boolean read FVisible write SetVisible default True;
+      property Visible: Boolean read FVisible write SetVisible default DefaultVisible;
     end;
 
     TCodeFolding = class(TPersistent)
     type
     strict private const
+      DefaultDelayInterval = 300 {ms};
       DefaultOptions = [cfoHighlightIndentGuides, cfoShowTreeLine];
+      DefaultVisible = False;
     strict private
       FDelayInterval: Cardinal;
       FLeftMargin: TBCEditorLeftMargin;
@@ -406,31 +421,15 @@ type
       FVisible: Boolean;
       procedure SetOptions(AValue: TBCEditorCodeFoldingOptions);
       procedure SetVisible(const AValue: Boolean);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const ALeftMargin: TBCEditorLeftMargin);
     published
-      property DelayInterval: Cardinal read FDelayInterval write FDelayInterval default 300;
+      property DelayInterval: Cardinal read FDelayInterval write FDelayInterval default DefaultDelayInterval;
       property Options: TBCEditorCodeFoldingOptions read FOptions write SetOptions default DefaultOptions;
-      property Visible: Boolean read FVisible write SetVisible default False;
-    end;
-
-    TMarks = class(TPersistent)
-    strict private
-      FDefaultImageIndex: Integer;
-      FImages: TCustomImageList;
-      FLeftMargin: TBCEditorLeftMargin;
-      FShortCuts: Boolean;
-      FVisible: Boolean;
-      procedure SetImages(const AValue: TCustomImageList);
-      procedure SetVisible(AValue: Boolean);
-    public
-      procedure Assign(ASource: TPersistent); override;
-      constructor Create(const ALeftMargin: TBCEditorLeftMargin);
-    published
-      property DefaultImageIndex: Integer read FDefaultImageIndex write FDefaultImageIndex default -1;
-      property Images: TCustomImageList read FImages write SetImages;
-      property Visible: Boolean read FVisible write SetVisible default False;
+      property Visible: Boolean read FVisible write SetVisible default DefaultVisible;
     end;
 
     TLineNumbers = class(TPersistent)
@@ -446,6 +445,8 @@ type
       procedure SetOptions(const AValue: TBCEditorLeftMarginLineNumberOptions);
       procedure SetOffset(const AValue: Integer);
       procedure SetVisible(const AValue: Boolean);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const ALeftMargin: TBCEditorLeftMargin);
@@ -462,11 +463,35 @@ type
       FLeftMargin: TBCEditorLeftMargin;
       FVisible: Boolean;
       procedure SetVisible(const AValue: Boolean);
+    protected
+      function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const ALeftMargin: TBCEditorLeftMargin);
     published
       property Visible: Boolean read FVisible write SetVisible default DefaultVisible;
+    end;
+
+    TMarks = class(TPersistent)
+    strict private const
+      DefaultDefaultImageIndex = -1;
+      DefaultVisible = False;
+    strict private
+      FDefaultImageIndex: Integer;
+      FImages: TCustomImageList;
+      FLeftMargin: TBCEditorLeftMargin;
+      FVisible: Boolean;
+      procedure SetImages(const AValue: TCustomImageList);
+      procedure SetVisible(AValue: Boolean);
+    protected
+      function IsStored(): Boolean;
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const ALeftMargin: TBCEditorLeftMargin);
+    published
+      property DefaultImageIndex: Integer read FDefaultImageIndex write FDefaultImageIndex default -1;
+      property Images: TCustomImageList read FImages write SetImages;
+      property Visible: Boolean read FVisible write SetVisible default False;
     end;
 
   strict private
@@ -483,6 +508,7 @@ type
     procedure SetLineState(AValue: TLineState);
     procedure SetMarks(AValue: TMarks);
   protected
+    function IsStored(): Boolean;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     procedure Assign(ASource: TPersistent); override;
@@ -552,7 +578,7 @@ begin
   FOwner := AOwner;
 end;
 
-function TBCEditorCompletionProposalItems.Add: TBCEditorCompletionProposalItems.TItem;
+function TBCEditorCompletionProposalItems.Add(): TBCEditorCompletionProposalItems.TItem;
 begin
   Result := inherited Add as TBCEditorCompletionProposalItems.TItem;
 end;
@@ -567,7 +593,7 @@ begin
   Result := inherited GetItem(AIndex) as TBCEditorCompletionProposalItems.TItem;
 end;
 
-function TBCEditorCompletionProposalItems.GetOwner: TPersistent;
+function TBCEditorCompletionProposalItems.GetOwner(): TPersistent;
 begin
   Result := FOwner;
 end;
@@ -694,9 +720,9 @@ begin
   FOwner := AOwner;
 end;
 
-function TBCEditorCompletionProposalColumns.Add: TColumn;
+function TBCEditorCompletionProposalColumns.Add(): TColumn;
 begin
-  Result := inherited Add as TColumn;
+  Result := TColumn(inherited Add());
 end;
 
 function TBCEditorCompletionProposalColumns.FindItemID(AID: Integer): TColumn;
@@ -709,7 +735,7 @@ begin
   Result := inherited GetItem(AIndex) as TColumn;
 end;
 
-function TBCEditorCompletionProposalColumns.GetOwner: TPersistent;
+function TBCEditorCompletionProposalColumns.GetOwner(): TPersistent;
 begin
   Result := FOwner;
 end;
@@ -743,9 +769,16 @@ begin
 
   FCompletionProposal := ACompletionProposal;
 
-  FChars := '.';
-  FEnabled := False;
-  FInterval := 1000;
+  FChars := DefaultChars;
+  FEnabled := DefaultEnabled;
+  FInterval := DefaultInterval;
+end;
+
+function TBCEditorCompletionProposal.TTrigger.IsStored(): Boolean;
+begin
+  Result := (FChars <> DefaultChars)
+    or (FEnabled <> DefaultEnabled)
+    or (FInterval <> DefaultInterval);
 end;
 
 { TBCEditorCompletionProposal *************************************************}
@@ -778,14 +811,14 @@ begin
   FOwner := AOwner;
   FCloseChars := DefaultCloseChars;
   FColumns := TBCEditorCompletionProposalColumns.Create(Self);
-  FColumns.Add; { default column }
-  FCompletionColumnIndex := 0;
-  FEnabled := True;
+  FColumns.Add(); { default column }
+  FCompletionColumnIndex := DefaultCompletionColumnIndex;
+  FConstraints := TSizeConstraints.Create(nil);
+  FEnabled := DefaultEnabled;
   FOptions := DefaultOptions;
   FTrigger := TTrigger.Create(Self);
-  FVisibleLines := 8;
-  FWidth := 260;
-  FConstraints := TSizeConstraints.Create(nil);
+  FVisibleLines := DefaultVisibleLines;
+  FWidth := DefaultWidth;
 end;
 
 destructor TBCEditorCompletionProposal.Destroy();
@@ -802,6 +835,19 @@ begin
   Result := FOwner;
 end;
 
+function TBCEditorCompletionProposal.IsStored(): Boolean;
+begin
+  Result := (FCloseChars <> DefaultCloseChars)
+    or (FColumns.Count <> 1)
+    or (FCompletionColumnIndex <> DefaultCompletionColumnIndex)
+    or (FConstraints.MaxHeight <> 0) or (FConstraints.MaxWidth <> 0) or (FConstraints.MinHeight <> 0) or (FConstraints.MinWidth <> 0)
+    or (FEnabled <> DefaultEnabled)
+    or (FOptions <> DefaultOptions)
+    or FTrigger.IsStored()
+    or (FVisibleLines <> DefaultVisibleLines)
+    or (FWidth <> DefaultWidth);
+end;
+
 procedure TBCEditorCompletionProposal.SetImages(const AValue: TCustomImageList);
 begin
   if FImages <> AValue then
@@ -809,6 +855,42 @@ begin
     FImages := AValue;
     if Assigned(FImages) then
       FImages.FreeNotification(FOwner);
+  end;
+end;
+
+{ TBCEditorColors.TActiveLine ************************************************}
+
+procedure TBCEditorColors.TActiveLine.Assign(ASource: TPersistent);
+begin
+  Assert(ASource is TBCEditorColors.TActiveLine);
+
+  inherited;
+
+  FBackground := TBCEditorColors.TActiveLine(ASource).FBackground;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TActiveLine.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBackground := clActiveLineBackground;
+end;
+
+function TBCEditorColors.TActiveLine.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clActiveLineBackground);
+end;
+
+procedure TBCEditorColors.TActiveLine.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
   end;
 end;
 
@@ -832,8 +914,14 @@ begin
 
   FColors := AColors;
 
-  FBackground := DefaultBackground;
-  FForeground := DefaultForeground;
+  FBackground := clCodeFoldingBackground;
+  FForeground := clCodeFoldingForeground;
+end;
+
+function TBCEditorColors.TCodeFolding.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clCodeFoldingBackground)
+    or (FForeground <> clCodeFoldingForeground);
 end;
 
 procedure TBCEditorColors.TCodeFolding.SetBackground(AValue: TColor);
@@ -850,37 +938,6 @@ begin
   if (AValue <> FForeground) then
   begin
     FForeground := AValue;
-    FColors.DoChange();
-  end;
-end;
-
-{ TBCEditorColors.TCurrentLine ************************************************}
-
-procedure TBCEditorColors.TCurrentLine.Assign(ASource: TPersistent);
-begin
-  Assert(ASource is TBCEditorColors.TCurrentLine);
-
-  inherited;
-
-  FBackground := TBCEditorColors.TCurrentLine(ASource).FBackground;
-
-  FColors.DoChange();
-end;
-
-constructor TBCEditorColors.TCurrentLine.Create(const AColors: TBCEditorColors);
-begin
-  inherited Create();
-
-  FColors := AColors;
-
-  FBackground := DefaultBackground;
-end;
-
-procedure TBCEditorColors.TCurrentLine.SetBackground(AValue: TColor);
-begin
-  if (AValue <> FBackground) then
-  begin
-    FBackground := AValue;
     FColors.DoChange();
   end;
 end;
@@ -905,8 +962,14 @@ begin
 
   FColors := AColors;
 
-  FBackground := DefaultBackground;
-  FForeground := DefaultForeground;
+  FBackground := clFoundTextBackground;
+  FForeground := clFoundTextForeground;
+end;
+
+function TBCEditorColors.TFoundText.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clFoundTextBackground)
+    or (FForeground <> clFoundTextForeground);
 end;
 
 procedure TBCEditorColors.TFoundText.SetBackground(AValue: TColor);
@@ -947,8 +1010,14 @@ begin
 
   FColors := AColors;
 
-  FBackground := DefaultBackground;
-  FForeground := DefaultForeground;
+  FBackground := clLineNumbersBackground;
+  FForeground := clLineNumbersForeground;
+end;
+
+function TBCEditorColors.TLineNumbers.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clLineNumbersBackground)
+    or (FForeground <> clLineNumbersForeground);
 end;
 
 procedure TBCEditorColors.TLineNumbers.SetBackground(AValue: TColor);
@@ -990,9 +1059,16 @@ begin
 
   FColors := AColors;
 
-  FModified := clYellow;
-  FLoaded := DefaultBackground;
-  FSaved := clLime;
+  FModified := clLineStateModified;
+  FLoaded := clLineStateLoaded;
+  FSaved := clLineStateSaved;
+end;
+
+function TBCEditorColors.TLineState.IsStored(): Boolean;
+begin
+  Result := (FModified <> clLineStateModified)
+    or (FLoaded <> clLineStateLoaded)
+    or (FSaved <> clLineStateSaved);
 end;
 
 procedure TBCEditorColors.TLineState.SetModified(AValue: TColor);
@@ -1041,7 +1117,12 @@ begin
 
   FColors := AColors;
 
-  FBackground := clBtnFace;
+  FBackground := clMarksBackground;
+end;
+
+function TBCEditorColors.TMarks.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clMarksBackground);
 end;
 
 procedure TBCEditorColors.TMarks.SetBackground(AValue: TColor);
@@ -1072,7 +1153,12 @@ begin
 
   FColors := AColors;
 
-  FBackground := DefaultBackground;
+  FBackground := clMatchingPairBackground;
+end;
+
+function TBCEditorColors.TMatchingPairs.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clMatchingPairBackground);
 end;
 
 procedure TBCEditorColors.TMatchingPairs.SetBackground(AValue: TColor);
@@ -1104,8 +1190,8 @@ begin
 
   FColors := AColors;
 
-  FBackground := DefaultBackground;
-  FForeground := DefaultForeground;
+  FBackground := clSelectionBackground;
+  FForeground := clSelectionForeground;
 end;
 
 procedure TBCEditorColors.TSelection.SetBackground(AValue: TColor);
@@ -1115,6 +1201,12 @@ begin
     FBackground := AValue;
     FColors.DoChange();
   end;
+end;
+
+function TBCEditorColors.TSelection.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clSelectionBackground)
+    or (FForeground <> clSelectionForeground);
 end;
 
 procedure TBCEditorColors.TSelection.SetForeground(AValue: TColor);
@@ -1145,7 +1237,12 @@ begin
 
   FColors := AColors;
 
-  FForeground := DefaultForeground;
+  FForeground := clSpecialCharsForeground;
+end;
+
+function TBCEditorColors.TSpecialChars.IsStored(): Boolean;
+begin
+  Result := (FForeground <> clSpecialCharsForeground);
 end;
 
 procedure TBCEditorColors.TSpecialChars.SetForeground(AValue: TColor);
@@ -1166,7 +1263,7 @@ begin
   inherited;
 
   FBackground := TBCEditorColors.TSyncEdit(ASource).FBackground;
-  FOverlays := TBCEditorColors.TSyncEdit(ASource).FOverlays;
+  FOverlay := TBCEditorColors.TSyncEdit(ASource).FOverlay;
 
   FColors.DoChange();
 end;
@@ -1177,8 +1274,14 @@ begin
 
   FColors := AColors;
 
-  FBackground := DefaultBackground;
-  FOverlays := DefaultOverlay;
+  FBackground := clSyncEditBackground;
+  FOverlay := clSyncEditOverlay;
+end;
+
+function TBCEditorColors.TSyncEdit.IsStored(): Boolean;
+begin
+  Result := (FBackground <> clSyncEditBackground)
+    or (FOverlay <> clSyncEditOverlay);
 end;
 
 procedure TBCEditorColors.TSyncEdit.SetBackground(AValue: TColor);
@@ -1192,9 +1295,9 @@ end;
 
 procedure TBCEditorColors.TSyncEdit.SetOverlays(AValue: TColor);
 begin
-  if (AValue <> FOverlays) then
+  if (AValue <> FOverlay) then
   begin
-    FOverlays := AValue;
+    FOverlay := AValue;
     FColors.DoChange();
   end;
 end;
@@ -1208,7 +1311,7 @@ begin
   inherited;
 
   FCodeFolding.Assign(TBCEditorColors(ASource).FCodeFolding);
-  FCurrentLine.Assign(TBCEditorColors(ASource).FCurrentLine);
+  FActiveLine.Assign(TBCEditorColors(ASource).FActiveLine);
   FFoundText.Assign(TBCEditorColors(ASource).FFoundText);
   FLineNumbers.Assign(TBCEditorColors(ASource).FLineNumbers);
   FLineState.Assign(TBCEditorColors(ASource).FLineState);
@@ -1224,7 +1327,7 @@ begin
   inherited;
 
   FCodeFolding := TCodeFolding.Create(Self);
-  FCurrentLine := TCurrentLine.Create(Self);
+  FActiveLine := TActiveLine.Create(Self);
   FFoundText := TFoundText.Create(Self);
   FLineNumbers := TLineNumbers.Create(Self);
   FLineState := TLineState.Create(Self);
@@ -1238,7 +1341,7 @@ end;
 destructor TBCEditorColors.Destroy();
 begin
   FCodeFolding.Free();
-  FCurrentLine.Free();
+  FActiveLine.Free();
   FFoundText.Free();
   FLineNumbers.Free();
   FLineState.Free();
@@ -1257,14 +1360,28 @@ begin
     FOnChange(Self);
 end;
 
+function TBCEditorColors.IsStored(): Boolean;
+begin
+  Result := FCodeFolding.IsStored()
+    or FActiveLine.IsStored()
+    or FFoundText.IsStored()
+    or FLineNumbers.IsStored()
+    or FLineState.IsStored()
+    or FSelection.IsStored()
+    or FMarks.IsStored()
+    or FMatchingPairs.IsStored()
+    or FSpecialChars.IsStored()
+    or FSyncEdit.IsStored();
+end;
+
 procedure TBCEditorColors.SetCodeFolding(AValue: TCodeFolding);
 begin
   FCodeFolding.Assign(AValue);
 end;
 
-procedure TBCEditorColors.SetCurrentLine(AValue: TCurrentLine);
+procedure TBCEditorColors.SetActiveLine(AValue: TActiveLine);
 begin
-  FCurrentLine.Assign(AValue);
+  FActiveLine.Assign(AValue);
 end;
 
 procedure TBCEditorColors.SetFoundText(AValue: TFoundText);
@@ -1326,7 +1443,12 @@ begin
 
   FLeftMargin := ALeftMargin;
 
-  FVisible := True;
+  FVisible := DefaultVisible;
+end;
+
+function TBCEditorLeftMargin.TBookmarks.IsStored(): Boolean;
+begin
+  Result := FVisible <> DefaultVisible;
 end;
 
 procedure TBCEditorLeftMargin.TBookmarks.SetVisible(AValue: Boolean);
@@ -1358,11 +1480,18 @@ begin
 
   FLeftMargin := ALeftMargin;
 
-  FVisible := False;
+  FDelayInterval := DefaultDelayInterval;
   FOptions := DefaultOptions;
-  FDelayInterval := 300;
+  FVisible := DefaultVisible;
 
   FMouseOverHint := False;
+end;
+
+function TBCEditorLeftMargin.TCodeFolding.IsStored(): Boolean;
+begin
+  Result := (FDelayInterval <> DefaultDelayInterval)
+    or (FOptions <> DefaultOptions)
+    or (FVisible <> DefaultVisible);
 end;
 
 procedure TBCEditorLeftMargin.TCodeFolding.SetOptions(AValue: TBCEditorCodeFoldingOptions);
@@ -1377,53 +1506,6 @@ end;
 procedure TBCEditorLeftMargin.TCodeFolding.SetVisible(const AValue: Boolean);
 begin
   if (AValue <> FVisible) then
-  begin
-    FVisible := AValue;
-    FLeftMargin.DoChange();
-  end;
-end;
-
-{ TBCEditorLeftMargin.TMarks **************************************************}
-
-procedure TBCEditorLeftMargin.TMarks.Assign(ASource: TPersistent);
-begin
-  Assert(ASource is TBCEditorLeftMargin.TMarks);
-
-  inherited;
-
-  FDefaultImageIndex := TBCEditorLeftMargin.TMarks(ASource).FDefaultImageIndex;
-  FImages := TBCEditorLeftMargin.TMarks(ASource).FImages;
-  FShortCuts := TBCEditorLeftMargin.TMarks(ASource).FShortCuts;
-  FVisible := TBCEditorLeftMargin.TMarks(ASource).FVisible;
-
-  FLeftMargin.DoChange();
-end;
-
-constructor TBCEditorLeftMargin.TMarks.Create(const ALeftMargin: TBCEditorLeftMargin);
-begin
-  inherited Create();
-
-  FLeftMargin := ALeftMargin;
-
-  FDefaultImageIndex := -1;
-  FShortCuts := True;
-  FVisible := False;
-end;
-
-procedure TBCEditorLeftMargin.TMarks.SetImages(const AValue: TCustomImageList);
-begin
-  if (AValue <> FImages) then
-  begin
-    FImages := AValue;
-    if Assigned(FImages) then
-      FImages.FreeNotification(nil);
-    FLeftMargin.DoChange();
-  end;
-end;
-
-procedure TBCEditorLeftMargin.TMarks.SetVisible(AValue: Boolean);
-begin
-  if FVisible <> AValue then
   begin
     FVisible := AValue;
     FLeftMargin.DoChange();
@@ -1454,6 +1536,13 @@ begin
   FOptions := DefaultOptions;
   FOffset := DefaultOffset;
   FVisible := DefaultVisible;
+end;
+
+function TBCEditorLeftMargin.TLineNumbers.IsStored(): Boolean;
+begin
+  Result := (FOptions <> DefaultOptions)
+    or (FOffset <> DefaultOffset)
+    or (FVisible <> DefaultVisible);
 end;
 
 procedure TBCEditorLeftMargin.TLineNumbers.SetOptions(const AValue: TBCEditorLeftMarginLineNumberOptions);
@@ -1505,9 +1594,66 @@ begin
   FVisible := DefaultVisible;
 end;
 
+function TBCEditorLeftMargin.TLineState.IsStored(): Boolean;
+begin
+  Result := FVisible <> DefaultVisible;
+end;
+
 procedure TBCEditorLeftMargin.TLineState.SetVisible(const AValue: Boolean);
 begin
   if (AValue <> FVisible) then
+  begin
+    FVisible := AValue;
+    FLeftMargin.DoChange();
+  end;
+end;
+
+{ TBCEditorLeftMargin.TMarks **************************************************}
+
+procedure TBCEditorLeftMargin.TMarks.Assign(ASource: TPersistent);
+begin
+  Assert(ASource is TBCEditorLeftMargin.TMarks);
+
+  inherited;
+
+  FDefaultImageIndex := TBCEditorLeftMargin.TMarks(ASource).FDefaultImageIndex;
+  FImages := TBCEditorLeftMargin.TMarks(ASource).FImages;
+  FVisible := TBCEditorLeftMargin.TMarks(ASource).FVisible;
+
+  FLeftMargin.DoChange();
+end;
+
+constructor TBCEditorLeftMargin.TMarks.Create(const ALeftMargin: TBCEditorLeftMargin);
+begin
+  inherited Create();
+
+  FLeftMargin := ALeftMargin;
+
+  FDefaultImageIndex := DefaultDefaultImageIndex;
+  FVisible := DefaultVisible;
+end;
+
+function TBCEditorLeftMargin.TMarks.IsStored(): Boolean;
+begin
+  Result := (FDefaultImageIndex <> DefaultDefaultImageIndex)
+    or (FImages.Count > 0)
+    or (FVisible <> DefaultVisible);
+end;
+
+procedure TBCEditorLeftMargin.TMarks.SetImages(const AValue: TCustomImageList);
+begin
+  if (AValue <> FImages) then
+  begin
+    FImages := AValue;
+    if Assigned(FImages) then
+      FImages.FreeNotification(nil);
+    FLeftMargin.DoChange();
+  end;
+end;
+
+procedure TBCEditorLeftMargin.TMarks.SetVisible(AValue: Boolean);
+begin
+  if FVisible <> AValue then
   begin
     FVisible := AValue;
     FLeftMargin.DoChange();
@@ -1523,8 +1669,10 @@ begin
   inherited;
 
   FBookmarks.Assign(TBCEditorLeftMargin(ASource).FBookmarks);
-  FMarks.Assign(TBCEditorLeftMargin(ASource).FMarks);
+  FCodeFolding.Assign(TBCEditorLeftMargin(ASource).FCodeFolding);
   FLineNumbers.Assign(TBCEditorLeftMargin(ASource).FLineNumbers);
+  FLineState.Assign(TBCEditorLeftMargin(ASource).FLineState);
+  FMarks.Assign(TBCEditorLeftMargin(ASource).FMarks);
 
   DoChange();
 end;
@@ -1535,9 +1683,9 @@ begin
 
   FBookmarks := TBookmarks.Create(Self);
   FCodeFolding := TCodeFolding.Create(Self);
-  FMarks := TMarks.Create(Self);
   FLineState := TLineState.Create(Self);
   FLineNumbers := TLineNumbers.Create(Self);
+  FMarks := TMarks.Create(Self);
   FOnChange := nil;
 end;
 
@@ -1545,9 +1693,9 @@ destructor TBCEditorLeftMargin.Destroy();
 begin
   FBookmarks.Free();
   FCodeFolding.Free();
-  FMarks.Free();
   FLineState.Free();
   FLineNumbers.Free();
+  FMarks.Free();
 
   inherited;
 end;
@@ -1556,6 +1704,12 @@ procedure TBCEditorLeftMargin.DoChange();
 begin
   if (Assigned(FOnChange)) then
     FOnChange(Self);
+end;
+
+function TBCEditorLeftMargin.IsStored(): Boolean;
+begin
+  Result := FBookmarks.IsStored()
+    or FCodeFolding.IsStored();
 end;
 
 procedure TBCEditorLeftMargin.SetBookMarks(AValue: TBookmarks);

@@ -44,8 +44,8 @@ type
     eoBeyondEndOfFile, { Allows the cursor to go beyond the end of file into the white space }
     eoBeyondEndOfLine, { Allows the cursor to go beyond the last character into the white space }
     eoDropFiles, { Allows the editor accept OLE file drops }
+    eoHighlightActiveLine, { Highlights the background of the line with the caret }
     eoHighlightAllFoundTexts, { Highlight all found texts }
-    eoHighlightCurrentLine, { Highlights the background of the line with the caret }
     eoHighlightMatchingPairs, { Highlights the background two matching pairs like quoters or brackets }
     eoMiddleClickScrolling, { Scrolling by mouse move after wheel click. }
     eoShowSpecialChars, { Shows special chars (#0, space, tab and line break) }
@@ -194,8 +194,6 @@ type
   TBCEditorMarksPanelClick = procedure(ASender: TObject; const ALine: Integer) of object;
   TBCEditorMouseCursorEvent = procedure(ASender: TObject; const ALineCharPos: TBCEditorLinesPosition; var ACursor: TCursor) of object;
   TBCEditorReplacePromptEvent = procedure(ASender: TObject; const AArea: TBCEditorLinesArea; const ABackwards: Boolean; const AReplaceText: string; var AAction: TBCEditorReplaceAction) of object;
-
-  TBCEditorTerminatedFunc = function(): Boolean of object;
 
 function Max(const A, B: TBCEditorLinesPosition): TBCEditorLinesPosition; overload; inline;
 function Min(const A, B: TBCEditorLinesPosition): TBCEditorLinesPosition; overload; inline;

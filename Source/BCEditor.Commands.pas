@@ -12,142 +12,6 @@ type
   TBCEditorCommandCategory = Integer;
   TBCEditorCommand = Integer;
 
-const
-  // User defined command categories must be eccUser + n
-  // Last defined category: 9
-  eccUnknown = 0;
-  eccState = 1;
-  eccBookmark = 2;
-  eccScroll = 3;
-  eccMoveCaret = 4;
-  eccText = 5;
-  eccUndo = 6;
-  eccClipboard = 7;
-  eccShowDialog = 8;
-  eccMacroRecorder = 9;
-  eccUser = 100;
-
-  // User defined commands must be ecUser + n
-  // Last defined command: 106
-  ecNone = 0;
-
-  ecCancel = 104;
-  ecInsertTextMode = 1;
-  ecOverwriteTextMode = 2;
-  ecSyncEdit = 3;
-  ecToggleTextMode = 4;
-
-  ecGotoBookmark1 = 5;
-  ecGotoBookmark2 = 6;
-  ecGotoBookmark3 = 7;
-  ecGotoBookmark4 = 8;
-  ecGotoBookmark5 = 9;
-  ecGotoBookmark6 = 10;
-  ecGotoBookmark7 = 11;
-  ecGotoBookmark8 = 12;
-  ecGotoBookmark9 = 13;
-  ecGotoBookmark0 = 14;
-  ecGotoNextBookmark = 15;
-  ecGotoPreviousBookmark = 16;
-  ecSetBookmark1 = 17;
-  ecSetBookmark2 = 18;
-  ecSetBookmark3 = 19;
-  ecSetBookmark4 = 20;
-  ecSetBookmark5 = 21;
-  ecSetBookmark6 = 22;
-  ecSetBookmark7 = 23;
-  ecSetBookmark8 = 24;
-  ecSetBookmark9 = 25;
-  ecSetBookmark0 = 26;
-
-  ecScrollDown = 27;
-  ecScrollLeft = 28;
-  ecScrollRight = 29;
-  ecScrollTo = 30;
-  ecScrollUp = 31;
-
-  ecBOF = 32;
-  ecBOL = 33;
-  ecBOP = 34;
-  ecDown = 35;
-  ecEOF = 36;
-  ecEOL = 37;
-  ecEOP = 38;
-  ecFindBackward = 39;
-  ecFindFirst = 40;
-  ecFindForeward = 41;
-  ecFindNext = 42;
-  ecFindPrevious = 43;
-  ecLeft = 44;
-  ecPageDown = 45;
-  ecPageUp = 46;
-  ecPosition = 47;
-  ecRight = 48;
-  ecSel = 49;
-  ecSelBOF = 50;
-  ecSelBOL = 51;
-  ecSelBOP = 52;
-  ecSelDown = 53;
-  ecSelectAll = 54;
-  ecSelEOF = 55;
-  ecSelEOL = 56;
-  ecSelEOP = 57;
-  ecSelLeft = 58;
-  ecSelPageDown = 59;
-  ecSelPageUp = 60;
-  ecSelRight = 61;
-  ecSelUp = 62;
-  ecSelWord = 63;
-  ecSelWordLeft = 64;
-  ecSelWordRight = 65;
-  ecUnselect = 66;
-  ecUp = 67;
-  ecWordLeft = 68;
-  ecWordRight = 69;
-
-  ecAcceptDrop = 105;
-  ecBackspace = 70;
-  ecBlockComment = 71;
-  ecBlockIndent = 72;
-  ecBlockUnindent = 73;
-  ecChar = 74;
-  ecClear = 75;
-  ecDeleteToBOL = 76;
-  ecDeleteChar = 77;
-  ecDeleteToEOL = 78;
-  ecDeleteLastWord = 79;
-  ecDeleteLine = 80;
-  ecDeleteWord = 81;
-  ecDropOLE = 106;
-  ecInsertLine = 82;
-  ecLineComment = 83;
-  ecLowerCase = 84;
-  ecReturn = 85;
-  ecReplace = 86;
-  ecShiftTab = 87;
-  ecTab = 88;
-  ecText = 89;
-  ecUpperCase = 90;
-
-  ecRedo = 91;
-  ecUndo = 92;
-
-  ecCopyToClipboard = 93;
-  ecCutToClipboard = 94;
-  ecPasteFromClipboard = 95;
-
-  ecShowCompletionProposal = 96;
-  ecShowFind = 97;
-  ecShowGotoLine = 98;
-  ecShowReplace = 99;
-
-  ecPlaybackMacro = 100;
-  ecRecordMacro = 101;
-  ecStepMacro = 102;
-  ecStopMacro = 103;
-
-  ecUser = 10000;
-
 type
   { Command Data }
 
@@ -220,11 +84,11 @@ type
 
   PBCEditorCommandDataSelection = ^TBCEditorCommandDataSelection;
   TBCEditorCommandDataSelection = packed record
-    CaretPos: TPoint;
     BeginPos: TPoint;
     EndPos: TPoint;
-    class function Create(const ACaretPosition: TBCEditorLinesPosition;
-      const ASelArea: TBCEditorLinesArea): TBCEditorCommandData; static;
+    CaretToBeginPosition: Boolean;
+    class function Create(const ASelArea: TBCEditorLinesArea;
+      const ACaretToBeginPosition: Boolean = False): TBCEditorCommandData; static;
   end;
 
   PBCEditorCommandDataText = ^TBCEditorCommandDataText;
@@ -242,20 +106,29 @@ type
   end;
 
   TBCEditorHookedCommandProc = procedure(const AEditor: Pointer; const ABefore: LongBool;
-    const ACommand: Integer; const AData: TBCEditorCommandData; const ADataSize: Int64;
+    const ACommand: Integer; const AData: Pointer; const ADataSize: Int64;
     var AHandled: LongBool; const AHandlerData: Pointer); stdcall;
   TBCEditorHookedCommandObjectProc = procedure(ASender: TObject; const ABefore: Boolean;
     const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean) of object;
   TBCEditorAfterProcessCommandEvent = procedure(ASender: TObject;
     const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData) of object;
   TBCEditorBeforeProcessCommandEvent = procedure(ASender: TObject;
-    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AAllowed: Boolean) of object;
+    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean) of object;
 
   TBCEditorHookedCommandHandler = record
     HandlerData: Pointer;
     ObjectProc: TBCEditorHookedCommandObjectProc;
     Proc: TBCEditorHookedCommandProc;
     class operator Equal(a, b: TBCEditorHookedCommandHandler): Boolean; inline;
+  end;
+
+  TBCEditorHookedCommandHandlers = class(TList<TBCEditorHookedCommandHandler>)
+  private
+    FEditor: TCustomControl;
+  public
+    procedure Broadcast(const ABefore: Boolean; const ACommand: TBCEditorCommand;
+      const AData: TBCEditorCommandData; var AHandled: Boolean);
+    constructor Create(const AEditor: TCustomControl);
   end;
 
   TBCEditorCommandManager = class
@@ -394,15 +267,15 @@ implementation {***************************************************************}
 
 uses
   Windows,
-  BCEditor,
-  Math;
+  Math,
+  BCEditor, BCEditor.Consts;
 
 resourcestring
   SBCEditorCannotRecord = 'Cannot record macro: Already recording or playing';
   SBCEditorCannotPlay = 'Cannot play macro: Already recording or playing';
   SBCEditorNotTCustomBCEditor = 'Value must be a TCustomBCEditor class object';
 
-{ TBCEditorCommandDataChar *************************************************************}
+{ TBCEditorCommandDataChar ****************************************************}
 
 class function TBCEditorCommandDataChar.Create(const AChar: Char): TBCEditorCommandData;
 var
@@ -412,7 +285,7 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCommandDataDropOLE ********************************************************}
+{ TBCEditorCommandDataDropOLE *************************************************}
 
 class function TBCEditorCommandDataDropOLE.Create(const APos: TPoint; const AdataObj: IDataObject): TBCEditorCommandData;
 var
@@ -423,7 +296,7 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCommandDataFind *************************************************************}
+{ TBCEditorCommandDataFind ****************************************************}
 
 class function TBCEditorCommandDataFind.Create(const APattern: string;
   const AOptions: TBCEditorFindOptions): TBCEditorCommandData;
@@ -445,7 +318,7 @@ begin
   SetString(Result, FPattern, FPatternLength);
 end;
 
-{ TBCEditorCommandDataMoveCaret ********************************************************}
+{ TBCEditorCommandDataMoveCaret ***********************************************}
 
 class function TBCEditorCommandDataMoveCaret.Create(const AX, AY: Integer;
   const ASelection: Boolean = False): TBCEditorCommandData;
@@ -458,7 +331,7 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCommandDataPosition *********************************************************}
+{ TBCEditorCommandDataPosition ************************************************}
 
 class function TBCEditorCommandDataPosition.Create(const APosition: TBCEditorLinesPosition;
   const ASelection: Boolean = False): TBCEditorCommandData;
@@ -470,7 +343,7 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCommandDataReplace **********************************************************}
+{ TBCEditorCommandDataReplace *************************************************}
 
 class function TBCEditorCommandDataReplace.Create(const APattern, AReplaceText: string;
   const AOptions: TBCEditorReplaceOptions): TBCEditorCommandData;
@@ -500,7 +373,7 @@ begin
   SetString(Result, FReplaceText, FReplaceTextLength);
 end;
 
-{ TBCEditorCommandDataScrollTo ********************************************************}
+{ TBCEditorCommandDataScrollTo ************************************************}
 
 class function TBCEditorCommandDataScrollTo.Create(const APos: TPoint): TBCEditorCommandData;
 var
@@ -510,20 +383,20 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCommandDataSelection ********************************************************}
+{ TBCEditorCommandDataSelection ***********************************************}
 
-class function TBCEditorCommandDataSelection.Create(const ACaretPosition: TBCEditorLinesPosition;
-  const ASelArea: TBCEditorLinesArea): TBCEditorCommandData;
+class function TBCEditorCommandDataSelection.Create(const ASelArea: TBCEditorLinesArea;
+  const ACaretToBeginPosition: Boolean = False): TBCEditorCommandData;
 var
   LData: TBCEditorCommandDataSelection;
 begin
-  LData.CaretPos := ACaretPosition;
   LData.BeginPos := ASelArea.BeginPosition;
   LData.EndPos := ASelArea.EndPosition;
+  LData.CaretToBeginPosition := ACaretToBeginPosition;
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-{ TBCEditorCommandDataText *************************************************************}
+{ TBCEditorCommandDataText ****************************************************}
 
 class function TBCEditorCommandDataText.Create(const AText: string; const ADelete: Boolean = False;
   const ASelection: Boolean = False): TBCEditorCommandData;
@@ -555,7 +428,48 @@ begin
     and (Pointer((@a.Proc)^) = Pointer((@b.Proc)^));
 end;
 
-{ TBCEditorCommands ***********************************************************}
+{ TBCEditorHookedCommandHandlers **********************************************}
+
+procedure TBCEditorHookedCommandHandlers.Broadcast(const ABefore: Boolean;
+  const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean);
+var
+  LHandledLong: LongBool;
+  LIndex: Integer;
+begin
+  if (ABefore) then
+    for LIndex := Count - 1 downto 0 do
+      if (Assigned(Items[LIndex].ObjectProc)) then
+        Items[LIndex].ObjectProc(FEditor, ABefore, ACommand, AData, AHandled)
+      else
+      begin
+        LHandledLong := AHandled;
+        Items[LIndex].Proc(FEditor, ABefore, Ord(ACommand), @AData[0], Length(AData),
+          LHandledLong, Items[LIndex].HandlerData);
+        AHandled := LHandledLong;
+      end
+  else
+    for LIndex := 0 to Count - 1 do
+      if (Assigned(Items[LIndex].ObjectProc)) then
+        Items[LIndex].ObjectProc(FEditor, ABefore, ACommand, AData, AHandled)
+      else
+      begin
+        LHandledLong := AHandled;
+        Items[LIndex].Proc(FEditor, ABefore, Ord(ACommand), @AData[0], Length(AData),
+          LHandledLong, Items[LIndex].HandlerData);
+        AHandled := LHandledLong;
+      end;
+end;
+
+constructor TBCEditorHookedCommandHandlers.Create(const AEditor: TCustomControl);
+begin
+  Assert(AEditor is TCustomBCEditor);
+
+  inherited Create();
+
+  FEditor := AEditor;
+end;
+
+{ TBCEditorCommandManager *****************************************************}
 
 procedure TBCEditorCommandManager.AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
 var
@@ -680,6 +594,9 @@ var
   LCommand: TItem;
   LIndex: Integer;
 begin
+  Assert((ACommand <= ecLast) or (ACommand >= ecUser));
+  Assert((ACommandCategory <= eccLast) or (ACommandCategory >= eccUser));
+
   LCommand.Command := ACommand;
   LCommand.CommandCategory := ACommandCategory;
   LCommand.Ident := AIdent;
@@ -756,11 +673,11 @@ begin
 
   RegisterCommand(ecBOL, eccMoveCaret, 'ecBOL', ShortCut(VK_HOME, []));
   RegisterCommand(ecBOF, eccMoveCaret, 'ecBOF', ShortCut(VK_HOME, [ssCtrl]));
-  RegisterCommand(ecBOP, eccMoveCaret, 'ecBOP', ShortCut(VK_PRIOR, [ssCtrl]), False);
+  RegisterCommand(ecPageTop, eccMoveCaret, 'ecBOP', ShortCut(VK_PRIOR, [ssCtrl]), False);
   RegisterCommand(ecDown, eccMoveCaret, 'ecDown', ShortCut(VK_DOWN, []));
   RegisterCommand(ecEOF, eccMoveCaret, 'ecEOF', ShortCut(VK_END, [ssCtrl]));
   RegisterCommand(ecEOL, eccMoveCaret, 'ecEOL', ShortCut(VK_END, []));
-  RegisterCommand(ecEOP, eccMoveCaret, 'ecEOP', ShortCut(VK_NEXT, [ssCtrl]), False);
+  RegisterCommand(ecPageBottom, eccMoveCaret, 'ecEOP', ShortCut(VK_NEXT, [ssCtrl]), False);
   RegisterCommand(ecFindBackward, eccMoveCaret, 'ecFindBackward');
   RegisterCommand(ecFindFirst, eccMoveCaret, 'ecFindFirst');
   RegisterCommand(ecFindForeward, eccMoveCaret, 'ecFindForeward');
@@ -965,6 +882,8 @@ begin
         end;
       ecSyncEdit:
         AHandled := True;
+      ecTerminate:
+        FEditor := nil;
       else
         if ((FState = msRecording)
           and Assigned(BCEditorCommandManager)

@@ -569,6 +569,7 @@ type
       FLineLength: Integer;
       FLineText: PChar;
       FRange: TRange;
+      FTemporaryToken: Boolean;
       FText: PChar;
       FToken: TToken;
     public
@@ -601,7 +602,6 @@ type
     FSample: string;
     FSkipCloseKeyChars: TBCEditorAnsiCharSet;
     FSkipOpenKeyChars: TBCEditorAnsiCharSet;
-    FTemporaryCurrentTokens: TObjectList<TToken>;
     FWordBreakChars: TBCEditorAnsiCharSet;
     procedure AddAllAttributes(ARange: TRange);
     procedure SetFileName(AValue: string);
@@ -2474,7 +2474,7 @@ begin
       if Assigned(LColorsObject) then
       begin
         Color := StringToColorDef(LColorsObject['Background'].Value, Color);
-        Colors.CurrentLine.Background := StringToColorDef(LColorsObject['ActiveLineBackground'].Value, Colors.CurrentLine.Background);
+        Colors.ActiveLine.Background := StringToColorDef(LColorsObject['ActiveLineBackground'].Value, Colors.ActiveLine.Background);
         Colors.CodeFolding.Background := StringToColorDef(LColorsObject['CodeFoldingBackground'].Value, Colors.CodeFolding.Background);
         Colors.CodeFolding.Foreground := StringToColorDef(LColorsObject['CodeFoldingFoldingLine'].Value, Colors.CodeFolding.Foreground);
         Colors.Marks.Background := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, Colors.Marks.Background);
@@ -2490,7 +2490,7 @@ begin
         Colors.Selection.Foreground := StringToColorDef(LColorsObject['SelectionForeground'].Value, Colors.Selection.Foreground);
         Colors.SpecialChars.Foreground := StringToColorDef(LColorsObject['SpecialCharForeground'], Colors.SpecialChars.Foreground);
         Colors.SyncEdit.Background := StringToColorDef(LColorsObject['SyncEditBackground'].Value, Colors.SyncEdit.Background);
-        Colors.SyncEdit.Overlays := StringToColorDef(LColorsObject['SyncEditWordBorder'].Value, Colors.SyncEdit.Overlays);
+        Colors.SyncEdit.Overlay := StringToColorDef(LColorsObject['SyncEditWordBorder'].Value, Colors.SyncEdit.Overlay);
       end;
       LFontsObject := AEditorObject['Fonts'].ObjectValue;
       if Assigned(LFontsObject) then
@@ -2925,8 +2925,7 @@ begin
     LRegion.Free;
   end;
   CodeFoldingRangeCount := 0;
-  if (not (csDestroying in Editor.ComponentState)) then
-    TCustomBCEditor(Editor).InvalidateMatchingPair();
+  DoChange();
 end;
 
 constructor TBCEditorHighlighter.Create(const AEditor: TCustomControl);
@@ -2953,8 +2952,6 @@ begin
   FMatchingPairs := TList<TMatchingPairToken>.Create();
   FMatchingPairHighlight := True;
 
-  FTemporaryCurrentTokens := TObjectList<TToken>.Create();
-
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
 end;
 
@@ -2974,7 +2971,6 @@ begin
   FCompletionProposalSkipRegions.Free();
   FMatchingPairs.Free();
   FColors.Free();
-  FTemporaryCurrentTokens.Free();
 
   inherited;
 end;
@@ -2995,6 +2991,7 @@ begin
     else
       AFind.FRange := ABeginRange;
     AFind.FLength := 0;
+    AFind.FTemporaryToken := False;
     AFind.FToken := nil;
 
     if (Assigned(AFind.FRange) and not AFind.FRange.Prepared) then
@@ -3025,9 +3022,9 @@ begin
     Inc(AFind.FLineChar, AFind.FLength);
     AFind.FText := @AFind.FLineText[AFind.FLineChar];
 
-    if (FTemporaryCurrentTokens.Count > 0) then
+    if (AFind.FTemporaryToken) then
     begin
-      FTemporaryCurrentTokens.Clear();
+      AFind.FTemporaryToken := False;
       AFind.FToken := nil;
     end;
 
@@ -3098,7 +3095,7 @@ begin
       end;
 
       if (Assigned(AFind.FToken) and AFind.FToken.Temporary) then
-        FTemporaryCurrentTokens.Add(AFind.FToken);
+        AFind.FTemporaryToken := True;
     end;
 
     AFind.FLength := LChar - AFind.FLineChar;

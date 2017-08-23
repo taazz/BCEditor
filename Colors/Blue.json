@@ -6,8 +6,6 @@
         "ActiveLineBackground": "$00E6FAFF",
         "CodeFoldingBackground": "clWhite",
         "CodeFoldingFoldingLine": "$00CC9999",
-        "CodeFoldingIndent": "$00CC9999",
-        "CodeFoldingIndentHighlight": "$00CC9999",
         "LeftMarginBackground": "clWhite",
         "LeftMarginLineNumbers": "$00CC9999",
         "LeftMarginLineStateModified": "clYellow",
