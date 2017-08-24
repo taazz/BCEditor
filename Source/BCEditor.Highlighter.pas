@@ -618,6 +618,7 @@ type
   public
     constructor Create(const AEditor: TCustomControl);
     destructor Destroy(); override;
+    procedure FindClose(const AFind: TTokenFind);
     function FindFirstToken(const ABeginRange: TRange; const AText: PChar;
       const ALength, AFirstChar: Integer; out AFind: TTokenFind): Boolean; overload;
     function FindNextToken(var AFind: TTokenFind): Boolean;
@@ -2957,7 +2958,7 @@ end;
 
 procedure TBCEditorHighlighter.DoChange();
 begin
-  if Assigned(FOnChange) then
+  if (Assigned(FOnChange)) then
     FOnChange(Self);
 end;
 
@@ -2973,6 +2974,12 @@ begin
   FColors.Free();
 
   inherited;
+end;
+
+procedure TBCEditorHighlighter.FindClose(const AFind: TTokenFind);
+begin
+  if (AFind.FTemporaryToken) then
+    AFind.FToken.Free();
 end;
 
 function TBCEditorHighlighter.FindFirstToken(const ABeginRange: TRange;
@@ -3025,6 +3032,7 @@ begin
     if (AFind.FTemporaryToken) then
     begin
       AFind.FTemporaryToken := False;
+      AFind.FToken.Free();
       AFind.FToken := nil;
     end;
 

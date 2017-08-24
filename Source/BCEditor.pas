@@ -310,7 +310,7 @@ type
     FInsertPos: TPoint;
     FInsertPosBitmap: TGPCachedBitmap;
     FInsertPosCache: TBitmap;
-    FLastBuiltLine: Integer;
+    FLastLineInBuiltRows: Integer;
     FLastCursorPoint: TPoint;
     FLastDoubleClickTime: Cardinal;
     FLastSearch: (lsFind, lsReplace);
@@ -1801,7 +1801,7 @@ begin
 
   LLastUpdateScrollBars := 0;
   LRow := FRows.Count;
-  LLine := FLastBuiltLine + 1; {$MESSAGE 'FLastBuildLine -> '}
+  LLine := FLastLineInBuiltRows + 1;
   while ((LLine < FLines.Count)
     and ((LRow <= AEndRow) or (AEndRow < 0) and not AThread.Terminated)) do
   begin
@@ -1814,57 +1814,56 @@ begin
         FLines.CriticalSection.Leave();
       end
       else
-        Inc(FLastBuiltLine);
+        Inc(FLastLineInBuiltRows);
 
-{$MESSAGE 'Nils'}
-//      FBuildRowsCriticalSection.Enter();
-//      try
-//        case (FRowsWanted.What) of
-//          rwPaintText:
-//            LSynchronizeRowsWantedValid := LRow > FRowsWanted.Row;
-//          rwScrollToPosition:
-//            LSynchronizeRowsWantedValid := LLine >= FRowsWanted.Position.Line;
-//          else
-//            LSynchronizeRowsWantedValid := False;
-//        end;
-//      finally
-//        FBuildRowsCriticalSection.Leave();
-//      end;
-//      if (LSynchronizeRowsWantedValid) then
-//        AThread.Synchronize(RowsWantedValid);
+      FBuildRowsCriticalSection.Enter();
+      try
+        case (FRowsWanted.What) of
+          rwPaintText:
+            LSynchronizeRowsWantedValid := LRow > FRowsWanted.Row;
+          rwScrollToPosition:
+            LSynchronizeRowsWantedValid := LLine >= FRowsWanted.Position.Line;
+          else
+            LSynchronizeRowsWantedValid := False;
+        end;
+      finally
+        FBuildRowsCriticalSection.Leave();
+      end;
+      if (LSynchronizeRowsWantedValid) then
+        AThread.Synchronize(RowsWantedValid);
 
-//      if (AEndRow < 0) then
-//      begin
-//        LTickCount := GetTickCount();
-//        if (LTickCount >= LLastUpdateScrollBars + GClientRefreshTime) then
-//        begin
-//          LLastUpdateScrollBars := LTickCount;
-//          InvalidateScrollBars();
-//        end;
-//      end;
+      if (AEndRow < 0) then
+      begin
+        LTickCount := GetTickCount();
+        if (LTickCount >= LLastUpdateScrollBars + GClientRefreshTime) then
+        begin
+          LLastUpdateScrollBars := LTickCount;
+          InvalidateScrollBars();
+        end;
+      end;
 
-//      Inc(LLine);
+      Inc(LLine);
     finally
       FLines.CriticalSection.Leave();
     end;
   end;
 
-//  FBuildRowsCriticalSection.Enter();
-//  try
-//    Exclude(FState, esBuildingRows);
-//    case (FRowsWanted.What) of
-//      rwEOF:
-//        LSynchronizeRowsWantedValid := True;
-//      else
-//        LSynchronizeRowsWantedValid := False;
-//    end;
-//  finally
-//    FBuildRowsCriticalSection.Leave();
-//  end;
-//  if (LSynchronizeRowsWantedValid) then
-//    AThread.Synchronize(RowsWantedValid);
+  FBuildRowsCriticalSection.Enter();
+  try
+    Exclude(FState, esBuildingRows);
+    case (FRowsWanted.What) of
+      rwEOF:
+        LSynchronizeRowsWantedValid := True;
+      else
+        LSynchronizeRowsWantedValid := False;
+    end;
+  finally
+    FBuildRowsCriticalSection.Leave();
+  end;
+  if (LSynchronizeRowsWantedValid) then
+    AThread.Synchronize(RowsWantedValid);
 
-//  InvalidateScrollBars();
+  InvalidateScrollBars();
 end;
 
 procedure TCustomBCEditor.CaretChanged(ASender: TObject);
@@ -1982,6 +1981,7 @@ begin
       LLeft := FTextPos.X;
       if (GetFindTokenData(LRow, LLeft, LBeginRange, LText, LLength, LChar, LColumn)
         and FHighlighter.FindFirstToken(LBeginRange, LText, LLength, LChar, LToken)) then
+      begin
         repeat
           LTokenWidth := TokenWidth(FPaintHelper, LToken.Text, LToken.Length, LColumn, LToken);
 
@@ -1991,6 +1991,8 @@ begin
           Inc(LLeft, LTokenWidth);
           Inc(LColumn, TokenColumns(LToken.Text, LToken.Length, LColumn));
         until (not FHighlighter.FindNextToken(LToken));
+        FHighlighter.FindClose(LToken);
+      end;
 
       if (LX < LLeft + LTokenWidth) then
       begin
@@ -2251,7 +2253,6 @@ var
 begin
   inherited;
 
-  AutoSize := False;
   Color := clWindow;
   ControlStyle := ControlStyle + [csOpaque, csNeedsBorderPaint];
   DoubleBuffered := True;
@@ -2287,7 +2288,7 @@ begin
   FMouseCapture := mcNone;
   FNoParentNotify := False;
   FLastCursorPoint := Point(-1, -1);
-  FLastBuiltLine := -1;
+  FLastLineInBuiltRows := -1;
   FLastSearch := lsFind;
   FLastSearchData := nil;
   FLineHeight := 0;
@@ -2523,7 +2524,7 @@ begin
     for LLine := ALine to FLines.Count - 1 do
       FLines.SetRow(LLine, FLines.Items[LLine].FirstRow - LDeletedRows, FLines.Items[LLine].RowCount);
 
-    Dec(FLastBuiltLine);
+    Dec(FLastLineInBuiltRows);
   end;
 end;
 
@@ -2539,6 +2540,7 @@ begin
     FBuildRowsThread.Terminate();
     FBuildRowsThread.WaitFor();
     FBuildRowsThread.Free();
+    FBuildRowsThread := nil;
   end;
 
   FLines.TerminateJob(True);
@@ -4788,6 +4790,7 @@ begin
 
   FLines.TerminateJob();
   InvalidateRows();
+  InvalidateMatchingPair();
 
   Include(FState, esHighlighterChanged);
 end;
@@ -4857,8 +4860,6 @@ end;
 
 function TCustomBCEditor.InsertLineIntoRows(const APaintHelper: TPaintHelper;
   const AThread: TBuildRowsThread; const ALine, ARow: Integer): Integer;
-// Long lines will be splitted into multiple parts to proceed the painting
-// faster.
 const
   CRowPartLength = 1000;
 var
@@ -4887,160 +4888,166 @@ begin
   LTerminated := False;
   LRowPart.Char := 0;
   LRowPartList := nil;
-    if (not FHighlighter.FindFirstToken(FLines.Items[ALine].BeginRange,
-      PChar(FLines.Items[ALine].Text), Length(FLines.Items[ALine].Text), 0,
-      LToken)) then
+  if (not FHighlighter.FindFirstToken(FLines.Items[ALine].BeginRange,
+    PChar(FLines.Items[ALine].Text), Length(FLines.Items[ALine].Text), 0,
+    LToken)) then
   begin
     FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
       0, 0, 0, FLines.Items[ALine].BeginRange, nil);
     Result := 1;
   end
-  else if (not FWordWrap) then
-  begin
-    LColumn := 0;
-    LRowWidth := 0;
-    repeat
-      if (LToken.Char - LRowPart.Char > CRowPartLength) then
-      begin
-        if (not Assigned(LRowPartList)) then
-        begin
-          LRowPartList := TList<TRow.TPart>.Create();
-          LRowPart.BeginRange := FLines.Items[ALine].BeginRange;
-          LRowPart.Column := 0;
-          LRowPart.Left := 0;
-          LRowPartList.Add(LRowPart);
-        end
-        else
-          LRowPartList.Add(LRowPart);
-
-        LRowPart.BeginRange := LToken.Range;
-        LRowPart.Char := LToken.Char;
-        LRowPart.Column := LColumn;
-        LRowPart.Left := LRowWidth;
-
-        LTerminated := Assigned(AThread) and AThread.Terminated;
-      end;
-
-      Inc(LRowWidth, TokenWidth(APaintHelper, LToken.Text, LToken.Length, LColumn, LToken));
-      Inc(LColumn, TokenColumns(LToken.Text, LToken.Length, LColumn));
-    until (LTerminated or not FHighlighter.FindNextToken(LToken));
-
-    if (Assigned(LRowPartList)) then
-      LRowPartList.Add(LRowPart);
-
-    if (LTerminated) then
-      Result := 0
-    else
-    begin
-      if (not Assigned(LRowPartList)) then
-        FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
-          Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, nil)
-      else
-      begin
-        SetLength(LRowParts, LRowPartList.Count);
-        Move(LRowPartList.List[0], LRowParts[0], LRowPartList.Count * SizeOf(LRowParts[0]));
-        FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
-          Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, LRowParts);
-      end;
-      Result := 1;
-    end;
-
-    if (Assigned(LRowPartList)) then
-      LRowPartList.Free();
-  end
   else
   begin
-    LRow := ARow;
-    LFlags := [rfFirstRowOfLine];
-    LRowWidth := 0;
-    LRowLength := 0;
-    LColumn := 0;
-    LChar := 0;
-    LBeginRange := FLines.Items[ALine].BeginRange;
-    repeat
-      LTokenWidth := TokenWidth(APaintHelper, LToken.Text, LToken.Length, LColumn, LToken);
-
-      if (LRowWidth + LTokenWidth <= FTextRect.Width) then
-      begin
-        { no row break in token }
-        Inc(LRowLength, LToken.Length);
-        Inc(LRowWidth, LTokenWidth);
-        Inc(LColumn, TokenColumns(LToken.Text, LToken.Length, LColumn));
-      end
-      else if (LRowLength > 0) then
-      begin
-        { row break before token }
-        FRows.Insert(LRow, LFlags, ALine, LChar, LRowLength, LColumn, LRowWidth, LBeginRange, nil);
-        Exclude(LFlags, rfFirstRowOfLine);
-        Inc(LChar, LRowLength);
-        Inc(LRow);
-
-        LBeginRange := LToken.Range;
-        LRowLength := LToken.Length;
-        LRowWidth := LTokenWidth;
-        LColumn := TokenColumns(LToken.Text, LToken.Length, LColumn);
-
-        LTerminated := Assigned(AThread) and AThread.Terminated;
-      end
-      else
-      begin
-        { row break inside token }
-        LTokenBeginPos := LToken.Text;
-        LTokenPos := LTokenBeginPos;
-        LTokenEndPos := @LTokenPos[LToken.Length];
-
-        repeat
-          LTokenRowBeginPos := LTokenPos;
-
-          Inc(LTokenPos);
-
-          repeat
-            LTokenPrevPos := LTokenPos;
-
-            LTokenRowWidth := TokenWidth(APaintHelper, LToken.Text, LTokenPos - LTokenRowBeginPos, LColumn, LToken);
-
-            if (LTokenRowWidth < FTextRect.Width) then
-              repeat
-                Inc(LTokenPos);
-              until ((LTokenPos > LTokenEndPos)
-                or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
-                  and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
-          until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth >= FTextRect.Width));
-
-          if (LTokenRowWidth >= FTextRect.Width) then
+    if (not FWordWrap) then
+    begin
+      LColumn := 0;
+      LRowWidth := 0;
+      repeat
+        // Long lines will be splitted into multiple parts to proceed the painting
+        // faster.
+        if (LToken.Char - LRowPart.Char > CRowPartLength) then
+        begin
+          if (not Assigned(LRowPartList)) then
           begin
-            LTokenPos := LTokenPrevPos;
-
-            LRowLength := LTokenPos - LTokenRowBeginPos - 1;
-            FRows.Insert(LRow, LFlags, ALine, LChar, LRowLength, LColumn, LTokenRowWidth, LBeginRange, nil);
-            Exclude(LFlags, rfFirstRowOfLine);
-            Inc(LChar, LRowLength);
-            Inc(LRow);
-
-            LBeginRange := LToken.Range;
-            LRowLength := 0;
-            LRowWidth := 0;
-            LColumn := 0;
+            LRowPartList := TList<TRow.TPart>.Create();
+            LRowPart.BeginRange := FLines.Items[ALine].BeginRange;
+            LRowPart.Column := 0;
+            LRowPart.Left := 0;
+            LRowPartList.Add(LRowPart);
           end
           else
-          begin
-            LRowLength := LTokenPos - LTokenRowBeginPos;
-            LRowWidth := LTokenRowWidth;
-            SetString(LTokenRowText, PChar(@LToken.Text[LTokenRowBeginPos - LTokenBeginPos]), LRowLength);
-            LColumn := TokenColumns(PChar(LTokenRowText), Length(LTokenRowText), LColumn);
-          end;
-        until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth < FTextRect.Width));
+            LRowPartList.Add(LRowPart);
 
-        LTerminated := Assigned(AThread) and AThread.Terminated;
+          LRowPart.BeginRange := LToken.Range;
+          LRowPart.Char := LToken.Char;
+          LRowPart.Column := LColumn;
+          LRowPart.Left := LRowWidth;
+
+          LTerminated := Assigned(AThread) and AThread.Terminated;
+        end;
+
+        Inc(LRowWidth, TokenWidth(APaintHelper, LToken.Text, LToken.Length, LColumn, LToken));
+        Inc(LColumn, TokenColumns(LToken.Text, LToken.Length, LColumn));
+      until (LTerminated or not FHighlighter.FindNextToken(LToken));
+
+      if (Assigned(LRowPartList)) then
+        LRowPartList.Add(LRowPart);
+
+      if (LTerminated) then
+        Result := 0
+      else
+      begin
+        if (not Assigned(LRowPartList)) then
+          FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
+            Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, nil)
+        else
+        begin
+          SetLength(LRowParts, LRowPartList.Count);
+          Move(LRowPartList.List[0], LRowParts[0], LRowPartList.Count * SizeOf(LRowParts[0]));
+          FRows.Insert(ARow, [rfFirstRowOfLine, rfLastRowOfLine], ALine, 0,
+            Length(FLines.Items[ALine].Text), LColumn, LRowWidth, FLines.Items[ALine].BeginRange, LRowParts);
+        end;
+        Result := 1;
       end;
-    until (LTerminated or not FHighlighter.FindNextToken(LToken));
 
-    if (not LTerminated and (LRowLength > 0)) then
+      if (Assigned(LRowPartList)) then
+        LRowPartList.Free();
+    end
+    else
     begin
-      FRows.Insert(LRow, LFlags + [rfLastRowOfLine], ALine, LChar, LRowLength, LColumn, LRowWidth, LBeginRange, nil);
-      Inc(LRow);
+      LRow := ARow;
+      LFlags := [rfFirstRowOfLine];
+      LRowWidth := 0;
+      LRowLength := 0;
+      LColumn := 0;
+      LChar := 0;
+      LBeginRange := FLines.Items[ALine].BeginRange;
+      repeat
+        LTokenWidth := TokenWidth(APaintHelper, LToken.Text, LToken.Length, LColumn, LToken);
+
+        if (LRowWidth + LTokenWidth <= FTextRect.Width) then
+        begin
+          { no row break in token }
+          Inc(LRowLength, LToken.Length);
+          Inc(LRowWidth, LTokenWidth);
+          Inc(LColumn, TokenColumns(LToken.Text, LToken.Length, LColumn));
+        end
+        else if (LRowLength > 0) then
+        begin
+          { row break before token }
+          FRows.Insert(LRow, LFlags, ALine, LChar, LRowLength, LColumn, LRowWidth, LBeginRange, nil);
+          Exclude(LFlags, rfFirstRowOfLine);
+          Inc(LChar, LRowLength);
+          Inc(LRow);
+
+          LBeginRange := LToken.Range;
+          LRowLength := LToken.Length;
+          LRowWidth := LTokenWidth;
+          LColumn := TokenColumns(LToken.Text, LToken.Length, LColumn);
+
+          LTerminated := Assigned(AThread) and AThread.Terminated;
+        end
+        else
+        begin
+          { row break inside token }
+          LTokenBeginPos := LToken.Text;
+          LTokenPos := LTokenBeginPos;
+          LTokenEndPos := @LTokenPos[LToken.Length];
+
+          repeat
+            LTokenRowBeginPos := LTokenPos;
+
+            Inc(LTokenPos);
+
+            repeat
+              LTokenPrevPos := LTokenPos;
+
+              LTokenRowWidth := TokenWidth(APaintHelper, LToken.Text, LTokenPos - LTokenRowBeginPos, LColumn, LToken);
+
+              if (LTokenRowWidth < FTextRect.Width) then
+                repeat
+                  Inc(LTokenPos);
+                until ((LTokenPos > LTokenEndPos)
+                  or (Char((LTokenPos - 1)^).GetUnicodeCategory() <> TUnicodeCategory.ucNonSpacingMark) or IsCombiningDiacriticalMark((LTokenPos - 1)^)
+                    and not (Char(LTokenPos^).GetUnicodeCategory in [TUnicodeCategory.ucCombiningMark, TUnicodeCategory.ucNonSpacingMark]));
+            until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth >= FTextRect.Width));
+
+            if (LTokenRowWidth >= FTextRect.Width) then
+            begin
+              LTokenPos := LTokenPrevPos;
+
+              LRowLength := LTokenPos - LTokenRowBeginPos - 1;
+              FRows.Insert(LRow, LFlags, ALine, LChar, LRowLength, LColumn, LTokenRowWidth, LBeginRange, nil);
+              Exclude(LFlags, rfFirstRowOfLine);
+              Inc(LChar, LRowLength);
+              Inc(LRow);
+
+              LBeginRange := LToken.Range;
+              LRowLength := 0;
+              LRowWidth := 0;
+              LColumn := 0;
+            end
+            else
+            begin
+              LRowLength := LTokenPos - LTokenRowBeginPos;
+              LRowWidth := LTokenRowWidth;
+              SetString(LTokenRowText, PChar(@LToken.Text[LTokenRowBeginPos - LTokenBeginPos]), LRowLength);
+              LColumn := TokenColumns(PChar(LTokenRowText), Length(LTokenRowText), LColumn);
+            end;
+          until ((LTokenPos > LTokenEndPos) or (LTokenRowWidth < FTextRect.Width));
+
+          LTerminated := Assigned(AThread) and AThread.Terminated;
+        end;
+      until (LTerminated or not FHighlighter.FindNextToken(LToken));
+
+      if (not LTerminated and (LRowLength > 0)) then
+      begin
+        FRows.Insert(LRow, LFlags + [rfLastRowOfLine], ALine, LChar, LRowLength, LColumn, LRowWidth, LBeginRange, nil);
+        Inc(LRow);
+      end;
+      Result := LRow - ARow;
     end;
-    Result := LRow - ARow;
+    FHighlighter.FindClose(LToken);
   end;
 
   if (LTerminated) then
@@ -5054,7 +5061,7 @@ begin
     for LLine := ALine + 1 to FLines.Count - 1 do
       if (FLines.Items[LLine].FirstRow >= 0) then
         FLines.SetRow(LLine, FLines.Items[LLine].FirstRow + Result, FLines.Items[LLine].RowCount);
-    Inc(FLastBuiltLine);
+    Inc(FLastLineInBuiltRows);
   end;
 end;
 
@@ -5152,7 +5159,7 @@ begin
   FRows.Clear();
   for LLine := 0 to FLines.Count - 1 do
     FLines.SetRow(LLine, GRowToInsert, 0);
-  FLastBuiltLine := -1;
+  FLastLineInBuiltRows := -1;
 
   Include(FState, esRowsInvalid);
 
@@ -5360,7 +5367,7 @@ procedure TCustomBCEditor.LineDeleting(ASender: TObject; const ALine: Integer);
 var
   LRow: Integer;
 begin
-  if (ALine <= FLastBuiltLine) then
+  if (ALine <= FLastLineInBuiltRows) then
   begin
     LRow := FLines.Items[ALine].FirstRow + FLines.Items[ALine].RowCount;
     for LRow := LRow to FRows.Count - 1 do
@@ -5391,7 +5398,7 @@ var
 begin
   if (FRows.Count = 0) then
     InvalidateRows()
-  else if (ALine <= FLastBuiltLine) then
+  else if (ALine <= FLastLineInBuiltRows) then
   begin
     SetLinesBeginRanges(ALine);
 
@@ -5559,7 +5566,7 @@ var
   LNewRowCount: Integer;
   LOldRowCount: Integer;
 begin
-  if (ALine <= FLastBuiltLine) then
+  if (ALine <= FLastLineInBuiltRows) then
   begin
     SetLinesBeginRanges(ALine);
 
@@ -6510,7 +6517,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
         if (LRect.IntersectsWith(AClipRect)
           and (csOpaque in ControlStyle)) then
         begin
-          if (ARow < FRows.Count) then
+          if ((0 <= ARow) and (ARow < FRows.Count)) then
           begin
             case (FLines.Items[ALine].State) of
               lsModified:
@@ -6872,7 +6879,7 @@ begin
               if (FLeftMarginWidth > 0) then
                 Result := Result or ProcessLeftMarginBorder(LRowRect, LLine, LRow);
 
-              if (not Result) then
+              if (not Result and (LLine >= 0)) then
               begin
                 if (AJob = cjMouseTrplClk) then
                 begin
@@ -6924,6 +6931,7 @@ begin
                           Inc(LColumn, LToken.Length);
                       until ((LRowRect.Left > FClientRect.Width)
                         or not FHighlighter.FindNextToken(LToken));
+                      FHighlighter.FindClose(LToken);
                     end
                     else
                       Dec(LRowRect.Left, FTextPos.X);
@@ -6949,10 +6957,10 @@ begin
                       FRows.BORPosition[LRow], RowsPosition(0, LRow),
                       nil, 0);
                 end;
-
-                LRowRect.Left := 0;
-                LRowRect.Right := FClientRect.Width;
               end;
+
+              LRowRect.Left := 0;
+              LRowRect.Right := FClientRect.Width;
             end;
           end;
 
@@ -8244,6 +8252,8 @@ begin
               Inc(LColumn, LTokenColumns);
             end;
           until (not LEOL or not FHighlighter.FindNextToken(LToken));
+
+        FHighlighter.FindClose(LToken);
       end;
 
       if ((LRowColumns < ARowsPosition.Column) and (LTokenColumns > 0)
@@ -9151,7 +9161,7 @@ begin
   begin
     FBuildRowsCriticalSection.Enter();
     try
-      if (APosition.Line <= FLastBuiltLine) then
+      if (APosition.Line <= FLastLineInBuiltRows) then
         LTextPos := RowsToText(LinesToRows(APosition))
       else
       begin
@@ -9324,9 +9334,12 @@ begin
       PChar(FLines.Items[LLine].Text), Length(FLines.Items[LLine].Text), 0, LToken)) then
       LRange := FLines.Items[LLine].BeginRange
     else
+    begin
       repeat
         LRange := LToken.Range;
       until (not FHighlighter.FindNextToken(LToken));
+      FHighlighter.FindClose(LToken);
+    end;
 
     if (LRange = FLines.Items[LLine + 1].BeginRange) then
       exit;
