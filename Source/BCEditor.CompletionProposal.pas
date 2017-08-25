@@ -51,12 +51,12 @@ type
   protected
     FActiveControl: TWinControl;
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure Hide; virtual;
+    procedure Hide();
     procedure KeyDown(var Key: Word; Shift: TShiftState); override;
     procedure KeyPress(var Key: Char); override;
     procedure MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer); override;
-    procedure Paint; override;
-    procedure Show(Origin: TPoint); virtual;
+    procedure Paint(); override;
+    procedure Show(Origin: TPoint);
     property OnClose: TBCEditorCompletionProposalCloseEvent read FOnClose write FOnClose;
     property OnValidate: TBCEditorCompletionProposalValidateEvent read FOnValidate write FOnValidate;
   public
@@ -127,7 +127,7 @@ begin
   Visible := False;
 
   FItems := TStringList.Create;
-  FDoubleBufferBitmap := Graphics.TBitmap.Create;
+  FDoubleBufferBitmap := Graphics.TBitmap.Create();
 
   FOnValidate := nil;
   OnDblClick := HandleDblClick;
@@ -656,23 +656,15 @@ begin
         LRect.Bottom := LRect.Top + FItemHeight;
       end;
     end;
-    { Data }
-    for LIndex := 0 to Min(GetVisibleLines, Length(FItemIndexArray) - 1) do
+    { Items }
+    for LIndex := 0 to Min(GetVisibleLines(), Length(FItemIndexArray) - 1) do
     begin
-      if LIndex + TopLine >= Length(FItemIndexArray) then
-        Break;
-
       if LIndex + TopLine = FSelectedLine then
-      begin
-        Canvas.Brush.Color := TCustomBCEditor(FEditor).Colors.Selection.Background;
-        Canvas.Pen.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground;
-        Canvas.Rectangle(LRect);
-      end
+        Canvas.Brush.Color := TCustomBCEditor(FEditor).Colors.Selection.Background
       else
-      begin
         Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
-        Canvas.Pen.Color := TCustomBCEditor(FEditor).Color;
-      end;
+      Canvas.FillRect(LRect);
+
       LColumnWidth := 0;
       for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
       begin
@@ -681,7 +673,6 @@ begin
         if (LColumn.Visible) then
         begin
           Canvas.Font.Assign(LColumn.Font);
-
           if LIndex + TopLine = FSelectedLine then
             Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
           else
@@ -697,11 +688,12 @@ begin
             end;
             Canvas.TextOut(FMargin + LColumnWidth + LLeft, LRect.Top, LColumn.Items[LItemIndex].Value);
           end;
+
           LColumnWidth := LColumnWidth + LColumn.Width;
         end;
       end;
-      LRect.Top := LRect.Bottom;
-      LRect.Bottom := LRect.Top + FItemHeight;
+      Inc(LRect.Top, FItemHeight);
+      Inc(LRect.Bottom, FItemHeight);
     end;
   end;
   Canvas.Draw(0, 0, FDoubleBufferBitmap);
