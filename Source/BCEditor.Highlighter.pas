@@ -2626,8 +2626,6 @@ procedure TBCEditorHighlighter.TImportJSON.ImportHighlighter(AJSONObject: TJsonO
 var
   LHighlighterObject: TJsonObject;
 begin
-  FHighlighter.Clear;
-
   LHighlighterObject := AJSONObject['Highlighter'];
   ImportSample(LHighlighterObject.A['Sample']);
   ImportRange(FHighlighter.MainRules, LHighlighterObject['MainRules'].ObjectValue);

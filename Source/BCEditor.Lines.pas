@@ -71,6 +71,7 @@ type
 
     TState = set of (lsLoading, lsSaving, lsInserting, lsSearching,
       lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair,
+      lsUpdating,
       lsDontTrim, lsUndo, lsRedo, lsBlockModify,
       lsCaretChanged, lsSelChanged,
       lsSyncEditAvailable, lsSyncEdit);
@@ -79,7 +80,8 @@ type
 
     TLine = packed record
     type
-      TFlags = set of (lfContainsTabs);
+      TFlag = (lfContainsTabs, lfContainsWideChar);
+      TFlags = set of TFlag;
       TState = (lsLoaded, lsModified, lsSaved);
     public
       Background: TColor;
@@ -250,6 +252,7 @@ type
     FBookmarks: TMarkList;
     FCaretPosition: TBCEditorLinesPosition;
     FCaseSensitive: Boolean;
+    FContainsWideChar: (cwcUnknown, cwcTrue, cwcFalse);
     FCriticalSection: TCriticalSection;
     FFinal: Boolean;
     FFoundAreas: TList<TBCEditorLinesArea>;
@@ -308,6 +311,7 @@ type
     function GetCanRedo(): Boolean;
     function GetCanUndo(): Boolean;
     function GetChar(APosition: TBCEditorLinesPosition): Char;
+    function GetContainsWideChar(): Boolean;
     function GetEOFPosition(): TBCEditorLinesPosition;
     function GetEOLPosition(ALine: Integer): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
     function GetLineArea(ALine: Integer): TBCEditorLinesArea; {$IFNDEF Debug} inline; {$ENDIF}
@@ -398,6 +402,7 @@ type
     property CaseSensitive: Boolean read FCaseSensitive write FCaseSensitive default False;
     property Char[Position: TBCEditorLinesPosition]: Char read GetChar;
     property CriticalSection: TCriticalSection read FCriticalSection;
+    property ContainsWideChar: Boolean read GetContainsWideChar;
     property EOFPosition: TBCEditorLinesPosition read GetEOFPosition;
     property EOLPosition[ALine: Integer]: TBCEditorLinesPosition read GetEOLPosition;
     property FoundAreas: TList<TBCEditorLinesArea> read FFoundAreas;
@@ -434,6 +439,7 @@ type
     property WordArea[Position: TBCEditorLinesPosition]: TBCEditorLinesArea read GetWordArea;
   public
     function Add(const AText: string): Integer; override;
+    procedure Assign(ASource: TPersistent); override;
     procedure BeginUpdate();
     procedure Clear(); overload; override;
     constructor Create();
@@ -481,6 +487,10 @@ end;
 constructor TBCEditorLines.TJobThread.Create(const ALines: TBCEditorLines);
 begin
   inherited Create(False);
+
+  {$IFDEF Nils}
+  NameThreadForDebugging('JobThread', ThreadId);
+  {$ENDIF}
 
   FLines := ALines;
 
@@ -1258,6 +1268,13 @@ begin
   end;
 end;
 
+procedure TBCEditorLines.Assign(ASource: TPersistent);
+begin
+  Assert(ASource is TStrings);
+
+  SetTextStr(TStrings(ASource).Text);
+end;
+
 procedure TBCEditorLines.BeginUpdate();
 begin
   if (TThread.CurrentThread.ThreadID <> MainThreadID) then
@@ -1388,6 +1405,7 @@ begin
   FBookmarks.OnChange := BookmarksChanged;
   FCaretPosition := BOFPosition;
   FCaseSensitive := False;
+  FContainsWideChar := cwcUnknown;
   FCriticalSection := TCriticalSection.Create();
   FFinal := False;
   FItems := TLines.Create();
@@ -1587,6 +1605,9 @@ begin
 
   if (Assigned(FOnDelete)) then
     FOnDelete(Self, ALine);
+
+  if (lfContainsWideChar in Items[ALine].Flags) then
+    FContainsWideChar := cwcUnknown;
 
   Items.Delete(ALine);
 
@@ -1878,7 +1899,15 @@ begin
         if (LPos^ = BCEDITOR_TAB_CHAR) then
         begin
           Include(Items.List[ALine].Flags, lfContainsTabs);
-          break;
+          if (Items.List[ALine].Flags = [lfContainsTabs, lfContainsWideChar]) then
+            break;
+        end
+        else if (LPos^ >= #256) then
+        begin
+          Include(Items.List[ALine].Flags, lfContainsWideChar);
+          FContainsWideChar := cwcTrue;
+          if (Items.List[ALine].Flags = [lfContainsTabs, lfContainsWideChar]) then
+            break;
         end;
         Inc(LPos);
       end;
@@ -2088,6 +2117,24 @@ begin
   Assert((0 <= APosition.Char) and (APosition.Char < Length(Items.List[APosition.Line].Text)));
 
   Result := Items[APosition.Line].Text[1 + APosition.Char];
+end;
+
+function TBCEditorLines.GetContainsWideChar(): Boolean;
+var
+  LIndex: Integer;
+begin
+  if (FContainsWideChar = cwcUnknown) then
+  begin
+    FContainsWideChar := cwcFalse;
+    for LIndex := 0 to Count - 1 do
+      if (lfContainsWideChar in Items[LIndex].Flags) then
+      begin
+        FContainsWideChar := cwcTrue;
+        break;
+      end;
+  end;
+
+  Result := FContainsWideChar = cwcTrue;
 end;
 
 function TBCEditorLines.GetCount(): Integer;
@@ -2858,7 +2905,7 @@ begin
           end;
         end;
 
-        CaretPosition := LNewCaretPosition;
+        SelArea := LinesArea(LNewCaretPosition, LNewCaretPosition);
       finally
         EndUpdate();
       end;
@@ -3248,14 +3295,18 @@ procedure TBCEditorLines.SetBackground(const ALine: Integer; const AValue: TColo
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].Background := AValue;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetBeginRange(const ALine: Integer; const AValue: Pointer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].BeginRange := AValue;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetCaretPosition(const AValue: TBCEditorLinesPosition);
@@ -3307,28 +3358,36 @@ procedure TBCEditorLines.SetCodeFoldingBeginRange(const ALine: Integer; const AV
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].CodeFolding.BeginRange := AValue;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].CodeFolding.EndRange := AValue;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].CodeFolding.TreeLine := AValue;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetForeground(const ALine: Integer; const AValue: TColor);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].Foreground := AValue;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetModified(const AValue: Boolean);
@@ -3359,8 +3418,10 @@ procedure TBCEditorLines.SetRow(const ALine: Integer; const AFirstRow, ARowCount
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
+  if (UpdateCount = 0) then FCriticalSection.Enter();
   Items.List[ALine].FirstRow := AFirstRow;
   Items.List[ALine].RowCount := ARowCount;
+  if (UpdateCount = 0) then FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetSelArea(AValue: TBCEditorLinesArea);
@@ -3466,7 +3527,7 @@ begin
 
     UndoList.BeginUpdate();
 
-    FState := FState - [lsCaretChanged, lsSelChanged];
+    FState := FState - [lsCaretChanged, lsSelChanged] + [lsUpdating];
     FOldUndoListCount := UndoList.Count;
     FOldCaretPosition := CaretPosition;
     FOldSelArea := FSelArea;
@@ -3499,7 +3560,7 @@ begin
     if (Assigned(FOnLoad) and (lsLoading in FState)) then
       FOnLoad(Self);
 
-    FState := FState - [lsCaretChanged, lsSelChanged];
+    FState := FState - [lsUpdating, lsCaretChanged, lsSelChanged];
   end;
 end;
 

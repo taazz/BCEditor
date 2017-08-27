@@ -151,7 +151,7 @@ type
   );
   TBCEditorUndoOptions = set of TBCEditorUndoOption;
 
-  TBCEditorLinesPosition = packed record
+  TBCEditorLinesPosition = record
     Char: Integer;
     Line: Integer;
     class operator Equal(a, b: TBCEditorLinesPosition): Boolean; inline;
@@ -178,7 +178,7 @@ type
     procedure Union(const a: TBCEditorLinesArea); overload;
   end;
 
-  TBCEditorRowsPosition = packed record
+  TBCEditorRowsPosition = record
     Column: Integer;
     Row: Integer;
     class operator Equal(a, b: TBCEditorRowsPosition): Boolean; inline;

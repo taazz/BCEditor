@@ -311,23 +311,26 @@ var
 begin
   Result := '';
 
-  LTextCaretPosition := TCustomBCEditor(Editor).CaretPos;
-
-  LLineText := TCustomBCEditor(Editor).Lines[Min(LTextCaretPosition.Line, TCustomBCEditor(Editor).Lines.Count - 1)];
-  LChar := LTextCaretPosition.Char;
-  if (LChar <= Length(LLineText)) then
+  if (TCustomBCEditor(Editor).Lines.Count > 0) then
   begin
-    FAdjustCompletionStart := False;
-    while ((LChar > 0) and not TCustomBCEditor(Editor).IsWordBreakChar(LLineText[1 + LChar - 1])) do
-      Dec(LChar);
+    LTextCaretPosition := TCustomBCEditor(Editor).CaretPos;
 
-    FCompletionStartChar := LChar;
-    Result := Copy(LLineText, 1 + FCompletionStartChar, LTextCaretPosition.Char - FCompletionStartChar);
-  end
-  else
-  begin
-    FAdjustCompletionStart := True;
-    FCompletionStartChar := LTextCaretPosition.Char;
+    LLineText := TCustomBCEditor(Editor).Lines[Min(LTextCaretPosition.Line, TCustomBCEditor(Editor).Lines.Count - 1)];
+    LChar := LTextCaretPosition.Char;
+    if (LChar <= Length(LLineText)) then
+    begin
+      FAdjustCompletionStart := False;
+      while ((LChar > 0) and not TCustomBCEditor(Editor).IsWordBreakChar(LLineText[1 + LChar - 1])) do
+        Dec(LChar);
+
+      FCompletionStartChar := LChar;
+      Result := Copy(LLineText, 1 + FCompletionStartChar, LTextCaretPosition.Char - FCompletionStartChar);
+    end
+    else
+    begin
+      FAdjustCompletionStart := True;
+      FCompletionStartChar := LTextCaretPosition.Char;
+    end;
   end;
 end;
 
