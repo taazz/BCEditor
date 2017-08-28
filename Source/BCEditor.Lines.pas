@@ -64,9 +64,9 @@ type
       ErrorMessage: string;
     end;
 
-    TOption = (loTrimTrailingSpaces, loTrimTrailingLines, loUndoGrouped,
-      loUndoAfterLoad, loUndoAfterSave, loSyncEditCaseSensitive, loReadOnly,
-      loBeyondEOF, loBeyondEOL);
+    TOption = (loTrimEOL, loTrimEOF, loUndoGrouped, loUndoAfterLoad,
+      loUndoAfterSave, loSyncEditCaseSensitive, loReadOnly,
+      loCaretBeyondEOF, loCaretBeyondEOL);
     TOptions = set of TOption;
 
     TState = set of (lsLoading, lsSaving, lsInserting, lsSearching,
@@ -1167,7 +1167,7 @@ begin
   begin
     LHandled := False;
     if ((FLines.State * [lsUndo, lsRedo] = [])
-      and (loUndoGrouped in FLines.Options)
+      and (loUndoGrouped in FLines.FOptions)
       and not FGroupBreak
       and (Count > 0) and (List[Count - 1].UndoType = AUndoType)) then
       case (AUndoType) of
@@ -1877,23 +1877,29 @@ end;
 
 procedure TBCEditorLines.DoPut(ALine: Integer; const AText: string);
 var
+  LEndPos: PChar;
   LModified: Boolean;
   LPos: PChar;
-  LEndPos: PChar;
+  LText: string;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  LModified := AText <> Items[ALine].Text;
+  if (not (loTrimEOL in FOptions) or (lsLoading in FState)) then
+    LText := AText
+  else
+    LText := TrimRight(AText);
+
+  LModified := LText <> Items[ALine].Text;
   if (LModified) then
   begin
     Items.List[ALine].Flags := [];
     Items.List[ALine].State := lsModified;
-    Items.List[ALine].Text := AText;
+    Items.List[ALine].Text := LText;
 
-    if (AText <> '') then
+    if (LText <> '') then
     begin
-      LPos := @AText[1];
-      LEndPos := @AText[Length(AText)];
+      LPos := @LText[1];
+      LEndPos := @LText[Length(LText)];
       while (LPos <= LEndPos) do
       begin
         if (LPos^ = BCEDITOR_TAB_CHAR) then
@@ -2195,11 +2201,6 @@ begin
     Assert(AArea.EndPosition.Char <= Length(Items[AArea.EndPosition.Line].Text));
 
     LEndLine := AArea.EndPosition.Line;
-    if ((loTrimTrailingLines in Options) and (lsSaving in State)) then
-      while ((LEndLine > 0)
-        and (Trim(Items[LEndLine].Text) = '')
-        and (Trim(Items[LEndLine - 1].Text) = '')) do
-        Dec(LEndLine);
 
     if (AArea.IsEmpty()) then
       Result := ''
@@ -2209,44 +2210,24 @@ begin
         LEndChar := AArea.EndPosition.Char
       else
         LEndChar := Length(Items[LEndLine].Text);
-      if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
-        while ((LEndChar > 0) and (Items[LEndLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
-          Dec(LEndChar);
       Result := Copy(Items[AArea.BeginPosition.Line].Text, 1 + AArea.BeginPosition.Char, LEndChar - AArea.BeginPosition.Char)
     end
     else
     begin
       LStringBuilder := TStringBuilder.Create();
 
-      LEndChar := Length(Items[AArea.BeginPosition.Line].Text);
-      if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
-        while ((LEndChar > AArea.BeginPosition.Char) and (Items[AArea.BeginPosition.Line].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
-          Dec(LEndChar);
-
-      LStringBuilder.Append(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char, LEndChar - AArea.BeginPosition.Char);
+      LStringBuilder.Append(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char, Length(Items[AArea.BeginPosition.Line].Text) - AArea.BeginPosition.Char);
       for LLine := AArea.BeginPosition.Line + 1 to LEndLine - 1 do
       begin
         LStringBuilder.Append(LineBreak);
-        LEndChar := Length(Items[LLine].Text);
-        if ((loTrimTrailingSpaces in Options) and (lsSaving in State)) then
-          while ((LEndChar > 0) and (Items[LLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
-            Dec(LEndChar);
-
-        LStringBuilder.Append(Items[LLine].Text, 0, LEndChar);
+        LStringBuilder.Append(Items[LLine].Text, 0, Length(Items[LLine].Text));
       end;
       if (LEndLine = AArea.EndPosition.Line) then
         LEndChar := AArea.EndPosition.Char
       else
         LEndChar := Length(Items[LEndLine].Text);
-      if ((loTrimTrailingSpaces in Options) and (lsSaving in State) and (LEndChar = Length(Items[LEndLine].Text))) then
-        while ((LEndChar > 0) and (Items[LEndLine].Text[1 + LEndChar - 1] = BCEDITOR_SPACE_CHAR)) do
-          Dec(LEndChar);
-      if ((LEndChar > 0)
-        or not (loTrimTrailingSpaces in Options) or not (lsSaving in State) or (LEndChar <> Length(Items[LEndLine].Text))) then
-      begin
-        LStringBuilder.Append(LineBreak);
-        LStringBuilder.Append(Items[LEndLine].Text, 0, LEndChar);
-      end;
+      LStringBuilder.Append(LineBreak);
+      LStringBuilder.Append(Items[LEndLine].Text, 0, LEndChar);
 
       Result := LStringBuilder.ToString();
 
@@ -2715,8 +2696,9 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
       else raise ERangeError.Create('UndoType: ' + IntToStr(Ord(AUndoType)));
     end;
 
-    UndoList.Push(AUndoType, LCaretPosition, LSelArea,
-      LArea, LText);
+    if (not (lsLoading in FState) or (loUndoAfterLoad in FOptions)) then
+      UndoList.Push(AUndoType, LCaretPosition, LSelArea,
+        LArea, LText);
   end;
 
 var
@@ -2917,7 +2899,7 @@ procedure TBCEditorLines.SaveToStream(AStream: TStream; AEncoding: TEncoding);
 begin
   inherited;
 
-  if (not (loUndoAfterSave in Options)) then
+  if (not (loUndoAfterSave in FOptions)) then
   begin
     UndoList.Clear();
     RedoList.Clear();
@@ -3096,7 +3078,7 @@ var
 
     Result := True;
 
-    if (loSyncEditCaseSensitive in Options) then
+    if (loSyncEditCaseSensitive in FOptions) then
       strcmp := lstrcmp
     else
       strcmp := lstrcmpi;
@@ -3321,12 +3303,12 @@ begin
   FMatchedPairCloseArea := InvalidLinesArea;
 
   LValue := AValue;
-  if (not (loBeyondEOL in FOptions)) then
+  if (not (loCaretBeyondEOL in FOptions)) then
     if (LValue.Line < Count) then
       LValue.Char := Min(LValue.Char, Length(Items[LValue.Line].Text))
     else
       LValue.Char := 0;
-  if (not (loBeyondEOL in FOptions)) then
+  if (not (loCaretBeyondEOL in FOptions)) then
     LValue.Line := Max(0, Min(LValue.Line, Count - 1));
 
   if (LValue <> FCaretPosition) then
@@ -3334,8 +3316,17 @@ begin
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
 
-    FCaretPosition := LValue;
-    FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
+    BeginUpdate();
+    try
+      if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
+        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
+          Delete(Count - 1);
+
+      FCaretPosition := LValue;
+      FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
+    finally
+      EndUpdate();
+    end;
 
     if (UpdateCount > 0) then
     begin
@@ -3449,11 +3440,16 @@ begin
 
   if ((LValue <> FSelArea) or (FSelArea.EndPosition <> FCaretPosition)) then
   begin
-    LOldSelArea := FSelArea;
     LOldCaretPosition := FCaretPosition;
+    LOldSelArea := FSelArea;
 
-    FSelArea := LValue;
-    FCaretPosition := FSelArea.EndPosition;
+    BeginUpdate();
+    try
+      FCaretPosition := FSelArea.EndPosition;
+      FSelArea := LValue;
+    finally
+      EndUpdate();
+    end;
 
     if (UpdateCount > 0) then
     begin
@@ -3490,14 +3486,14 @@ begin
 
     BeginUpdate();
     try
-      if (loUndoAfterLoad in Options) then
+      if (loUndoAfterLoad in FOptions) then
         DeleteText(LinesArea(BOFPosition, EOFPosition));
 
-      InternalClear(not (loUndoAfterLoad in Options));
+      InternalClear(not (loUndoAfterLoad in FOptions));
 
       InsertText(BOFPosition, AValue);
 
-      if (loUndoAfterLoad in Options) then
+      if (loUndoAfterLoad in FOptions) then
         UndoList.Push(utInsert, BOFPosition, InvalidLinesArea,
           LinesArea(BOFPosition, FCaretPosition));
 
@@ -3534,17 +3530,17 @@ begin
   end
   else
   begin
-    if (not (lsRedo in State) and ((lsCaretChanged in State) or (lsSelChanged in State)) and not UndoList.Updated) then
+    if (not (lsUndo in State)
+      and not (lsRedo in State)
+      and ((lsCaretChanged in State) or (lsSelChanged in State))
+      and not UndoList.Updated) then
     begin
-      if (not (lsUndo in State)) then
-      begin
-        if ((UndoList.Count = FOldUndoListCount)
-          and (CaretPosition <> FOldCaretPosition)
-            or (FSelArea <> FOldSelArea)) then
-          UndoList.Push(utSelection, FOldCaretPosition, FOldSelArea,
-            InvalidLinesArea);
-        RedoList.Clear();
-      end;
+      if ((UndoList.Count = FOldUndoListCount)
+        and (CaretPosition <> FOldCaretPosition)
+          or (FSelArea <> FOldSelArea)) then
+        UndoList.Push(utSelection, FOldCaretPosition, FOldSelArea,
+          InvalidLinesArea);
+      RedoList.Clear();
     end;
 
     UndoList.EndUpdate();
@@ -3710,7 +3706,7 @@ end;
 
 procedure TBCEditorLines.UndoGroupBreak();
 begin
-  if ((loUndoGrouped in Options) and CanUndo) then
+  if ((loUndoGrouped in FOptions) and CanUndo) then
     UndoList.GroupBreak();
 end;
 

@@ -49,8 +49,8 @@ type
     eoHighlightMatchingPairs, { Highlights the background two matching pairs like quoters or brackets }
     eoMiddleClickScrolling, { Scrolling by mouse move after wheel click. }
     eoShowSpecialChars, { Shows special chars (#0, space, tab and line break) }
-    eoTrimTrailingLines, { Empty lines at the end of text will be removed while saving }
-    eoTrimTrailingSpaces { Spaces at the end of lines will be removed while saving }
+    eoTrimEndOfFile, { Empty lines at the end of text will be removed automatically }
+    eoTrimEndOfLine { Spaces at the end of lines will be removed automatically }
   );
   TBCEditorOptions = set of TBCEditorOption;
 

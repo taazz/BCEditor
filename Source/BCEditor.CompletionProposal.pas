@@ -187,7 +187,7 @@ var
 
     if LPoint.Y + ClientHeight > Screen.DesktopHeight then
     begin
-      LPoint.Y := LPoint.Y - ClientHeight - TCustomBCEditor(Editor).LineHeight - 2;
+      LPoint.Y := LPoint.Y - ClientHeight - TCustomBCEditor(Editor).RowHeight - 2;
       if LPoint.Y < 0 then
         LPoint.Y := 0;
     end;

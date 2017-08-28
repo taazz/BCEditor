@@ -522,6 +522,32 @@ type
     property Marks: TMarks read FMarks write SetMarks;
   end;
 
+  TBCEditorMinimap = class(TPersistent)
+  strict private const
+    DefaultFontSize = 1;
+    DefaultVisible = False;
+    DefaultWidth = 140;
+  strict private
+    FFontSize: Integer;
+    FOnChange: TNotifyEvent;
+    FVisible: Boolean;
+    FWidth: Integer;
+    procedure DoChange();
+    procedure SetFontSize(const AValue: Integer);
+    procedure SetVisible(const AValue: Boolean);
+    procedure SetWidth(const AValue: Integer);
+  protected
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
+    procedure ChangeScale(M, D: Integer);
+  public
+    procedure Assign(ASource: TPersistent); override;
+    constructor Create();
+  published
+    property FontSize: Integer read FFontSize write SetFontSize default DefaultFontSize;
+    property Visible: Boolean read FVisible write SetVisible default DefaultVisible;
+    property Width: Integer read FWidth write SetWidth default DefaultWidth;
+  end;
+
   TBCEditorTabs = class(TPersistent)
   strict private const
     DefaultOptions = [toSelectedBlockIndent];
@@ -1737,6 +1763,68 @@ begin
   FMarks.Assign(AValue);
 end;
 
+{ TBCEditorMinimap ************************************************************}
+
+procedure TBCEditorMinimap.Assign(ASource: TPersistent);
+begin
+  Assert(ASource is TBCEditorMinimap);
+
+  inherited;
+
+  FFontSize := TBCEditorMinimap(ASource).FFontSize;
+  FVisible := TBCEditorMinimap(ASource).FVisible;
+  FWidth := TBCEditorMinimap(ASource).FWidth;
+
+  DoChange();
+end;
+
+procedure TBCEditorMinimap.ChangeScale(M, D: Integer);
+begin
+  FWidth := FWidth * M div D;
+end;
+
+constructor TBCEditorMinimap.Create();
+begin
+  inherited;
+
+  FFontSize := DefaultFontSize;
+  FVisible := DefaultVisible;
+  FWidth := DefaultWidth;
+end;
+
+procedure TBCEditorMinimap.DoChange();
+begin
+  if (Assigned(FOnChange)) then
+    FOnChange(Self);
+end;
+
+procedure TBCEditorMinimap.SetFontSize(const AValue: Integer);
+begin
+  if (AValue <> FFontSize) then
+  begin
+    FFontSize := AValue;
+    DoChange();
+  end;
+end;
+
+procedure TBCEditorMinimap.SetVisible(const AValue: Boolean);
+begin
+  if (AValue <> FVisible) then
+  begin
+    FVisible := AValue;
+    DoChange();
+  end;
+end;
+
+procedure TBCEditorMinimap.SetWidth(const AValue: Integer);
+begin
+  if (AValue <> FWidth) then
+  begin
+    FWidth := AValue;
+    DoChange();
+  end;
+end;
+
 { TBCEditorTabs ***************************************************************}
 
 procedure TBCEditorTabs.Assign(ASource: TPersistent);
@@ -1776,7 +1864,7 @@ end;
 
 procedure TBCEditorTabs.SetWidth(const AValue: Integer);
 begin
-  if ((FWidth <> AValue) and (1 <= AValue) and (AValue < 256)) then
+  if ((AValue <> FWidth) and (1 <= AValue) and (AValue < 256)) then
   begin
     FWidth := AValue;
     DoChange();
