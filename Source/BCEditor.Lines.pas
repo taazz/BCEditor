@@ -3299,9 +3299,6 @@ var
 begin
   Assert(BOFPosition <= AValue);
 
-  FMatchedPairOpenArea := InvalidLinesArea;
-  FMatchedPairCloseArea := InvalidLinesArea;
-
   LValue := AValue;
   if (not (loCaretBeyondEOL in FOptions)) then
     if (LValue.Line < Count) then
@@ -3313,6 +3310,11 @@ begin
 
   if (LValue <> FCaretPosition) then
   begin
+    FMatchedPairOpenArea := InvalidLinesArea;
+    FMatchedPairCloseArea := InvalidLinesArea;
+
+    Exclude(FState, lsSyncEditAvailable);
+
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
 
@@ -3423,11 +3425,6 @@ var
 begin
   Assert(BOFPosition <= AValue.BeginPosition);
 
-  FMatchedPairOpenArea := InvalidLinesArea;
-  FMatchedPairCloseArea := InvalidLinesArea;
-
-  Exclude(FState, lsSyncEditAvailable);
-
   LValue := AValue;
   if (LValue.BeginPosition.Line < Count) then
     LValue.BeginPosition.Char := Min(LValue.BeginPosition.Char, Length(Items[LValue.BeginPosition.Line].Text))
@@ -3440,12 +3437,17 @@ begin
 
   if ((LValue <> FSelArea) or (FSelArea.EndPosition <> FCaretPosition)) then
   begin
+    FMatchedPairOpenArea := InvalidLinesArea;
+    FMatchedPairCloseArea := InvalidLinesArea;
+
+    Exclude(FState, lsSyncEditAvailable);
+
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
 
     BeginUpdate();
     try
-      FCaretPosition := FSelArea.EndPosition;
+      FCaretPosition := LValue.EndPosition;
       FSelArea := LValue;
     finally
       EndUpdate();
