@@ -373,6 +373,8 @@ type
     FOldActiveLine: Integer;
     FOldClientRect: TRect;
     FOldHorzScrollBarVisible: Boolean;
+    FOldMatchingPairOpenArea: TBCEditorLinesArea;
+    FOldMatchingPairCloseArea: TBCEditorLinesArea;
     FOldSelArea: TBCEditorLinesArea;
     FOldVertScrollBarVisible: Boolean;
     FOnCaretChanged: TBCEditorCaretChangedEvent;
@@ -2534,6 +2536,8 @@ begin
   FOldActiveLine := -1;
   FOldClientRect := InvalidRect;
   FOldHorzScrollBarVisible := False;
+  FOldMatchingPairOpenArea := InvalidLinesArea;
+  FOldMatchingPairCloseArea := InvalidLinesArea;
   FOldSelArea := InvalidLinesArea;
   FOldVertScrollBarVisible := False;
   FOnChange := nil;
@@ -5476,8 +5480,11 @@ end;
 
 procedure TCustomBCEditor.InvalidateMatchingPair();
 begin
-  InvalidateText(FLines.MatchedPairOpenArea.BeginPosition.Line);
-  InvalidateText(FLines.MatchedPairCloseArea.BeginPosition.Line);
+  InvalidateText(FOldMatchingPairOpenArea.BeginPosition.Line);
+  InvalidateText(FOldMatchingPairCloseArea.BeginPosition.Line);
+
+  FOldMatchingPairOpenArea := FOldMatchingPairOpenArea;
+  FOldMatchingPairCloseArea := FOldMatchingPairCloseArea;
 
   Include(FState, esMatchedPairInvalid);
 end;
@@ -5992,6 +5999,9 @@ procedure TCustomBCEditor.MatchingPairScanned(const AData: Pointer);
 begin
   InvalidateText(FLines.MatchedPairOpenArea.BeginPosition.Line);
   InvalidateText(FLines.MatchedPairCloseArea.BeginPosition.Line);
+
+  FOldMatchingPairOpenArea := FLines.MatchedPairOpenArea;
+  FOldMatchingPairCloseArea := FLines.MatchedPairCloseArea;
 
   Exclude(FState, esMatchedPairInvalid);
 end;

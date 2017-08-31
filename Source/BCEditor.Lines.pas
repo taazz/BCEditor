@@ -847,8 +847,11 @@ begin
         if (ABackwards) then
           Dec(FFoundPosition.Char);
 
-        if (ABackwards and (FFoundPosition.Line = FArea.BeginPosition.Line)) then
-          LLineBeginPos := @LLineText[1 + FArea.BeginPosition.Char]
+        if (ABackwards) then
+          if (FFoundPosition.Line = FArea.BeginPosition.Line) then
+            LLineBeginPos := @LLineText[1 + FArea.BeginPosition.Char]
+          else
+            LLineBeginPos := @LLineText[1]
         else
           LLineBeginPos := @LLineText[1 + FFoundPosition.Char];
         LLineEndPos := @LLineText[1 + LLineLength - LPatternLength];

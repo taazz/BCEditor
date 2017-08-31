@@ -395,6 +395,7 @@ begin
     begin
       Lines.BeginUpdate();
       try
+        ProcessCommand(ecSelWordLeft);
         ProcessCommand(ecDeleteWord);
         ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value));
       finally
