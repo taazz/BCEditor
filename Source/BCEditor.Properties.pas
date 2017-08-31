@@ -155,6 +155,7 @@ type
     FColumns: TBCEditorCompletionProposalColumns;
     FCompletionColumnIndex: Integer;
     FConstraints: TSizeConstraints;
+    FDefaultWidth: Integer;
     FEnabled: Boolean;
     FImages: TCustomImageList;
     FOptions: TBCEditorCompletionProposalOptions;
@@ -167,10 +168,10 @@ type
     function GetOwner(): TPersistent; override;
     function IsStored(): Boolean;
   public
-    constructor Create(AOwner: TComponent);
-    destructor Destroy(); override;
     procedure Assign(ASource: TPersistent); override;
     procedure ChangeScale(M, D: Integer);
+    constructor Create(AOwner: TComponent);
+    destructor Destroy(); override;
   published
     property CloseChars: string read FCloseChars write FCloseChars;
     property Columns: TBCEditorCompletionProposalColumns read FColumns write FColumns;
@@ -528,6 +529,7 @@ type
     DefaultVisible = False;
     DefaultWidth = 140;
   strict private
+    FDefaultWidth: Integer;
     FFontSize: Integer;
     FOnChange: TNotifyEvent;
     FVisible: Boolean;
@@ -539,6 +541,7 @@ type
   protected
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     procedure ChangeScale(M, D: Integer);
+    function IsStored(): Boolean;
   public
     procedure Assign(ASource: TPersistent); override;
     constructor Create();
@@ -574,7 +577,7 @@ implementation  {**************************************************************}
 uses
   Windows,
   Math, SysUtils, Character,
-  Menus;
+  Forms, Menus;
 
 { TBCEditorCompletionProposalItems.TItem **************************************}
 
@@ -828,6 +831,7 @@ end;
 procedure TBCEditorCompletionProposal.ChangeScale(M, D: Integer);
 begin
   FWidth := FWidth * M div D;
+  FDefaultWidth := DefaultWidth * M div D;
 end;
 
 constructor TBCEditorCompletionProposal.Create(AOwner: TComponent);
@@ -845,6 +849,8 @@ begin
   FTrigger := TTrigger.Create(Self);
   FVisibleLines := DefaultVisibleLines;
   FWidth := DefaultWidth;
+
+  ChangeScale(Screen.PixelsPerInch, USER_DEFAULT_SCREEN_DPI);
 end;
 
 destructor TBCEditorCompletionProposal.Destroy();
@@ -871,7 +877,7 @@ begin
     or (FOptions <> DefaultOptions)
     or FTrigger.IsStored()
     or (FVisibleLines <> DefaultVisibleLines)
-    or (FWidth <> DefaultWidth);
+    or (FWidth <> FDefaultWidth);
 end;
 
 procedure TBCEditorCompletionProposal.SetImages(const AValue: TCustomImageList);
@@ -1781,6 +1787,7 @@ end;
 procedure TBCEditorMinimap.ChangeScale(M, D: Integer);
 begin
   FWidth := FWidth * M div D;
+  FDefaultWidth := DefaultWidth * M div D;
 end;
 
 constructor TBCEditorMinimap.Create();
@@ -1790,12 +1797,21 @@ begin
   FFontSize := DefaultFontSize;
   FVisible := DefaultVisible;
   FWidth := DefaultWidth;
+
+  ChangeScale(Screen.PixelsPerInch, USER_DEFAULT_SCREEN_DPI);
 end;
 
 procedure TBCEditorMinimap.DoChange();
 begin
   if (Assigned(FOnChange)) then
     FOnChange(Self);
+end;
+
+function TBCEditorMinimap.IsStored(): Boolean;
+begin
+  Result := (FFontSize <> DefaultFontSize)
+    or (FVisible <> DefaultVisible)
+    or (FWidth <> FDefaultWidth);
 end;
 
 procedure TBCEditorMinimap.SetFontSize(const AValue: Integer);

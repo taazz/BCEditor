@@ -2990,7 +2990,7 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
         if (LOpenTokenSearch.Find(LBeginPosition, False, LOpenTokenFoundLength)) then
         begin
           LOpenTokenArea.BeginPosition := LBeginPosition;
-          LOpenTokenArea.EndPosition := PositionOf(1, LOpenTokenArea.BeginPosition);
+          LOpenTokenArea.EndPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenArea.BeginPosition);
 
           LDeep := 0;
 
