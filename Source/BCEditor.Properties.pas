@@ -155,7 +155,6 @@ type
     FColumns: TBCEditorCompletionProposalColumns;
     FCompletionColumnIndex: Integer;
     FConstraints: TSizeConstraints;
-    FDefaultWidth: Integer;
     FEnabled: Boolean;
     FImages: TCustomImageList;
     FOptions: TBCEditorCompletionProposalOptions;
@@ -529,7 +528,6 @@ type
     DefaultVisible = False;
     DefaultWidth = 140;
   strict private
-    FDefaultWidth: Integer;
     FFontSize: Integer;
     FOnChange: TNotifyEvent;
     FVisible: Boolean;
@@ -541,7 +539,6 @@ type
   protected
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     procedure ChangeScale(M, D: Integer);
-    function IsStored(): Boolean;
   public
     procedure Assign(ASource: TPersistent); override;
     constructor Create();
@@ -831,7 +828,6 @@ end;
 procedure TBCEditorCompletionProposal.ChangeScale(M, D: Integer);
 begin
   FWidth := FWidth * M div D;
-  FDefaultWidth := DefaultWidth * M div D;
 end;
 
 constructor TBCEditorCompletionProposal.Create(AOwner: TComponent);
@@ -877,7 +873,7 @@ begin
     or (FOptions <> DefaultOptions)
     or FTrigger.IsStored()
     or (FVisibleLines <> DefaultVisibleLines)
-    or (FWidth <> FDefaultWidth);
+    or (FWidth <> DefaultWidth);
 end;
 
 procedure TBCEditorCompletionProposal.SetImages(const AValue: TCustomImageList);
@@ -1787,7 +1783,6 @@ end;
 procedure TBCEditorMinimap.ChangeScale(M, D: Integer);
 begin
   FWidth := FWidth * M div D;
-  FDefaultWidth := DefaultWidth * M div D;
 end;
 
 constructor TBCEditorMinimap.Create();
@@ -1805,13 +1800,6 @@ procedure TBCEditorMinimap.DoChange();
 begin
   if (Assigned(FOnChange)) then
     FOnChange(Self);
-end;
-
-function TBCEditorMinimap.IsStored(): Boolean;
-begin
-  Result := (FFontSize <> DefaultFontSize)
-    or (FVisible <> DefaultVisible)
-    or (FWidth <> FDefaultWidth);
 end;
 
 procedure TBCEditorMinimap.SetFontSize(const AValue: Integer);

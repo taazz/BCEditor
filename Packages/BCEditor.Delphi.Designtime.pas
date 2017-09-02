@@ -28,11 +28,12 @@ procedure Register();
 begin
   RegisterComponents('BCEditor', [TBCEditor, TBCEditorMacroRecorder]);
 
+  UnlistPublishedProperty(TBCEditor, 'Cursor');
   UnlistPublishedProperty(TBCEditor, 'CustomHint');
   UnlistPublishedProperty(TBCEditor, 'DoubleBuffered');
+  UnlistPublishedProperty(TBCEditor, 'Hint');
   UnlistPublishedProperty(TBCEditor, 'ParentCustomHint');
   UnlistPublishedProperty(TBCEditor, 'ParentColor');
-  UnlistPublishedProperty(TBCEditor, 'Hint');
 
   RegisterPropertyEditor(TypeInfo(Char), nil, '', TCharProperty);
   RegisterPropertyEditor(TypeInfo(TStrings), nil, '', TStringListProperty);

@@ -4,6 +4,7 @@ A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VC
 * Predefined highlighter definitions for 70 programming languages
 * User defined highlighter definions
 * Multi highglighter support (for example: HTTP and PHP)
+* Minimap
 * Matching pair highlighting (for example "<" and ">" in HTML)
 * Search with regular expressions, forwards / backwards, whole words, case sensitive, selection only
 * Search result highlighting

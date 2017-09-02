@@ -395,8 +395,11 @@ begin
     begin
       Lines.BeginUpdate();
       try
-        ProcessCommand(ecSelWordLeft);
-        ProcessCommand(ecDeleteWord);
+        if (FCompletionStartChar < TCustomBCEditor(Editor).CaretPos.X) then
+        begin
+          ProcessCommand(ecSelWordLeft);
+          ProcessCommand(ecDeleteWord);
+        end;
         ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems[FItemIndexArray[FSelectedLine]].Value));
       finally
         Lines.EndUpdate();

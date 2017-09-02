@@ -3318,20 +3318,22 @@ begin
 
     Exclude(FState, lsSyncEditAvailable);
 
+    if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
+    begin
+      BeginUpdate();
+      try
+        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
+          Delete(Count - 1);
+      finally
+        EndUpdate();
+      end;
+    end;
+
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
 
-    BeginUpdate();
-    try
-      if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
-        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
-          Delete(Count - 1);
-
-      FCaretPosition := LValue;
-      FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
-    finally
-      EndUpdate();
-    end;
+    FCaretPosition := LValue;
+    FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
 
     if (UpdateCount > 0) then
     begin
@@ -3448,13 +3450,8 @@ begin
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
 
-    BeginUpdate();
-    try
-      FCaretPosition := LValue.EndPosition;
-      FSelArea := LValue;
-    finally
-      EndUpdate();
-    end;
+    FCaretPosition := LValue.EndPosition;
+    FSelArea := LValue;
 
     if (UpdateCount > 0) then
     begin

@@ -569,7 +569,6 @@ type
       FLineLength: Integer;
       FLineText: PChar;
       FRange: TRange;
-      FTemporaryToken: Boolean;
       FText: PChar;
       FToken: TToken;
     public
@@ -2976,7 +2975,7 @@ end;
 
 procedure TBCEditorHighlighter.FindClose(const AFind: TTokenFind);
 begin
-  if (AFind.FTemporaryToken) then
+  if (Assigned(AFind.FToken) and AFind.FToken.Temporary) then
     AFind.FToken.Free();
 end;
 
@@ -2996,7 +2995,6 @@ begin
     else
       AFind.FRange := ABeginRange;
     AFind.FLength := 0;
-    AFind.FTemporaryToken := False;
     AFind.FToken := nil;
 
     if (Assigned(AFind.FRange) and not AFind.FRange.Prepared) then
@@ -3027,9 +3025,8 @@ begin
     Inc(AFind.FLineChar, AFind.FLength);
     AFind.FText := @AFind.FLineText[AFind.FLineChar];
 
-    if (AFind.FTemporaryToken) then
+    if (Assigned(AFind.FToken) and AFind.FToken.Temporary) then
     begin
-      AFind.FTemporaryToken := False;
       AFind.FToken.Free();
       AFind.FToken := nil;
     end;
@@ -3099,9 +3096,6 @@ begin
           AFind.FToken := AFind.FRange.DefaultToken;
         end;
       end;
-
-      if (Assigned(AFind.FToken) and AFind.FToken.Temporary) then
-        AFind.FTemporaryToken := True;
     end;
 
     AFind.FLength := LChar - AFind.FLineChar;
