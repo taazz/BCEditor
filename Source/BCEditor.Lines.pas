@@ -371,6 +371,7 @@ type
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure ReplaceText(const AArea: TBCEditorLinesArea;
       const AText: string); overload; {$IFNDEF Debug} inline; {$ENDIF}
+    procedure RowsCleared();
     procedure SetBackground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetBeginRange(const ALine: Integer; const AValue: Pointer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetCodeFoldingBeginRange(const ALine: Integer; const AValue: Pointer);
@@ -1611,20 +1612,20 @@ begin
 
   if (lfContainsWideChar in Items[ALine].Flags) then
     FContainsWideChar := cwcUnknown;
-
-  Items.Delete(ALine);
-
-  FModified := True;
   FFoundAreas.Clear();
   FMatchedPairOpenArea := InvalidLinesArea;
   FMatchedPairCloseArea := InvalidLinesArea;
 
+  FModified := True;
+
+  Items.Delete(ALine);
+
   if (Count = 0) then
-    CaretPosition := BOFPosition
+    SetCaretPosition(BOFPosition)
   else if (ALine < Count) then
-    CaretPosition := BOLPosition[ALine]
+    SetCaretPosition(BOLPosition[ALine])
   else
-    CaretPosition := EOLPosition[ALine - 1];
+    SetCaretPosition(EOLPosition[ALine - 1]);
 
   if ((Count = 0) and Assigned(FOnClear)) then
     FOnClear(Self);
@@ -1730,7 +1731,8 @@ begin
     LLine.Flags := [];
     LLine.FirstRow := -1;
     LLine.Foreground := clNone;
-    LLine.State := lsModified;
+    LLine.RowCount := 0;
+    LLine.State := lsLoaded;
     LLine.Text := '';
     Items.Insert(ALine, LLine);
 
@@ -1742,9 +1744,9 @@ begin
     end;
 
     if (ALine < Count - 1) then
-      CaretPosition := BOLPosition[ALine + 1]
+      SetCaretPosition(BOLPosition[ALine + 1])
     else
-      CaretPosition := EOLPosition[ALine];
+      SetCaretPosition(EOLPosition[ALine]);
 
     if (Assigned(FOnInsert)) then
       FOnInsert(Self, ALine);
@@ -1892,9 +1894,15 @@ begin
   else
     LText := TrimRight(AText);
 
-  LModified := LText <> Items[ALine].Text;
+  LModified := (LText <> Items[ALine].Text) or (lsInserting in FState);
   if (LModified) then
   begin
+    FFoundAreas.Clear();
+    FMatchedPairOpenArea := InvalidLinesArea;
+    FMatchedPairCloseArea := InvalidLinesArea;
+
+    FModified := True;
+
     Items.List[ALine].Flags := [];
     Items.List[ALine].State := lsModified;
     Items.List[ALine].Text := LText;
@@ -1923,18 +1931,12 @@ begin
     end;
   end;
 
-  CaretPosition := EOLPosition[ALine];
+  SetCaretPosition(EOLPosition[ALine]);
 
-  if (LModified and not (lsInserting in State)) then
-  begin
-    FModified := True;
-    FFoundAreas.Clear();
-    FMatchedPairOpenArea := InvalidLinesArea;
-    FMatchedPairCloseArea := InvalidLinesArea;
-
-    if (Assigned(FOnUpdate)) then
-      FOnUpdate(Self, ALine);
-  end;
+  if (LModified
+    and not (lsInserting in State)
+    and Assigned(FOnUpdate)) then
+    FOnUpdate(Self, ALine);
 end;
 
 procedure TBCEditorLines.EndUpdate();
@@ -2074,7 +2076,7 @@ begin
       until ((List.Count = 0)
         or (LUndoItem.BlockNumber <> LPreviousBlockNumber));
 
-      CaretPosition := LCaretPosition;
+      SetCaretPosition(LCaretPosition);
       SetSelArea(LSelArea);
     finally
       EndUpdate();
@@ -2898,6 +2900,21 @@ begin
   end;
 end;
 
+procedure TBCEditorLines.RowsCleared();
+var
+  LLine: Integer;
+begin
+  FCriticalSection.Enter();
+
+  for LLine := 0 to Count - 1 do
+  begin
+    Items.List[LLine].FirstRow := -1;
+    Items.List[LLine].RowCount := 0;
+  end;
+
+  FCriticalSection.Leave();
+end;
+
 procedure TBCEditorLines.SaveToStream(AStream: TStream; AEncoding: TEncoding);
 begin
   inherited;
@@ -3280,18 +3297,18 @@ procedure TBCEditorLines.SetBackground(const ALine: Integer; const AValue: TColo
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
   Items.List[ALine].Background := AValue;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetBeginRange(const ALine: Integer; const AValue: Pointer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
   Items.List[ALine].BeginRange := AValue;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetCaretPosition(const AValue: TBCEditorLinesPosition);
@@ -3356,36 +3373,36 @@ procedure TBCEditorLines.SetCodeFoldingBeginRange(const ALine: Integer; const AV
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
   Items.List[ALine].CodeFolding.BeginRange := AValue;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
   Items.List[ALine].CodeFolding.EndRange := AValue;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
   Items.List[ALine].CodeFolding.TreeLine := AValue;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetForeground(const ALine: Integer; const AValue: TColor);
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
   Items.List[ALine].Foreground := AValue;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetModified(const AValue: Boolean);
@@ -3413,13 +3430,31 @@ begin
 end;
 
 procedure TBCEditorLines.SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer);
+var
+  LCount: Integer;
+  LLine: Integer;
+  LRowDiff: Integer;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (UpdateCount = 0) then FCriticalSection.Enter();
+  FCriticalSection.Enter();
+
+  LRowDiff :=  - Items.List[ALine].RowCount;
+
   Items.List[ALine].FirstRow := AFirstRow;
   Items.List[ALine].RowCount := ARowCount;
-  if (UpdateCount = 0) then FCriticalSection.Leave();
+
+  Inc(LRowDiff, ARowCount);
+
+  if (LRowDiff <> 0) then
+  begin
+    LCount := Count;
+    for LLine := ALine + 1 to LCount - 1 do
+      if (Items.List[LLine].FirstRow >= 0) then
+        Inc(Items.List[LLine].FirstRow, LRowDiff);
+  end;
+
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetSelArea(AValue: TBCEditorLinesArea);
@@ -3504,7 +3539,7 @@ begin
       for LLine := 0 to Count - 1 do
         Items.List[LLine].State := lsLoaded;
 
-      CaretPosition := BOFPosition;
+      SetCaretPosition(BOFPosition);
     finally
       EndUpdate();
     end;

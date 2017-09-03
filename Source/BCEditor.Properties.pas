@@ -1803,10 +1803,13 @@ begin
 end;
 
 procedure TBCEditorMinimap.SetFontSize(const AValue: Integer);
+var
+  LValue: Integer;
 begin
-  if (AValue <> FFontSize) then
+  LValue := Min(100, Max(1, AValue));
+  if (LValue <> FFontSize) then
   begin
-    FFontSize := AValue;
+    FFontSize := LValue;
     DoChange();
   end;
 end;
