@@ -9,7 +9,7 @@
 #include <Vcl.Forms.hpp>
 #include <Vcl.ExtCtrls.hpp>
 
-#include "BCEditor.Editor.hpp"
+#include "BCEditor.hpp"
 #include "BCEditor.Highlighter.hpp"
 //---------------------------------------------------------------------------
 class TMainForm : public TForm

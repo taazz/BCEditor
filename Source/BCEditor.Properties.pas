@@ -12,33 +12,33 @@ type
   TBCEditorCompletionProposalValidateEvent = procedure(ASender: TObject; Shift: TShiftState; EndToken: Char) of object;
 
   TBCEditorCompletionProposalItems = class(TCollection)
-    type
+  type
 
-      TItem = class(TCollectionItem)
-      strict private
-        FImageIndex: Integer;
-        FValue: string;
-      public
-        procedure Assign(ASource: TPersistent); override;
-        constructor Create(ACollection: TCollection); override;
-      published
-        property ImageIndex: Integer read FImageIndex write FImageIndex default -1;
-        property Value: string read FValue write FValue;
-      end;
-
+    TItem = class(TCollectionItem)
     strict private
-      FOwner: TPersistent;
-      function GetItem(AIndex: Integer): TItem;
-      procedure SetItem(AIndex: Integer; AValue: TItem);
-    protected
-      function GetOwner(): TPersistent; override;
+      FImageIndex: Integer;
+      FValue: string;
     public
-      constructor Create(AOwner: TPersistent);
-      function Add(): TItem;
-      function FindItemID(AID: Integer): TItem;
-      function Insert(AIndex: Integer): TItem;
-      property Items[AIndex: Integer]: TItem read GetItem write SetItem; default;
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(ACollection: TCollection); override;
+    published
+      property ImageIndex: Integer read FImageIndex write FImageIndex default -1;
+      property Value: string read FValue write FValue;
     end;
+
+  strict private
+    FOwner: TPersistent;
+    function GetItem(AIndex: Integer): TItem;
+    procedure SetItem(AIndex: Integer; AValue: TItem);
+  protected
+    function GetOwner(): TPersistent; override;
+  public
+    constructor Create(AOwner: TPersistent);
+    function Add(): TItem;
+    function FindItemID(AID: Integer): TItem;
+    function Insert(AIndex: Integer): TItem;
+    property Items[AIndex: Integer]: TItem read GetItem write SetItem; default;
+  end;
 
   TBCEditorCompletionProposalColumns = class(TCollection)
   type
@@ -107,9 +107,10 @@ type
     procedure SetItem(AIndex: Integer; AValue: TColumn);
   protected
     function GetOwner(): TPersistent; override;
+    function IsStored(): Boolean;
   public
-    constructor Create(AOwner: TPersistent);
     function Add(): TColumn;
+    constructor Create(AOwner: TPersistent);
     function FindItemID(AID: Integer): TColumn;
     function Insert(AIndex: Integer): TColumn;
     property Items[AIndex: Integer]: TColumn read GetItem write SetItem; default;
@@ -165,21 +166,24 @@ type
     procedure SetImages(const AValue: TCustomImageList);
   protected
     function GetOwner(): TPersistent; override;
+    function IsCloseCharsStored(): Boolean;
+    function IsColumnsStored(): Boolean;
     function IsStored(): Boolean;
+    function IsTriggersStored(): Boolean;
   public
     procedure Assign(ASource: TPersistent); override;
     procedure ChangeScale(M, D: Integer);
     constructor Create(AOwner: TComponent);
     destructor Destroy(); override;
   published
-    property CloseChars: string read FCloseChars write FCloseChars;
-    property Columns: TBCEditorCompletionProposalColumns read FColumns write FColumns;
+    property CloseChars: string read FCloseChars write FCloseChars stored IsCloseCharsStored;
+    property Columns: TBCEditorCompletionProposalColumns read FColumns write FColumns stored IsColumnsStored;
     property CompletionColumnIndex: Integer read FCompletionColumnIndex write FCompletionColumnIndex default DefaultCompletionColumnIndex;
     property Constraints: TSizeConstraints read FConstraints write FConstraints;
     property Enabled: Boolean read FEnabled write FEnabled default DefaultEnabled;
     property Images: TCustomImageList read FImages write SetImages;
     property Options: TBCEditorCompletionProposalOptions read FOptions write FOptions default DefaultOptions;
-    property Trigger: TBCEditorCompletionProposal.TTrigger read FTrigger write FTrigger;
+    property Trigger: TBCEditorCompletionProposal.TTrigger read FTrigger write FTrigger stored IsTriggersStored;
     property VisibleLines: Integer read FVisibleLines write FVisibleLines default DefaultVisibleLines;
     property Width: Integer read FWidth write FWidth default DefaultWidth;
   end;
@@ -537,8 +541,8 @@ type
     procedure SetVisible(const AValue: Boolean);
     procedure SetWidth(const AValue: Integer);
   protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
     procedure ChangeScale(M, D: Integer);
+    property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
     procedure Assign(ASource: TPersistent); override;
     constructor Create();
@@ -739,16 +743,16 @@ end;
 
 { TBCEditorCompletionProposalColumns ****************************************}
 
+function TBCEditorCompletionProposalColumns.Add(): TColumn;
+begin
+  Result := TColumn(inherited Add());
+end;
+
 constructor TBCEditorCompletionProposalColumns.Create(AOwner: TPersistent);
 begin
   inherited Create(TColumn);
 
   FOwner := AOwner;
-end;
-
-function TBCEditorCompletionProposalColumns.Add(): TColumn;
-begin
-  Result := TColumn(inherited Add());
 end;
 
 function TBCEditorCompletionProposalColumns.FindItemID(AID: Integer): TColumn;
@@ -769,6 +773,11 @@ end;
 function TBCEditorCompletionProposalColumns.Insert(AIndex: Integer): TColumn;
 begin
   Result := inherited Insert(AIndex) as TColumn;
+end;
+
+function TBCEditorCompletionProposalColumns.IsStored(): Boolean;
+begin
+  Result := Count <> 1;
 end;
 
 procedure TBCEditorCompletionProposalColumns.SetItem(AIndex: Integer; AValue: TColumn);
@@ -845,8 +854,6 @@ begin
   FTrigger := TTrigger.Create(Self);
   FVisibleLines := DefaultVisibleLines;
   FWidth := DefaultWidth;
-
-  ChangeScale(Screen.PixelsPerInch, USER_DEFAULT_SCREEN_DPI);
 end;
 
 destructor TBCEditorCompletionProposal.Destroy();
@@ -863,17 +870,32 @@ begin
   Result := FOwner;
 end;
 
+function TBCEditorCompletionProposal.IsCloseCharsStored(): Boolean;
+begin
+  Result := FCloseChars <> DefaultCloseChars;
+end;
+
+function TBCEditorCompletionProposal.IsColumnsStored(): Boolean;
+begin
+  Result := FColumns.IsStored();
+end;
+
 function TBCEditorCompletionProposal.IsStored(): Boolean;
 begin
-  Result := (FCloseChars <> DefaultCloseChars)
-    or (FColumns.Count <> 1)
+  Result := IsCloseCharsStored()
+    or IsColumnsStored()
     or (FCompletionColumnIndex <> DefaultCompletionColumnIndex)
     or (FConstraints.MaxHeight <> 0) or (FConstraints.MaxWidth <> 0) or (FConstraints.MinHeight <> 0) or (FConstraints.MinWidth <> 0)
     or (FEnabled <> DefaultEnabled)
     or (FOptions <> DefaultOptions)
-    or FTrigger.IsStored()
+    or IsTriggersStored()
     or (FVisibleLines <> DefaultVisibleLines)
     or (FWidth <> DefaultWidth);
+end;
+
+function TBCEditorCompletionProposal.IsTriggersStored(): Boolean;
+begin
+  Result := FTrigger.IsStored();
 end;
 
 procedure TBCEditorCompletionProposal.SetImages(const AValue: TCustomImageList);
@@ -1792,8 +1814,6 @@ begin
   FFontSize := DefaultFontSize;
   FVisible := DefaultVisible;
   FWidth := DefaultWidth;
-
-  ChangeScale(Screen.PixelsPerInch, USER_DEFAULT_SCREEN_DPI);
 end;
 
 procedure TBCEditorMinimap.DoChange();

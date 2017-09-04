@@ -2536,8 +2536,8 @@ begin
   begin
     if (Canvas.HandleAllocated) then
     begin
-      Assert(FClientRect.Width > 0);
-      Assert(FClientRect.Height > 0);
+      Assert(FClientRect.Width >= 0);
+      Assert(FClientRect.Height >= 0);
 
       FDoubleBufferDC := CreateCompatibleDC(Canvas.Handle); if (FDoubleBufferDC = 0) then RaiseLastOSError();
       FDoubleBufferBitmap := CreateCompatibleBitmap(Canvas.Handle, FClientRect.Width, FClientRect.Height); if (FDoubleBufferBitmap = 0) then RaiseLastOSError();
@@ -2894,7 +2894,7 @@ procedure TCustomBCEditor.CreateWnd();
 begin
   inherited;
 
-  if (not Assigned(Parent)) then
+  if (not Assigned(Parent) or not Assigned(GetParentForm(Self))) then
   begin
     FFormWnd := 0;
     FParentWnd := 0;
@@ -10459,7 +10459,7 @@ procedure TCustomBCEditor.SetParent(AParent: TWinControl);
 begin
   inherited;
 
-  if (not Assigned(Parent)) then
+  if (not Assigned(Parent) or not Assigned(GetParentForm(Self))) then
   begin
     FFormWnd := 0;
     FParentWnd := 0;

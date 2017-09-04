@@ -6,7 +6,7 @@ uses
   SysUtils, Variants, Classes,
   Windows, Messages,
   Graphics, Controls, Forms, Dialogs, ExtCtrls, StdCtrls,
-  BCEditor.Editor, BCEditor.Highlighter;
+  BCEditor, BCEditor.Highlighter;
 
 type
   TMainForm = class(TForm)

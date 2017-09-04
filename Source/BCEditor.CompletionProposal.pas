@@ -6,7 +6,7 @@ uses
   Messages,
   Classes, Types,
   Forms, Controls, Graphics, StdCtrls,
-  BCEditor.Types, BCEditor.Properties;
+  BCEditor.Properties, BCEditor.Types;
 
 type
   TBCEditorCompletionProposalPopup = class(TCustomControl)

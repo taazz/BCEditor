@@ -70,27 +70,6 @@ object MainForm: TMainForm
     Height = 524
     Margins.Left = 0
     Align = alClient
-    CompletionProposal.CloseChars = '()[]. '
-    CompletionProposal.Columns = <
-      item
-        Font.Charset = DEFAULT_CHARSET
-        Font.Color = clWindowText
-        Font.Height = -11
-        Font.Name = 'Courier New'
-        Font.Style = []
-        Items = <>
-        Title.Font.Charset = DEFAULT_CHARSET
-        Title.Font.Color = clWindowText
-        Title.Font.Height = -11
-        Title.Font.Name = 'Courier New'
-        Title.Font.Style = []
-      end>
-    CompletionProposal.Trigger.Chars = '.'
-    Font.Charset = DEFAULT_CHARSET
-    Font.Color = clWindowText
-    Font.Height = -12
-    Font.Name = 'Courier New'
-    Font.Style = []
     TabOrder = 1
   end
 end
