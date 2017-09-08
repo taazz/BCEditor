@@ -61,7 +61,7 @@ object MainForm: TMainForm
       OnClick = ListBoxHighlightersClick
     end
   end
-  object Editor: TBCEditor
+  object BCEditor: TBCEditor
     AlignWithMargins = True
     Left = 226
     Top = 3

@@ -355,11 +355,6 @@ type
     FCompletionProposalPopup: TBCEditorCompletionProposalPopup;
     FDefaultFontSize: Integer;
     FDoubleClickTime: Cardinal;
-    FDoubleBufferBitmap: HBITMAP;
-    FDoubleBufferDC: HDC;
-    FDoubleBufferOverlayBitmap: HBITMAP;
-    FDoubleBufferOverlayDC: HDC;
-    FDoubleBufferUpdateRect: TRect;
     FFontPitchFixed: Boolean;
     FFormWnd: HWND;
     FHideSelectionBeforeSearch: Boolean;
@@ -575,6 +570,7 @@ type
     function GetSelText(): string;
     function GetTabs(): BCEditor.Properties.TBCEditorTabs; {$IFNDEF Debug} inline; {$ENDIF}
     function GetText(): string; {$IFNDEF Debug} inline; {$ENDIF}
+    function GetTopRow(): Integer;
     function GetUndoOptions(): TBCEditorUndoOptions;
     function GetWordAt(ALinesPos: TPoint): string;
     procedure HighlighterChanged(ASender: TObject);
@@ -652,7 +648,7 @@ type
       const AVisibleOnly: Boolean = False): TPoint;
     procedure ScanCodeFolding();
     procedure ScrollTo(AValue: TPoint); overload; inline;
-    procedure ScrollTo(AValue: TPoint; const AAlignToRow: Boolean); overload;
+    procedure ScrollTo(ATextPos: TPoint; const AAlignToRow: Boolean); overload;
     procedure ScrollTo(AX, AY: Integer); overload; inline;
     procedure ScrollToPosition(const APosition: TBCEditorLinesPosition);
     procedure SetBorderStyle(const AValue: TBorderStyle);
@@ -685,6 +681,7 @@ type
     procedure SetText(const AValue: string); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextPos(const AValue: TPoint); overload;
     procedure SetTextPos(AX, AY: Integer); overload; inline;
+    procedure SetTopRow(const AValue: Integer);
     procedure SetUndoOptions(AOptions: TBCEditorUndoOptions);
     procedure SetWantReturns(const AValue: Boolean); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetWordBlock(const ALinesPosition: TBCEditorLinesPosition);
@@ -851,6 +848,7 @@ type
     property Text: string read GetText write SetText;
     property TextEntryMode: TBCEditorTextEntryMode read FTextEntryMode write FTextEntryMode default temInsert;
     property TextPos: TPoint read FTextPos write ScrollTo;
+    property TopRow: Integer read GetTopRow write SetTopRow;
     property UndoOptions: TBCEditorUndoOptions read GetUndoOptions write SetUndoOptions default DefaultUndoOptions;
     property UpdateCount: Integer read FUpdateCount;
     property WantReturns: Boolean read FWantReturns write SetWantReturns default True;
@@ -2279,7 +2277,7 @@ begin
         Inc(LLine);
       end;
     finally
-      FBuildRowsCriticalSection.Enter();
+      FBuildRowsCriticalSection.Leave();
     end;
   end;
 
@@ -2515,40 +2513,9 @@ end;
 
 procedure TCustomBCEditor.CMDoubleBufferedChanged(var AMessage: TMessage);
 begin
-  if (FDoubleBufferBitmap <> 0) then
-  begin
-    DeleteObject(FDoubleBufferBitmap);
-    DeleteDC(FDoubleBufferDC);
-    FDoubleBufferBitmap := 0;
-    FDoubleBufferDC := 0;
-  end;
-  if (FDoubleBufferOverlayBitmap <> 0) then
-  begin
-    DeleteObject(FDoubleBufferOverlayBitmap);
-    DeleteDC(FDoubleBufferOverlayDC);
-    FDoubleBufferOverlayBitmap := 0;
-    FDoubleBufferOverlayDC := 0;
-  end;
+  inherited;
 
-  if (not DoubleBuffered) then
-    Exclude(FState, esDoubleBufferInvalid)
-  else
-  begin
-    if (Canvas.HandleAllocated) then
-    begin
-      Assert(FClientRect.Width >= 0);
-      Assert(FClientRect.Height >= 0);
-
-      FDoubleBufferDC := CreateCompatibleDC(Canvas.Handle); if (FDoubleBufferDC = 0) then RaiseLastOSError();
-      FDoubleBufferBitmap := CreateCompatibleBitmap(Canvas.Handle, FClientRect.Width, FClientRect.Height); if (FDoubleBufferBitmap = 0) then RaiseLastOSError();
-      SelectObject(FDoubleBufferDC, FDoubleBufferBitmap);
-      FDoubleBufferOverlayDC := CreateCompatibleDC(FDoubleBufferDC); if (FDoubleBufferOverlayDC = 0) then RaiseLastOSError();
-      FDoubleBufferOverlayBitmap := CreateCompatibleBitmap(FDoubleBufferDC, FClientRect.Width, FClientRect.Height); if (FDoubleBufferOverlayBitmap = 0) then RaiseLastOSError();
-      SelectObject(FDoubleBufferOverlayDC, FDoubleBufferOverlayBitmap);
-    end;
-    FDoubleBufferUpdateRect := InvalidRect;
-    Include(FState, esDoubleBufferInvalid);
-  end;
+  RecreateWnd();
 end;
 
 procedure TCustomBCEditor.CMSysFontChanged(var AMessage: TMessage);
@@ -2728,8 +2695,6 @@ begin
   FCodeFoldingLineBitmap := nil;
   FCodeFoldingEndLineBitmap := nil;
   FDefaultFontSize := Font.Size + 1;
-  FDoubleBufferBitmap := 0;
-  FDoubleBufferDC := 0;
   FDoubleClickTime := GetDoubleClickTime();
   FFmtLines := False;
   FGotoLineDialog := nil;
@@ -2881,6 +2846,8 @@ begin
       Style := Style or ES_READONLY;
     if (eoDropFiles in FOptions) then
       ExStyle := ExStyle or WS_EX_ACCEPTFILES;
+    if (DoubleBuffered) then
+      ExStyle := ExStyle or WS_EX_COMPOSITED;
 
     if (NewStyleControls and Ctl3D and (FBorderStyle = bsSingle)) then
     begin
@@ -3041,14 +3008,6 @@ begin
   if Assigned(FCompletionProposalPopup) then
     FCompletionProposalPopup.Free();
   FColors.Free();
-  if (FDoubleBufferBitmap <> 0) then
-    DeleteObject(FDoubleBufferBitmap);
-  if (FDoubleBufferDC <> 0) then
-    DeleteDC(FDoubleBufferDC);
-  if (FDoubleBufferOverlayBitmap <> 0) then
-    DeleteObject(FDoubleBufferOverlayBitmap);
-  if (FDoubleBufferOverlayDC <> 0) then
-    DeleteDC(FDoubleBufferOverlayDC);
   FHighlighter.Free();
   if (Assigned(FHintWindow)) then
     FHintWindow.Free();
@@ -4996,7 +4955,7 @@ begin
   else
     LOptions := LOptions - [foWholeWordsOnly];
 
-  ProcessCommand(ecFindFirst, FLastSearchData);
+  ProcessCommand(ecFindFirst, TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions));
 end;
 
 procedure TCustomBCEditor.FindExecuted(const AData: Pointer);
@@ -5274,6 +5233,11 @@ begin
   Result := FLines.Text;
 end;
 
+function TCustomBCEditor.GetTopRow(): Integer;
+begin
+  Result := FPaintHelper.TopRow;
+end;
+
 function TCustomBCEditor.GetUndoOptions(): TBCEditorUndoOptions;
 begin
   Result := [];
@@ -5369,6 +5333,7 @@ begin
   FLines.TerminateJob();
   InvalidateRows();
   InvalidateMatchingPair();
+  InvalidateClient();
 
   Include(FState, esHighlighterChanged);
 end;
@@ -5739,14 +5704,7 @@ begin
     LRect := TRect.Intersect(ARect, FClientRect);
 
     if (not LRect.IsEmpty()) then
-    begin
-      if (DoubleBuffered and not AOverlay) then
-        if (FDoubleBufferUpdateRect.IsEmpty()) then
-          FDoubleBufferUpdateRect := LRect
-        else
-          FDoubleBufferUpdateRect.Union(LRect);
       Windows.InvalidateRect(WindowHandle, LRect, not (csOpaque in ControlStyle));
-    end;
   end;
 end;
 
@@ -6793,7 +6751,7 @@ begin
     else if (not StyleServices.Enabled or not StyleServices.GetElementColor(StyleServices.GetElementDetails(tebNormalGroupHead), ecGradientColor2, LColor)) then
       APaintHelper.MinimapBorderBrush := TGPSolidBrush.Create(ColorRefToARGB(ColorToRGB(clBtnFace)))
     else
-      APaintHelper.MinimapBorderBrush := TGPSolidBrush.Create(ColorRefToARGB(ColorToRGB(Color)));
+      APaintHelper.MinimapBorderBrush := TGPSolidBrush.Create(ColorRefToARGB(ColorToRGB(LColor)));
     if (not FMinimap.Visible) then
       APaintHelper.MinimapBrush := nil
     else
@@ -7714,7 +7672,7 @@ begin
       if ((AJob = cjPaint)
         and (FVertScrollBar.Visible and FHorzScrollBar.Visible)) then
       begin
-        if (not StyleServices.Enabled or not StyleServices.GetElementColor(StyleServices.GetElementDetails(tsScrollBarRoot), ecGradientColor2, LColor)) then
+        if (not StyleServices.Enabled or not StyleServices.GetElementColor(StyleServices.GetElementDetails(tsSizeBoxRightAlign), ecBorderColor, LColor)) then
           LPaintHelper.BackgroundColor := clScrollBar
         else
           LPaintHelper.BackgroundColor := LColor;
@@ -8321,9 +8279,7 @@ var
   LSelLength: Integer;
   LSelStartAfter: Integer;
   LSelStartBefore: Integer;
-  LStep: Integer;
   LText: PChar;
-  LSize: TSize;
 begin
   Result := False;
 
@@ -9039,10 +8995,6 @@ begin
         FVertScrollBarRect.Right,
         FHorzScrollBarRect.Bottom));
   InvalidateRect(FMinimapBorderRect);
-
-
-  if (DoubleBuffered) then
-    Perform(CM_DOUBLEBUFFEREDCHANGED, 0, 0);
 end;
 
 function TCustomBCEditor.RowsToClient(ARowsPosition: TBCEditorRowsPosition;
@@ -10036,16 +9988,16 @@ begin
   ScrollTo(AValue, True);
 end;
 
-procedure TCustomBCEditor.ScrollTo(AValue: TPoint; const AAlignToRow: Boolean);
+procedure TCustomBCEditor.ScrollTo(ATextPos: TPoint; const AAlignToRow: Boolean);
 var
-  LValue: TPoint;
+  LTextPos: TPoint;
 begin
-  LValue := AValue;
+  LTextPos := ATextPos;
   if (AAlignToRow and (FPaintHelper.RowHeight > 0)) then
-    Dec(LValue.Y, LValue.Y mod FPaintHelper.RowHeight);
+    Dec(LTextPos.Y, LTextPos.Y mod FPaintHelper.RowHeight);
 
-  if (LValue <> FTextPos) then
-    ProcessCommand(ecScrollTo, TBCEditorCommandDataScrollTo.Create(LValue));
+  if (LTextPos <> FTextPos) then
+    ProcessCommand(ecScrollTo, TBCEditorCommandDataScrollTo.Create(LTextPos));
 end;
 
 procedure TCustomBCEditor.ScrollTo(AX, AY: Integer);
@@ -10314,6 +10266,11 @@ end;
 procedure TCustomBCEditor.SetTextPos(AX, AY: Integer);
 begin
   SetTextPos(Point(AX, AY));
+end;
+
+procedure TCustomBCEditor.SetTopRow(const AValue: Integer);
+begin
+  ScrollTo(AValue * FPaintHelper.RowHeight, 0);
 end;
 
 procedure TCustomBCEditor.SetInsertPos(AValue: TPoint);
@@ -11815,72 +11772,11 @@ begin
 
     BeginPaint(WindowHandle, LPaintStruct);
     try
-      if (not DoubleBuffered) then
-      begin
-        FPaintHelper.BeginPaint(LPaintStruct.hdc);
-        try
-          PaintTo(FPaintHelper, FClientRect);
-        finally
-          FPaintHelper.EndPaint();
-        end;
-      end
-      else
-      begin
-        if (FDoubleBufferBitmap = 0) then
-        begin
-          Canvas.Handle; // Allocate Handle
-          Perform(CM_DOUBLEBUFFEREDCHANGED, 0, 0);
-        end;
-
-        FPaintHelper.BeginPaint(FDoubleBufferDC);
-        try
-          if (esDoubleBufferInvalid in FState) then
-          begin
-            PaintTo(FPaintHelper, FClientRect, False);
-            Exclude(FState, esDoubleBufferInvalid);
-            FDoubleBufferUpdateRect := InvalidRect;
-          end
-          else if (LPaintStruct.rcPaint.IntersectsWith(FDoubleBufferUpdateRect)) then
-          begin
-            PaintTo(FPaintHelper, FDoubleBufferUpdateRect, False);
-            FDoubleBufferUpdateRect := InvalidRect;
-          end;
-        finally
-          FPaintHelper.EndPaint();
-        end;
-
-        if (FSyncEditButtonRect.IsEmpty() and FScrollingRect.IsEmpty()) then
-          BitBlt(LPaintStruct.hdc,
-            LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top, LPaintStruct.rcPaint.Width, LPaintStruct.rcPaint.Height,
-            FDoubleBufferDC,
-            LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top,
-            SRCCOPY)
-        else
-        begin
-          FPaintHelper.BeginPaint(FDoubleBufferOverlayDC);
-          try
-            BitBlt(FDoubleBufferOverlayDC,
-              LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top, LPaintStruct.rcPaint.Width, LPaintStruct.rcPaint.Height,
-              FDoubleBufferDC,
-              LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top,
-              SRCCOPY);
-            FPaintHelper.Graphics := TGPGraphics.Create(FDoubleBufferOverlayDC);
-            ProcessClient(cjPaintOverlays,
-              FPaintHelper, FSyncEditButtonRect,
-              mbLeft, [], Point(-1, -1), True);
-            ProcessClient(cjPaintOverlays,
-              FPaintHelper, FScrollingRect,
-              mbLeft, [], Point(-1, -1), True);
-            FPaintHelper.Graphics.Free();
-            BitBlt(LPaintStruct.hdc,
-              LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top, LPaintStruct.rcPaint.Width, LPaintStruct.rcPaint.Height,
-              FDoubleBufferOverlayDC,
-              LPaintStruct.rcPaint.Left, LPaintStruct.rcPaint.Top,
-              SRCCOPY);
-          finally
-            FPaintHelper.EndPaint();
-          end;
-        end;
+      FPaintHelper.BeginPaint(LPaintStruct.hdc);
+      try
+        PaintTo(FPaintHelper, FClientRect);
+      finally
+        FPaintHelper.EndPaint();
       end;
     finally
       EndPaint(WindowHandle, LPaintStruct);

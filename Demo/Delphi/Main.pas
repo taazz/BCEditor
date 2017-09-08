@@ -10,7 +10,7 @@ uses
 
 type
   TMainForm = class(TForm)
-    Editor: TBCEditor;
+    BCEditor: TBCEditor;
     ListBoxColors: TListBox;
     ListBoxHighlighters: TListBox;
     PanelLeft: TPanel;
@@ -71,15 +71,15 @@ procedure TMainForm.SetSelectedColor;
 begin
   with ListBoxColors do
     if (ItemIndex >= 0) then
-      Editor.Highlighter.Colors.LoadFromFile(ColorPath + Items[ItemIndex]);
+      BCEditor.Highlighter.Colors.LoadFromFile(ColorPath + Items[ItemIndex]);
 end;
 
 procedure TMainForm.SetSelectedHighlighter;
 begin
   with ListBoxHighlighters do
     if (ItemIndex >= 0) then
-      Editor.Highlighter.LoadFromFile(HighlighterPath + Items[ItemIndex]);
-  Editor.Lines.Text := Editor.Highlighter.Sample;
+      BCEditor.Highlighter.LoadFromFile(HighlighterPath + Items[ItemIndex]);
+  BCEditor.Lines.Text := BCEditor.Highlighter.Sample;
 end;
 
 procedure TMainForm.ListBoxColorsClick(Sender: TObject);

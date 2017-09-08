@@ -15,7 +15,7 @@
 class TMainForm : public TForm
 {
 __published:	// IDE-managed Components
-	TBCEditor *Editor;
+	TBCEditor *BCEditor;
     TListBox *ListBoxColors;
 	TListBox *ListBoxHighlighters;
 	TPanel *PanelLeft;
