@@ -570,7 +570,7 @@ type
     function GetSelText(): string;
     function GetTabs(): BCEditor.Properties.TBCEditorTabs; {$IFNDEF Debug} inline; {$ENDIF}
     function GetText(): string; {$IFNDEF Debug} inline; {$ENDIF}
-    function GetTopRow(): Integer;
+    function GetTopLine(): Integer;
     function GetUndoOptions(): TBCEditorUndoOptions;
     function GetWordAt(ALinesPos: TPoint): string;
     procedure HighlighterChanged(ASender: TObject);
@@ -681,7 +681,7 @@ type
     procedure SetText(const AValue: string); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextPos(const AValue: TPoint); overload;
     procedure SetTextPos(AX, AY: Integer); overload; inline;
-    procedure SetTopRow(const AValue: Integer);
+    procedure SetTopLine(const AValue: Integer);
     procedure SetUndoOptions(AOptions: TBCEditorUndoOptions);
     procedure SetWantReturns(const AValue: Boolean); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetWordBlock(const ALinesPosition: TBCEditorLinesPosition);
@@ -848,7 +848,7 @@ type
     property Text: string read GetText write SetText;
     property TextEntryMode: TBCEditorTextEntryMode read FTextEntryMode write FTextEntryMode default temInsert;
     property TextPos: TPoint read FTextPos write ScrollTo;
-    property TopRow: Integer read GetTopRow write SetTopRow;
+    property TopLine: Integer read GetTopLine write SetTopLine;
     property UndoOptions: TBCEditorUndoOptions read GetUndoOptions write SetUndoOptions default DefaultUndoOptions;
     property UpdateCount: Integer read FUpdateCount;
     property WantReturns: Boolean read FWantReturns write SetWantReturns default True;
@@ -5233,9 +5233,9 @@ begin
   Result := FLines.Text;
 end;
 
-function TCustomBCEditor.GetTopRow(): Integer;
+function TCustomBCEditor.GetTopLine(): Integer;
 begin
-  Result := FPaintHelper.TopRow;
+  Result := FRows.Items[FPaintHelper.TopRow].Line;
 end;
 
 function TCustomBCEditor.GetUndoOptions(): TBCEditorUndoOptions;
@@ -10268,9 +10268,9 @@ begin
   SetTextPos(Point(AX, AY));
 end;
 
-procedure TCustomBCEditor.SetTopRow(const AValue: Integer);
+procedure TCustomBCEditor.SetTopLine(const AValue: Integer);
 begin
-  ScrollTo(AValue * FPaintHelper.RowHeight, 0);
+  ScrollTo(FLines.Items[AValue].FirstRow * FPaintHelper.RowHeight, 0);
 end;
 
 procedure TCustomBCEditor.SetInsertPos(AValue: TPoint);
@@ -12086,3 +12086,4 @@ initialization
 finalization
   OleUninitialize();
 end.
+

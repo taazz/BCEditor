@@ -3,7 +3,7 @@ unit BCEditor.Editor.Base deprecated 'Use BCEditor'; // 2017-03-11
 interface
 
 uses
-  BCEditor.Editor;
+  BCEditor;
 
 type
   TBCBaseEditor = class(TCustomBCEditor)
