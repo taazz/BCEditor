@@ -1228,7 +1228,7 @@ procedure TCustomBCEditor.TBuildMinimapThread.SetTopRow(const AValue: Integer);
 var
   LValue: Integer;
 begin
-  LValue := Max(0, AValue);
+  LValue := Max(0, Min(FEditor.FRows.Count - FPaintHelper.VisibleRows, AValue));
   FCriticalSection.Enter();
   try
     if (LValue <> FPaintHelper.TopRow) then
@@ -7358,60 +7358,9 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
             APaintHelper.Graphics.FillRectangle(APaintHelper.MinimapBrush, FMinimapRect.Left, FBuildMinimapThread.VisibleRect.Bottom - FMinimapRect.Top, FMinimapRect.Width, FMinimapRect.Height - (FBuildMinimapThread.VisibleRect.Bottom - FMinimapRect.Top));
           end;
         end;
-      cjMouseDown:
-        if ((MouseCapture = mcNone)
-          and LRect.Contains(ACursorPos)
-          and Assigned(FBuildMinimapThread)) then
-        begin
-          FBuildMinimapCriticalSection.Enter();
-          try
-            if (not FBuildMinimapThread.VisibleRect.Contains(ACursorPos)) then
-            begin
-              Inc(FMouseDownTextPos.Y, (ACursorPos.Y - FBuildMinimapThread.VisibleRect.Top - FBuildMinimapThread.VisibleRect.Height div 2 - GLineWidth)
-                  * FPaintHelper.RowHeight div FBuildMinimapThread.PaintHelper.RowHeight);
-              SetTextPos(FMouseDownTextPos);
-              Cursor := crSizeNS
-            end;
-            MouseCapture := mcMinimap;
-          finally
-            FBuildMinimapCriticalSection.Leave();
-          end;
-          Result := True;
-        end;
       cjMouseMove:
-        if ((MouseCapture = mcNone)
-          and LRect.Contains(ACursorPos)
-          and Assigned(FBuildMinimapThread)) then
         begin
-          FBuildMinimapCriticalSection.Enter();
-          try
-            if (Assigned(FBuildMinimapThread)
-              and FBuildMinimapThread.VisibleRect.Contains(ACursorPos)) then
-              Cursor := crSizeNS
-            else
-              Cursor := crDefault;
-          finally
-            FBuildMinimapCriticalSection.Leave();
-          end;
-          Result := True;
-        end
-        else if (MouseCapture = mcMinimap) then
-        begin
-          SetTextPos(FMouseDownTextPos.X,
-            FMouseDownTextPos.Y
-              + (ACursorPos.Y - FMouseDownCursorPos.Y)
-                * FPaintHelper.RowHeight div FBuildMinimapThread.PaintHelper.RowHeight
-              + (FBuildMinimapThread.PaintHelper.TopRow - FMouseDownMinimapTopRow)
-                * FPaintHelper.RowHeight);
-          if ((ACursorPos.Y < FMinimapRect.Top)
-            or (ACursorPos.Y > FMinimapRect.Bottom)) then
-            SetTimer(WindowHandle, tiMinimap, GClientRefreshTime, nil);
-          Result := True;
-        end;
-      cjMouseUp:
-        if (MouseCapture = mcMinimap) then
-        begin
-          MouseCapture := mcNone;
+          Cursor := crDefault;
           Result := True;
         end;
     end;
@@ -7672,7 +7621,8 @@ begin
       if ((AJob = cjPaint)
         and (FVertScrollBar.Visible and FHorzScrollBar.Visible)) then
       begin
-        if (not StyleServices.Enabled or not StyleServices.GetElementColor(StyleServices.GetElementDetails(tsSizeBoxRightAlign), ecBorderColor, LColor)) then
+        if (not StyleServices.Enabled
+          or not StyleServices.GetElementColor(StyleServices.GetElementDetails(twWindowDontCare), ecEdgeFillColor, LColor)) then
           LPaintHelper.BackgroundColor := clScrollBar
         else
           LPaintHelper.BackgroundColor := LColor;
@@ -10254,10 +10204,7 @@ begin
 
     if (Assigned(FBuildMinimapThread)) then
     begin
-      if (FPaintHelper.TopRow < FBuildMinimapThread.PaintHelper.TopRow) then
-        FBuildMinimapThread.SetTopRow(FPaintHelper.TopRow)
-      else if (FPaintHelper.TopRow + FPaintHelper.UsableRows > FBuildMinimapThread.PaintHelper.TopRow + FBuildMinimapThread.PaintHelper.UsableRows) then
-        FBuildMinimapThread.SetTopRow(FPaintHelper.TopRow + FPaintHelper.UsableRows - FBuildMinimapThread.PaintHelper.UsableRows);
+      FBuildMinimapThread.SetTopRow(FPaintHelper.TopRow + (FPaintHelper.UsableRows - FBuildMinimapThread.PaintHelper.UsableRows) div 2);
       InvalidateRect(FMinimapRect);
     end;
   end;
