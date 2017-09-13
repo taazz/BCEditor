@@ -2739,7 +2739,7 @@ begin
   FRowsWanted.Minimap := False;
   FSelectedCaseText := '';
   FSelectionOptions := DefaultSelectionOptions;
-  FState := [esMetricsInvalid];
+  FState := [esSysFontChanged, esMetricsInvalid];
   FSyncEditButtonHotBitmap := nil;
   FSyncEditButtonNormalBitmap := nil;
   FSyncEditButtonPressedBitmap := nil;
@@ -3062,7 +3062,7 @@ begin
   FLines.BeginUpdate();
   try
     if (not FLines.SelArea.IsEmpty()) then
-      SelText := ''
+      FLines.DeleteText(FLines.SelArea)
     else if (FLines.CaretPosition > FLines.BOFPosition) then
     begin
       if ((FLines.CaretPosition.Line < FLines.Count)
