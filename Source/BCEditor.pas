@@ -270,7 +270,6 @@ type
       function GetMaxWidth(): Integer;
       function GetRowArea(ARow: Integer): TBCEditorLinesArea;
       function GetText(ARow: Integer): string;
-      procedure SetLastBuiltLine(const AValue: Integer);
     public
       procedure Add(const AFlags: TRow.TFlags; const ALine: Integer;
         const AChar, ALength, AColumns, AWidth: Integer;
@@ -292,7 +291,7 @@ type
       property EORPosition[Row: Integer]: TBCEditorLinesPosition read GetEORPosition;
       property FmtText: string read GetFmtText;
       property Items[Index: Integer]: TRow read GetItem;
-      property LastBuiltLine: Integer read GetLastBuiltLine write SetLastBuiltLine;
+      property LastBuiltLine: Integer read GetLastBuiltLine;
       property MaxColumns: Integer read GetMaxColumns;
       property MaxWidth: Integer read GetMaxWidth;
       property RowArea[Row: Integer]: TBCEditorLinesArea read GetRowArea;
@@ -355,6 +354,7 @@ type
     FCompletionProposalPopup: TBCEditorCompletionProposalPopup;
     FDefaultFontSize: Integer;
     FDoubleClickTime: Cardinal;
+    FFocused: Boolean;
     FFontPitchFixed: Boolean;
     FFormWnd: HWND;
     FHideSelectionBeforeSearch: Boolean;
@@ -1962,15 +1962,6 @@ begin
   Result := Copy(FEditor.FLines.Items[Items[ARow].Line].Text, 1 + Items[ARow].Char, Items[ARow].Length);
 end;
 
-procedure TCustomBCEditor.TRows.SetLastBuiltLine(const AValue: Integer);
-begin
-  FCriticalSection.Enter();
-
-  FLastBuiltLine := AValue;
-
-  FCriticalSection.Leave();
-end;
-
 procedure TCustomBCEditor.TRows.Insert(ARow: Integer; const AFlags: TRow.TFlags;
   const ALine: Integer; const AChar, ALength, AColumns, AWidth: Integer;
   const ABeginRange: Pointer; const AParts: TRow.TParts);
@@ -2011,6 +2002,8 @@ begin
     inherited Add(LItem)
   else
     inherited Insert(ARow, LItem);
+
+  FLastBuiltLine := Max(FLastBuiltLine, ALine);
 
   if ((FMaxColumns >= 0) and (AColumns > FMaxColumns)) then
   begin
@@ -2207,8 +2200,9 @@ begin
     FLines.CriticalSection.Leave();
   end;
 
+  FRows.Clear();
   LLastUpdateScrollBars := 0;
-  LRow := FRows.Count;
+  LRow := 0;
   LLine := 0;
   while ((LLine < FLines.Count) and not AThread.Terminated) do
   begin
@@ -2224,7 +2218,6 @@ begin
         finally
           FLines.CriticalSection.Leave();
         end;
-
         Inc(LRow, InsertLineIntoRows(APaintHelper, AThread, LLine, LRow, LLineItem));
 
         FRowsWanted.CriticalSection.Enter();
@@ -2272,10 +2265,7 @@ begin
       end;
 
       if (not AThread.Terminated) then
-      begin
-        FRows.LastBuiltLine := LLine;
         Inc(LLine);
-      end;
     finally
       FBuildRowsCriticalSection.Leave();
     end;
@@ -2697,6 +2687,7 @@ begin
   FDefaultFontSize := Font.Size + 1;
   FDoubleClickTime := GetDoubleClickTime();
   FFmtLines := False;
+  FFocused := False;
   FGotoLineDialog := nil;
   FHideScrollBars := True;
   FHideSelection := True;
@@ -2846,7 +2837,7 @@ begin
       Style := Style or ES_READONLY;
     if (eoDropFiles in FOptions) then
       ExStyle := ExStyle or WS_EX_ACCEPTFILES;
-    if (DoubleBuffered) then
+    if (DoubleBuffered and not (csDesigning in ComponentState)) then
       ExStyle := ExStyle or WS_EX_COMPOSITED;
 
     if (NewStyleControls and Ctl3D and (FBorderStyle = bsSingle)) then
@@ -4489,7 +4480,6 @@ end;
 function TCustomBCEditor.Drop(const dataObj: IDataObject; grfKeyState: Longint; pt: TPoint;
   var dwEffect: Longint): HResult;
 var
-  LMedium: STGMEDIUM;
   LText: string;
 begin
   if (dwEffect and (DROPEFFECT_COPY or DROPEFFECT_MOVE) = 0) then
@@ -4510,11 +4500,6 @@ begin
         dwEffect := DROPEFFECT_MOVE
       else
         dwEffect := DROPEFFECT_COPY;
-
-      if (not Assigned(LMedium.unkForRelease)) then
-        ReleaseStgMedium(LMedium)
-      else
-        IUnknown(LMedium.unkForRelease)._Release();
 
       Result := S_OK;
     end;
@@ -8358,7 +8343,8 @@ begin
           LBackgroundColor := APaintHelper.LineBackgroundColor
         else if ((phoHighlightActiveLine in APaintHelper.Options)
           and (ALinesPosition.Line = FLines.CaretPosition.Line)
-          and (Colors.ActiveLine.Background <> clNone)) then
+          and (Colors.ActiveLine.Background <> clNone)
+          and not (csDesigning in ComponentState)) then
           LBackgroundColor := Colors.ActiveLine.Background
         else if (Assigned(AToken) and Assigned(AToken^.Attribute) and (AToken^.Attribute.Background <> clNone)) then
           LBackgroundColor := AToken^.Attribute.Background
@@ -8442,13 +8428,13 @@ begin
                 end;
               ptSelection:
                 begin
-                  if (not Focused() and HideSelection) then
+                  if (not FFocused and HideSelection) then
                     LPartForegroundColor := clWindowText
                   else if (FColors.Selection.Foreground <> clNone) then
                     LPartForegroundColor := FColors.Selection.Foreground
                   else
                     LPartForegroundColor := clHighlightText;
-                  if (not Focused() and HideSelection) then
+                  if (not FFocused and HideSelection) then
                     LPartBackgroundColor := cl3DLight
                   else if (FColors.Selection.Background <> clNone) then
                     LPartBackgroundColor := FColors.Selection.Background
@@ -8613,7 +8599,7 @@ begin
         end;
 
         if ((phoCaretPos in APaintHelper.Options)
-          and (FState * [esCaretInvalid] <> [])
+          and (esCaretInvalid in FState)
           and (ALinesPosition.Line = FLines.CaretPosition.Line)
           and (ALinesPosition.Char <= FLines.CaretPosition.Char) and (FLines.CaretPosition.Char < ALinesPosition.Char + ALength)) then
         begin
@@ -11034,21 +11020,23 @@ begin
   Result := Focused;
 
   if (Result) then
-    if Action is TEditCut then
+    if (Action is TEditCut) then
       TEditCut(Action).Enabled := not FReadOnly and not FLines.SelArea.IsEmpty()
-    else if Action is TEditCopy then
+    else if (Action is TEditCopy) then
       TEditCopy(Action).Enabled := not FLines.SelArea.IsEmpty()
-    else if Action is TEditPaste then
-      TEditPaste(Action).Enabled := Focused() and CanPaste
-    else if Action is TEditDelete then
+    else if (Action is TEditPaste) then
+      TEditPaste(Action).Enabled := FFocused and CanPaste
+    else if (Action is TEditDelete) then
       TEditDelete(Action).Enabled := not FReadOnly and not FLines.SelArea.IsEmpty()
-    else if Action is TEditSelectAll then
+    else if (Action is TEditSelectAll) then
       TEditSelectAll(Action).Enabled := (FLines.Count > 0)
-    else if Action is TEditUndo then
+    else if (Action is TEditUndo) then
       TEditUndo(Action).Enabled := not FReadOnly and FLines.CanUndo
-    else if Action is TSearchFindNext then
+    else if (Action is TSearchFindNext) then
       TSearchFindNext(Action).Enabled := Assigned(FLastSearchData)
-    else if Action is TSearchReplace then
+    else if (Action is TSearchReplace) then
+      TSearchReplace(Action).Enabled := (FLines.Count > 0)
+    else if (Action is TSearchFindFirst) then
       TSearchReplace(Action).Enabled := (FLines.Count > 0)
     else
       Result := inherited;
@@ -11071,7 +11059,7 @@ begin
 
     if ((FRows.Count = 0)
       or not FTextRect.Contains(FCaretPos)
-      or not Focused() and not Assigned(FCompletionProposalPopup)) then
+      or not FFocused and not Assigned(FCompletionProposalPopup)) then
     begin
       if (FCaretVisible) then
       begin
@@ -11693,6 +11681,8 @@ begin
 
   inherited;
 
+  FFocused := False;
+
   NotifyParent(EN_KILLFOCUS);
 
   if (not Assigned(FCompletionProposalPopup)) then
@@ -11721,7 +11711,7 @@ begin
     try
       FPaintHelper.BeginPaint(LPaintStruct.hdc);
       try
-        PaintTo(FPaintHelper, FClientRect);
+        PaintTo(FPaintHelper, LPaintStruct.rcPaint);
       finally
         FPaintHelper.EndPaint();
       end;
@@ -11786,6 +11776,8 @@ procedure TCustomBCEditor.WMSetFocus(var AMessage: TWMSetFocus);
 begin
   inherited;
 
+  FFocused := True;
+
   NotifyParent(EN_SETFOCUS);
 
   if (not GetUpdateRect(WindowHandle, nil, not (csOpaque in ControlStyle))) then
@@ -11837,7 +11829,7 @@ begin
     SetWantReturns(AMessage.StyleStruct^.styleNew and ES_WANTRETURN <> 0);
     SetHideSelection(AMessage.StyleStruct^.styleNew and ES_NOHIDESEL = 0);
 
-    if (not Focused() and not FLines.SelArea.IsEmpty()) then
+    if (not FFocused and not FLines.SelArea.IsEmpty()) then
       InvalidateText();
   end
   else if (AMessage.StyleType = WPARAM(GWL_EXSTYLE)) then
@@ -11959,7 +11951,7 @@ begin
   case (AMessage.Msg) of
     WM_LBUTTONDOWN,
     WM_LBUTTONDBLCLK:
-      if (not (csDesigning in ComponentState) and not Focused()) then
+      if (not (csDesigning in ComponentState) and not FFocused) then
       begin
         Windows.SetFocus(WindowHandle);
         if (not Focused) then Exit;
