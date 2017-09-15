@@ -353,6 +353,7 @@ type
     FCompletionProposal: TBCEditorCompletionProposal;
     FCompletionProposalPopup: TBCEditorCompletionProposalPopup;
     FDefaultFontSize: Integer;
+    FDoubleBuffered: Boolean;
     FDoubleClickTime: Cardinal;
     FFocused: Boolean;
     FFontPitchFixed: Boolean;
@@ -466,7 +467,6 @@ type
     procedure BuildRows(const AThread: TBuildRowsThread; const APaintHelper: TPaintHelper);
     function ClientToLines(const X, Y: Integer; const AForCaret: Boolean = False): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
     function ClientToRows(const X, Y: Integer; const AForCaret: Boolean = False): TBCEditorRowsPosition;
-    procedure CMDoubleBufferedChanged(var AMessage: TMessage); message CM_DOUBLEBUFFEREDCHANGED;
     procedure CMSysFontChanged(var AMessage: TMessage); message CM_SYSFONTCHANGED;
     procedure CaretChanged(ASender: TObject);
     function CodeFoldingCollapsableFoldRangeForLine(const ALine: Integer): TBCEditorCodeFoldingRanges.TRange;
@@ -657,6 +657,7 @@ type
     procedure SetColors(AValue: BCEditor.Properties.TBCEditorColors);
     procedure SetCompletionProposal(AValue: BCEditor.Properties.TBCEditorCompletionProposal);
     procedure SetCursor(AValue: TCursor);
+    procedure SetDoubleBuffered(AValue: Boolean);
     procedure SetHideScrollBars(AValue: Boolean);
     procedure SetHideSelection(AValue: Boolean); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetInsertPos(AValue: TPoint);
@@ -806,6 +807,7 @@ type
     property Colors: BCEditor.Properties.TBCEditorColors read GetColors write SetColors stored IsColorsStored;
     property CompletionProposal: BCEditor.Properties.TBCEditorCompletionProposal read GetCompletionProposal write SetCompletionProposal stored IsCompletionProposalStored;
     property Cursor: TCursor read GetCursor write SetCursor;
+    property DoubleBuffered: Boolean read FDoubleBuffered write SetDoubleBuffered default True;
     property Font stored IsFontStored;
     property HideScrollBars: Boolean read FHideScrollBars write SetHideScrollBars default True;
     property HideSelection: Boolean read FHideSelection write SetHideSelection default True;
@@ -919,6 +921,7 @@ type
     property Canvas;
     property CaretPos;
     property CharAt;
+    property DoubleBuffered;
     property Highlighter;
     property InsertPos;
     property Marks;
@@ -941,7 +944,6 @@ type
     property CompletionProposal;
     property Constraints;
     property Ctl3D;
-    property DoubleBuffered default True;
     property Enabled;
     property Font;
     property Height;
@@ -1064,7 +1066,7 @@ begin
   FFont.Size := FEditor.Minimap.FontSize;
   FPaintHelper := TPaintHelper.Create(FFont);
   FRebuildEvent := TEvent.Create(nil, False, False, '');
-  FState := [];
+  FState := [bmsSizeChanged];
 
   FPaintHelper.BeginPaint(FDC);
 end;
@@ -1102,12 +1104,7 @@ begin
   FPaintHelper.SearchResultIndex := 0;
   FPaintHelper.SelArea := InvalidLinesArea;
   FPaintHelper.TopRow := 0;
-  FPaintHelper.UsableRows := Max(1, FRect.Height div FPaintHelper.RowHeight);
   FPaintHelper.UCCBrush := nil;
-  if (FRect.Height = FPaintHelper.UsableRows * FPaintHelper.RowHeight) then
-    FPaintHelper.VisibleRows := FPaintHelper.UsableRows
-  else
-    FPaintHelper.VisibleRows := FPaintHelper.UsableRows + 1;
 
   Invalidate();
 
@@ -1161,6 +1158,13 @@ begin
   FCriticalSection.Enter();
   try
     FCancelEvent.SetEvent();
+
+    FPaintHelper.UsableRows := Max(1, FRect.Height div FPaintHelper.RowHeight);
+    if (FRect.Height = FPaintHelper.UsableRows * FPaintHelper.RowHeight) then
+      FPaintHelper.VisibleRows := FPaintHelper.UsableRows
+    else
+      FPaintHelper.VisibleRows := FPaintHelper.UsableRows + 1;
+
     FInvalidRows.BeginRow := FPaintHelper.TopRow;
     FInvalidRows.EndRow := FPaintHelper.TopRow + FPaintHelper.VisibleRows;
     FRebuildEvent.SetEvent();
@@ -2501,13 +2505,6 @@ begin
   Result := ClientToPos(X, Y);
 end;
 
-procedure TCustomBCEditor.CMDoubleBufferedChanged(var AMessage: TMessage);
-begin
-  inherited;
-
-  RecreateWnd();
-end;
-
 procedure TCustomBCEditor.CMSysFontChanged(var AMessage: TMessage);
 begin
   if (Assigned(FHintWindow)) then
@@ -2666,7 +2663,6 @@ begin
 
   Color := clWindow;
   ControlStyle := ControlStyle + [csOpaque, csNeedsBorderPaint];
-  DoubleBuffered := True;
   Height := 89;
   ParentColor := False;
   TabStop := True;
@@ -2685,6 +2681,7 @@ begin
   FCodeFoldingLineBitmap := nil;
   FCodeFoldingEndLineBitmap := nil;
   FDefaultFontSize := Font.Size + 1;
+  FDoubleBuffered := True;
   FDoubleClickTime := GetDoubleClickTime();
   FFmtLines := False;
   FFocused := False;
@@ -2837,7 +2834,7 @@ begin
       Style := Style or ES_READONLY;
     if (eoDropFiles in FOptions) then
       ExStyle := ExStyle or WS_EX_ACCEPTFILES;
-    if (DoubleBuffered and not (csDesigning in ComponentState)) then
+    if (FDoubleBuffered and not (csDesigning in ComponentState)) then
       ExStyle := ExStyle or WS_EX_COMPOSITED;
 
     if (NewStyleControls and Ctl3D and (FBorderStyle = bsSingle)) then
@@ -10078,6 +10075,16 @@ begin
     inherited Cursor := AValue;
 
   Windows.SetCursor(Screen.Cursors[inherited Cursor]);
+end;
+
+procedure TCustomBCEditor.SetDoubleBuffered(AValue: Boolean);
+begin
+  if (AValue <> FDoubleBuffered) then
+  begin
+    FDoubleBuffered := AValue;
+
+    RecreateWnd();
+  end;
 end;
 
 procedure TCustomBCEditor.SetFocus();
