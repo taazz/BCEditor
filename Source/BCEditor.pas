@@ -892,9 +892,11 @@ type
     procedure LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromFile'; // 2017-03-10
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromStream'; // 2017-03-10
     procedure PasteFromClipboard();
-    procedure PostCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil);
+    function PostCommand(const ACommand: TBCEditorCommand;
+      const AData: TBCEditorCommandData = nil): Boolean;
     function PosToCharIndex(const APos: TPoint): Integer;
-    function ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil): Boolean;
+    function ProcessCommand(const ACommand: TBCEditorCommand;
+      const AData: TBCEditorCommandData = nil): Boolean;
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
     procedure RegisterCommandHandler(const AProc: Pointer; const AHandlerData: Pointer); overload;
     procedure RegisterCommandHandler(const AProc: TBCEditorHookedCommandObjectProc); overload;
@@ -6947,12 +6949,13 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.PostCommand(const ACommand: TBCEditorCommand;
-  const AData: TBCEditorCommandData = nil);
+function TCustomBCEditor.PostCommand(const ACommand: TBCEditorCommand;
+  const AData: TBCEditorCommandData = nil): Boolean;
 var
   LCommand: TCommand;
 begin
-  if (not (ecProcessingCommand in FState)) then
+  Result := not (ecProcessingCommand in FState);
+  if (Result) then
     ProcessCommand(ACommand, AData)
   else
   begin
