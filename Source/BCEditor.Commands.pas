@@ -111,7 +111,7 @@ type
   TBCEditorHookedCommandObjectProc = procedure(ASender: TObject; const ABefore: Boolean;
     const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean) of object;
   TBCEditorAfterProcessCommandEvent = procedure(ASender: TObject;
-    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData) of object;
+    const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; const AHandled: Boolean) of object;
   TBCEditorBeforeProcessCommandEvent = procedure(ASender: TObject;
     const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData; var AHandled: Boolean) of object;
 
@@ -683,6 +683,7 @@ begin
   RegisterCommand(ecFindForeward, eccMoveCaret, 'ecFindForeward');
   RegisterCommand(ecFindNext, eccMoveCaret, 'ecFindNext', ShortCut(VK_F3, []));
   RegisterCommand(ecFindPrevious, eccMoveCaret, 'ecFindPrevious', ShortCut(VK_F3, [ssShift]));
+  RegisterCommand(ecGotoMatchingPair, eccMoveCaret, 'ecGotoMatchingPair', ShortCut(Ord('D'), [ssCtrl]));
   RegisterCommand(ecLeft, eccMoveCaret, 'ecLeft', ShortCut(VK_LEFT, []));
   RegisterCommand(ecPageDown, eccMoveCaret, 'ecPageDown', ShortCut(VK_NEXT, []), False);
   RegisterCommand(ecPageUp, eccMoveCaret, 'ecPageUp', ShortCut(VK_PRIOR, []), False);

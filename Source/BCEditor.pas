@@ -66,7 +66,7 @@ type
       esScrollBarsInvalid, esSyncEditInvalid, esSyncEditOverlaysInvalid,
       esCaretChanged, esFontChanged, esHighlighterChanged, esSelChanged,
       esSizeChanged, esSysFontChanged, esTextChanged,
-      esDragging, esPainting, esScrolling, ecProcessingCommand,
+      esDragging, esPainting, esScrolling, ecProcessingCommand, ecProcessingCommands,
       esTextUpdated,
       esHighlightSearchAllAreas,
       esKeyHandled, esWaitForDrag, esMouseDblClk, esCenterCaret);
@@ -98,12 +98,13 @@ type
       procedure InvalidateRows(const ABeginRow, AEndRow: Integer);
       procedure LineBuilt(const ALine: Integer);
       procedure SetSize(const AWidth, AHeight: Integer);
-      procedure SetTopRow(const AValue: Integer);
+      procedure UpdateTopRow();
       property DC: HDC read FDC;
       property PaintHelper: TPaintHelper read FPaintHelper;
       property VisibleRect: TRect read FVisibleRect;
     public
-      constructor Create(const AEditor: TCustomBCEditor);
+      constructor Create(const AEditor: TCustomBCEditor;
+        const AWidth, AHeight, ATopRow: Integer);
       destructor Destroy(); override;
       procedure Terminate();
     end;
@@ -119,6 +120,11 @@ type
     public
       constructor Create(const AEditor: TCustomBCEditor);
       destructor Destroy(); override;
+    end;
+
+    TCommand = record
+      Command: TBCEditorCommand;
+      Data: TBCEditorCommandData;
     end;
 
     TOverlay = record
@@ -350,6 +356,7 @@ type
     FCodeFoldingNoneBitmap: TGPCachedBitmap;
     FCodeFoldingRect: TRect;
     FColors: TBCEditorColors;
+    FCommands: TQueue<TCommand>;
     FCompletionProposal: TBCEditorCompletionProposal;
     FCompletionProposalPopup: TBCEditorCompletionProposalPopup;
     FDefaultFontSize: Integer;
@@ -407,7 +414,7 @@ type
     FOldMatchingPairCloseArea: TBCEditorLinesArea;
     FOldSelArea: TBCEditorLinesArea;
     FOldVertScrollBarVisible: Boolean;
-    FOnCaretChanged: TBCEditorCaretChangedEvent;
+    FOnCaretChange: TBCEditorCaretChangedEvent;
     FOnChange: TNotifyEvent;
     FOnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent;
     FOnCompletionProposalShow: TBCEditorCompletionProposalShowEvent;
@@ -755,10 +762,11 @@ type
     procedure DestroyWnd(); override;
     procedure DoBlockIndent(const ACommand: TBCEditorCommand);
     procedure DoCompletionProposal(); virtual;
+    procedure DoGotoMatchingPair();
     function DoMouseWheelDown(Shift: TShiftState; MousePos: TPoint): Boolean; override;
     function DoMouseWheelUp(Shift: TShiftState; MousePos: TPoint): Boolean; override;
     procedure DoSyncEdit();
-    procedure DoTripleClick;
+    procedure DoTripleClick();
     procedure DragCanceled(); override;
     procedure DragOver(ASource: TObject; X, Y: Integer; AState: TDragState; var AAccept: Boolean); overload; override;
     procedure ExpandCodeFoldingLevel(const AFirstLevel: Integer; const ALastLevel: Integer);
@@ -820,7 +828,7 @@ type
     property Minimap: BCEditor.Properties.TBCEditorMinimap read GetMinimap write SetMinimap;
     property Modified: Boolean read GetModified write SetModified;
     property MouseCapture: TMouseCapture read FMouseCapture write SetMouseCapture;
-    property OnCaretChanged: TBCEditorCaretChangedEvent read FOnCaretChanged write FOnCaretChanged;
+    property OnCaretChange: TBCEditorCaretChangedEvent read FOnCaretChange write FOnCaretChange;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
     property OnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent read FOnCompletionProposalClose write FOnCompletionProposalClose;
     property OnCompletionProposalShow: TBCEditorCompletionProposalShowEvent read FOnCompletionProposalShow write FOnCompletionProposalShow;
@@ -884,6 +892,7 @@ type
     procedure LoadFromFile(const AFileName: string; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromFile'; // 2017-03-10
     procedure LoadFromStream(AStream: TStream; AEncoding: TEncoding = nil); deprecated 'Use Lines.LoadFromStream'; // 2017-03-10
     procedure PasteFromClipboard();
+    procedure PostCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil);
     function PosToCharIndex(const APos: TPoint): Integer;
     function ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil): Boolean;
     procedure Redo(); {$IFNDEF Debug} inline; {$ENDIF}
@@ -954,7 +963,7 @@ type
     property LeftMargin;
     property Lines: TStrings read GetLines write SetLines stored IsLinesStored;
     property Minimap;
-    property OnCaretChanged;
+    property OnCaretChange;
     property OnChange;
     property OnClick;
     property OnCompletionProposalClose;
@@ -1045,7 +1054,8 @@ end;
 
 { TCustomBCEditor.TBuildMinimapThread *****************************************}
 
-constructor TCustomBCEditor.TBuildMinimapThread.Create(const AEditor: TCustomBCEditor);
+constructor TCustomBCEditor.TBuildMinimapThread.Create(const AEditor: TCustomBCEditor;
+  const AWidth, AHeight, ATopRow: Integer);
 begin
   inherited Create(False);
 
@@ -1066,9 +1076,12 @@ begin
   FFont.Size := FEditor.Minimap.FontSize;
   FPaintHelper := TPaintHelper.Create(FFont);
   FRebuildEvent := TEvent.Create(nil, False, False, '');
-  FState := [bmsSizeChanged];
+  FState := [];
 
   FPaintHelper.BeginPaint(FDC);
+
+  SetSize(AWidth,AHeight);
+  Exclude(FState, bmsSizeChanged);
 end;
 
 destructor TCustomBCEditor.TBuildMinimapThread.Destroy();
@@ -1106,6 +1119,7 @@ begin
   FPaintHelper.TopRow := 0;
   FPaintHelper.UCCBrush := nil;
 
+  UpdateTopRow();
   Invalidate();
 
   while ((FRebuildEvent.WaitFor(INFINITE) = wrSignaled)
@@ -1228,23 +1242,6 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.TBuildMinimapThread.SetTopRow(const AValue: Integer);
-var
-  LValue: Integer;
-begin
-  LValue := Max(0, Min(FEditor.FRows.Count - FPaintHelper.VisibleRows, AValue));
-  FCriticalSection.Enter();
-  try
-    if (LValue <> FPaintHelper.TopRow) then
-    begin
-      FPaintHelper.TopRow := LValue;
-      Invalidate();
-    end;
-  finally
-    FCriticalSection.Leave();
-  end;
-end;
-
 procedure TCustomBCEditor.TBuildMinimapThread.Terminate();
 begin
   FCriticalSection.Enter();
@@ -1253,6 +1250,24 @@ begin
 
     FCancelEvent.SetEvent();
     FRebuildEvent.SetEvent();
+  finally
+    FCriticalSection.Leave();
+  end;
+end;
+
+procedure TCustomBCEditor.TBuildMinimapThread.UpdateTopRow();
+var
+  LValue: Integer;
+begin
+  LValue := FEditor.FPaintHelper.TopRow + (FEditor.FPaintHelper.UsableRows - PaintHelper.UsableRows) div 2;
+  LValue := Max(0, Min(FEditor.FRows.Count - FPaintHelper.VisibleRows, LValue));
+  FCriticalSection.Enter();
+  try
+    if (LValue <> FPaintHelper.TopRow) then
+    begin
+      FPaintHelper.TopRow := LValue;
+      Invalidate();
+    end;
   finally
     FCriticalSection.Leave();
   end;
@@ -2317,8 +2332,8 @@ begin
   if (FUpdateCount > 0) then
     Include(FState, esCaretChanged)
   else
-    if (Assigned(FOnCaretChanged)) then
-      FOnCaretChanged(Self, CaretPos);
+    if (Assigned(FOnCaretChange)) then
+      FOnCaretChange(Self, CaretPos);
 end;
 
 procedure TCustomBCEditor.Change();
@@ -2680,6 +2695,7 @@ begin
   FCodeFoldingExpandedBitmap := nil;
   FCodeFoldingLineBitmap := nil;
   FCodeFoldingEndLineBitmap := nil;
+  FCommands := TQueue<TCommand>.Create();
   FDefaultFontSize := Font.Size + 1;
   FDoubleBuffered := True;
   FDoubleClickTime := GetDoubleClickTime();
@@ -2776,7 +2792,7 @@ begin
   FPaintHelper.Options := [phoCaretPos, phoLineColors, phoTextOverlays];
   if (eoHighlightActiveLine in FOptions) then
     FPaintHelper.Options := FPaintHelper.Options + [phoHighlightActiveLine];
-  if (eoShowSpecialChars in FOptions) then
+  if (eoSpecialChars in FOptions) then
     FPaintHelper.Options := FPaintHelper.Options + [phoSpecialChars];
   FPaintHelper.TopRow := 0;
   FPaintHelper.UsableRows := 0;
@@ -2830,6 +2846,7 @@ begin
   begin
     WindowClass.Style := WindowClass.Style and not CS_VREDRAW and not CS_HREDRAW;
     Style := Style or LBorderStyles[FBorderStyle] or WS_CLIPCHILDREN or ES_AUTOHSCROLL or ES_AUTOVSCROLL;
+    Style := Style and not WS_BORDER;
     if (FReadOnly) then
       Style := Style or ES_READONLY;
     if (eoDropFiles in FOptions) then
@@ -2839,7 +2856,6 @@ begin
 
     if (NewStyleControls and Ctl3D and (FBorderStyle = bsSingle)) then
     begin
-      Style := Style and not WS_BORDER;
       ExStyle := ExStyle or WS_EX_CLIENTEDGE;
     end;
   end;
@@ -2996,6 +3012,7 @@ begin
   if Assigned(FCompletionProposalPopup) then
     FCompletionProposalPopup.Free();
   FColors.Free();
+  FCommands.Free();
   FHighlighter.Free();
   if (Assigned(FHintWindow)) then
     FHintWindow.Free();
@@ -3726,6 +3743,16 @@ begin
     LFindResult.Count := -1;
     FindExecuted(@LFindResult);
   end;
+end;
+
+procedure TCustomBCEditor.DoGotoMatchingPair();
+begin
+  if (FLines.MatchedPairOpenArea.Contains(FLines.CaretPosition)
+    or (FLines.CaretPosition = FLines.MatchedPairOpenArea.EndPosition)) then
+    FLines.CaretPosition := FLines.MatchedPairCloseArea.BeginPosition
+  else if (FLines.MatchedPairCloseArea.Contains(FLines.CaretPosition)
+    or (FLines.CaretPosition = FLines.MatchedPairCloseArea.EndPosition)) then
+    FLines.CaretPosition := FLines.MatchedPairOpenArea.BeginPosition;
 end;
 
 procedure TCustomBCEditor.DoInsertText(const AText: string);
@@ -6807,10 +6834,9 @@ begin
         if (FMinimap.Visible and Assigned(FMinimapBitmap)) then
         begin
           if (not Assigned(FBuildMinimapThread)) then
-          begin
-            FBuildMinimapThread := TBuildMinimapThread.Create(Self);
-            FBuildMinimapThread.SetSize(FMinimapRect.Width - 2 * GLineWidth, FMinimapRect.Height - 2 * GLineWidth);
-          end;
+            FBuildMinimapThread := TBuildMinimapThread.Create(Self,
+              FMinimapRect.Width - 2 * GLineWidth, FMinimapRect.Height - 2 * GLineWidth,
+              FPaintHelper.TopRow);
           FBuildMinimapThread.Invalidate();
         end;
         Exclude(FState, esMinimapInvalid);
@@ -6918,6 +6944,21 @@ begin
     finally
       FLines.EndUpdate();
     end;
+  end;
+end;
+
+procedure TCustomBCEditor.PostCommand(const ACommand: TBCEditorCommand;
+  const AData: TBCEditorCommandData = nil);
+var
+  LCommand: TCommand;
+begin
+  if (not (ecProcessingCommand in FState)) then
+    ProcessCommand(ACommand, AData)
+  else
+  begin
+    LCommand.Command := ACommand;
+    LCommand.Data := AData;
+    FCommands.Enqueue(LCommand);
   end;
 end;
 
@@ -7646,8 +7687,8 @@ end;
 
 function TCustomBCEditor.ProcessCommand(const ACommand: TBCEditorCommand; const AData: TBCEditorCommandData = nil): Boolean;
 var
-  LAllow: Boolean;
   LCollapsedCount: Integer;
+  LCommand: TCommand;
   LHandled: Boolean;
   LLine: Integer;
   LNewSelArea: TBCEditorLinesArea;
@@ -7661,267 +7702,276 @@ begin
     Result := False
   else
   begin
-    LAllow := True;
+    LHandled := False;
 
     if ((ACommand = ecRecordMacro) and FLines.SyncEdit) then
-      LAllow := ProcessCommand(ecSyncEdit);
+      LHandled := not ProcessCommand(ecSyncEdit);
 
     if (Assigned(FBeforeProcessCommand)) then
-      FBeforeProcessCommand(Self, ACommand, AData, LAllow);
+      FBeforeProcessCommand(Self, ACommand, AData, LHandled);
 
-    LHandled := False;
-    if (LAllow) then
+    FHookedCommandHandlers.Broadcast(True, ACommand, AData, LHandled);
+
+    if (not LHandled and (ACommand <> ecNone)) then
     begin
-      FHookedCommandHandlers.Broadcast(True, ACommand, AData, LHandled);
-
-      if (not LHandled and (ACommand <> ecNone)) then
-      begin
-        FRowsWanted.CriticalSection.Enter();
-        try
-          if (FRowsWanted.What <> rwNothing) then
-          begin
-            FRowsWanted.What := rwNothing;
-            UpdateCursor();
-          end;
-        finally
-          FRowsWanted.CriticalSection.Leave();
+      FRowsWanted.CriticalSection.Enter();
+      try
+        if (FRowsWanted.What <> rwNothing) then
+        begin
+          FRowsWanted.What := rwNothing;
+          UpdateCursor();
         end;
+      finally
+        FRowsWanted.CriticalSection.Leave();
+      end;
 
-        if (FLeftMargin.CodeFolding.Visible) then
-          case (ACommand) of
-            ecBackspace, ecDeleteChar, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
-            ecClear, ecReturn, ecChar, ecText, ecCutToClipboard, ecPasteFromClipboard,
-            ecBlockIndent, ecBlockUnindent, ecTab:
-              if (not FLines.SelArea.IsEmpty()) then
-              begin
-                LNewSelArea := FLines.SelArea;
-                LCollapsedCount := 0;
-                for LLine := LNewSelArea.BeginPosition.Line to LNewSelArea.EndPosition.Line do
-                  LCollapsedCount := ExpandCodeFoldingLines(LLine + 1);
-                if LCollapsedCount <> 0 then
-                begin
-                  Inc(LNewSelArea.EndPosition.Line, LCollapsedCount);
-                  LNewSelArea.EndPosition.Char := Length(FLines.Items[LNewSelArea.EndPosition.Line].Text);
-                end;
-                FLines.BeginUpdate();
-                try
-                  FLines.SelArea := LNewSelArea;
-                finally
-                  FLines.EndUpdate();
-                end;
-              end
-              else
-                ExpandCodeFoldingLines(FLines.CaretPosition.Line + 1);
-          end;
-
-        LHandled := True;
+      if (FLeftMargin.CodeFolding.Visible) then
         case (ACommand) of
-          ecAcceptDrop:
-            ; // Do nothing, but LHandled should be True
-          ecBackspace:
-            DoBackspace();
-          ecBlockComment:
-            DoBlockComment();
-          ecBlockIndent:
-            DoBlockIndent(ACommand);
-          ecBlockUnindent:
-            DoBlockIndent(ACommand);
-          ecBOF:
-            DoBOF(ACommand);
-          ecBOL:
-            DoBOL(ACommand = ecSelBOL);
-          ecCancel:
-            if (FLines.SyncEdit) then
-              DoSyncEdit()
-            else if (esScrolling in FState) then
-              ProcessClient(cjMouseDown, nil, FClientRect, mbMiddle, [], FScrollingPoint)
-            else if (not ReadOnly and not FLines.CanModify) then
-              FLines.TerminateJob()
-            else if (esHighlightSearchAllAreas in FState) then
+          ecBackspace, ecDeleteChar, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
+          ecClear, ecReturn, ecChar, ecText, ecCutToClipboard, ecPasteFromClipboard,
+          ecBlockIndent, ecBlockUnindent, ecTab:
+            if (not FLines.SelArea.IsEmpty()) then
             begin
-              Exclude(FState, esHighlightSearchAllAreas);
-              InvalidateText();
-            end;
-          ecClear:
-            FLines.Clear();
-          ecChar:
-            DoChar(PBCEditorCommandDataChar(AData));
-          ecCopyToClipboard:
-            DoCopyToClipboard();
-          ecCutToClipboard:
-            DoCutToClipboard();
-          ecDeleteChar:
-            DeleteChar();
-          ecDeleteLastWord:
-            DeleteLastWordOrBOL(ACommand);
-          ecDeleteLine:
-            DeleteLine();
-          ecDeleteToBOL:
-            DeleteLastWordOrBOL(ACommand);
-          ecDeleteToEOL:
-            DoDeleteToEOL();
-          ecDeleteWord:
-            DoDeleteWord();
-          ecDown:
-            DoUpOrDown(1, ACommand = ecSelDown);
-          ecDropOLE:
-            DoDropOLE(PBCEditorCommandDataDropOLE(AData));
-          ecEOF:
-            DoEOF(ACommand);
-          ecEOL:
-            DoEOL(ACommand = ecSelEOL);
-          ecFindFirst:
-            DoFindFirst(PBCEditorCommandDataFind(AData));
-          ecFindNext:
-            if (FLastSearch = lsReplace) then
-              DoReplace(PBCEditorCommandDataReplace(FLastSearchData))
-            else if (not Assigned(FLastSearchData)) then
-              DoShowFind(True)
-            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
-              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData))
+              LNewSelArea := FLines.SelArea;
+              LCollapsedCount := 0;
+              for LLine := LNewSelArea.BeginPosition.Line to LNewSelArea.EndPosition.Line do
+                LCollapsedCount := ExpandCodeFoldingLines(LLine + 1);
+              if LCollapsedCount <> 0 then
+              begin
+                Inc(LNewSelArea.EndPosition.Line, LCollapsedCount);
+                LNewSelArea.EndPosition.Char := Length(FLines.Items[LNewSelArea.EndPosition.Line].Text);
+              end;
+              FLines.BeginUpdate();
+              try
+                FLines.SelArea := LNewSelArea;
+              finally
+                FLines.EndUpdate();
+              end;
+            end
             else
-              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData));
-          ecFindPrevious:
-            if (FLastSearch = lsReplace) then
-              DoReplace(PBCEditorCommandDataReplace(FLastSearchData))
-            else if (not Assigned(FLastSearchData)) then
-              DoShowFind(True)
-            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
-              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData))
-            else
-              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData));
-          ecGotoBookmark1 ..
-            ecGotoBookmark0: GotoBookmark(Ord(ACommand) - Ord(ecGotoBookmark1));
-          ecGotoNextBookmark:
-            GotoNextBookmark();
-          ecGotoPreviousBookmark:
-            GotoPreviousBookmark();
-          ecInsertLine:
-            InsertLine();
-          ecInsertTextMode:
-            TextEntryMode := temInsert;
-          ecLeft:
-            MoveCaretHorizontally(-1, ACommand = ecSelLeft);
-          ecLineComment:
-            DoLineComment();
-          ecLowerCase:
-            DoToggleSelectedCase(ACommand);
-          ecOverwriteTextMode:
-            TextEntryMode := temOverwrite;
-          ecPageBottom:
-            DoPageTopOrBottom(ACommand);
-          ecPageDown:
-            DoPageUpOrDown(ACommand);
-          ecPageTop:
-            DoPageTopOrBottom(ACommand);
-          ecPageUp:
-            DoPageUpOrDown(ACommand);
-          ecPasteFromClipboard:
-            PasteFromClipboard();
-          ecPosition:
-            DoPosition(PBCEditorCommandDataPosition(AData));
-          ecRedo:
-            FLines.Redo();
-          ecReplace:
-            DoReplace(PBCEditorCommandDataReplace(AData));
-          ecReturn:
-            if (FWantReturns) then DoReturnKey();
-          ecRight:
-            MoveCaretHorizontally(1, ACommand = ecSelRight);
-          ecScrollDown:
-            DoScroll(ACommand);
-          ecScrollLeft:
-            DoScroll(ACommand);
-          ecScrollRight:
-            DoScroll(ACommand);
-          ecScrollTo:
-            DoScrollTo(PBCEditorCommandDataScrollTo(AData));
-          ecScrollUp:
-            DoScroll(ACommand);
-          ecSel:
-            DoSelection(PBCEditorCommandDataSelection(AData));
-          ecSelBOF:
-            DoBOF(ACommand);
-          ecSelBOL:
-            DoBOL(ACommand = ecSelBOL);
-          ecSelBOP:
-            DoPageTopOrBottom(ACommand);
-          ecSelDown:
-            DoUpOrDown(1, ACommand = ecSelDown);
-          ecSelectAll:
-            DoSelectAll();
-          ecSelEOF:
-            DoEOF(ACommand);
-          ecSelEOL:
-            DoEOL(ACommand = ecSelEOL);
-          ecSelEOP:
-            DoPageTopOrBottom(ACommand);
-          ecSelLeft:
-            MoveCaretHorizontally(-1, ACommand = ecSelLeft);
-          ecSelPageDown:
-            DoPageUpOrDown(ACommand);
-          ecSelPageUp:
-            DoPageUpOrDown(ACommand);
-          ecSelRight:
-            MoveCaretHorizontally(1, ACommand = ecSelRight);
-          ecSelUp:
-            DoUpOrDown(-1, ACommand = ecSelUp);
-          ecSelWord:
-            SetSelectedWord;
-          ecSelWordLeft:
-            DoWordLeft(ACommand);
-          ecSelWordRight:
-            DoWordRight(ACommand);
-          ecSetBookmark1 ..
-            ecSetBookmark0: DoSetBookmark(ACommand);
-          ecShiftTab:
-            if (FWantTabs) then DoTabKey(ACommand);
-          ecShowCompletionProposal:
-            DoCompletionProposal();
-          ecShowFind:
-            DoShowFind(True);
-          ecShowGotoLine:
-            DoShowGotoLine();
-          ecShowReplace:
-            DoShowReplace();
-          ecSyncEdit:
-            DoSyncEdit();
-          ecTab:
-            if (FWantTabs) then DoTabKey(ACommand);
-          ecText:
-            DoText(PBCEditorCommandDataText(AData));
-          ecToggleTextMode:
-            if (FTextEntryMode = temInsert) then
-              TextEntryMode := temOverwrite
-            else
-              TextEntryMode := temInsert;
-          ecUndo:
-            FLines.Undo();
-          ecUnselect:
-            DoUnselect();
-          ecUp:
-            DoUpOrDown(-1, ACommand = ecSelUp);
-          ecUpperCase:
-            DoToggleSelectedCase(ACommand);
-          ecWordLeft:
-            DoWordLeft(ACommand);
-          ecWordRight:
-            DoWordRight(ACommand);
-          else
-            LHandled := False;
+              ExpandCodeFoldingLines(FLines.CaretPosition.Line + 1);
         end;
+
+      LHandled := True;
+      case (ACommand) of
+        ecAcceptDrop:
+          ; // Do nothing, but LHandled should be True
+        ecBackspace:
+          DoBackspace();
+        ecBlockComment:
+          DoBlockComment();
+        ecBlockIndent:
+          DoBlockIndent(ACommand);
+        ecBlockUnindent:
+          DoBlockIndent(ACommand);
+        ecBOF:
+          DoBOF(ACommand);
+        ecBOL:
+          DoBOL(ACommand = ecSelBOL);
+        ecCancel:
+          if (FLines.SyncEdit) then
+            DoSyncEdit()
+          else if (esScrolling in FState) then
+            ProcessClient(cjMouseDown, nil, FClientRect, mbMiddle, [], FScrollingPoint)
+          else if (not ReadOnly and not FLines.CanModify) then
+            FLines.TerminateJob()
+          else if (esHighlightSearchAllAreas in FState) then
+          begin
+            Exclude(FState, esHighlightSearchAllAreas);
+            InvalidateText();
+          end;
+        ecClear:
+          FLines.Clear();
+        ecChar:
+          DoChar(PBCEditorCommandDataChar(AData));
+        ecCopyToClipboard:
+          DoCopyToClipboard();
+        ecCutToClipboard:
+          DoCutToClipboard();
+        ecDeleteChar:
+          DeleteChar();
+        ecDeleteLastWord:
+          DeleteLastWordOrBOL(ACommand);
+        ecDeleteLine:
+          DeleteLine();
+        ecDeleteToBOL:
+          DeleteLastWordOrBOL(ACommand);
+        ecDeleteToEOL:
+          DoDeleteToEOL();
+        ecDeleteWord:
+          DoDeleteWord();
+        ecDown:
+          DoUpOrDown(1, ACommand = ecSelDown);
+        ecDropOLE:
+          DoDropOLE(PBCEditorCommandDataDropOLE(AData));
+        ecEOF:
+          DoEOF(ACommand);
+        ecEOL:
+          DoEOL(ACommand = ecSelEOL);
+        ecFindFirst:
+          DoFindFirst(PBCEditorCommandDataFind(AData));
+        ecFindNext:
+          if (FLastSearch = lsReplace) then
+            DoReplace(PBCEditorCommandDataReplace(FLastSearchData))
+          else if (not Assigned(FLastSearchData)) then
+            DoShowFind(True)
+          else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
+            DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData))
+          else
+            DoFindForewards(PBCEditorCommandDataFind(FLastSearchData));
+        ecFindPrevious:
+          if (FLastSearch = lsReplace) then
+            DoReplace(PBCEditorCommandDataReplace(FLastSearchData))
+          else if (not Assigned(FLastSearchData)) then
+            DoShowFind(True)
+          else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
+            DoFindForewards(PBCEditorCommandDataFind(FLastSearchData))
+          else
+            DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData));
+        ecGotoBookmark1 .. ecGotoBookmark0:
+          GotoBookmark(Ord(ACommand) - Ord(ecGotoBookmark1));
+        ecGotoMatchingPair:
+          DoGotoMatchingPair();
+        ecGotoNextBookmark:
+          GotoNextBookmark();
+        ecGotoPreviousBookmark:
+          GotoPreviousBookmark();
+        ecInsertLine:
+          InsertLine();
+        ecInsertTextMode:
+          TextEntryMode := temInsert;
+        ecLeft:
+          MoveCaretHorizontally(-1, ACommand = ecSelLeft);
+        ecLineComment:
+          DoLineComment();
+        ecLowerCase:
+          DoToggleSelectedCase(ACommand);
+        ecOverwriteTextMode:
+          TextEntryMode := temOverwrite;
+        ecPageBottom:
+          DoPageTopOrBottom(ACommand);
+        ecPageDown:
+          DoPageUpOrDown(ACommand);
+        ecPageTop:
+          DoPageTopOrBottom(ACommand);
+        ecPageUp:
+          DoPageUpOrDown(ACommand);
+        ecPasteFromClipboard:
+          PasteFromClipboard();
+        ecPosition:
+          DoPosition(PBCEditorCommandDataPosition(AData));
+        ecRedo:
+          FLines.Redo();
+        ecReplace:
+          DoReplace(PBCEditorCommandDataReplace(AData));
+        ecReturn:
+          if (FWantReturns) then DoReturnKey();
+        ecRight:
+          MoveCaretHorizontally(1, ACommand = ecSelRight);
+        ecScrollDown:
+          DoScroll(ACommand);
+        ecScrollLeft:
+          DoScroll(ACommand);
+        ecScrollRight:
+          DoScroll(ACommand);
+        ecScrollTo:
+          DoScrollTo(PBCEditorCommandDataScrollTo(AData));
+        ecScrollUp:
+          DoScroll(ACommand);
+        ecSel:
+          DoSelection(PBCEditorCommandDataSelection(AData));
+        ecSelBOF:
+          DoBOF(ACommand);
+        ecSelBOL:
+          DoBOL(ACommand = ecSelBOL);
+        ecSelBOP:
+          DoPageTopOrBottom(ACommand);
+        ecSelDown:
+          DoUpOrDown(1, ACommand = ecSelDown);
+        ecSelectAll:
+          DoSelectAll();
+        ecSelEOF:
+          DoEOF(ACommand);
+        ecSelEOL:
+          DoEOL(ACommand = ecSelEOL);
+        ecSelEOP:
+          DoPageTopOrBottom(ACommand);
+        ecSelLeft:
+          MoveCaretHorizontally(-1, ACommand = ecSelLeft);
+        ecSelPageDown:
+          DoPageUpOrDown(ACommand);
+        ecSelPageUp:
+          DoPageUpOrDown(ACommand);
+        ecSelRight:
+          MoveCaretHorizontally(1, ACommand = ecSelRight);
+        ecSelUp:
+          DoUpOrDown(-1, ACommand = ecSelUp);
+        ecSelWord:
+          SetSelectedWord;
+        ecSelWordLeft:
+          DoWordLeft(ACommand);
+        ecSelWordRight:
+          DoWordRight(ACommand);
+        ecSetBookmark1 ..
+          ecSetBookmark0: DoSetBookmark(ACommand);
+        ecShiftTab:
+          if (FWantTabs) then DoTabKey(ACommand);
+        ecShowCompletionProposal:
+          DoCompletionProposal();
+        ecShowFind:
+          DoShowFind(True);
+        ecShowGotoLine:
+          DoShowGotoLine();
+        ecShowReplace:
+          DoShowReplace();
+        ecSyncEdit:
+          DoSyncEdit();
+        ecTab:
+          if (FWantTabs) then DoTabKey(ACommand);
+        ecText:
+          DoText(PBCEditorCommandDataText(AData));
+        ecToggleTextMode:
+          if (FTextEntryMode = temInsert) then
+            TextEntryMode := temOverwrite
+          else
+            TextEntryMode := temInsert;
+        ecUndo:
+          FLines.Undo();
+        ecUnselect:
+          DoUnselect();
+        ecUp:
+          DoUpOrDown(-1, ACommand = ecSelUp);
+        ecUpperCase:
+          DoToggleSelectedCase(ACommand);
+        ecWordLeft:
+          DoWordLeft(ACommand);
+        ecWordRight:
+          DoWordRight(ACommand);
+        else
+          LHandled := False;
       end;
 
       FHookedCommandHandlers.Broadcast(False, ACommand, AData, LHandled);
     end;
 
     if (Assigned(FAfterProcessCommand)) then
-      FAfterProcessCommand(Self, ACommand, AData);
+      FAfterProcessCommand(Self, ACommand, AData, LHandled);
 
     Result := LHandled;
   end;
 
   Exclude(FState, ecProcessingCommand);
+
+  if (not (ecProcessingCommand in FState)
+    and (FCommands.Count > 0)) then
+  begin
+    Include(FState, ecProcessingCommands);
+
+    LCommand := FCommands.Dequeue();
+    ProcessCommand(LCommand.Command, LCommand.Data);
+
+    Exclude(FState, ecProcessingCommands);
+  end;
 end;
 
 function TCustomBCEditor.ProcessText(const AJob: TClientJob; const ATextRect: TRect;
@@ -8905,8 +8955,6 @@ procedure TCustomBCEditor.Resize();
 begin
   inherited;
 
-  InvalidateMetrics();
-
   if (FPaintHelper.RowHeight <> 0) then
   begin
     Include(FState, esCenterCaret);
@@ -8920,6 +8968,7 @@ begin
   Include(FState, esSizeChanged);
   InvalidateScrollBars();
   InvalidateMinimap();
+  InvalidateMetrics();
   if (FVertScrollBar.Visible and FHorzScrollBar.Visible) then
     InvalidateRect(
       Rect(
@@ -10170,7 +10219,7 @@ begin
 
   LTextPos := AValue;
   if (not (eoBeyondEndOfLine in FOptions)) then
-    if (eoShowSpecialChars in FOptions) then
+    if (eoSpecialChars in FOptions) then
       LTextPos.X := Min(LTextPos.X, FRows.MaxWidth + FPaintHelper.LineBreakSignWidth + FCaretWidth - FTextRect.Width)
     else
       LTextPos.X := Min(LTextPos.X, FRows.MaxWidth + FCaretWidth - FTextRect.Width);
@@ -10197,7 +10246,7 @@ begin
 
     if (Assigned(FBuildMinimapThread)) then
     begin
-      FBuildMinimapThread.SetTopRow(FPaintHelper.TopRow + (FPaintHelper.UsableRows - FBuildMinimapThread.PaintHelper.UsableRows) div 2);
+      FBuildMinimapThread.UpdateTopRow();
       InvalidateRect(FMinimapRect);
     end;
   end;
@@ -10322,7 +10371,7 @@ begin
   begin
     FOptions := AValue;
 
-    if (eoShowSpecialChars in FOptions) then
+    if (eoSpecialChars in FOptions) then
       FPaintHelper.Options := FPaintHelper.Options + [phoSpecialChars]
     else
       FPaintHelper.Options := FPaintHelper.Options - [phoSpecialChars];
@@ -10514,8 +10563,8 @@ begin
     if ((FState * [esTextChanged] <> [])
       and not (csReading in ComponentState)) then
       Change();
-    if (Assigned(FOnCaretChanged) and (FState * [esCaretChanged] <> [])) then
-      FOnCaretChanged(Self, CaretPos);
+    if (Assigned(FOnCaretChange) and (FState * [esCaretChanged] <> [])) then
+      FOnCaretChange(Self, CaretPos);
     if ((FState * [esSelChanged] <> []) and Assigned(FOnSelChanged)) then
       FOnSelChanged(Self);
 
@@ -11278,7 +11327,7 @@ begin
     LMax := Max(LMax, FRows.CaretPosition.Column * FPaintHelper.SpaceWidth)
   else if (FRows.CaretPosition.Column > FRows.Items[FRows.CaretPosition.Row].Length) then
     LMax := Max(LMax, FRows.MaxWidth + (FRows.CaretPosition.Column - FRows.Items[FRows.CaretPosition.Row].Length) * FPaintHelper.SpaceWidth);
-  if (eoShowSpecialChars in FOptions) then
+  if (eoSpecialChars in FOptions) then
     Inc(LMax, FPaintHelper.LineBreakSignWidth);
   Inc(LMax, FCaretWidth);
   LPage := FTextRect.Width;

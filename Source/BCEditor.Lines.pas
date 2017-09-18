@@ -715,9 +715,8 @@ end;
 function TBCEditorLines.TSearch.Find(var APosition: TBCEditorLinesPosition;
   const ABackwards: Boolean; out AFoundLength: Integer): Boolean;
 begin
-  Assert((FArea.BeginPosition <= APosition) and (APosition <= FArea.EndPosition));
-
-  if (FErrorMessage <> '') then
+  if (not FArea.Contains(APosition) and (APosition <> FArea.EndPosition)
+    or (FErrorMessage <> '')) then
     Result := False
   else
   begin
@@ -849,13 +848,18 @@ begin
           Dec(FFoundPosition.Char);
 
         if (ABackwards) then
+        begin
           if (FFoundPosition.Line = FArea.BeginPosition.Line) then
             LLineBeginPos := @LLineText[1 + FArea.BeginPosition.Char]
           else
-            LLineBeginPos := @LLineText[1]
+            LLineBeginPos := @LLineText[1];
+          LLineEndPos := @LLineText[1 + FFoundPosition.Char];
+        end
         else
+        begin
           LLineBeginPos := @LLineText[1 + FFoundPosition.Char];
-        LLineEndPos := @LLineText[1 + LLineLength - LPatternLength];
+          LLineEndPos := @LLineText[1 + LLineLength - LPatternLength];
+        end;
 
         if (ABackwards) then
           LLinePos := LLineEndPos
@@ -2935,11 +2939,13 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
     LBeginPosition: TBCEditorLinesPosition;
     LCloseTokenArea: TBCEditorLinesArea;
     LCloseTokenFoundLength: Integer;
+    LCloseTokenPosition: TBCEditorLinesPosition;
     LCloseTokenSearch: TBCEditorLines.TSearch;
     LDeep: Integer;
     LIndex: Integer;
     LOpenTokenArea: TBCEditorLinesArea;
     LOpenTokenFoundLength: Integer;
+    LOpenTokenPosition: TBCEditorLinesPosition;
     LOpenTokenSearch: TBCEditorLines.TSearch;
     LPosition: TBCEditorLinesPosition;
   begin
@@ -2958,42 +2964,40 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
           LCloseTokenArea.BeginPosition := LBeginPosition;
           LCloseTokenArea.EndPosition := PositionOf(LCloseTokenFoundLength, LCloseTokenArea.BeginPosition);
 
-          LDeep := 0;
+          LDeep := 1;
+          LOpenTokenPosition := LCloseTokenArea.BeginPosition;
+          LCloseTokenPosition := LCloseTokenArea.BeginPosition;
 
           LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
-            LinesArea(BOFPosition,
-              LCloseTokenArea.BeginPosition),
+            LinesArea(BOFPosition, LOpenTokenPosition),
             False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
-          LOpenTokenArea.BeginPosition := LOpenTokenSearch.Area.EndPosition;
 
-          LPosition := LOpenTokenSearch.Area.EndPosition;
-          while (not Result and not AThread.Terminated
-            and LOpenTokenSearch.Find(LOpenTokenArea.BeginPosition, True, LOpenTokenFoundLength)) do
+          while ((LDeep > 0) and not AThread.Terminated
+            and LOpenTokenSearch.Find(LOpenTokenPosition, True, LOpenTokenFoundLength)) do
           begin
+            Dec(LDeep);
+
             LCloseTokenSearch.Free();
             LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
-              LinesArea(LOpenTokenSearch.Area.BeginPosition,
-                LPosition),
+              LinesArea(LOpenTokenPosition, LCloseTokenPosition),
               False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
 
-            if (LCloseTokenSearch.Find(LPosition, True, LCloseTokenFoundLength)
-              and (LPosition > LOpenTokenArea.BeginPosition)) then
+            while (not Result and not AThread.Terminated
+              and LCloseTokenSearch.Find(LCloseTokenPosition, True, LCloseTokenFoundLength)) do
             begin
               Inc(LDeep);
-              LOpenTokenArea.BeginPosition := LPosition;
-            end
-            else if (LDeep > 0) then
+              LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength, LCloseTokenPosition);
+            end;
+
+            Result := LDeep = 0;
+            if (Result) then
             begin
-              Dec(LDeep);
-              LPosition := LOpenTokenArea.BeginPosition;
-              LOpenTokenArea.BeginPosition := LPosition;
-            end
-            else
-            begin
+              LOpenTokenArea.BeginPosition := LOpenTokenPosition;
               LOpenTokenArea.EndPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenArea.BeginPosition);
               Result := True;
             end;
           end;
+
           LOpenTokenSearch.Free();
         end;
         LCloseTokenSearch.Free();
@@ -3012,43 +3016,42 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
           LOpenTokenArea.BeginPosition := LBeginPosition;
           LOpenTokenArea.EndPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenArea.BeginPosition);
 
-          LDeep := 0;
+          LDeep := 1;
+          LCloseTokenPosition := LOpenTokenArea.EndPosition;
+          LOpenTokenPosition := LOpenTokenArea.EndPosition;
 
           LCloseTokenSearch := TBCEditorLines.TSearch.Create(Self,
-            LinesArea(LOpenTokenArea.EndPosition,
-              EOFPosition),
+            LinesArea(LCloseTokenPosition, EOFPosition),
             False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
-          LCloseTokenArea.BeginPosition := LCloseTokenSearch.Area.BeginPosition;
 
-          LPosition := LCloseTokenSearch.Area.BeginPosition;
-          while (not Result and not AThread.Terminated
-            and LCloseTokenSearch.Find(LCloseTokenArea.BeginPosition, False, LCloseTokenFoundLength)) do
+          while ((LDeep > 0) and not AThread.Terminated
+            and LCloseTokenSearch.Find(LCloseTokenPosition, False, LCloseTokenFoundLength)) do
           begin
+            Dec(LDeep);
+
             LOpenTokenSearch.Free();
             LOpenTokenSearch := TBCEditorLines.TSearch.Create(Self,
-              LinesArea(LPosition,
-                LCloseTokenSearch.Area.EndPosition),
+              LinesArea(LOpenTokenPosition, LCloseTokenPosition),
               False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
 
-            if (LOpenTokenSearch.Find(LPosition, False, LOpenTokenFoundLength)
-              and (LPosition < LCloseTokenArea.BeginPosition)) then
+            while (not Result and not AThread.Terminated
+              and LOpenTokenSearch.Find(LOpenTokenPosition, False, LOpenTokenFoundLength)) do
             begin
               Inc(LDeep);
-              LPosition := PositionOf(1, LPosition);
-              LCloseTokenArea.BeginPosition := LPosition;
-            end
-            else if (LDeep > 0) then
+              LOpenTokenPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenPosition);
+            end;
+
+            Result := LDeep = 0;
+            if (Result) then
             begin
-              Dec(LDeep);
-              LPosition := PositionOf(1, LCloseTokenArea.BeginPosition);
-              LCloseTokenArea.BeginPosition := LPosition;
-            end
-            else
-            begin
+              LCloseTokenArea.BeginPosition := LCloseTokenPosition;
               LCloseTokenArea.EndPosition := PositionOf(LCloseTokenFoundLength, LCloseTokenArea.BeginPosition);
               Result := True;
             end;
+
+            LCloseTokenPosition := PositionOf(1, LCloseTokenPosition);
           end;
+
           LCloseTokenSearch.Free();
         end;
         LOpenTokenSearch.Free()

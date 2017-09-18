@@ -125,6 +125,7 @@ const
   ecFindForeward = 41;
   ecFindNext = 42;
   ecFindPrevious = 43;
+  ecGotoMatchingPair = 108;
   ecLeft = 44;
   ecPageBottom = 38;
   ecPageDown = 45;
@@ -195,7 +196,7 @@ const
   ecStepMacro = 102;
   ecStopMacro = 103;
 
-  ecLast = 107;
+  ecLast = 108;
   ecUser = 10000;
 
   { Colors ********************************************************************}
