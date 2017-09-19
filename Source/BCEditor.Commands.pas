@@ -153,6 +153,7 @@ type
   public
     procedure AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
     procedure Clear();
+    function CommandToIdent(const ACommand: TBCEditorCommand): string;
     constructor Create();
     destructor Destroy(); override;
     procedure RegisterCommand(const ACommand: TBCEditorCommand;
@@ -163,7 +164,6 @@ type
     procedure Reset();
     function TryCommandToCommandCategory(const ACommand: TBCEditorCommand;
       out ACommandCategory: TBCEditorCommandCategory): Boolean;
-    function TryCommandToIdent(const ACommand: TBCEditorCommand; out AIdent: string): Boolean;
     function TryCommandToShortCut(const ACommand: TBCEditorCommand; out AShortCut: TShortCut): Boolean;
     function TryShortCutToCommand(const AShortCut: TShortCut; out ACommand: TBCEditorCommand): Boolean;
     procedure UnregisterCommand(const ACommand: TBCEditorCommand);
@@ -493,6 +493,21 @@ begin
   FItems.Clear();
 end;
 
+function TBCEditorCommandManager.CommandToIdent(const ACommand: TBCEditorCommand): string;
+var
+  LIndex: Integer;
+begin
+  Result := IntToStr(Ord(ACommand));
+
+  LIndex := IndexOf(ACommand);
+  if ((LIndex >= 0) and (Length(FItems[LIndex].ShortCuts) > 0)) then
+  begin
+    Result := FItems[LIndex].Ident;
+    if (Result = '') then
+      Result := IntToStr(Ord(ACommand));
+  end;
+end;
+
 constructor TBCEditorCommandManager.Create();
 begin
   inherited;
@@ -770,20 +785,6 @@ begin
   Result := LIndex >= 0;
   if (Result) then
     ACommandCategory := FItems[LIndex].CommandCategory;
-end;
-
-function TBCEditorCommandManager.TryCommandToIdent(const ACommand: TBCEditorCommand; out AIdent: string): Boolean;
-var
-  LIndex: Integer;
-begin
-  LIndex := IndexOf(ACommand);
-  Result := (LIndex >= 0) and (Length(FItems[LIndex].ShortCuts) > 0);
-  if (Result) then
-  begin
-    AIdent := FItems[LIndex].Ident;
-    if (AIdent = '') then
-      AIdent := IntToStr(Ord(ACommand));
-  end;
 end;
 
 function TBCEditorCommandManager.TryCommandToShortCut(const ACommand: TBCEditorCommand;
