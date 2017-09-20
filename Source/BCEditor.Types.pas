@@ -132,13 +132,6 @@ type
   );
   TBCEditorSyncEditOptions = set of TBCEditorSyncEditOption;
 
-  TBCEditorTabOption = (
-    toPreviousLineIndent,
-    toSelectedBlockIndent,
-    toTabsToSpaces
-  );
-  TBCEditorTabOptions = set of TBCEditorTabOption;
-
   TBCEditorTextEntryMode = (
     temInsert,
     temOverwrite

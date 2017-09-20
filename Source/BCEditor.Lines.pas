@@ -65,7 +65,7 @@ type
     end;
 
     TOption = (loTrimEOL, loTrimEOF, loUndoGrouped, loUndoAfterLoad,
-      loUndoAfterSave, loSyncEditCaseSensitive, loReadOnly,
+      loUndoAfterSave, loSyncEditCaseSensitive,
       loCaretBeyondEOF, loCaretBeyondEOL);
     TOptions = set of TOption;
 
@@ -2112,8 +2112,7 @@ end;
 
 function TBCEditorLines.GetCanModify(): Boolean;
 begin
-  Result := not (loReadOnly in FOptions)
-    and not (lsBlockModify in FState);
+  Result := not (lsBlockModify in FState);
 end;
 
 function TBCEditorLines.GetCanRedo(): Boolean;
@@ -2947,7 +2946,6 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
     LOpenTokenFoundLength: Integer;
     LOpenTokenPosition: TBCEditorLinesPosition;
     LOpenTokenSearch: TBCEditorLines.TSearch;
-    LPosition: TBCEditorLinesPosition;
   begin
     Result := False;
 
