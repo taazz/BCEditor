@@ -132,11 +132,6 @@ type
   );
   TBCEditorSyncEditOptions = set of TBCEditorSyncEditOption;
 
-  TBCEditorTextEntryMode = (
-    temInsert,
-    temOverwrite
-  );
-
   TBCEditorUndoOption = (
     uoGroupUndo,
     uoUndoAfterLoad,

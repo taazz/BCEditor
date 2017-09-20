@@ -273,6 +273,7 @@ type
     FOnInsert: TChangeEvent;
     FOnLoad: TNotifyEvent;
     FOnMarksChange: TNotifyEvent;
+    FOnModifiedChange: TNotifyEvent;
     FOnReplacePrompt: TBCEditorReplacePromptEvent;
     FOnSelChange: TNotifyEvent;
     FOnSyncEditChange: TNotifyEvent;
@@ -420,6 +421,7 @@ type
     property OnInsert: TChangeEvent read FOnInsert write FOnInsert;
     property OnLoad: TNotifyEvent read FOnLoad write FOnLoad;
     property OnMarksChange: TNotifyEvent read FOnMarksChange write FOnMarksChange;
+    property OnModifiedChange: TNotifyEvent read FOnModifiedChange write FOnModifiedChange;
     property OnReplacePrompt: TBCEditorReplacePromptEvent read FOnReplacePrompt write FOnReplacePrompt;
     property OnSelChange: TNotifyEvent read FOnSelChange write FOnSelChange;
     property OnSyncEditChange: TNotifyEvent read FOnSyncEditChange write FOnSyncEditChange;
@@ -1426,6 +1428,9 @@ begin
   FOnDelete := nil;
   FOnInsert := nil;
   FOnLoad := nil;
+  FOnMarksChange := nil;
+  FOnModifiedChange := nil;
+  FOnReplacePrompt := nil;
   FOnSelChange := nil;
   FOnUpdate := nil;
   FOptions := DefaultOptions;
@@ -1620,7 +1625,7 @@ begin
   FMatchedPairOpenArea := InvalidLinesArea;
   FMatchedPairCloseArea := InvalidLinesArea;
 
-  FModified := True;
+  SetModified(True);
 
   Items.Delete(ALine);
 
@@ -1905,7 +1910,7 @@ begin
     FMatchedPairOpenArea := InvalidLinesArea;
     FMatchedPairCloseArea := InvalidLinesArea;
 
-    FModified := True;
+    SetModified(True);
 
     Items.List[ALine].Flags := [];
     Items.List[ALine].State := lsModified;
@@ -3427,6 +3432,9 @@ begin
         EndUpdate();
       end;
     end;
+
+    if (Assigned(FOnModifiedChange)) then
+      FOnModifiedChange(Self);
   end;
 end;
 
@@ -3546,7 +3554,7 @@ begin
     end;
 
     Exclude(FState, lsLoading);
-    FModified := False;
+    SetModified(False);
   end;
 end;
 
@@ -3740,6 +3748,8 @@ end;
 procedure TBCEditorLines.Undo();
 begin
   ExecuteUndoRedo(UndoList);
+  if (UndoList.Count = 0) then
+    SetModified(False);
 end;
 
 procedure TBCEditorLines.UndoGroupBreak();
