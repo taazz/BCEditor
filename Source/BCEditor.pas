@@ -572,6 +572,7 @@ type
     function GetLines(): TStrings;
     function GetMinimap(): BCEditor.Properties.TBCEditorMinimap; {$IFNDEF Debug} inline; {$ENDIF}
     function GetModified(): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
+    function GetReadOnly(): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     function GetRowHeight(): Integer;
     function GetSearchResultCount(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function GetSelLength(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
@@ -846,7 +847,7 @@ type
     property PaintHelper: TCustomBCEditor.TPaintHelper read FPaintHelper;
     property ParentColor default False;
     property ParentFont default False;
-    property ReadOnly: Boolean read FReadOnly write SetReadOnly default False;
+    property ReadOnly: Boolean read GetReadOnly write SetReadOnly default False;
     property RowHeight: Integer read GetRowHeight;
     property ScrollBars: UITypes.TScrollStyle read FScrollBars write SetScrollBars default ssBoth;
     property SearchResultCount: Integer read GetSearchResultCount;
@@ -2853,7 +2854,7 @@ begin
     WindowClass.Style := WindowClass.Style and not CS_VREDRAW and not CS_HREDRAW;
     Style := Style or LBorderStyles[FBorderStyle] or WS_CLIPCHILDREN or ES_AUTOHSCROLL or ES_AUTOVSCROLL;
     Style := Style and not WS_BORDER;
-    if (FReadOnly) then
+    if (ReadOnly) then
       Style := Style or ES_READONLY;
     if (eoDropFiles in FOptions) then
       ExStyle := ExStyle or WS_EX_ACCEPTFILES;
@@ -3501,7 +3502,7 @@ end;
 
 procedure TCustomBCEditor.DoCutToClipboard();
 begin
-  if (FReadOnly or FLines.SelArea.IsEmpty()) then
+  if (ReadOnly or FLines.SelArea.IsEmpty()) then
     EmptyClipboard()
   else
   begin
@@ -4228,13 +4229,13 @@ begin
             if LLengthAfterLine > 1 then
               LCaretPosition := FLines.BOLPosition[LCaretPosition.Line];
 
-            if (not InsertTabChar(LCaretPosition)) then
+            if (InsertTabChar(LCaretPosition)) then
             begin
               LTabText := StringOfChar(BCEDITOR_TAB_CHAR, LCharCount div FTabs.Width);
               LTabText := LTabText + StringOfChar(BCEDITOR_TAB_CHAR, LCharCount mod FTabs.Width);
             end
             else
-              LTabText := StringOfChar(BCEDITOR_SPACE_CHAR, LCharCount - (LRowsPosition.Column - 1) mod FTabs.Width);
+              LTabText := StringOfChar(BCEDITOR_SPACE_CHAR, LCharCount - LRowsPosition.Column mod FTabs.Width);
 
             if FTextEntryMode = temInsert then
               FLines.InsertText(LCaretPosition, LTabText);
@@ -4448,7 +4449,7 @@ end;
 
 procedure TCustomBCEditor.DragDrop(ASource: TObject; X, Y: Integer);
 begin
-  if (not FReadOnly) then
+  if (not ReadOnly) then
   begin
     inherited;
 
@@ -4508,7 +4509,7 @@ var
   LPosition: TBCEditorLinesPosition;
   LScreen: TPoint;
 begin
-  if (FReadOnly
+  if (ReadOnly
     or (pt.X <= FTextRect.Left)) then
   begin
     SetInsertPos(InvalidPos);
@@ -4548,7 +4549,7 @@ var
 begin
   LScreen := ScreenToClient(Point(X, Y));
   LPosition := ClientToLines(LScreen.X, LScreen.Y);
-  AAccept := not FReadOnly and not ProcessCommand(ecAcceptDrop, TBCEditorCommandDataPosition.Create(LPosition));
+  AAccept := not ReadOnly and not ProcessCommand(ecAcceptDrop, TBCEditorCommandDataPosition.Create(LPosition));
 
   if (AAccept) then
     inherited;
@@ -4797,7 +4798,7 @@ end;
 
 procedure TCustomBCEditor.EMSetReadOnly(var AMessage: TMessage);
 begin
-  ReadOnly := BOOL(AMessage.WParam);
+  SetReadOnly(BOOL(AMessage.WParam));
   AMessage.Result := LRESULT(TRUE);
 end;
 
@@ -5108,17 +5109,17 @@ end;
 
 function TCustomBCEditor.GetCanPaste(): Boolean;
 begin
-  Result := not FReadOnly and (IsClipboardFormatAvailable(CF_TEXT) or IsClipboardFormatAvailable(CF_UNICODETEXT));
+  Result := not ReadOnly and (IsClipboardFormatAvailable(CF_TEXT) or IsClipboardFormatAvailable(CF_UNICODETEXT));
 end;
 
 function TCustomBCEditor.GetCanRedo(): Boolean;
 begin
-  Result := not FReadOnly and FLines.CanRedo;
+  Result := not ReadOnly and FLines.CanRedo;
 end;
 
 function TCustomBCEditor.GetCanUndo(): Boolean;
 begin
-  Result := not FReadOnly and FLines.CanUndo;
+  Result := not ReadOnly and FLines.CanUndo;
 end;
 
 function TCustomBCEditor.GetCaretPos(): TPoint;
@@ -5258,6 +5259,11 @@ end;
 function TCustomBCEditor.GetMinimap(): BCEditor.Properties.TBCEditorMinimap;
 begin
   Result := FMinimap;
+end;
+
+function TCustomBCEditor.GetReadOnly(): Boolean;
+begin
+  Result := ReadOnly and not (csDesigning in ComponentState);
 end;
 
 function TCustomBCEditor.GetRowHeight(): Integer;
@@ -6239,7 +6245,7 @@ begin
       LColumn := 0;
       LLinePos := @FLines[ALinesPosition.Line][1 + FRows.Items[LRow].Char];
       LLineEndPos := @FLines[ALinesPosition.Line][Min(1 + FRows.Items[LRow].Char + LChar, Length(FLines[ALinesPosition.Line]))];
-      while (LLinePos < LLineEndPos) do
+      while (LLinePos <= LLineEndPos) do
       begin
         Inc(LColumn, TokenColumns(LLinePos, 1, LColumn));
         Inc(LLinePos);
@@ -10494,11 +10500,11 @@ end;
 
 procedure TCustomBCEditor.SetReadOnly(const AValue: Boolean);
 begin
-  if ((AValue <> FReadOnly) and not (csDesigning in ComponentState)) then
+  if (AValue <> ReadOnly) then
   begin
-    FReadOnly := AValue;
-    if (HandleAllocated) then
-      if (not FReadOnly) then
+    ReadOnly := AValue;
+    if (HandleAllocated and not (csDesigning in ComponentState)) then
+      if (not ReadOnly) then
         SetWindowLong(WindowHandle, GWL_STYLE, GetWindowLong(WindowHandle, GWL_STYLE) and not ES_READONLY)
       else
         SetWindowLong(WindowHandle, GWL_STYLE, GetWindowLong(WindowHandle, GWL_STYLE) or ES_READONLY);
@@ -11148,17 +11154,17 @@ begin
 
   if (Result) then
     if (Action is TEditCut) then
-      TEditCut(Action).Enabled := not FReadOnly and not FLines.SelArea.IsEmpty()
+      TEditCut(Action).Enabled := not ReadOnly and not FLines.SelArea.IsEmpty()
     else if (Action is TEditCopy) then
       TEditCopy(Action).Enabled := not FLines.SelArea.IsEmpty()
     else if (Action is TEditPaste) then
       TEditPaste(Action).Enabled := FFocused and CanPaste
     else if (Action is TEditDelete) then
-      TEditDelete(Action).Enabled := not FReadOnly and not FLines.SelArea.IsEmpty()
+      TEditDelete(Action).Enabled := not ReadOnly and not FLines.SelArea.IsEmpty()
     else if (Action is TEditSelectAll) then
       TEditSelectAll(Action).Enabled := (FLines.Count > 0)
     else if (Action is TEditUndo) then
-      TEditUndo(Action).Enabled := not FReadOnly and FLines.CanUndo
+      TEditUndo(Action).Enabled := not ReadOnly and FLines.CanUndo
     else if (Action is TSearchFindNext) then
       TSearchFindNext(Action).Enabled := Assigned(FLastSearchData)
     else if (Action is TSearchReplace) then
@@ -11583,7 +11589,7 @@ begin
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
               WM_CUT:
-                if (not FLines.SelArea.IsEmpty() and not FReadOnly) then
+                if (not FLines.SelArea.IsEmpty() and not ReadOnly) then
                   LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
@@ -11598,7 +11604,7 @@ begin
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
               WM_CLEAR:
-                if (not FLines.SelArea.IsEmpty() and not FReadOnly) then
+                if (not FLines.SelArea.IsEmpty() and not ReadOnly) then
                   LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
@@ -11615,7 +11621,7 @@ begin
 //                else
 //                  LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_CHECKED;
 //              WM_APP + 19: { Insert Unicode control character }
-//                if (FReadOnly) then
+//                if (ReadOnly) then
 //                  LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED
 //                else
 //                  LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED;
@@ -11648,7 +11654,7 @@ end;
 
 procedure TCustomBCEditor.WMCut(var AMessage: TWMCut);
 begin
-  if (FReadOnly or FLines.SelArea.IsEmpty()) then
+  if (ReadOnly or FLines.SelArea.IsEmpty()) then
     AMessage.Result := LRESULT(FALSE)
   else
   begin
@@ -11861,7 +11867,7 @@ end;
 
 procedure TCustomBCEditor.WMPaste(var AMessage: TWMPaste);
 begin
-  if (FReadOnly or not IsClipboardFormatAvailable(CF_UNICODETEXT)) then
+  if (ReadOnly or not IsClipboardFormatAvailable(CF_UNICODETEXT)) then
     AMessage.Result := LRESULT(FALSE)
   else
   begin
@@ -11936,7 +11942,7 @@ end;
 
 procedure TCustomBCEditor.WMSetText(var AMessage: TWMSetText);
 begin
-  if (FReadOnly) then
+  if (ReadOnly) then
     AMessage.Result := LPARAM(FALSE)
   else
   begin
