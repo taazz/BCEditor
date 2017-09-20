@@ -5263,7 +5263,7 @@ end;
 
 function TCustomBCEditor.GetReadOnly(): Boolean;
 begin
-  Result := ReadOnly and not (csDesigning in ComponentState);
+  Result := FReadOnly and not (csDesigning in ComponentState);
 end;
 
 function TCustomBCEditor.GetRowHeight(): Integer;
