@@ -146,11 +146,11 @@
         <DelphiCompile Include="..\Source\BCEditor.Highlighter.pas">
             <BuildOrder>32</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Language.pas">
-            <BuildOrder>33</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Lines.pas">
             <BuildOrder>34</BuildOrder>
+        </DelphiCompile>
+        <DelphiCompile Include="..\Source\BCEditor.Locale.pas">
+            <BuildOrder>33</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Properties.pas">
             <BuildOrder>39</BuildOrder>

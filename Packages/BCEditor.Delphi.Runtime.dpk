@@ -41,8 +41,8 @@ contains
   BCEditor.ExportHTML in '..\Source\BCEditor.ExportHTML.pas',
   BCEditor.Highlighter in '..\Source\BCEditor.Highlighter.pas',
   BCEditor.GotoLine in '..\Source\BCEditor.GotoLine.pas',
-  BCEditor.Language in '..\Source\BCEditor.Language.pas',
   BCEditor.Lines in '..\Source\BCEditor.Lines.pas',
+  BCEditor.Locale in '..\Source\BCEditor.Locale.pas',
   BCEditor.Properties in '..\Source\BCEditor.Properties.pas',
   BCEditor.Types in '..\Source\BCEditor.Types.pas',
   JsonDataObjects in '..\Source\JsonDataObjects.pas';

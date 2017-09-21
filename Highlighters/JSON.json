@@ -307,7 +307,10 @@
       }
     ]
   },
-  "FileExtensions": [
-    "json"
-  ]
+  "FileExtensions": {
+    "Default": ".json",
+    "Extensions": [
+      ".json"
+    ]
+  }
 }

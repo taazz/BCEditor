@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   SysUtils, Classes, Generics.Collections, RegularExpressions, SyncObjs,
   Graphics, Controls, StdCtrls, Types,
-  BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter, BCEditor.Language;
+  BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter, BCEditor.Locale;
 
 type
   TBCEditorLines = class(TStrings)
@@ -687,7 +687,7 @@ begin
   FWholeWords := AWholeWords;
 
   if (FPattern = '') then
-    FErrorMessage := SBCEditorPatternIsEmpty;
+    FErrorMessage := BCEditorTranslation(8);
 
   if (FEngine = eNormal) then
   begin
@@ -695,7 +695,7 @@ begin
       for LIndex := 1 to Length(FPattern) do
         if (FLines.IsWordBreakChar(FPattern[LIndex])) then
         begin
-          FErrorMessage := SBCEditorPatternContainsWordBreakChar;
+          FErrorMessage := BCEditorTranslation(9);
           FPattern := '';
           break;
         end;
@@ -3280,7 +3280,7 @@ begin
     until (AThread.Terminated or not Result or not FSearchAll or (LReplaceAction = raCancel));
 
     if (AThread.Terminated) then
-      FSearchResult.ErrorMessage := SBCEditorTerminatedByUser
+      FSearchResult.ErrorMessage := BCEditorTranslation(15)
     else
       FSearchResult.ErrorMessage := FSearch.ErrorMessage;
     if (FSearchResult.ErrorMessage <> '') then

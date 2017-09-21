@@ -29,7 +29,7 @@ implementation {***************************************************************}
 uses
   Windows,
   SysUtils, Types, Math,
-  BCEditor.Language;
+  BCEditor.Locale;
 
 {$R *.dfm}
 
@@ -55,11 +55,11 @@ end;
 
 procedure TGotoLineDialog.FormCreate(Sender: TObject);
 begin
-  Caption := SBCEditorGotoLineCaption;
+  Caption := BCEditorTranslation(16);
   FGroupBox.Caption := '';
-  FLLine.Caption := SBCEditorGotoLineLine + ':';
-  FBOk.Caption := SBCEditorOk;
-  FBCancel.Caption := SBCEditorCancel;
+  FLLine.Caption := BCEditorTranslation(17) + ':';
+  FBOk.Caption := BCEditorTranslation(4);
+  FBCancel.Caption := BCEditorTranslation(5);
 end;
 
 procedure TGotoLineDialog.FormHide(Sender: TObject);

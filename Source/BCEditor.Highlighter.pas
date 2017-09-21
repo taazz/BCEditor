@@ -655,7 +655,7 @@ implementation {***************************************************************}
 uses
   Types, IOUtils, TypInfo,
   GraphUtil,
-  BCEditor, BCEditor.Language, BCEditor.Properties;
+  BCEditor, BCEditor.Locale, BCEditor.Properties;
 
 resourcestring
   SBCEditorErrorInHighlighterParse = 'JSON parse error on line %d column %d: %s';

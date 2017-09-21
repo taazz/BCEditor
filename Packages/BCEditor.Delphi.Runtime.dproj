@@ -100,8 +100,8 @@
         <DCCReference Include="..\Source\BCEditor.ExportHTML.pas"/>
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
         <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Language.pas"/>
         <DCCReference Include="..\Source\BCEditor.Lines.pas"/>
+        <DCCReference Include="..\Source\BCEditor.Locale.pas"/>
         <DCCReference Include="..\Source\BCEditor.Properties.pas"/>
         <DCCReference Include="..\Source\BCEditor.Types.pas"/>
         <DCCReference Include="..\Source\JsonDataObjects.pas"/>

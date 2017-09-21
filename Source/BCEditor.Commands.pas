@@ -153,6 +153,7 @@ type
   public
     procedure AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
     procedure Clear();
+    function CommandCategoryOf(const ACommand: TBCEditorCommand): TBCEditorCommandCategory;
     function CommandToIdent(const ACommand: TBCEditorCommand): string;
     constructor Create();
     destructor Destroy(); override;
@@ -162,8 +163,6 @@ type
       const AEnabledWhileRecording: Boolean = True; const ARecordable: Boolean = True);
     procedure RemoveShortCut(const AShortCut: TShortCut);
     procedure Reset();
-    function TryCommandToCommandCategory(const ACommand: TBCEditorCommand;
-      out ACommandCategory: TBCEditorCommandCategory): Boolean;
     function TryCommandToShortCut(const ACommand: TBCEditorCommand; out AShortCut: TShortCut): Boolean;
     function TryShortCutToCommand(const AShortCut: TShortCut; out ACommand: TBCEditorCommand): Boolean;
     procedure UnregisterCommand(const ACommand: TBCEditorCommand);
@@ -493,6 +492,16 @@ begin
   FItems.Clear();
 end;
 
+function TBCEditorCommandManager.CommandCategoryOf(const ACommand: TBCEditorCommand): TBCEditorCommandCategory;
+var
+  LIndex: Integer;
+begin
+  Result := eccText;
+  LIndex := IndexOf(ACommand);
+  if (LIndex >= 0) then
+    Result := FItems[LIndex].CommandCategory;
+end;
+
 function TBCEditorCommandManager.CommandToIdent(const ACommand: TBCEditorCommand): string;
 var
   LIndex: Integer;
@@ -774,17 +783,6 @@ begin
   RegisterCommand(ecRecordMacro, eccMacroRecorder, 'ecRecordMacro', ShortCut(Ord('R'), [ssCtrl, ssShift]));
   RegisterCommand(ecStepMacro, eccMacroRecorder, 'ecStepMacro');
   RegisterCommand(ecStopMacro, eccMacroRecorder, 'ecStopMacro');
-end;
-
-function TBCEditorCommandManager.TryCommandToCommandCategory(const ACommand: TBCEditorCommand;
-  out ACommandCategory: TBCEditorCommandCategory): Boolean;
-var
-  LIndex: Integer;
-begin
-  LIndex := IndexOf(ACommand);
-  Result := LIndex >= 0;
-  if (Result) then
-    ACommandCategory := FItems[LIndex].CommandCategory;
 end;
 
 function TBCEditorCommandManager.TryCommandToShortCut(const ACommand: TBCEditorCommand;
