@@ -564,6 +564,18 @@ type
       property Text: PChar read FText;
     end;
 
+    TFileExtensions = class(TStringList)
+    strict private
+      FDefaultExtension: string;
+      FHighlighter: TBCEditorHighlighter;
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject);
+    public
+      procedure Clear(); override;
+      constructor Create(const AHighlighter: TBCEditorHighlighter);
+      property DefaultExtension: string read FDefaultExtension;
+    end;
+
   strict private
     FAllDelimiters: TBCEditorAnsiCharSet;
     FAttributes: TStringList;
@@ -573,6 +585,7 @@ type
     FCompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions;
     FDirectory: string;
     FEditor: TCustomControl;
+    FFileExtensions: TFileExtensions;
     FFilename: string;
     FFoldCloseKeyChars: TBCEditorAnsiCharSet;
     FFoldOpenKeyChars: TBCEditorAnsiCharSet;
@@ -620,6 +633,7 @@ type
     property Colors: TElements read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
+    property FileExtensions: TFileExtensions read FFileExtensions;
     property FoldCloseKeyChars: TBCEditorAnsiCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
     property FoldOpenKeyChars: TBCEditorAnsiCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
     property MainRules: TRange read FMainRules;
@@ -1693,6 +1707,7 @@ end;
 procedure TBCEditorHighlighter.TElements.LoadFromJSON(const AJSON: TJSONObject);
 var
   LColorsObject: TJSONObject;
+  LEditorColorsObject: TJSONObject;
   LEditorObject: TJSONObject;
   LElement: TElement;
   LElementsArray: TJSONArray;
@@ -1706,29 +1721,30 @@ begin
 
   if (Assigned(AJSON)) then
   begin
-    LEditorObject := GetJSONObject(AJSON, 'Editor');
+    LColorsObject := GetJSONObject(AJSON, 'Colors');
+    LEditorObject := GetJSONObject(LColorsObject, 'Editor');
     if (Assigned(LEditorObject)) then
       with TCustomBCEditor(FHighlighter.Editor) do
       begin
-        LColorsObject := GetJSONObject(LEditorObject, 'Colors');
-        Color := StringToColor(GetJSONString(LColorsObject, 'Background', ColorToString(Color)));
-        Colors.ActiveLine.Background := StringToColor(GetJSONString(LColorsObject, 'ActiveLineBackground', ColorToString(Colors.ActiveLine.Background)));
-        Colors.CodeFolding.Background := StringToColor(GetJSONString(LColorsObject, 'CodeFoldingBackground', ColorToString(Colors.CodeFolding.Background)));
-        Colors.CodeFolding.Foreground := StringToColor(GetJSONString(LColorsObject, 'CodeFoldingFoldingLine', ColorToString(Colors.CodeFolding.Foreground)));
-        Colors.Marks.Background := StringToColor(GetJSONString(LColorsObject, 'LeftMarginBookmarkPanel', ColorToString(Colors.Marks.Background)));
-        Colors.LineNumbers.Background := StringToColor(GetJSONString(LColorsObject, 'LeftMarginBackground', ColorToString(Colors.LineNumbers.Background)));
-        Colors.LineNumbers.Foreground := StringToColor(GetJSONString(LColorsObject, 'LeftMarginLineNumbers', ColorToString(Colors.LineNumbers.Foreground)));
-        Colors.LineState.Loaded := StringToColor(GetJSONString(LColorsObject, 'LeftMarginBackground', ColorToString(Colors.LineState.Loaded)));
-        Colors.LineState.Modified := StringToColor(GetJSONString(LColorsObject, 'LeftMarginLineStateModified', ColorToString(Colors.LineState.Modified)));
-        Colors.LineState.Saved := StringToColor(GetJSONString(LColorsObject, 'LeftMarginLineStateNormal', ColorToString(Colors.LineState.Saved)));
-        Colors.MatchingPairs.Background := StringToColor(GetJSONString(LColorsObject, 'MatchingPairMatched', ColorToString(Colors.MatchingPairs.Background)));
-        Colors.FoundText.Background := StringToColor(GetJSONString(LColorsObject, 'SearchHighlighterBackground', ColorToString(Colors.FoundText.Background)));
-        Colors.FoundText.Foreground := StringToColor(GetJSONString(LColorsObject, 'SearchHighlighterForeground', ColorToString(Colors.FoundText.Foreground)));
-        Colors.Selection.Background := StringToColor(GetJSONString(LColorsObject, 'SelectionBackground', ColorToString(Colors.Selection.Background)));
-        Colors.Selection.Foreground := StringToColor(GetJSONString(LColorsObject, 'SelectionForeground', ColorToString(Colors.Selection.Foreground)));
-        Colors.SpecialChars.Foreground := StringToColor(GetJSONString(LColorsObject, 'SpecialCharForeground', ColorToString(Colors.SpecialChars.Foreground)));
-        Colors.SyncEdit.Background := StringToColor(GetJSONString(LColorsObject, 'SyncEditBackground', ColorToString(Colors.SyncEdit.Background)));
-        Colors.SyncEdit.Overlay := StringToColor(GetJSONString(LColorsObject, 'SyncEditWordBorder', ColorToString(Colors.SyncEdit.Overlay)));
+        LEditorColorsObject := GetJSONObject(LEditorObject, 'Colors');
+        Color := StringToColor(GetJSONString(LEditorColorsObject, 'Background', ColorToString(Color)));
+        Colors.ActiveLine.Background := StringToColor(GetJSONString(LEditorColorsObject, 'ActiveLineBackground', ColorToString(Colors.ActiveLine.Background)));
+        Colors.CodeFolding.Background := StringToColor(GetJSONString(LEditorColorsObject, 'CodeFoldingBackground', ColorToString(Colors.CodeFolding.Background)));
+        Colors.CodeFolding.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'CodeFoldingFoldingLine', ColorToString(Colors.CodeFolding.Foreground)));
+        Colors.Marks.Background := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginBookmarkPanel', ColorToString(Colors.Marks.Background)));
+        Colors.LineNumbers.Background := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginBackground', ColorToString(Colors.LineNumbers.Background)));
+        Colors.LineNumbers.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginLineNumbers', ColorToString(Colors.LineNumbers.Foreground)));
+        Colors.LineState.Loaded := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginBackground', ColorToString(Colors.LineState.Loaded)));
+        Colors.LineState.Modified := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginLineStateModified', ColorToString(Colors.LineState.Modified)));
+        Colors.LineState.Saved := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginLineStateNormal', ColorToString(Colors.LineState.Saved)));
+        Colors.MatchingPairs.Background := StringToColor(GetJSONString(LEditorColorsObject, 'MatchingPairMatched', ColorToString(Colors.MatchingPairs.Background)));
+        Colors.FoundText.Background := StringToColor(GetJSONString(LEditorColorsObject, 'SearchHighlighterBackground', ColorToString(Colors.FoundText.Background)));
+        Colors.FoundText.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'SearchHighlighterForeground', ColorToString(Colors.FoundText.Foreground)));
+        Colors.Selection.Background := StringToColor(GetJSONString(LEditorColorsObject, 'SelectionBackground', ColorToString(Colors.Selection.Background)));
+        Colors.Selection.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'SelectionForeground', ColorToString(Colors.Selection.Foreground)));
+        Colors.SpecialChars.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'SpecialCharForeground', ColorToString(Colors.SpecialChars.Foreground)));
+        Colors.SyncEdit.Background := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditBackground', ColorToString(Colors.SyncEdit.Background)));
+        Colors.SyncEdit.Overlay := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditWordBorder', ColorToString(Colors.SyncEdit.Overlay)));
 
         LFontObject := GetJSONObject(LEditorObject, 'Fonts');
         if (Assigned(LFontObject)) then
@@ -1747,7 +1763,8 @@ begin
               if (TryStrToInt(GetJSONString(LSizeObject, 'CompletionProposal'), LSize)) then CompletionProposal.Columns[LIndex].Font.Size := LSize;
         end;
       end;
-    LElementsArray := GetJSONArray(AJSON, 'Elements');
+
+    LElementsArray := GetJSONArray(LColorsObject, 'Elements');
     for LIndex := 0 to LElementsArray.Size - 1 do
     begin
       LItem := GetJSONObject(LElementsArray, LIndex);
@@ -1782,7 +1799,7 @@ begin
   LJSON := CreateJSONObjectFromStream(AStream);
   if (Assigned(LJSON)) then
   begin
-    LoadFromJSON(GetJSONObject(LJSON, 'Colors'));
+    LoadFromJSON(LJSON);
     LJSON.Free();
   end;
 end;
@@ -2943,7 +2960,7 @@ begin
   Result := False;
 end;
 
-{ TBCEditorHighlighter.TBCEditorHighlighter.TDelimitersParser **************************************}
+{ TBCEditorHighlighter.TDelimitersParser **************************************}
 
 constructor TBCEditorHighlighter.TDelimitersParser.Create(AToken: TToken);
 begin
@@ -2966,6 +2983,47 @@ begin
     Inc(AChar);
   AToken := FToken;
   Result := True;
+end;
+
+{ TBCEditorHighlighter.TFileExtensions ****************************************}
+
+procedure TBCEditorHighlighter.TFileExtensions.Clear();
+begin
+  inherited;
+
+  FDefaultExtension := '';
+end;
+
+constructor TBCEditorHighlighter.TFileExtensions.Create(const AHighlighter: TBCEditorHighlighter);
+begin
+  inherited Create();
+
+  FHighlighter := AHighlighter;
+
+  Clear();
+end;
+
+procedure TBCEditorHighlighter.TFileExtensions.LoadFromJSON(const AJSON: TJSONObject);
+var
+  LExtensionsArray: TJSONArray;
+  LIndex: Integer;
+  LString: string;
+begin
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    FDefaultExtension := GetJSONString(AJSON, 'Default');
+
+    LExtensionsArray := GetJSONArray(AJSON, 'Extensions');
+    if (Assigned(LExtensionsArray)) then
+      for LIndex := 0 to LExtensionsArray.Size - 1 do
+      begin
+        LString := GetJSONString(LExtensionsArray, LIndex);
+        if ((LString <> '') and (LString[1] = '.')) then
+          Add(LString);
+      end;
+  end;
 end;
 
 { TBCEditorHighlighter ********************************************************}
@@ -3010,27 +3068,19 @@ begin
   FAttributes.AddObject(AHighlighterAttribute.Name, AHighlighterAttribute);
 end;
 
-procedure TBCEditorHighlighter.Clear;
-var
-  LIndex: Integer;
-  LRegion: TBCEditorCodeFoldingRegion;
+procedure TBCEditorHighlighter.Clear();
 begin
+  FAttributes.Clear;
+  FCodeFoldingRegions.Clear();
+  FComments.Clear();
+  FCompletionProposalSkipRegions.Clear();
   FFoldOpenKeyChars := [];
   FFoldCloseKeyChars := [];
+  FMainRules.Clear();
+  FMatchingPairs.Clear();
+  FSample := '';
   FSkipOpenKeyChars := [];
   FSkipCloseKeyChars := [];
-  FAttributes.Clear;
-  FMainRules.Clear;
-  FComments.Clear;
-  FCompletionProposalSkipRegions.Clear;
-  FMatchingPairs.Clear;
-  FSample := '';
-  for LIndex := 0 to FCodeFoldingRegions.Count - 1 do
-  begin
-    LRegion := FCodeFoldingRegions[LIndex];
-    LRegion.Free;
-  end;
-  CodeFoldingRegions.Clear();
   DoChange();
 end;
 
@@ -3059,6 +3109,8 @@ begin
   FMatchingPairHighlight := True;
 
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
+
+  FFileExtensions := TFileExtensions.Create(Self);
 end;
 
 procedure TBCEditorHighlighter.DoChange();
@@ -3073,6 +3125,7 @@ begin
 
   FCodeFoldingRegions.Free();
   FComments.Free();
+  FFileExtensions.Free();
   FMainRules.Free();
   FAttributes.Free();
   FCompletionProposalSkipRegions.Free();
@@ -3226,8 +3279,8 @@ procedure TBCEditorHighlighter.LoadFromFile(const AFilename: string);
 var
   LStream: TStream;
 begin
-  FDirectory := IncludeTrailingPathDelimiter(TPath.GetDirectoryName(TPath.GetFullPath(AFilename)));
-  FFilename := AFilename;
+  FFilename := TPath.GetFullPath(AFilename);
+  FDirectory := IncludeTrailingPathDelimiter(TPath.GetDirectoryName(FFilename));
   FName := TPath.GetFileNameWithoutExtension(AFilename);
 
   LStream := TFileStream.Create(AFilename, fmOpenRead);
@@ -3241,6 +3294,7 @@ var
   LCodeFoldingRangeObject: TJSONObject;
   LCodeFoldingRangesArray: TJSONArray;
   LCodeFoldingRegion: TBCEditorCodeFoldingRegion;
+  LHighlighterObject: TJSONObject;
   LIndex: Integer;
   LSampleArray: TJSONArray;
 begin
@@ -3256,7 +3310,8 @@ begin
         FSample := FSample + GetJSONString(LSampleArray, LIndex);
       end;
 
-    MainRules.LoadFromJSON(GetJSONObject(AJSON, 'MainRules'));
+    LHighlighterObject := GetJSONObject(AJSON, 'Highlighter');
+    FMainRules.LoadFromJSON(GetJSONObject(LHighlighterObject, 'MainRules'));
 
     LCodeFoldingObject := GetJSONObject(AJSON, 'CodeFolding');
     if (Assigned(LCodeFoldingObject)) then
@@ -3279,6 +3334,8 @@ begin
 
     LoadMatchingPairFromJSON(GetJSONObject(AJSON, 'MatchingPair'));
     LoadCompletionProposalFromJSON(GetJSONObject(AJSON, 'CompletionProposal'));
+
+    FFileExtensions.LoadFromJSON(GetJSONObject(AJSON, 'FileExtensions'));
   end;
 
   UpdateColors();
@@ -3300,7 +3357,7 @@ begin
   LJSON := CreateJSONObjectFromStream(AStream);
   if (Assigned(LJSON)) then
   begin
-    LoadFromJSON(GetJSONObject(LJSON, 'Highlighter'));
+    LoadFromJSON(LJSON);
     LJSON.Free();
   end;
 end;
