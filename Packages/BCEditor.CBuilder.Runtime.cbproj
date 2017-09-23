@@ -149,17 +149,11 @@
         <DelphiCompile Include="..\Source\BCEditor.Lines.pas">
             <BuildOrder>34</BuildOrder>
         </DelphiCompile>
-        <DelphiCompile Include="..\Source\BCEditor.Locale.pas">
-            <BuildOrder>33</BuildOrder>
-        </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Properties.pas">
             <BuildOrder>39</BuildOrder>
         </DelphiCompile>
         <DelphiCompile Include="..\Source\BCEditor.Types.pas">
             <BuildOrder>40</BuildOrder>
-        </DelphiCompile>
-        <DelphiCompile Include="..\Source\JsonDataObjects.pas">
-            <BuildOrder>42</BuildOrder>
         </DelphiCompile>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>

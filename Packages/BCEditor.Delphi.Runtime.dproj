@@ -59,7 +59,7 @@
         <DCC_E>false</DCC_E>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
-        <DCC_UsePackage>vcl;rtl;dbrtl;vcldb;$(DCC_UsePackage)</DCC_UsePackage>
+        <DCC_UsePackage>vcl;rtl;dbrtl;vcldb;DbxCommonDriver;$(DCC_UsePackage)</DCC_UsePackage>
         <DCC_Namespace>Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
         <VerInfo_Locale>1033</VerInfo_Locale>
@@ -101,10 +101,8 @@
         <DCCReference Include="..\Source\BCEditor.Highlighter.pas"/>
         <DCCReference Include="..\Source\BCEditor.GotoLine.pas"/>
         <DCCReference Include="..\Source\BCEditor.Lines.pas"/>
-        <DCCReference Include="..\Source\BCEditor.Locale.pas"/>
         <DCCReference Include="..\Source\BCEditor.Properties.pas"/>
         <DCCReference Include="..\Source\BCEditor.Types.pas"/>
-        <DCCReference Include="..\Source\JsonDataObjects.pas"/>
         <BuildConfiguration Include="Debug">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>

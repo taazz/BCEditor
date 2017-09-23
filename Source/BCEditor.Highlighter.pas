@@ -5,10 +5,12 @@ interface {********************************************************************}
 uses
   Classes, SysUtils, Generics.Collections,
   Controls, Graphics, StdCtrls,
-  JsonDataObjects,
+  {$IF Defined(VER270)} JSON, {$ELSE} DBXJSON, {$ENDIF}
   BCEditor.Consts, BCEditor.Types;
 
 type
+  TBCEditorHighlighter = class;
+
   TBCEditorCodeFoldingRegionItem = class(TCollectionItem)
     strict private
       FBeginWithBreakChar: Boolean;
@@ -29,12 +31,14 @@ type
       FParentRegionItem: TBCEditorCodeFoldingRegionItem;
       FSharedClose: Boolean;
       FShowGuideLine: Boolean;
-      FSkipIfFoundAfterOpenTokenArray: TBCEditorArrayOfString;
-      FSkipIfFoundAfterOpenTokenArrayCount: Integer;
+      FSkipIfFoundAfterOpenTokenList: TStringList;
       FTokenEndIsPreviousLine: Boolean;
-      procedure SetSkipIfFoundAfterOpenTokenArrayCount(const AValue: Integer);
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject);
     public
+      procedure Clear();
       constructor Create(ACollection: TCollection); override;
+      destructor Destroy(); override;
       property BeginWithBreakChar: Boolean read FBeginWithBreakChar write FBeginWithBreakChar;
       property BreakCharFollows: Boolean read FBreakCharFollows write FBreakCharFollows default True;
       property BreakIfNotFoundBeforeNextRegion: string read FBreakIfNotFoundBeforeNextRegion write FBreakIfNotFoundBeforeNextRegion;
@@ -53,12 +57,9 @@ type
       property ParentRegionItem: TBCEditorCodeFoldingRegionItem read FParentRegionItem write FParentRegionItem;
       property SharedClose: Boolean read FSharedClose write FSharedClose default False;
       property ShowGuideLine: Boolean read FShowGuideLine write FShowGuideLine default True;
-      property SkipIfFoundAfterOpenTokenArray: TBCEditorArrayOfString read FSkipIfFoundAfterOpenTokenArray write FSkipIfFoundAfterOpenTokenArray;
-      property SkipIfFoundAfterOpenTokenArrayCount: Integer read FSkipIfFoundAfterOpenTokenArrayCount write SetSkipIfFoundAfterOpenTokenArrayCount;
+      property SkipIfFoundAfterOpenTokenList: TStringList read FSkipIfFoundAfterOpenTokenList write FSkipIfFoundAfterOpenTokenList;
       property TokenEndIsPreviousLine: Boolean read FTokenEndIsPreviousLine write FTokenEndIsPreviousLine default False;
     end;
-
-  TBCEditorCodeFoldingRegions = array of Pointer;
 
   TBCEditorCodeFoldingAllRanges = class;
   TBCEditorCodeFoldingSkipRegions = class;
@@ -68,15 +69,21 @@ type
     FCloseToken: string;
     FEscapeChar: Char;
     FFoldTags: Boolean;
+    FHighlighter: TBCEditorHighlighter;
     FOpenToken: string;
     FSkipRegions: TBCEditorCodeFoldingSkipRegions;
     FStringEscapeChar: Char;
     function GetItem(AIndex: Integer): TBCEditorCodeFoldingRegionItem;
+  protected
+    procedure LoadFromJSON(const AJSON: TJSONObject);
+    procedure LoadFoldRegionFromJSON(const AJSON: TJSONObject);
+    procedure LoadSkipRegionFromJSON(const AJSON: TJSONObject);
   public
-    constructor Create(AItemClass: TCollectionItemClass);
-    destructor Destroy; override;
     function Add(const AOpenToken: string; const ACloseToken: string): TBCEditorCodeFoldingRegionItem;
+    procedure Clear();
     function Contains(const AOpenToken: string; const ACloseToken: string): Boolean;
+    constructor Create(const AHighlighter: TBCEditorHighlighter; const AItemClass: TCollectionItemClass);
+    destructor Destroy; override;
     property CloseToken: string read FCloseToken write FCloseToken;
     property EscapeChar: Char read FEscapeChar write FEscapeChar default BCEDITOR_NONE_CHAR;
     property FoldTags: Boolean read FFoldTags write FFoldTags default False;
@@ -85,6 +92,7 @@ type
     property SkipRegions: TBCEditorCodeFoldingSkipRegions read FSkipRegions;
     property StringEscapeChar: Char read FStringEscapeChar write FStringEscapeChar default BCEDITOR_NONE_CHAR;
   end;
+  TBCEditorCodeFoldingRegions = class(TObjectList<TBCEditorCodeFoldingRegion>);
 
   TBCEditorCodeFoldingSkipRegions = class(TCollection)
   type
@@ -184,6 +192,8 @@ type
     property List: TObjectList<TBCEditorCodeFoldingRanges.TRange> read FList;
   end;
 
+  EBCEditorHighlighterJSON = class(Exception);
+
   TBCEditorHighlighter = class(TObject)
   type
     TAttribute = class;
@@ -199,14 +209,6 @@ type
     TMatchingPairToken = record
       OpenToken: string;
       CloseToken: string;
-    end;
-
-    PElement = ^TElement;
-    TElement = record
-      Background: TColor;
-      Foreground: TColor;
-      Name: string;
-      FontStyles: TFontStyles;
     end;
 
     TAttribute = class(TPersistent)
@@ -225,12 +227,15 @@ type
       FOnChange: TNotifyEvent;
       FParentBackground: Boolean;
       FParentForeground: Boolean;
+      procedure Clear();
       function GetBackgroundColorStored: Boolean;
       function GetFontStylesStored: Boolean;
       function GetForegroundColorStored: Boolean;
       procedure SetBackground(const AValue: TColor);
       procedure SetFontStyles(const AValue: TFontStyles);
       procedure SetForeground(const AValue: TColor);
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject);
     public
       procedure Assign(ASource: TPersistent); override;
       procedure AssignColorAndStyle(ASource: TAttribute);
@@ -248,25 +253,28 @@ type
       property ParentForeground: Boolean read FParentForeground write FParentForeground;
     end;
 
-    TColors = class(TObject)
+    PElement = ^TElement;
+    TElement = record
+      Background: TColor;
+      Foreground: TColor;
+      Name: string;
+      FontStyles: TFontStyles;
+    end;
+
+    TElements = class(TList<TElement>)
     strict private
-      FElements: TList;
-      FFileName: string;
       FHighlighter: TBCEditorHighlighter;
       FName: string;
-    protected
-      property Highlighter: TBCEditorHighlighter read FHighlighter;
+      function GetElement(AName: string): PElement;
+      procedure LoadFromJSON(const AJSON: TJSONObject);
     public
-      procedure Clear;
       constructor Create(const AHighlighter: TBCEditorHighlighter);
-      destructor Destroy; override;
-      function GetElement(const Name: string): PElement;
+      function IndexOf(const AName: string): Integer;
       procedure LoadFromFile(const AFileName: string);
       procedure LoadFromResource(const ResName: string; const ResType: PChar);
-      procedure LoadFromStream(AStream: TStream);
-      property FileName: string read FFileName write FFileName;
-      property Name: string read FName write FName;
-      property Styles: TList read FElements write FElements;
+      procedure LoadFromStream(const AStream: TStream);
+      property Element[Name: string]: PElement read GetElement; default;
+      property Name: string read FName;
     end;
 
     TAbstractRule = class(TObject)
@@ -373,6 +381,8 @@ type
     strict private
       FKeyList: TStringList;
       FSyncEdit: Boolean;
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject);
     public
       constructor Create;
       destructor Destroy; override;
@@ -383,6 +393,8 @@ type
     TSet = class(TRule)
     strict private
       FCharSet: TBCEditorAnsiCharSet;
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject);
     public
       constructor Create(ACharSet: TBCEditorAnsiCharSet = []);
       property CharSet: TBCEditorAnsiCharSet read FCharSet write FCharSet;
@@ -393,8 +405,7 @@ type
 
     TRange = class(TRule)
     strict private
-      FAlternativeCloseArray: TBCEditorArrayOfString;
-      FAlternativeCloseArrayCount: Integer;
+      FAlternativeCloseArray: TStringList;
       FCaseFunct: TCaseFunction;
       FCaseSensitive: Boolean;
       FCloseOnEndOfLine: Boolean;
@@ -406,9 +417,11 @@ type
       FDefaultTermSymbol: TDelimitersParser;
       FDefaultToken: TToken;
       FDelimiters: TBCEditorAnsiCharSet;
+      FHighlighter: TBCEditorHighlighter;
       FKeyList: TObjectList<TKeyList>;
       FOpenBeginningOfLine: Boolean;
       FOpenToken: TMultiToken;
+      FParent: TRange;
       FPrepared: Boolean;
       FRanges: TObjectList<TRange>;
       FSets: TObjectList<TSet>;
@@ -424,8 +437,9 @@ type
       function GetSet(const AIndex: Integer): TSet;
       function GetSetCount: Integer;
       function GetToken(const AIndex: Integer): TToken;
-      procedure SetAlternativeCloseArrayCount(const AValue: Integer);
       procedure SetCaseSensitive(const AValue: Boolean);
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject; const ASkipBeforeSubRules: Boolean = False);
     public
       procedure AddKeyList(NewKeyList: TKeyList);
       procedure AddRange(NewRange: TRange);
@@ -434,14 +448,15 @@ type
       procedure AddTokenRange(const AOpenToken: string; AOpenTokenBreakType: TBCEditorBreakType; const ACloseToken: string;
         ACloseTokenBreakType: TBCEditorBreakType);
       procedure Clear;
-      constructor Create(const AOpenToken: string = ''; const ACloseToken: string = ''); virtual;
+      constructor Create(const AHighlighter: TBCEditorHighlighter;
+        const AParent: TRange = nil;
+        const AOpenToken: string = ''; const ACloseToken: string = ''); virtual;
       destructor Destroy; override;
       function FindToken(const AString: string): TToken;
       procedure Prepare(AParent: TRange);
       procedure Reset;
       procedure SetDelimiters(const ADelimiters: TBCEditorAnsiCharSet);
-      property AlternativeCloseArray: TBCEditorArrayOfString read FAlternativeCloseArray write FAlternativeCloseArray;
-      property AlternativeCloseArrayCount: Integer read FAlternativeCloseArrayCount write SetAlternativeCloseArrayCount;
+      property AlternativeCloseList: TStringList read FAlternativeCloseArray;
       property CaseFunct: TCaseFunction read FCaseFunct;
       property CaseSensitive: Boolean read FCaseSensitive write SetCaseSensitive;
       property CloseOnEndOfLine: Boolean read FCloseOnEndOfLine write FCloseOnEndOfLine;
@@ -529,36 +544,6 @@ type
         var AChar: Integer; out AToken: TToken): Boolean; override;
     end;
 
-    TImportJSON = class(TObject)
-    type
-      EException = class(Exception);
-    private
-      FHighlighter: TBCEditorHighlighter;
-      procedure ImportAttributes(AHighlighterAttribute: TAttribute; AAttributesObject: TJsonObject;
-        const AElementPrefix: string);
-      procedure ImportCodeFolding(ACodeFoldingObject: TJsonObject);
-      procedure ImportCodeFoldingFoldRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion; ACodeFoldingObject: TJsonObject);
-      procedure ImportCodeFoldingOptions(ACodeFoldingRegion: TBCEditorCodeFoldingRegion; ACodeFoldingObject: TJsonObject);
-      procedure ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion; ACodeFoldingObject: TJsonObject);
-      procedure ImportColors(AJSONObject: TJsonObject);
-      procedure ImportColorsEditorProperties(AEditorObject: TJsonObject);
-      procedure ImportCompletionProposal(ACompletionProposalObject: TJsonObject);
-      procedure ImportElements(AColorsObject: TJsonObject);
-      procedure ImportHighlighter(AJSONObject: TJsonObject);
-      procedure ImportKeyList(AKeyList: TKeyList; KeyListObject: TJsonObject; const AElementPrefix: string);
-      procedure ImportMatchingPair(AMatchingPairObject: TJsonObject);
-      procedure ImportRange(ARange: TRange; RangeObject: TJsonObject; AParentRange: TRange = nil;
-        ASkipBeforeSubRules: Boolean = False; const AElementPrefix: string = '');
-      procedure ImportSample(ASampleArray: TJsonArray);
-      procedure ImportSet(ASet: TSet; SetObject: TJsonObject; const AElementPrefix: string);
-    protected
-      property Highlighter: TBCEditorHighlighter read FHighlighter;
-    public
-      constructor Create(AHighlighter: TBCEditorHighlighter); overload;
-      procedure ImportColorsFromStream(AStream: TStream);
-      procedure ImportFromStream(AStream: TStream);
-    end;
-
     PTokenFind = ^TTokenFind;
     TTokenFind = record
     private
@@ -582,14 +567,13 @@ type
   strict private
     FAllDelimiters: TBCEditorAnsiCharSet;
     FAttributes: TStringList;
-    FCodeFoldingRangeCount: Integer;
     FCodeFoldingRegions: TBCEditorCodeFoldingRegions;
-    FColors: TColors;
+    FColors: TElements;
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions;
+    FDirectory: string;
     FEditor: TCustomControl;
-    FFileName: string;
-    FFilePath: string;
+    FFilename: string;
     FFoldCloseKeyChars: TBCEditorAnsiCharSet;
     FFoldOpenKeyChars: TBCEditorAnsiCharSet;
     FMainRules: TRange;
@@ -603,15 +587,17 @@ type
     FSkipOpenKeyChars: TBCEditorAnsiCharSet;
     FWordBreakChars: TBCEditorAnsiCharSet;
     procedure AddAllAttributes(ARange: TRange);
-    procedure SetFileName(AValue: string);
     procedure UpdateAttributes(ARange: TRange; AParentRange: TRange);
   strict private
     procedure DoChange();
     function GetAttribute(AIndex: Integer): TAttribute;
     procedure AddAttribute(AHighlighterAttribute: TAttribute);
-    procedure SetCodeFoldingRangeCount(AValue: Integer);
+    procedure LoadFromJSON(const AJSON: TJSONObject);
     procedure SetWordBreakChars(AChars: TBCEditorAnsiCharSet);
   protected
+    procedure LoadCompletionProposalFromJSON(const AJSON: TJSONObject);
+    procedure LoadMatchingPairFromJSON(const AJSON: TJSONObject);
+    property Directory: string read FDirectory;
     property Editor: TCustomControl read FEditor;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
   public
@@ -624,26 +610,23 @@ type
     procedure AddKeyChar(AKeyCharType: TBCEditorKeyCharType; AChar: Char);
     procedure AddKeywords(var AStringList: TStringList);
     procedure Clear();
-    procedure LoadFromFile(const AFileName: string);
-    procedure LoadFromResource(const ResName: string; const ResType: PChar);
-    procedure LoadFromStream(AStream: TStream);
+    procedure LoadFromFile(const AFilename: string);
+    procedure LoadFromResource(const AResourceName: string; const AResourceType: PChar);
+    procedure LoadFromStream(const AStream: TStream);
     procedure UpdateColors();
     property Attribute[AIndex: Integer]: TAttribute read GetAttribute;
     property Attributes: TStringList read FAttributes;
-    property CodeFoldingRangeCount: Integer read FCodeFoldingRangeCount write SetCodeFoldingRangeCount;
-    property CodeFoldingRegions: TBCEditorCodeFoldingRegions read FCodeFoldingRegions write FCodeFoldingRegions;
-    property Colors: TColors read FColors write FColors;
+    property CodeFoldingRegions: TBCEditorCodeFoldingRegions read FCodeFoldingRegions;
+    property Colors: TElements read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
-    property FileName: string read FFileName write SetFileName;
-    property FilePath: string read FFilePath write FFilePath;
     property FoldCloseKeyChars: TBCEditorAnsiCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
     property FoldOpenKeyChars: TBCEditorAnsiCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
     property MainRules: TRange read FMainRules;
     property MatchingPairHighlight: Boolean read FMatchingPairHighlight write FMatchingPairHighlight default True;
     property MatchingPairs: TList<TMatchingPairToken> read FMatchingPairs;
     property MultiHighlighter: Boolean read FMultiHighlighter write FMultiHighlighter;
-    property Name: string read FName write FName;
+    property Name: string read FName;
     property Sample: string read FSample write FSample;
     property SkipCloseKeyChars: TBCEditorAnsiCharSet read FSkipCloseKeyChars write FSkipCloseKeyChars;
     property SkipOpenKeyChars: TBCEditorAnsiCharSet read FSkipOpenKeyChars write FSkipOpenKeyChars;
@@ -655,11 +638,16 @@ implementation {***************************************************************}
 uses
   Types, IOUtils, TypInfo,
   GraphUtil,
-  BCEditor, BCEditor.Locale, BCEditor.Properties;
+  BCEditor, BCEditor.Properties;
 
 resourcestring
   SBCEditorErrorInHighlighterParse = 'JSON parse error on line %d column %d: %s';
   SBCEditorErrorInHighlighterImport = 'Error in highlighter import: %s';
+  SBCEditorHighlighterJSONInvalidPair = 'Invalid JSON value type for pair "%s" (Expected type: %s, Found type: %s)';
+  SBCEditorHighlighterJSONInvalidValue = 'Invalid JSON value type for item #%d (Expected type: %s, Found type: %s)';
+  SBCEditorHighlighterJSONItemNotFound = 'Missing item #%d';
+  SBCEditorHighlighterJSONPairNotFound = 'Missing pair "%s" in JSON';
+  SBCEditorHighlighterJSONSyntaxError = 'Syntax Error in JSON (Line: %d, Column: %d)';
 
 type
   TCustomBCEditor = class(BCEditor.TCustomBCEditor);
@@ -674,47 +662,387 @@ begin
   Result := AString;
 end;
 
+function CreateJSONObjectFromText(const AJSON: string): TJSONObject;
+var
+  LChar: Integer;
+  LLine: Integer;
+  LPos: Integer;
+  LStringList: TStringList;
+begin
+  if (AJSON = '') then
+    raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONSyntaxError, [1, 1])
+  else
+  begin
+    Result := TJSONObject.Create();
+    LPos := Result.Parse(BytesOf(AJSON), 0);
+    if (LPos < 0) then
+    begin
+      LPos := - LPos;
+      LLine := 0;
+      LStringList := TStringList.Create();
+      LStringList.Text := AJSON;
+      while ((LStringList.Count > 0) and (LPos > Length(LStringList[0]))) do
+      begin
+        Dec(LPos, Length(LStringList[0]) + Length(LStringList.LineBreak));
+        LStringList.Delete(0);
+        Inc(LLine);
+      end;
+      LChar := LPos;
+      raise Exception(BCEditorTranslation(18, [LLine + 1, LChar + 1]));
+      LStringList.Free();
+      FreeAndNil(Result);
+    end;
+  end;
+end;
+
+function CreateJSONObjectFromFile(const AFilename: string): TJSONObject;
+var
+  LStringList: TStringList;
+begin
+  if (not TFile.Exists(AFilename)) then
+    Result := nil
+  else
+  begin
+    LStringList := TStringList.Create();
+    LStringList.LoadFromFile(AFilename);
+    Result := CreateJSONObjectFromText(LStringList.Text);
+    LStringList.Free();
+  end;
+end;
+
+function CreateJSONObjectFromStream(const AStream: TStream): TJSONObject;
+var
+  LStringList: TStringList;
+begin
+  if (AStream.Size = 0) then
+    Result := CreateJSONObjectFromText('')
+  else
+  begin
+    LStringList := TStringList.Create();
+    LStringList.LoadFromStream(AStream);
+    Result := CreateJSONObjectFromText(LStringList.Text);
+    LStringList.Free();
+  end;
+end;
+
+function JSONValueType(const AJsonValue: TClass): string;
+begin
+  if (AJsonValue = TJSONTrue) then
+    Result := 'True'
+  else if (AJsonValue = TJSONString) then
+    Result := 'String'
+  else if (AJsonValue = TJSONObject) then
+    Result := 'Object'
+  else if (AJsonValue = TJSONNull) then
+    Result := 'Null'
+  else if (AJsonValue = TJSONFalse) then
+    Result := 'False'
+  else if (AJsonValue = TJSONArray) then
+    Result := 'Array'
+  else
+    raise Exception.Create('Unknown TJSONValue class: ' + AJsonValue.ClassName);
+end;
+
+function GetJSONValue(const AParentArray: TJSONArray; const AIndex: Integer;
+  const AClassType: TClass; const ARequired: Boolean = False): TJSONValue; overload;
+var
+  LJsonValue: TJSONValue;
+begin
+  if (not Assigned(AParentArray)) then
+    Result := nil
+  else
+  begin
+    LJsonValue := AParentArray.Get(AIndex);
+    if (ARequired and not Assigned(LJsonValue)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONItemNotFound, [AIndex]);
+    if (ARequired and (LJsonValue.ClassType <> AClassType)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONInvalidValue, [AIndex, JSONValueType(AClassType), JSONValueType(LJsonValue.ClassType)]);
+    Result := LJsonValue;
+  end;
+end;
+
+function GetJSONValue(const AParentObject: TJSONObject; const AName: string;
+  const AClassType: TClass; const ARequired: Boolean = False): TJSONValue; overload;
+var
+  LPair: TJSONPair;
+begin
+  if (not Assigned(AParentObject)) then
+    Result := nil
+  else
+  begin
+    LPair := AParentObject.Get(AName);
+    if (ARequired and not Assigned(LPair)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONPairNotFound, [AName]);
+    if (ARequired and (LPair.JsonValue.ClassType <> AClassType)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONInvalidPair, [AName, JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
+    if (not Assigned(LPair)) then
+      Result := nil
+    else
+      Result := LPair.JsonValue;
+  end;
+end;
+
+function GetJSONValue(const AParentObject: TJSONObject; const AIndex: Integer;
+  const AClassType: TClass; const AName: string = ''): TJSONValue; overload;
+var
+  LPair: TJSONPair;
+begin
+  if (not Assigned(AParentObject)) then
+    Result := nil
+  else
+  begin
+    LPair := AParentObject.Get(AIndex);
+    if (not Assigned(LPair)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONPairNotFound, ['#' + IntToStr(AIndex)]);
+    if ((AName <> '') and (LPair.JsonValue.ClassType <> AClassType)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONInvalidPair, ['#' + IntToStr(AIndex), JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
+    if (not Assigned(LPair) or (AName <> '') and (LPair.JsonString.Value() <> AName)) then
+      Result := nil
+    else
+      Result := LPair.JsonValue;
+  end;
+end;
+
+function GetJSONArray(const AParentObject: TJSONObject; const AName: string;
+  const ARequired: Boolean = False): TJSONArray; overload; inline;
+begin
+  Result := GetJSONValue(AParentObject, AName, TJSONArray, ARequired) as TJSONArray;
+end;
+
+function GetJSONArray(const AParentObject: TJSONObject; const AIndex: Integer;
+  const AName: string = ''): TJSONArray; overload; inline;
+begin
+  Result := GetJSONValue(AParentObject, AIndex, TJSONArray, AName) as TJSONArray;
+end;
+
+function GetJSONBoolean(const AParentArray: TJSONArray; const AIndex: Integer;
+  const ADefault: Boolean = False): Boolean; overload;
+var
+  LJSONValue: TJSONValue;
+begin
+  LJSONValue := GetJSONValue(AParentArray, AIndex, TJSONValue);
+  if (LJSONValue is TJSONTrue) then
+    Result := True
+  else if (LJSONValue is TJSONFalse) then
+    Result := False
+  else
+    Result := ADefault;
+end;
+
+function GetJSONBoolean(const AParentObject: TJSONObject; const AName: string;
+  const ADefault: Boolean = False): Boolean; overload;
+var
+  LJSONValue: TJSONValue;
+begin
+  LJSONValue := GetJSONValue(AParentObject, AName, TJSONValue);
+  if (LJSONValue is TJSONTrue) then
+    Result := True
+  else if (LJSONValue is TJSONFalse) then
+    Result := False
+  else
+    Result := ADefault;
+end;
+
+function GetJSONString(const AParentArray: TJSONArray; const AIndex: Integer;
+  const ADefault: string = ''; const ARequired: Boolean = False): string; overload;
+var
+  LJSONString: TJSONString;
+begin
+  LJSONString := GetJSONValue(AParentArray, AIndex, TJSONString, ARequired) as TJSONString;
+  if (not Assigned(LJSONString)) then
+    Result := ADefault
+  else
+    Result := LJSONString.Value();
+end;
+
+function GetJSONString(const AParentArray: TJSONArray; const AIndex: Integer;
+  const ARequired: Boolean): string; overload;
+var
+  LJSONString: TJSONString;
+begin
+  LJSONString := GetJSONValue(AParentArray, AIndex, TJSONString, ARequired) as TJSONString;
+  Result := LJSONString.Value();
+end;
+
+function GetJSONString(const AParentObject: TJSONObject; const AName: string;
+  const ADefault: string = ''): string; overload;
+var
+  LJSONString: TJSONString;
+begin
+  LJSONString := GetJSONValue(AParentObject, AName, TJSONString) as TJSONString;
+  if (not Assigned(LJSONString)) then
+    Result := ADefault
+  else
+    Result := LJSONString.Value();
+end;
+
+function GetJSONString(const AParentObject: TJSONObject; const AName: string;
+  const ARequired: Boolean): string; overload;
+var
+  LJSONString: TJSONString;
+begin
+  LJSONString := GetJSONValue(AParentObject, AName, TJSONString, ARequired) as TJSONString;
+  Result := LJSONString.Value();
+end;
+
+function GetJSONObject(const AParentArray: TJSONArray; const AIndex: Integer): TJSONObject; overload; inline;
+begin
+  Result := GetJSONValue(AParentArray, AIndex, TJSONObject) as TJSONObject;
+end;
+
+function GetJSONObject(const AParentObject: TJSONObject; const AIndex: Integer): TJSONObject; overload; inline;
+begin
+  Result := GetJSONValue(AParentObject, AIndex, TJSONObject) as TJSONObject;
+end;
+
+function GetJSONObject(const AParentObject: TJSONObject; const AName: string): TJSONObject; overload; inline;
+begin
+  Result := GetJSONValue(AParentObject, AName, TJSONObject) as TJSONObject;
+end;
+
+function StringToColorDef(const AString: string; const DefaultColor: TColor): Integer;
+begin
+  if Trim(AString) = '' then
+    Result := DefaultColor
+  else
+  if Pos('clWeb', AString) = 1 then
+    Result := WebColorNameToColor(AString)
+  else
+    Result := StringToColor(AString);
+end;
+
+function StrToSet(const AString: string): TBCEditorAnsiCharSet;
+var
+  LIndex: Integer;
+begin
+  Result := [];
+  for LIndex := 1 to Length(AString) do
+    Result := Result + [AString[LIndex]];
+end;
+
+function StrToStrDef(const AString: string; const AStringDef: string): string;
+begin
+  if Trim(AString) = '' then
+    Result := AStringDef
+  else
+    Result := AString
+end;
+
+function StrToFontStyle(const AString: string): TFontStyles;
+begin
+  Result := [];
+  if Pos('Bold', AString) > 0 then
+    Include(Result, fsBold);
+  if Pos('Italic', AString) > 0 then
+    Include(Result, fsItalic);
+  if Pos('Underline', AString) > 0 then
+    Include(Result, fsUnderline);
+  if Pos('StrikeOut', AString) > 0 then
+    Include(Result, fsStrikeOut);
+end;
+
+function StrToBreakType(const AString: string): TBCEditorBreakType;
+begin
+  if AString = 'Any' then
+    Result := btAny
+  else
+  if (AString = 'Term') or (AString = '') then
+    Result := btTerm
+  else
+    Result := btUnspecified;
+end;
+
+function StrToRegionType(const AString: string): TBCEditorRangeItemType;
+begin
+  if AString = 'SingleLine' then
+    Result := ritSingleLineComment
+  else
+  if AString = 'MultiLine' then
+    Result := ritMultiLineComment
+  else
+  if AString = 'SingleLineString' then
+    Result := ritSingleLineString
+  else
+    Result := ritMultiLineString
+end;
+
+function StrToRangeType(const AString: string): TBCEditorRangeType;
+var
+  LIndex: Integer;
+begin
+  LIndex := GetEnumValue(TypeInfo(TBCEditorRangeType), 'tt' + AString);
+  if LIndex = -1 then
+    Result := ttUnspecified
+  else
+    Result := TBCEditorRangeType(LIndex);
+end;
+
 { TBCEditorCodeFoldingRegion.TItem ********************************************}
+
+procedure TBCEditorCodeFoldingRegionItem.Clear();
+begin
+  FNoSubs := False;
+  FBreakCharFollows := True;
+  FBreakIfNotFoundBeforeNextRegion := '';
+  FCloseTokenBeginningOfLine := False;
+  FOpenIsClose := False;
+  FOpenTokenBeginningOfLine := False;
+  FOpenTokenBreaksLine := False;
+  FSharedClose := False;
+  FSkipIfFoundAfterOpenTokenList.Clear();
+end;
 
 constructor TBCEditorCodeFoldingRegionItem.Create(ACollection: TCollection);
 begin
   inherited Create(ACollection);
 
-  FSkipIfFoundAfterOpenTokenArrayCount := 0;
-  FBreakIfNotFoundBeforeNextRegion := '';
-  FCloseTokenBeginningOfLine := False;
-  FNoSubs := False;
-  FOpenIsClose := False;
-  FOpenTokenBeginningOfLine := False;
-  FOpenTokenBreaksLine := False;
-  FSharedClose := False;
-  FBreakCharFollows := True;
+  FSkipIfFoundAfterOpenTokenList := TStringList.Create();
+
+  Clear();
 end;
 
-procedure TBCEditorCodeFoldingRegionItem.SetSkipIfFoundAfterOpenTokenArrayCount(const AValue: Integer);
+destructor TBCEditorCodeFoldingRegionItem.Destroy();
 begin
-  FSkipIfFoundAfterOpenTokenArrayCount := AValue;
-  SetLength(FSkipIfFoundAfterOpenTokenArray, AValue);
-end;
-
-{ TBCEditorCodeFoldingRegion **************************************************}
-
-constructor TBCEditorCodeFoldingRegion.Create(AItemClass: TCollectionItemClass);
-begin
-  inherited Create(AItemClass);
-
-  FSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
-  FEscapeChar := BCEDITOR_NONE_CHAR;
-  FStringEscapeChar := BCEDITOR_NONE_CHAR;
-  FFoldTags := False;
-end;
-
-destructor TBCEditorCodeFoldingRegion.Destroy;
-begin
-  FSkipRegions.Free;
+  FSkipIfFoundAfterOpenTokenList.Free();
 
   inherited;
 end;
+
+procedure TBCEditorCodeFoldingRegionItem.LoadFromJSON(const AJSON: TJSONObject);
+var
+  LIndex: Integer;
+  LJSONArray: TJSONArray;
+  LSkip: string;
+begin
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    FBeginWithBreakChar := GetJSONBoolean(AJSON, 'BeginWithBreakChar', FBeginWithBreakChar);
+    FBreakCharFollows := GetJSONBoolean(AJSON, 'BreakCharFollows', FBreakCharFollows);
+    FBreakIfNotFoundBeforeNextRegion := GetJSONString(AJSON, 'BreakIfNotFoundBeforeNextRegion', FBreakIfNotFoundBeforeNextRegion);
+    FCloseTokenBeginningOfLine := GetJSONBoolean(AJSON, 'CloseTokenBeginningOfLine', FCloseTokenBeginningOfLine);
+    FNoSubs := GetJSONBoolean(AJSON, 'NoSubs', FNoSubs);
+    FOpenIsClose := GetJSONBoolean(AJSON, 'OpenIsClose', FOpenIsClose);
+    FOpenTokenBreaksLine := GetJSONBoolean(AJSON, 'OpenTokenBreaksLine', FOpenTokenBreaksLine);
+    FOpenTokenBeginningOfLine := GetJSONBoolean(AJSON, 'OpenTokenBeginningOfLine', FOpenTokenBeginningOfLine);
+    FOpenTokenCanBeFollowedBy := GetJSONString(AJSON, 'OpenTokenCanBeFollowedBy', FOpenTokenCanBeFollowedBy);
+    FOpenTokenEnd := GetJSONString(AJSON, 'OpenTokenEnd', FOpenTokenEnd);
+    FSharedClose := GetJSONBoolean(AJSON, 'SharedClose', FSharedClose);
+    FShowGuideLine := GetJSONBoolean(AJSON, 'ShowGuideLine', FShowGuideLine);
+    LJSONArray := GetJSONArray(AJSON, 'SkipIfFoundAfterOpenToken');
+    if (Assigned(LJSONArray)) then
+      for LIndex := 0 to LJSONArray.Size - 1 do
+      begin
+        LSkip := GetJSONString(LJSONArray, LIndex);
+        if (LSkip <> '') then
+          FSkipIfFoundAfterOpenTokenList.Add(LSkip);
+      end;
+    FTokenEndIsPreviousLine := GetJSONBoolean(AJSON, 'TokenEndIsPreviousLine', FTokenEndIsPreviousLine);
+  end;
+end;
+
+{ TBCEditorCodeFoldingRegion **************************************************}
 
 function TBCEditorCodeFoldingRegion.Add(const AOpenToken: string; const ACloseToken: string): TBCEditorCodeFoldingRegionItem;
 begin
@@ -726,6 +1054,16 @@ begin
     CloseToken := ACloseToken;
     CloseTokenLength := Length(ACloseToken);
   end;
+end;
+
+procedure TBCEditorCodeFoldingRegion.Clear();
+begin
+  FCloseToken := '';
+  FEscapeChar := BCEDITOR_NONE_CHAR;
+  FFoldTags := False;
+  FOpenToken := '';
+  FSkipRegions.Clear();
+  FStringEscapeChar := BCEDITOR_NONE_CHAR;
 end;
 
 function TBCEditorCodeFoldingRegion.Contains(const AOpenToken: string; const ACloseToken: string): Boolean;
@@ -742,9 +1080,186 @@ begin
   end;
 end;
 
+constructor TBCEditorCodeFoldingRegion.Create(const AHighlighter: TBCEditorHighlighter;
+  const AItemClass: TCollectionItemClass);
+begin
+  inherited Create(AItemClass);
+
+  FHighlighter := AHighlighter;
+
+  FSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
+
+  Clear();
+end;
+
+destructor TBCEditorCodeFoldingRegion.Destroy();
+begin
+  FSkipRegions.Free();
+
+  inherited;
+end;
+
 function TBCEditorCodeFoldingRegion.GetItem(AIndex: Integer): TBCEditorCodeFoldingRegionItem;
 begin
   Result := TBCEditorCodeFoldingRegionItem(inherited Items[AIndex]);
+end;
+
+procedure TBCEditorCodeFoldingRegion.LoadFromJSON(const AJSON: TJSONObject);
+var
+  LString: string;
+begin
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    FCloseToken := GetJSONString(AJSON, 'CloseToken');
+    LString := GetJSONString(AJSON, 'EscapeChar'); if (Length(LString) = 1) then FEscapeChar := LString[1];
+    FFoldTags := GetJSONBoolean(AJSON, 'FoldTags', FoldTags);
+    FOpenToken := GetJSONString(AJSON, 'OpenToken');
+    LString := GetJSONString(AJSON, 'StringEscapeChar'); if (Length(LString) = 1) then FStringEscapeChar := LString[1];
+
+    FHighlighter.MatchingPairHighlight := GetJSONBoolean(AJSON, 'MatchingPairHighlight', FHighlighter.MatchingPairHighlight);
+  end;
+end;
+
+procedure TBCEditorCodeFoldingRegion.LoadFoldRegionFromJSON(const AJSON: TJSONObject);
+var
+  LCloseToken: string;
+  LCodeFoldingObject: TJSONObject;
+  LFilename: string;
+  LFoldRegionArray: TJSONArray;
+  LIndex: Integer;
+  LJSONItem: TJSONObject;
+  LJSONObject: TJSONObject;
+  LOpenToken: string;
+  LRangesItem: TJSONObject;
+  LRegionItem: TBCEditorCodeFoldingRegionItem;
+begin
+  if (Assigned(AJSON)) then
+  begin
+    LFoldRegionArray := GetJSONArray(AJSON, 'FoldRegion');
+    if (Assigned(LFoldRegionArray)) then
+      for LIndex := 0 to LFoldRegionArray.Size - 1 do
+      begin
+        LJSONItem := GetJSONObject(LFoldRegionArray, LIndex);
+
+        LOpenToken := GetJSONString(LJSONItem, 'OpenToken');
+        LCloseToken := GetJSONString(LJSONItem, 'CloseToken');
+
+        if (FHighlighter.MultiHighlighter) then
+        begin
+          { Multi highlighter code folding fold region include }
+          LFilename := GetJSONString(LJSONItem, 'File');
+          if (TFile.Exists(FHighlighter.Directory + LFilename)) then
+          begin
+            LJSONObject := CreateJSONObjectFromFile(FHighlighter.Directory + LFilename) as TJSONObject;
+            if (Assigned(LJSONObject)) then
+            begin
+              LCodeFoldingObject := GetJSONObject(LJSONObject, 'CodeFolding');
+              LRangesItem := GetJSONObject(LCodeFoldingObject, 0);
+              if (Assigned(LRangesItem)) then
+                LoadFoldRegionFromJSON(LRangesItem);
+              LJSONObject.Free();
+            end;
+          end;
+          { Skip duplicates }
+          if (Contains(LOpenToken, LCloseToken)) then
+            Continue;
+        end;
+
+        LRegionItem := Add(LOpenToken, LCloseToken);
+        LRegionItem.LoadFromJSON(GetJSONObject(LJSONItem, 'Properties'));
+
+        if (LOpenToken <> '') then
+          FHighlighter.AddKeyChar(ctFoldOpen, LOpenToken[1]);
+        if (LRegionItem.BreakIfNotFoundBeforeNextRegion <> '') then
+          FHighlighter.AddKeyChar(ctFoldOpen, LRegionItem.BreakIfNotFoundBeforeNextRegion[1]);
+        if (LCloseToken <> '') then
+          FHighlighter.AddKeyChar(ctFoldClose, LCloseToken[1]);
+      end;
+  end;
+end;
+
+procedure TBCEditorCodeFoldingRegion.LoadSkipRegionFromJSON(const AJSON: TJSONObject);
+var
+  LCloseToken: string;
+  LCodeFoldingObject: TJSONObject;
+  LFilename: string;
+  LIndex: Integer;
+  LItem: TJSONObject;
+  LJSONObject: TJSONObject;
+  LOpenToken: string;
+  LRangesArray: TJSONArray;
+  LRangesItem: TJSONObject;
+  LRegionItem: TBCEditorCodeFoldingRegionItem;
+  LSkipRegionArray: TJSONArray;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
+  LSkipRegionType: TBCEditorRangeItemType;
+  LString: string;
+begin
+  if (Assigned(AJSON)) then
+  begin
+    LSkipRegionArray := GetJSONArray(AJSON, 'SkipRegion');
+    if (Assigned(LSkipRegionArray)) then
+    begin
+      for LIndex := 0 to LSkipRegionArray.Size - 1 do
+      begin
+        LItem := GetJSONObject(LSkipRegionArray, LIndex);
+        if (Assigned(LItem)) then
+        begin
+          LOpenToken := GetJSONString(LItem, 'OpenToken');
+          LCloseToken := GetJSONString(LItem, 'CloseToken');
+
+          if (FHighlighter.MultiHighlighter) then
+          begin
+            { Multi highlighter code folding skip region include }
+            LFilename := GetJSONString(LItem, 'File');
+            if (TFile.Exists(FHighlighter.Directory + LFilename)) then
+            begin
+              LJSONObject := CreateJSONObjectFromFile(FHighlighter.Directory + LFilename);
+              if (Assigned(LJSONObject)) then
+              begin
+                LCodeFoldingObject := GetJSONObject(LJSONObject, 'CodeFolding');
+                if (Assigned(LCodeFoldingObject)) then
+                begin
+                  LRangesArray := GetJSONArray(LCodeFoldingObject, 'Ranges');
+                  LRangesItem := GetJSONObject(LRangesArray, 0);
+                  LoadSkipRegionFromJSON(LRangesItem);
+                end;
+                LJSONObject.Free();
+              end;
+            end;
+            { Skip duplicates }
+            if (SkipRegions.Contains(LOpenToken, LCloseToken)) then
+              Continue;
+          end;
+
+          LSkipRegionType := StrToRegionType(GetJSONString(LItem, 'RegionType', True));
+          if (LSkipRegionType = ritMultiLineComment) and (cfoFoldMultilineComments in TCustomBCEditor(FHighlighter.Editor).LeftMargin.CodeFolding.Options) then
+          begin
+            LRegionItem := Add(LOpenToken, LCloseToken);
+            LRegionItem.NoSubs := True;
+            FHighlighter.AddKeyChar(ctFoldOpen, LOpenToken[1]);
+            if LCloseToken <> '' then
+              FHighlighter.AddKeyChar(ctFoldClose, LCloseToken[1]);
+          end
+          else
+          begin
+            LSkipRegionItem := SkipRegions.Add(LOpenToken, LCloseToken);
+            LSkipRegionItem.RegionType := LSkipRegionType;
+            LSkipRegionItem.SkipEmptyChars := GetJSONBoolean(LItem, 'SkipEmptyChars', LSkipRegionItem.SkipEmptyChars);
+            LSkipRegionItem.SkipIfNextCharIsNot := BCEDITOR_NONE_CHAR;
+            LString := GetJSONString(LItem, 'NextCharIsNot');
+            if (LString <> '') then LSkipRegionItem.SkipIfNextCharIsNot := LString[1];
+            if (LOpenToken <> '') then
+              FHighlighter.AddKeyChar(ctSkipOpen, LOpenToken[1]);
+            if (LCloseToken <> '') then
+              FHighlighter.AddKeyChar(ctSkipClose, LCloseToken[1]);
+          end;
+        end;
+      end;
+    end;
+  end;
 end;
 
 { TBCEditorCodeFoldingSkipRegions *********************************************}
@@ -785,7 +1300,7 @@ begin
   Result := (FBeginLine < FEndLine) or RegionItem.TokenEndIsPreviousLine and (FBeginLine = FEndLine);
 end;
 
-constructor TBCEditorCodeFoldingRanges.TRange.Create;
+constructor TBCEditorCodeFoldingRanges.TRange.Create();
 begin
   inherited;
 
@@ -1049,14 +1564,27 @@ begin
     FOnChange(Self);
 end;
 
+procedure TBCEditorHighlighter.TAttribute.Clear();
+begin
+  FBackground := clNone;
+  FBackgroundDefault := clNone;
+  FElement := '';
+  FEscapeChar := BCEDITOR_NONE_CHAR;
+  FFontStyles := [];
+  FFontStylesDefault := [];
+  FForeground := clNone;
+  FForegroundDefault := clNone;
+  FParentBackground := False;
+  FParentForeground := False;
+end;
+
 constructor TBCEditorHighlighter.TAttribute.Create(const AttributeName: string);
 begin
-  inherited Create;
+  inherited Create();
 
-  FBackground := clNone;
-  FForeground := clNone;
   FName := AttributeName;
-  FEscapeChar := BCEDITOR_NONE_CHAR;
+
+  Clear();
 end;
 
 function TBCEditorHighlighter.TAttribute.GetBackgroundColorStored: Boolean;
@@ -1079,6 +1607,21 @@ begin
   FForegroundDefault := FForeground;
   FBackgroundDefault := FBackground;
   FFontStylesDefault := FFontStyles;
+end;
+
+procedure TBCEditorHighlighter.TAttribute.LoadFromJSON(const AJSON: TJSONObject);
+var
+  LString: string;
+begin
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    FElement := GetJSONString(AJSON, 'Element', True);
+    FParentBackground := GetJSONBoolean(AJSON, 'ParentBackground', True);
+    FParentForeground := GetJSONBoolean(AJSON, 'ParentForeground', False);
+    LString := GetJSONString(AJSON, 'EscapeChar'); if (Length(LString) = 1) then EscapeChar := LString[1];
+  end;
 end;
 
 procedure TBCEditorHighlighter.TAttribute.SetBackground(const AValue: TColor);
@@ -1110,78 +1653,138 @@ end;
 
 { TBCEditorHighlighter.TColors ************************************************}
 
-procedure TBCEditorHighlighter.TColors.Clear;
-var
-  LIndex: Integer;
-begin
-  for LIndex := FElements.Count - 1 downto 0 do
-    Dispose(PElement(FElements.Items[LIndex]));
-  FElements.Clear;
-end;
-
-constructor TBCEditorHighlighter.TColors.Create(const AHighlighter: TBCEditorHighlighter);
+constructor TBCEditorHighlighter.TElements.Create(const AHighlighter: TBCEditorHighlighter);
 begin
   inherited Create;
 
   FHighlighter := AHighlighter;
-
-  FElements := TList.Create;
 end;
 
-destructor TBCEditorHighlighter.TColors.Destroy;
-begin
-  Clear;
-  FElements.Free;
-
-  inherited;
-end;
-
-function TBCEditorHighlighter.TColors.GetElement(const Name: string): PElement;
+function TBCEditorHighlighter.TElements.GetElement(AName: string): PElement;
 var
-  LElement: PElement;
   LIndex: Integer;
 begin
-  Result := nil;
-  for LIndex := 0 to FElements.Count - 1 do
-  begin
-    LElement := PElement(FElements.Items[LIndex]);
-    if LElement^.Name = Name then
-      Exit(LElement);
-  end;
+  LIndex := IndexOf(AName);
+  if (LIndex < 0) then
+    Result := nil
+  else
+    Result := @List[LIndex];
 end;
 
-procedure TBCEditorHighlighter.TColors.LoadFromFile(const AFileName: string);
+function TBCEditorHighlighter.TElements.IndexOf(const AName: string): Integer;
+var
+  LIndex: Integer;
+begin
+  Result := -1;
+  for LIndex := 0 to Count - 1 do
+    if (Items[LIndex].Name = AName) then
+      Exit(LIndex);
+end;
+
+procedure TBCEditorHighlighter.TElements.LoadFromFile(const AFileName: string);
 var
   LStream: TStream;
 begin
   LStream := TFileStream.Create(AFileName, fmOpenRead);
-  try
-    LoadFromStream(LStream);
-  finally
-    LStream.Free;
-  end;
+  LoadFromStream(LStream);
+  LStream.Free();
 end;
 
-procedure TBCEditorHighlighter.TColors.LoadFromResource(const ResName: string; const ResType: PChar);
+procedure TBCEditorHighlighter.TElements.LoadFromJSON(const AJSON: TJSONObject);
 var
-  Stream: TResourceStream;
+  LColorsObject: TJSONObject;
+  LEditorObject: TJSONObject;
+  LElement: TElement;
+  LElementsArray: TJSONArray;
+  LFontObject: TJSONObject;
+  LIndex: Integer;
+  LItem: TJSONObject;
+  LSizeObject: TJSONObject;
+  LSize: Integer;
 begin
-  Stream := TResourceStream.Create(HInstance, PChar(ResName), ResType);
-  LoadFromStream(Stream);
-  Stream.Free();
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    LEditorObject := GetJSONObject(AJSON, 'Editor');
+    if (Assigned(LEditorObject)) then
+      with TCustomBCEditor(FHighlighter.Editor) do
+      begin
+        LColorsObject := GetJSONObject(LEditorObject, 'Colors');
+        Color := StringToColor(GetJSONString(LColorsObject, 'Background', ColorToString(Color)));
+        Colors.ActiveLine.Background := StringToColor(GetJSONString(LColorsObject, 'ActiveLineBackground', ColorToString(Colors.ActiveLine.Background)));
+        Colors.CodeFolding.Background := StringToColor(GetJSONString(LColorsObject, 'CodeFoldingBackground', ColorToString(Colors.CodeFolding.Background)));
+        Colors.CodeFolding.Foreground := StringToColor(GetJSONString(LColorsObject, 'CodeFoldingFoldingLine', ColorToString(Colors.CodeFolding.Foreground)));
+        Colors.Marks.Background := StringToColor(GetJSONString(LColorsObject, 'LeftMarginBookmarkPanel', ColorToString(Colors.Marks.Background)));
+        Colors.LineNumbers.Background := StringToColor(GetJSONString(LColorsObject, 'LeftMarginBackground', ColorToString(Colors.LineNumbers.Background)));
+        Colors.LineNumbers.Foreground := StringToColor(GetJSONString(LColorsObject, 'LeftMarginLineNumbers', ColorToString(Colors.LineNumbers.Foreground)));
+        Colors.LineState.Loaded := StringToColor(GetJSONString(LColorsObject, 'LeftMarginBackground', ColorToString(Colors.LineState.Loaded)));
+        Colors.LineState.Modified := StringToColor(GetJSONString(LColorsObject, 'LeftMarginLineStateModified', ColorToString(Colors.LineState.Modified)));
+        Colors.LineState.Saved := StringToColor(GetJSONString(LColorsObject, 'LeftMarginLineStateNormal', ColorToString(Colors.LineState.Saved)));
+        Colors.MatchingPairs.Background := StringToColor(GetJSONString(LColorsObject, 'MatchingPairMatched', ColorToString(Colors.MatchingPairs.Background)));
+        Colors.FoundText.Background := StringToColor(GetJSONString(LColorsObject, 'SearchHighlighterBackground', ColorToString(Colors.FoundText.Background)));
+        Colors.FoundText.Foreground := StringToColor(GetJSONString(LColorsObject, 'SearchHighlighterForeground', ColorToString(Colors.FoundText.Foreground)));
+        Colors.Selection.Background := StringToColor(GetJSONString(LColorsObject, 'SelectionBackground', ColorToString(Colors.Selection.Background)));
+        Colors.Selection.Foreground := StringToColor(GetJSONString(LColorsObject, 'SelectionForeground', ColorToString(Colors.Selection.Foreground)));
+        Colors.SpecialChars.Foreground := StringToColor(GetJSONString(LColorsObject, 'SpecialCharForeground', ColorToString(Colors.SpecialChars.Foreground)));
+        Colors.SyncEdit.Background := StringToColor(GetJSONString(LColorsObject, 'SyncEditBackground', ColorToString(Colors.SyncEdit.Background)));
+        Colors.SyncEdit.Overlay := StringToColor(GetJSONString(LColorsObject, 'SyncEditWordBorder', ColorToString(Colors.SyncEdit.Overlay)));
+
+        LFontObject := GetJSONObject(LEditorObject, 'Fonts');
+        if (Assigned(LFontObject)) then
+        begin
+          Font.Name := GetJSONString(LEditorObject, 'Text', Font.Name);
+          if (cpoUseHighlighterColumnFont in CompletionProposal.Options) then
+            for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
+              CompletionProposal.Columns[LIndex].Font.Name := GetJSONString(LFontObject, 'CompletionProposal', CompletionProposal.Columns[LIndex].Font.Name);
+        end;
+        LSizeObject := GetJSONObject(LEditorObject, 'FontSizes');
+        if Assigned(LSizeObject) then
+        begin
+          if (TryStrToInt(GetJSONString(LSizeObject, 'Text'), LSize)) then Font.Size := LSize;
+          if (cpoUseHighlighterColumnFont in CompletionProposal.Options) then
+            for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
+              if (TryStrToInt(GetJSONString(LSizeObject, 'CompletionProposal'), LSize)) then CompletionProposal.Columns[LIndex].Font.Size := LSize;
+        end;
+      end;
+    LElementsArray := GetJSONArray(AJSON, 'Elements');
+    for LIndex := 0 to LElementsArray.Size - 1 do
+    begin
+      LItem := GetJSONObject(LElementsArray, LIndex);
+      if (Assigned(LItem)) then
+      begin
+        LElement.Background := StringToColor(GetJSONString(LItem, 'Background', 'clNone'));
+        LElement.Foreground := StringToColor(GetJSONString(LItem, 'Foreground', 'clNone'));
+        LElement.Name := GetJSONString(LItem, 'Name');
+        LElement.FontStyles := StrToFontStyle(GetJSONString(LItem, 'Style'));
+        if ((LElement.Name <> '') and (IndexOf(LElement.Name) < 0)) then
+          Add(LElement);
+      end;
+    end;
+  end;
+
+  FHighlighter.UpdateColors();
 end;
 
-procedure TBCEditorHighlighter.TColors.LoadFromStream(AStream: TStream);
+procedure TBCEditorHighlighter.TElements.LoadFromResource(const ResName: string; const ResType: PChar);
 var
-  LImportJSON : TIMportJSON;
+  LStream: TResourceStream;
 begin
-  LImportJSON := TImportJSON.Create(Highlighter);
-  try
-    LImportJSON.ImportColorsFromStream(AStream);
-  finally
-    LImportJSON.Free();
+  LStream := TResourceStream.Create(HInstance, PChar(ResName), ResType);
+  LoadFromStream(LStream);
+  LStream.Free();
+end;
+
+procedure TBCEditorHighlighter.TElements.LoadFromStream(const AStream: TStream);
+var
+  LJSON: TJSONObject;
+begin
+  LJSON := CreateJSONObjectFromStream(AStream);
+  if (Assigned(LJSON)) then
+  begin
+    LoadFromJSON(GetJSONObject(LJSON, 'Colors'));
+    LJSON.Free();
   end;
-  Highlighter.UpdateColors();
 end;
 
 { TBCEditorHighlighter.TAbstractToken *****************************************}
@@ -1427,6 +2030,29 @@ begin
   inherited;
 end;
 
+procedure TBCEditorHighlighter.TKeyList.LoadFromJSON(const AJSON: TJSONObject);
+var
+  LIndex: Integer;
+  LString: string;
+  LSyncEditObject: TJSONObject;
+  LWordArray: TJSONArray;
+begin
+  if (Assigned(AJSON)) then
+  begin
+    TokenType := StrToRangeType(GetJSONString(AJSON, 'Type', True));
+    LWordArray := GetJSONArray(AJSON, 'Words', True);
+    for LIndex := 0 to LWordArray.Size - 1 do
+    begin
+      LString := GetJSONString(LWordArray, LIndex);
+      if (LString <> '') then
+        KeyList.Add(LString);
+    end;
+    Attribute.LoadFromJSON(GetJSONObject(AJSON, 'Attributes'));
+    LSyncEditObject := GetJSONObject(AJSON, 'SyncEdit');
+    if (Assigned(LSyncEditObject)) then
+      SyncEdit := GetJSONBoolean(LSyncEditObject, 'Enabled', SyncEdit);
+  end;
+end;
 { TBCEditorHighlighter.TSet ***************************************************}
 
 constructor TBCEditorHighlighter.TSet.Create(ACharSet: TBCEditorAnsiCharSet = []);
@@ -1436,6 +2062,16 @@ begin
   FCharSet := ACharSet;
   FAttribute.Foreground := clWindowText;
   FAttribute.Background := clWindow;
+end;
+
+procedure TBCEditorHighlighter.TSet.LoadFromJSON(const AJSON: TJSONObject);
+begin
+  if (Assigned(AJSON)) then
+  begin
+    CharSet := StrToSet(GetJSONString(AJSON, 'Symbols', True));
+
+    Attribute.LoadFromJSON(GetJSONObject(AJSON, 'Attributes'));
+  end;
 end;
 
 { TBCEditorHighlighter.TRange *************************************************}
@@ -1522,9 +2158,14 @@ begin
   FSets.Clear();
 end;
 
-constructor TBCEditorHighlighter.TRange.Create(const AOpenToken: string; const ACloseToken: string);
+constructor TBCEditorHighlighter.TRange.Create(const AHighlighter: TBCEditorHighlighter;
+  const AParent: TRange = nil;
+  const AOpenToken: string = ''; const ACloseToken: string = '');
 begin
   inherited Create;
+
+  FHighlighter := AHighlighter;
+  FParent := AParent;
 
   FOpenToken := TMultiToken.Create;
   FCloseToken := TMultiToken.Create;
@@ -1532,7 +2173,7 @@ begin
 
   SetCaseSensitive(False);
 
-  FAlternativeCloseArrayCount := 0;
+  FAlternativeCloseArray := TStringList.Create();
 
   FPrepared := False;
 
@@ -1552,6 +2193,7 @@ begin
   Clear;
   Reset;
 
+  FAlternativeCloseArray.Free();
   FOpenToken.Free;
   FOpenToken := nil;
   FCloseToken.Free;
@@ -1631,6 +2273,204 @@ end;
 function TBCEditorHighlighter.TRange.GetToken(const AIndex: Integer): TToken;
 begin
   Result := FTokens[AIndex];
+end;
+
+procedure TBCEditorHighlighter.TRange.LoadFromJSON(const AJSON: TJSONObject;
+  const ASkipBeforeSubRules: Boolean = False);
+var
+  LAlternativeCloseArray: TJSONArray;
+  LCloseBreakType: string;
+  LCloseToken: string;
+  LFilename: string;
+  LFileObject: TJSONObject;
+  LHighlighterObject: TJSONObject;
+  LIncludeRange: string;
+  LIndex: Integer;
+  LIndex2: Integer;
+  LKeyListArray: TJSONArray;
+  LKeyListObject: TJSONObject;
+  LMainRulesObject: TJSONObject;
+  LName: string;
+  LNewKeyList: TKeyList;
+  LNewRange: TRange;
+  LNewSet: TSet;
+  LOpenBreakType: string;
+  LOpenToken: string;
+  LPair: TJSONPair;
+  LPropertiesObject: TJSONObject;
+  LRangeArray: TJSONArray;
+  LRangeObject: TJSONObject;
+  LJSONString: TJSONString;
+  LSetArray: TJSONArray;
+  LSetObject: TJSONObject;
+  LString: string;
+  LSubRuleArray: TJSONArray;
+  LSubRuleObject: TJSONObject;
+  LSubRulesObject: TJSONObject;
+  LTokenRangeObject: TJSONObject;
+begin
+  if (Assigned(AJSON)) then
+  begin
+    LFilename := GetJSONString(AJSON, 'File');
+    if (FHighlighter.MultiHighlighter and TFile.Exists(FHighlighter.Directory + LFilename)) then
+    begin
+      LFileObject := CreateJSONObjectFromText(FHighlighter.Directory + LFilename);
+      if (Assigned(LFileObject)) then
+      begin
+        LHighlighterObject := GetJSONObject(LFileObject, 'Highlighter');
+        LMainRulesObject := GetJSONObject(LHighlighterObject, 'MainRules');
+
+        LName := GetJSONString(LMainRulesObject, 'Name');
+        LIncludeRange := GetJSONString(AJSON, 'IncludeRange');
+        { You can include MainRules... }
+        if (Assigned(FParent)
+          and (LName <> '') and (LName = LIncludeRange)) then
+          FParent.LoadFromJSON(LMainRulesObject, True)
+        else
+        { or SubRules... }
+        begin
+          LSubRulesObject := GetJSONObject(LMainRulesObject, 'SubRules');
+          if (Assigned(LSubRulesObject)) then
+            for LIndex := 0 to LSubRulesObject.Size - 1 do
+            begin
+              LSubRuleArray := GetJSONArray(LSubRulesObject, LIndex, 'Range');
+              if (Assigned(LSubRuleArray)) then
+                for LIndex2 := 0 to LSubRuleArray.Size - 1 do
+                begin
+                  LSubRuleObject := GetJSONObject(LSubRuleArray, LIndex2);
+                  if (Assigned(LSubRuleObject)) then
+                  begin
+                    LName := GetJSONString(LSubRuleObject, 'Name');
+                    if ((LName <> '') and (LName = LIncludeRange)) then
+                    begin
+                      LoadFromJSON(LSubRuleObject);
+                      Break;
+                    end;
+                  end;
+                end;
+            end;
+        end;
+      end;
+    end
+    else
+    begin
+      if (not ASkipBeforeSubRules) then
+      begin
+        Clear();
+        FAttribute.LoadFromJSON(GetJSONObject(AJSON, 'Attributes'));
+        FCaseSensitive := GetJSONBoolean(AJSON, 'CaseSensitive', FCaseSensitive);
+        LJSONString := GetJSONValue(AJSON, 'Delimiters', TJSONString) as TJSONString;
+        if (Assigned(LJSONString)) then
+          FDelimiters := StrToSet(LJSONString.Value());
+        LJSONString := GetJSONValue(AJSON, 'Type', TJSONString) as TJSONString;
+        if (Assigned(LJSONString)) then
+          TokenType := StrToRangeType(LJSONString.Value());
+
+        LPropertiesObject := GetJSONObject(AJSON, 'Properties');
+        if (Assigned(LPropertiesObject)) then
+        begin
+          FCloseOnEndOfLine := GetJSONBoolean(LPropertiesObject, 'CloseOnEndOfLine', FCloseOnEndOfLine);
+          FCloseOnTerm := GetJSONBoolean(LPropertiesObject, 'CloseOnTerm', FCloseOnTerm);
+          FCloseParent := GetJSONBoolean(LPropertiesObject, 'CloseParent', FCloseParent);
+          FOpenBeginningOfLine := GetJSONBoolean(LPropertiesObject, 'OpenBeginningOfLine', FOpenBeginningOfLine);
+          FSkipWhitespace := GetJSONBoolean(LPropertiesObject, 'SkipWhitespace', FSkipWhitespace);
+          FUseDelimitersForText := GetJSONBoolean(LPropertiesObject, 'UseDelimitersForText', FUseDelimitersForText);
+
+          LAlternativeCloseArray := GetJSONArray(LPropertiesObject, 'AlternativeClose');
+          if (Assigned(LAlternativeCloseArray)) then
+          begin
+            AlternativeCloseList.Clear();
+            for LIndex := 0 to LAlternativeCloseArray.Size - 1 do
+            begin
+              LString := GetJSONString(LAlternativeCloseArray, LIndex);
+              if (LString <> '') then
+                AlternativeCloseList.Add(LString);
+            end;
+          end;
+        end;
+
+        OpenToken.Clear();
+        OpenToken.BreakType := btUnspecified;
+        CloseToken.Clear();
+        CloseToken.BreakType := btUnspecified;
+
+        LTokenRangeObject := GetJSONObject(AJSON, 'TokenRange');
+        if (Assigned(LTokenRangeObject)) then
+        begin
+          LOpenToken := GetJSONString(LTokenRangeObject, 'Open');
+          LCloseToken := GetJSONString(LTokenRangeObject, 'Close');
+          LOpenBreakType := GetJSONString(LTokenRangeObject, 'OpenBreakType');
+          LCloseBreakType := GetJSONString(LTokenRangeObject, 'CloseBreakType');
+
+          AddTokenRange(LOpenToken, StrToBreakType(LOpenBreakType), LCloseToken, StrToBreakType(LCloseBreakType));
+
+          case (TokenType) of
+            ttLineComment: FHighlighter.Comments.AddLineComment(LOpenToken);
+            ttBlockComment: FHighlighter.Comments.AddBlockComment(LOpenToken, LCloseToken);
+          end;
+        end;
+      end;
+      { Sub rules }
+      LSubRulesObject := GetJSONObject(AJSON, 'SubRules');
+
+      if (Assigned(LSubRulesObject)) then
+      begin
+        for LIndex := 0 to LSubRulesObject.Size - 1 do
+        begin
+          LPair := LSubRulesObject.Get(LIndex);
+          if (LPair.JsonString.Value() = 'Range') then
+          begin
+            LRangeArray := GetJSONArray(LSubRulesObject, LIndex, 'Range');
+            if (Assigned(LRangeArray)) then
+              for LIndex2 := 0 to LRangeArray.Size - 1 do
+              begin
+                LRangeObject := GetJSONObject(LRangeArray, LIndex2);
+                if (Assigned(LRangeObject)) then
+                begin
+                  LNewRange := TRange.Create(FHighlighter, Self);
+                  LNewRange.LoadFromJSON(LRangeObject);
+                  AddRange(LNewRange);
+                end;
+              end;
+          end
+          else if (LPair.JsonString.Value() = 'KeyList') then
+          begin
+            LKeyListArray := GetJSONArray(LSubRulesObject, LIndex, 'KeyList');
+            if (Assigned(LKeyListArray)) then
+            begin
+              for LIndex2 := 0 to LKeyListArray.Size - 1 do
+              begin
+                LKeyListObject := GetJSONObject(LKeyListArray, LIndex2);
+                if (Assigned(LKeyListObject)) then
+                begin
+                  LNewKeyList := TKeyList.Create();
+                  LNewKeyList.LoadFromJSON(LKeyListObject);
+                  AddKeyList(LNewKeyList);
+                end;
+              end
+            end;
+          end
+          else if (LPair.JsonString.Value() = 'Set') then
+          begin
+            LSetArray := GetJSONArray(LSubRulesObject, LIndex);
+            if (Assigned(LSetArray)) then
+            begin
+              for LIndex2 := 0 to LSetArray.Size - 1 do
+              begin
+                LSetObject := GetJSONObject(LSetArray, LIndex2);
+                if (Assigned(LSetObject)) then
+                begin
+                  LNewSet := TSet.Create();
+                  LNewSet.LoadFromJSON(LSetObject);
+                  AddSet(LNewSet);
+                end;
+              end
+            end;
+          end;
+        end;
+      end;
+    end;
+  end;
 end;
 
 procedure TBCEditorHighlighter.TRange.Prepare(AParent: TRange);
@@ -1824,12 +2664,6 @@ begin
 
   FTokens.Clear();
   FPrepared := False;
-end;
-
-procedure TBCEditorHighlighter.TRange.SetAlternativeCloseArrayCount(const AValue: Integer);
-begin
-  FAlternativeCloseArrayCount := AValue;
-  SetLength(FAlternativeCloseArray, AValue);
 end;
 
 procedure TBCEditorHighlighter.TRange.SetCaseSensitive(const AValue: Boolean);
@@ -2134,732 +2968,6 @@ begin
   Result := True;
 end;
 
-{ TBCEditorHighlighter.TImportJSON ********************************************}
-
-function StringToColorDef(const AString: string; const DefaultColor: TColor): Integer;
-begin
-  if Trim(AString) = '' then
-    Result := DefaultColor
-  else
-  if Pos('clWeb', AString) = 1 then
-    Result := WebColorNameToColor(AString)
-  else
-    Result := StringToColor(AString);
-end;
-
-function StrToSet(const AString: string): TBCEditorAnsiCharSet;
-var
-  LIndex: Integer;
-begin
-  Result := [];
-  for LIndex := 1 to Length(AString) do
-    Result := Result + [AString[LIndex]];
-end;
-
-function StrToStrDef(const AString: string; const AStringDef: string): string;
-begin
-  if Trim(AString) = '' then
-    Result := AStringDef
-  else
-    Result := AString
-end;
-
-function StrToFontStyle(const AString: string): TFontStyles;
-begin
-  Result := [];
-  if Pos('Bold', AString) > 0 then
-    Include(Result, fsBold);
-  if Pos('Italic', AString) > 0 then
-    Include(Result, fsItalic);
-  if Pos('Underline', AString) > 0 then
-    Include(Result, fsUnderline);
-  if Pos('StrikeOut', AString) > 0 then
-    Include(Result, fsStrikeOut);
-end;
-
-function StrToBreakType(const AString: string): TBCEditorBreakType;
-begin
-  if AString = 'Any' then
-    Result := btAny
-  else
-  if (AString = 'Term') or (AString = '') then
-    Result := btTerm
-  else
-    Result := btUnspecified;
-end;
-
-function StrToRegionType(const AString: string): TBCEditorRangeItemType;
-begin
-  if AString = 'SingleLine' then
-    Result := ritSingleLineComment
-  else
-  if AString = 'MultiLine' then
-    Result := ritMultiLineComment
-  else
-  if AString = 'SingleLineString' then
-    Result := ritSingleLineString
-  else
-    Result := ritMultiLineString
-end;
-
-function StrToRangeType(const AString: string): TBCEditorRangeType;
-var
-  LIndex: Integer;
-begin
-  LIndex := GetEnumValue(TypeInfo(TBCEditorRangeType), 'tt' + AString);
-  if LIndex = -1 then
-    Result := ttUnspecified
-  else
-    Result := TBCEditorRangeType(LIndex);
-end;
-
-constructor TBCEditorHighlighter.TImportJSON.Create(AHighlighter: TBCEditorHighlighter);
-begin
-  inherited Create();
-
-  FHighlighter := AHighlighter;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportAttributes(AHighlighterAttribute: TAttribute;
-  AAttributesObject: TJsonObject; const AElementPrefix: string);
-begin
-  if Assigned(AAttributesObject) then
-  begin
-    AHighlighterAttribute.Element := AElementPrefix + AAttributesObject['Element'].Value;
-    AHighlighterAttribute.ParentForeground := StrToBoolDef(AAttributesObject['ParentForeground'].Value, False);
-    AHighlighterAttribute.ParentBackground := StrToBoolDef(AAttributesObject['ParentBackground'].Value, True);
-    if AAttributesObject.Contains('EscapeChar') then
-      AHighlighterAttribute.EscapeChar := AAttributesObject['EscapeChar'].Value[1];
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFolding(ACodeFoldingObject: TJsonObject);
-var
-  i: Integer;
-  LArray: TJsonArray;
-  LCodeFoldingObject: TJsonObject;
-  LCount: Integer;
-begin
-  if not Assigned(ACodeFoldingObject) then
-    Exit;
-  LArray := ACodeFoldingObject['Ranges'].ArrayValue;
-  LCount := LArray.Count;
-  if LCount > 0 then
-  begin
-    FHighlighter.CodeFoldingRangeCount := LCount;
-    for i := 0 to LCount - 1 do
-    begin
-      FHighlighter.CodeFoldingRegions[i] := TBCEditorCodeFoldingRegion.Create(TBCEditorCodeFoldingRegionItem);
-      LCodeFoldingObject := LArray.Items[i].ObjectValue;
-
-      ImportCodeFoldingOptions(FHighlighter.CodeFoldingRegions[i], LCodeFoldingObject);
-      ImportCodeFoldingSkipRegion(FHighlighter.CodeFoldingRegions[i], LCodeFoldingObject);
-      ImportCodeFoldingFoldRegion(FHighlighter.CodeFoldingRegions[i], LCodeFoldingObject);
-    end;
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingFoldRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion;
-  ACodeFoldingObject: TJsonObject);
-var
-  LCloseToken: string;
-  LFileName: string;
-  LFileStream: TStream;
-  LFoldRegionArray: TJsonArray;
-  LIndex: Integer;
-  LIndex2: Integer;
-  LJsonDataValue: PJsonDataValue;
-  LJSONObject: TJsonObject;
-  LMemberObject: TJsonObject;
-  LOpenToken: string;
-  LRegionItem: TBCEditorCodeFoldingRegionItem;
-  LSkipIfFoundAfterOpenTokenArray: TJsonArray;
-begin
-  if ACodeFoldingObject.Contains('FoldRegion') then
-  begin
-    LFoldRegionArray := ACodeFoldingObject['FoldRegion'].ArrayValue;
-    for LIndex := 0 to LFoldRegionArray.Count - 1 do
-    begin
-      LJsonDataValue := LFoldRegionArray.Items[LIndex];
-      LOpenToken := LJsonDataValue.ObjectValue['OpenToken'].Value;
-      LCloseToken := LJsonDataValue.ObjectValue['CloseToken'].Value;
-
-      if FHighlighter.MultiHighlighter then
-      begin
-        { Multi highlighter code folding fold region include }
-        LFileName := LJsonDataValue.ObjectValue['File'].Value;
-        if LFileName <> '' then
-        begin
-          LFileStream := TFileStream.Create(LFileName, fmOpenRead);
-          LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
-          if Assigned(LJSONObject) then
-          try
-            if LJSONObject.Contains('CodeFolding') then
-              ImportCodeFoldingFoldRegion(ACodeFoldingRegion, LJSONObject['CodeFolding']['Ranges'].ArrayValue.Items[0].ObjectValue);
-          finally
-            LJSONObject.Free;
-            LFileStream.Free;
-          end;
-        end;
-        { Skip duplicates }
-        if ACodeFoldingRegion.Contains(LOpenToken, LCloseToken) then
-          Continue;
-      end;
-
-      LRegionItem := ACodeFoldingRegion.Add(LOpenToken, LCloseToken);
-
-      LMemberObject := LJsonDataValue.ObjectValue['Properties'].ObjectValue;
-      if Assigned(LMemberObject) then
-      begin
-        { Options }
-        LRegionItem.OpenTokenBeginningOfLine := LMemberObject.B['OpenTokenBeginningOfLine'];
-        LRegionItem.CloseTokenBeginningOfLine := LMemberObject.B['CloseTokenBeginningOfLine'];
-        LRegionItem.SharedClose := LMemberObject.B['SharedClose'];
-        LRegionItem.OpenIsClose := LMemberObject.B['OpenIsClose'];
-        LRegionItem.OpenTokenCanBeFollowedBy := LMemberObject['OpenTokenCanBeFollowedBy'].Value;
-        LRegionItem.TokenEndIsPreviousLine := LMemberObject.B['TokenEndIsPreviousLine'];
-        LRegionItem.NoSubs := LMemberObject.B['NoSubs'];
-        LRegionItem.BeginWithBreakChar := LMemberObject.B['BeginWithBreakChar'];
-
-        LSkipIfFoundAfterOpenTokenArray := LMemberObject['SkipIfFoundAfterOpenToken'].ArrayValue;
-        if LSkipIfFoundAfterOpenTokenArray.Count > 0 then
-        begin
-          LRegionItem.SkipIfFoundAfterOpenTokenArrayCount := LSkipIfFoundAfterOpenTokenArray.Count;
-          for LIndex2 := 0 to LRegionItem.SkipIfFoundAfterOpenTokenArrayCount - 1 do
-            LRegionItem.SkipIfFoundAfterOpenTokenArray[LIndex2] := LSkipIfFoundAfterOpenTokenArray.Items[LIndex2].Value;
-        end;
-
-        if LMemberObject.Contains('BreakCharFollows') then
-          LRegionItem.BreakCharFollows := LMemberObject.B['BreakCharFollows'];
-        LRegionItem.BreakIfNotFoundBeforeNextRegion := LMemberObject['BreakIfNotFoundBeforeNextRegion'].Value;
-        LRegionItem.OpenTokenEnd := LMemberObject['OpenTokenEnd'].Value;
-        LRegionItem.ShowGuideLine := StrToBoolDef(LMemberObject['ShowGuideLine'].Value, True);
-        LRegionItem.OpenTokenBreaksLine := LMemberObject.B['OpenTokenBreaksLine'];
-      end;
-      if LOpenToken <> '' then
-        FHighlighter.AddKeyChar(ctFoldOpen, LOpenToken[1]);
-      if LRegionItem.BreakIfNotFoundBeforeNextRegion <> '' then
-        FHighlighter.AddKeyChar(ctFoldOpen, LRegionItem.BreakIfNotFoundBeforeNextRegion[1]);
-      if LCloseToken <> '' then
-        FHighlighter.AddKeyChar(ctFoldClose, LCloseToken[1]);
-    end;
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingOptions(ACodeFoldingRegion: TBCEditorCodeFoldingRegion;
-  ACodeFoldingObject: TJsonObject);
-var
-  LCodeFoldingObject: TJsonObject;
-begin
-  FHighlighter.MatchingPairHighlight := True;
-
-  if ACodeFoldingObject.Contains('Options') then
-  begin
-    LCodeFoldingObject := ACodeFoldingObject['Options'].ObjectValue;
-
-    if LCodeFoldingObject.Contains('OpenToken') then
-      ACodeFoldingRegion.OpenToken := LCodeFoldingObject['OpenToken'].Value;
-
-    if LCodeFoldingObject.Contains('CloseToken') then
-      ACodeFoldingRegion.CloseToken := LCodeFoldingObject['CloseToken'].Value;
-
-    if LCodeFoldingObject.Contains('EscapeChar') then
-      ACodeFoldingRegion.EscapeChar := LCodeFoldingObject['EscapeChar'].Value[1];
-
-    if LCodeFoldingObject.Contains('FoldTags') then
-      ACodeFoldingRegion.FoldTags := LCodeFoldingObject.B['FoldTags'];
-
-    if LCodeFoldingObject.Contains('StringEscapeChar') then
-      ACodeFoldingRegion.StringEscapeChar := LCodeFoldingObject['StringEscapeChar'].Value[1];
-
-    if LCodeFoldingObject.Contains('MatchingPairHighlight') then
-      FHighlighter.MatchingPairHighlight := LCodeFoldingObject.B['MatchingPairHighlight'];
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportCodeFoldingSkipRegion(ACodeFoldingRegion: TBCEditorCodeFoldingRegion;
-  ACodeFoldingObject: TJsonObject);
-var
-  LCloseToken: string;
-  LFileName: string;
-  LFileStream: TStream;
-  LIndex: Integer;
-  LJsonDataValue: PJsonDataValue;
-  LJSONObject: TJsonObject;
-  LOpenToken: string;
-  LRegionItem: TBCEditorCodeFoldingRegionItem;
-  LSkipRegionArray: TJsonArray;
-  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
-  LSkipRegionType: TBCEditorRangeItemType;
-begin
-  if ACodeFoldingObject.Contains('SkipRegion') then
-  begin
-    LSkipRegionArray := ACodeFoldingObject['SkipRegion'].ArrayValue;
-    for LIndex := 0 to LSkipRegionArray.Count - 1 do
-    begin
-      LJsonDataValue := LSkipRegionArray.Items[LIndex];
-      LOpenToken := LJsonDataValue.ObjectValue['OpenToken'].Value;
-      LCloseToken := LJsonDataValue.ObjectValue['CloseToken'].Value;
-
-      if FHighlighter.MultiHighlighter then
-      begin
-        { Multi highlighter code folding skip region include }
-        LFileName := LJsonDataValue.ObjectValue['File'].Value;
-        if LFileName <> '' then
-        begin
-          LFileStream := TFileStream.Create(LFileName, fmOpenRead);
-          LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
-          if Assigned(LJSONObject) then
-          try
-            if LJSONObject.Contains('CodeFolding') then
-              ImportCodeFoldingSkipRegion(ACodeFoldingRegion, LJSONObject['CodeFolding']['Ranges'].ArrayValue.Items[0].ObjectValue);
-          finally
-            LJSONObject.Free;
-            LFileStream.Free;
-          end;
-        end;
-        { Skip duplicates }
-        if ACodeFoldingRegion.SkipRegions.Contains(LOpenToken, LCloseToken) then
-          Continue;
-      end;
-
-      LSkipRegionType := StrToRegionType(LJsonDataValue.ObjectValue['RegionType'].Value);
-      if (LSkipRegionType = ritMultiLineComment) and (cfoFoldMultilineComments in TCustomBCEditor(FHighlighter.Editor).LeftMargin.CodeFolding.Options) then
-      begin
-        LRegionItem := ACodeFoldingRegion.Add(LOpenToken, LCloseToken);
-        LRegionItem.NoSubs := True;
-        FHighlighter.AddKeyChar(ctFoldOpen, LOpenToken[1]);
-        if LCloseToken <> '' then
-          FHighlighter.AddKeyChar(ctFoldClose, LCloseToken[1]);
-      end
-      else
-      begin
-        LSkipRegionItem := ACodeFoldingRegion.SkipRegions.Add(LOpenToken, LCloseToken);
-        LSkipRegionItem.RegionType := LSkipRegionType;
-        LSkipRegionItem.SkipEmptyChars := LJsonDataValue.ObjectValue.B['SkipEmptyChars'];
-        LSkipRegionItem.SkipIfNextCharIsNot := BCEDITOR_NONE_CHAR;
-        if LJsonDataValue.ObjectValue.Contains('NextCharIsNot') then
-          LSkipRegionItem.SkipIfNextCharIsNot := LJsonDataValue.ObjectValue['NextCharIsNot'].Value[1];
-        if LOpenToken <> '' then
-          FHighlighter.AddKeyChar(ctSkipOpen, LOpenToken[1]);
-        if LCloseToken <> '' then
-          FHighlighter.AddKeyChar(ctSkipClose, LCloseToken[1]);
-      end;
-    end;
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportColors(AJSONObject: TJsonObject);
-var
-  LColorsObject: TJsonObject;
-begin
-  FHighlighter.Colors.Clear;
-
-  LColorsObject := AJSONObject['Colors'];
-  ImportColorsEditorProperties(LColorsObject['Editor'].ObjectValue);
-  ImportElements(AJSONObject['Colors'].ObjectValue);
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportColorsEditorProperties(AEditorObject: TJsonObject);
-var
-  LColorsObject: TJsonObject;
-  LFontSizesObject: TJsonObject;
-  LFontsObject: TJsonObject;
-  LIndex: Integer;
-begin
-  if Assigned(AEditorObject) then
-    with TCustomBCEditor(Highlighter.Editor) do
-    begin
-      LColorsObject := AEditorObject['Colors'].ObjectValue;
-      if Assigned(LColorsObject) then
-      begin
-        Color := StringToColorDef(LColorsObject['Background'].Value, Color);
-        Colors.ActiveLine.Background := StringToColorDef(LColorsObject['ActiveLineBackground'].Value, Colors.ActiveLine.Background);
-        Colors.CodeFolding.Background := StringToColorDef(LColorsObject['CodeFoldingBackground'].Value, Colors.CodeFolding.Background);
-        Colors.CodeFolding.Foreground := StringToColorDef(LColorsObject['CodeFoldingFoldingLine'].Value, Colors.CodeFolding.Foreground);
-        Colors.Marks.Background := StringToColorDef(LColorsObject['LeftMarginBookmarkPanel'].Value, Colors.Marks.Background);
-        Colors.LineNumbers.Background := StringToColorDef(LColorsObject['LeftMarginBackground'].Value, Colors.LineNumbers.Background);
-        Colors.LineNumbers.Foreground := StringToColorDef(LColorsObject['LeftMarginLineNumbers'].Value, Colors.LineNumbers.Foreground);
-        Colors.LineState.Loaded := StringToColorDef(LColorsObject['LeftMarginBackground'].Value, Colors.LineState.Loaded);
-        Colors.LineState.Modified := StringToColorDef(LColorsObject['LeftMarginLineStateModified'].Value, Colors.LineState.Modified);
-        Colors.LineState.Saved := StringToColorDef(LColorsObject['LeftMarginLineStateNormal'].Value, Colors.LineState.Saved);
-        Colors.MatchingPairs.Background := StringToColorDef(LColorsObject['MatchingPairMatched'].Value, Colors.MatchingPairs.Background);
-        Colors.FoundText.Background := StringToColorDef(LColorsObject['SearchHighlighterBackground'].Value, Colors.FoundText.Background);
-        Colors.FoundText.Foreground := StringToColorDef(LColorsObject['SearchHighlighterForeground'].Value, Colors.FoundText.Foreground);
-        Colors.Selection.Background := StringToColorDef(LColorsObject['SelectionBackground'].Value, Colors.Selection.Background);
-        Colors.Selection.Foreground := StringToColorDef(LColorsObject['SelectionForeground'].Value, Colors.Selection.Foreground);
-        Colors.SpecialChars.Foreground := StringToColorDef(LColorsObject['SpecialCharForeground'], Colors.SpecialChars.Foreground);
-        Colors.SyncEdit.Background := StringToColorDef(LColorsObject['SyncEditBackground'].Value, Colors.SyncEdit.Background);
-        Colors.SyncEdit.Overlay := StringToColorDef(LColorsObject['SyncEditWordBorder'].Value, Colors.SyncEdit.Overlay);
-      end;
-      LFontsObject := AEditorObject['Fonts'].ObjectValue;
-      if Assigned(LFontsObject) then
-      begin
-        Font.Name := StrToStrDef(LFontsObject['Text'].Value, Font.Name);
-        if cpoUseHighlighterColumnFont in CompletionProposal.Options then
-          for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
-            CompletionProposal.Columns[LIndex].Font.Name := StrToStrDef(LFontsObject['CompletionProposal'].Value, CompletionProposal.Columns[0].Font.Name);
-      end;
-      LFontSizesObject := AEditorObject['FontSizes'].ObjectValue;
-      if Assigned(LFontSizesObject) then
-      begin
-        Font.Size := StrToIntDef(LFontSizesObject['Text'].Value, Font.Size);
-        if cpoUseHighlighterColumnFont in CompletionProposal.Options then
-          for LIndex := 0 to CompletionProposal.Columns.Count - 1 do
-            CompletionProposal.Columns[LIndex].Font.Size := StrToIntDef(LFontSizesObject['CompletionProposal'].Value, CompletionProposal.Columns[0].Font.Size);
-      end;
-    end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportColorsFromStream(AStream: TStream);
-var
-  JSONObject: TJsonObject;
-begin
-  try
-    JSONObject := TJsonObject.ParseFromStream(AStream) as TJsonObject;
-    if Assigned(JSONObject) then
-    try
-      ImportColors(JSONObject);
-    finally
-      JSONObject.Free;
-    end;
-  except
-    on E: EJsonParserException do
-      raise EException.Create(Format(SBCEditorErrorInHighlighterParse, [E.LineNum, E.Column, E.Message]));
-    on E: Exception do
-      raise EException.Create(Format(SBCEditorErrorInHighlighterImport, [E.Message]));
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportCompletionProposal(ACompletionProposalObject: TJsonObject);
-var
-  LFileName: string;
-  LFileStream: TStream;
-  LIndex: Integer;
-  LJsonDataValue: PJsonDataValue;
-  LJSONObject: TJsonObject;
-  LSkipRegionArray: TJsonArray;
-  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
-begin
-  if not Assigned(ACompletionProposalObject) then
-    Exit;
-  { Skip regions }
-  LSkipRegionArray := ACompletionProposalObject['SkipRegion'].ArrayValue;
-  for LIndex := 0 to LSkipRegionArray.Count - 1 do
-  begin
-    LJsonDataValue := LSkipRegionArray.Items[LIndex];
-
-    if FHighlighter.MultiHighlighter then
-    begin
-      { Multi highlighter code folding skip region include }
-      LFileName := LJsonDataValue.ObjectValue['File'].Value;
-      if LFileName <> '' then
-      begin
-        LFileStream := TFileStream.Create(LFileName, fmOpenRead);
-        LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
-        if Assigned(LJSONObject) then
-        try
-          if LJSONObject.Contains('CompletionProposal') then
-            ImportCompletionProposal(LJSONObject['CompletionProposal'].ObjectValue);
-        finally
-          LJSONObject.Free;
-          LFileStream.Free;
-        end;
-      end;
-      { Skip duplicates }
-      if FHighlighter.CompletionProposalSkipRegions.Contains(LJsonDataValue.ObjectValue['OpenToken'].Value, LJsonDataValue.ObjectValue['CloseToken'].Value) then
-        Continue;
-    end;
-
-    LSkipRegionItem := FHighlighter.CompletionProposalSkipRegions.Add(LJsonDataValue.ObjectValue['OpenToken'].Value,
-      LJsonDataValue.ObjectValue['CloseToken'].Value);
-    LSkipRegionItem.RegionType := StrToRegionType(LJsonDataValue.ObjectValue['RegionType'].Value);
-    LSkipRegionItem.SkipEmptyChars := LJsonDataValue.ObjectValue.B['SkipEmptyChars'];
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportElements(AColorsObject: TJsonObject);
-var
-  LElement: PElement;
-  LElementsArray: TJsonArray;
-  LIndex: Integer;
-  LJsonDataValue: PJsonDataValue;
-begin
-  if not Assigned(AColorsObject) then
-    Exit;
-
-  LElementsArray :=  AColorsObject['Elements'].ArrayValue;
-  for LIndex := 0 to LElementsArray.Count - 1 do
-  begin
-    LJsonDataValue := LElementsArray.Items[LIndex];
-    New(LElement);
-    LElement.Background := StringToColorDef(LJsonDataValue.ObjectValue['Background'].Value, clWindow);
-    LElement.Foreground := StringToColorDef(LJsonDataValue.ObjectValue['Foreground'].Value, clWindowText);
-    LElement.Name := LJsonDataValue.ObjectValue['Name'].Value;
-    LElement.FontStyles := StrToFontStyle(LJsonDataValue.ObjectValue['Style'].Value);
-    FHighlighter.Colors.Styles.Add(LElement);
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportFromStream(AStream: TStream);
-var
-  JSONObject: TJsonObject;
-begin
-  try
-    JSONObject := TJsonObject.ParseFromStream(AStream) as TJsonObject;
-    if Assigned(JSONObject) then
-    try
-      ImportHighlighter(JSONObject);
-    finally
-      JSONObject.Free;
-    end;
-  except
-    on E: EJsonParserException do
-      raise EException.Create(Format(SBCEditorErrorInHighlighterParse, [E.LineNum, E.Column, E.Message]));
-    on E: Exception do
-      raise EException.Create(Format(SBCEditorErrorInHighlighterImport, [E.Message]));
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportHighlighter(AJSONObject: TJsonObject);
-var
-  LHighlighterObject: TJsonObject;
-begin
-  LHighlighterObject := AJSONObject['Highlighter'];
-  ImportSample(LHighlighterObject.A['Sample']);
-  ImportRange(FHighlighter.MainRules, LHighlighterObject['MainRules'].ObjectValue);
-  ImportCodeFolding(AJSONObject['CodeFolding'].ObjectValue);
-  ImportMatchingPair(AJSONObject['MatchingPair'].ObjectValue);
-  ImportCompletionProposal(AJSONObject['CompletionProposal'].ObjectValue);
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportKeyList(AKeyList: TKeyList; KeyListObject: TJsonObject;
-  const AElementPrefix: string);
-var
-  LIndex: Integer;
-  LWordArray: TJsonArray;
-begin
-  if Assigned(KeyListObject) then
-  begin
-    AKeyList.TokenType := StrToRangeType(KeyListObject['Type'].Value);
-    LWordArray := KeyListObject.A['Words'];
-    for LIndex := 0 to LWordArray.Count - 1 do
-      AKeyList.KeyList.Add(LWordArray.S[LIndex]);
-    ImportAttributes(AKeyList.Attribute, KeyListObject['Attributes'].ObjectValue, AElementPrefix);
-    AKeyList.SyncEdit := KeyListObject['SyncEdit'].ObjectValue.B['Enabled'];
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportMatchingPair(AMatchingPairObject: TJsonObject);
-var
-  LArray: TJsonArray;
-  LFileName: string;
-  LFileStream: TStream;
-  LIndex: Integer;
-  LJsonDataValue: PJsonDataValue;
-  LJSONObject: TJsonObject;
-  LTokenMatch: TMatchingPairToken;
-begin
-  if not Assigned(AMatchingPairObject) then
-    Exit;
-  { Matching token pairs }
-  LArray := AMatchingPairObject['Pairs'].ArrayValue;
-  for LIndex := 0 to LArray.Count - 1 do
-  begin
-    LJsonDataValue := LArray.Items[LIndex];
-
-    if FHighlighter.MultiHighlighter then
-    begin
-      { Multi highlighter code folding fold region include }
-      LFileName := LJsonDataValue.ObjectValue['File'].Value;
-      if LFileName <> '' then
-      begin
-        LFileStream := TFileStream.Create(LFileName, fmOpenRead);
-        LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
-        if Assigned(LJSONObject) then
-        try
-          if LJSONObject.Contains('MatchingPair') then
-            ImportMatchingPair(LJSONObject['MatchingPair'].ObjectValue);
-        finally
-          LJSONObject.Free;
-          LFileStream.Free;
-        end;
-      end;
-    end;
-
-    LTokenMatch.OpenToken := LJsonDataValue.ObjectValue['OpenToken'].Value;
-    LTokenMatch.CloseToken := LJsonDataValue.ObjectValue['CloseToken'].Value;
-    if ((LTokenMatch.OpenToken <> '') and (LTokenMatch.CloseToken <> '')) then
-      FHighlighter.MatchingPairs.Add(LTokenMatch)
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportRange(ARange: TRange; RangeObject: TJsonObject;
-  AParentRange: TRange = nil; ASkipBeforeSubRules: Boolean = False;
-  const AElementPrefix: string = ''); { Recursive method }
-var
-  LAlternativeCloseArray: TJsonArray;
-  LCloseToken: string;
-  LEditor: TCustomBCEditor;
-  LElementPrefix: string;
-  LFileName: string;
-  LFileStream: TStream;
-  LIndex: Integer;
-  LIndex2: Integer;
-  LJSONObject: TJsonObject;
-  LJSONSubRulesObject: TJsonObject;
-  LNewKeyList: TKeyList;
-  LNewRange: TRange;
-  LNewSet: TSet;
-  LOpenToken: string;
-  LPropertiesObject: TJsonObject;
-  LSubRulesObject: TJsonObject;
-  LTokenRangeObject: TJsonObject;
-begin
-  if Assigned(RangeObject) then
-  begin
-    LFileName := RangeObject['File'].Value;
-    if FHighlighter.MultiHighlighter and (LFileName <> '') then
-    begin
-      LElementPrefix := RangeObject['ElementPrefix'].Value;
-      LEditor := FHighlighter.Editor as TCustomBCEditor;
-      LFileStream := TFileStream.Create(LFileName, fmOpenRead);
-      LJSONObject := TJsonObject.ParseFromStream(LFileStream) as TJsonObject;
-      if Assigned(LJSONObject) then
-      try
-        LTokenRangeObject := LJSONObject['Highlighter']['MainRules'].ObjectValue;
-        { You can include MainRules... }
-        if LTokenRangeObject['Name'].Value = RangeObject['IncludeRange'].Value then
-          ImportRange(AParentRange, LTokenRangeObject, nil, True, LElementPrefix)
-        else
-        { or SubRules... }
-        begin
-          LSubRulesObject := LTokenRangeObject['SubRules'].ObjectValue;
-          if Assigned(LSubRulesObject) then
-          for LIndex := 0 to LSubRulesObject.Count - 1 do
-          begin
-            if LSubRulesObject.Names[LIndex] = 'Range' then
-            for LIndex2 := 0 to LSubRulesObject.Items[LIndex].ArrayValue.Count - 1 do
-            begin
-              LJSONSubRulesObject := LSubRulesObject.Items[LIndex].ArrayValue.O[LIndex2];
-              if LJSONSubRulesObject.S['Name'] = RangeObject['IncludeRange'].Value then
-              begin
-                ImportRange(ARange, LJSONSubRulesObject, nil, False, LElementPrefix);
-                Break;
-              end;
-            end;
-          end;
-        end;
-      finally
-        LJSONObject.Free;
-        LFileStream.Free;
-      end;
-    end
-    else
-    begin
-      if not ASkipBeforeSubRules then
-      begin
-        ARange.Clear;
-        ARange.CaseSensitive := RangeObject.B['CaseSensitive'];
-        ImportAttributes(ARange.Attribute, RangeObject['Attributes'].ObjectValue, AElementPrefix);
-        if RangeObject['Delimiters'].Value <> '' then
-          ARange.Delimiters := StrToSet(RangeObject['Delimiters'].Value);
-        ARange.TokenType := StrToRangeType(RangeObject['Type'].Value);
-
-        LPropertiesObject := RangeObject['Properties'].ObjectValue;
-        if Assigned(LPropertiesObject) then
-        begin
-          ARange.CloseOnEndOfLine := LPropertiesObject.B['CloseOnEndOfLine'];
-          ARange.CloseOnTerm := LPropertiesObject.B['CloseOnTerm'];
-          ARange.SkipWhitespace := LPropertiesObject.B['SkipWhitespace'];
-          ARange.CloseParent := LPropertiesObject.B['CloseParent'];
-          ARange.UseDelimitersForText := LPropertiesObject.B['UseDelimitersForText'];
-
-          LAlternativeCloseArray := LPropertiesObject['AlternativeClose'].ArrayValue;
-          if LAlternativeCloseArray.Count > 0 then
-          begin
-            ARange.AlternativeCloseArrayCount := LAlternativeCloseArray.Count;
-            for LIndex := 0 to ARange.AlternativeCloseArrayCount - 1 do
-              ARange.AlternativeCloseArray[LIndex] := LAlternativeCloseArray.Items[LIndex].Value;
-          end;
-          ARange.OpenBeginningOfLine := LPropertiesObject.B['OpenBeginningOfLine'];
-        end;
-
-        ARange.OpenToken.Clear;
-        ARange.OpenToken.BreakType := btUnspecified;
-        ARange.CloseToken.Clear;
-        ARange.CloseToken.BreakType := btUnspecified;
-
-        LTokenRangeObject := RangeObject['TokenRange'].ObjectValue;
-        if Assigned(LTokenRangeObject) then
-        begin
-          LOpenToken := LTokenRangeObject['Open'].Value;
-          LCloseToken := LTokenRangeObject['Close'].Value;
-
-          ARange.AddTokenRange(LOpenToken, StrToBreakType(LTokenRangeObject['OpenBreakType'].Value), LCloseToken,
-            StrToBreakType(LTokenRangeObject['CloseBreakType'].Value));
-
-          case ARange.TokenType of
-            ttLineComment: FHighlighter.Comments.AddLineComment(LOpenToken);
-            ttBlockComment: FHighlighter.Comments.AddBlockComment(LOpenToken, LCloseToken);
-          end;
-        end;
-      end;
-      { Sub rules }
-      LSubRulesObject := RangeObject['SubRules'].ObjectValue;
-
-      if Assigned(LSubRulesObject) then
-      begin
-        for LIndex := 0 to LSubRulesObject.Count - 1 do
-        begin
-          if LSubRulesObject.Names[LIndex] = 'Range' then
-          for LIndex2 := 0 to LSubRulesObject.Items[LIndex].ArrayValue.Count - 1 do
-          begin
-            LNewRange := TRange.Create;
-            ImportRange(LNewRange, LSubRulesObject.Items[LIndex].ArrayValue.O[LIndex2], ARange); { ARange is for the MainRules include }
-            ARange.AddRange(LNewRange);
-          end
-          else
-          if LSubRulesObject.Names[LIndex] = 'KeyList' then
-          for LIndex2 := 0 to LSubRulesObject.Items[LIndex].ArrayValue.Count - 1 do
-          begin
-            LNewKeyList := TKeyList.Create;
-            ImportKeyList(LNewKeyList, LSubRulesObject.Items[LIndex].ArrayValue.O[LIndex2], AElementPrefix);
-            ARange.AddKeyList(LNewKeyList);
-          end
-          else
-          if LSubRulesObject.Names[LIndex] = 'Set' then
-          for LIndex2 := 0 to LSubRulesObject.Items[LIndex].ArrayValue.Count - 1 do
-          begin
-            LNewSet := TSet.Create;
-            ImportSet(LNewSet, LSubRulesObject.Items[LIndex].ArrayValue.O[LIndex2], AElementPrefix);
-            ARange.AddSet(LNewSet);
-          end
-        end;
-      end;
-    end;
-  end;
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportSample(ASampleArray: TJsonArray);
-var
-  LIndex: Integer;
-begin
-  if Assigned(ASampleArray) then
-    for LIndex := 0 to ASampleArray.Count - 1 do
-      FHighlighter.Sample := FHighlighter.Sample + ASampleArray.S[LIndex];
-end;
-
-procedure TBCEditorHighlighter.TImportJSON.ImportSet(ASet: TSet; SetObject: TJsonObject;
-  const AElementPrefix: string);
-begin
-  if Assigned(SetObject) then
-  begin
-    ASet.CharSet := StrToSet(SetObject['Symbols'].Value);
-    ImportAttributes(ASet.Attribute, SetObject['Attributes'].ObjectValue, AElementPrefix);
-  end;
-end;
-
 { TBCEditorHighlighter ********************************************************}
 
 procedure TBCEditorHighlighter.AddAllAttributes(ARange: TRange);
@@ -2917,12 +3025,12 @@ begin
   FCompletionProposalSkipRegions.Clear;
   FMatchingPairs.Clear;
   FSample := '';
-  for LIndex := 0 to FCodeFoldingRangeCount - 1 do
+  for LIndex := 0 to FCodeFoldingRegions.Count - 1 do
   begin
     LRegion := FCodeFoldingRegions[LIndex];
     LRegion.Free;
   end;
-  CodeFoldingRangeCount := 0;
+  CodeFoldingRegions.Clear();
   DoChange();
 end;
 
@@ -2937,16 +3045,16 @@ begin
   FAttributes.Duplicates := dupIgnore;
   FAttributes.Sorted := False;
 
-  FCodeFoldingRangeCount := 0;
+  FCodeFoldingRegions := TBCEditorCodeFoldingRegions.Create();
 
   FComments := TComments.Create;
 
   FCompletionProposalSkipRegions := TBCEditorCodeFoldingSkipRegions.Create(TBCEditorCodeFoldingSkipRegions.TItem);
 
-  FMainRules := TRange.Create;
+  FMainRules := TRange.Create(Self);
   FMainRules.Parent := FMainRules;
 
-  FColors := TColors.Create(Self);
+  FColors := TElements.Create(Self);
   FMatchingPairs := TList<TMatchingPairToken>.Create();
   FMatchingPairHighlight := True;
 
@@ -2963,6 +3071,7 @@ destructor TBCEditorHighlighter.Destroy();
 begin
   Clear();
 
+  FCodeFoldingRegions.Free();
   FComments.Free();
   FMainRules.Free();
   FAttributes.Free();
@@ -3031,10 +3140,10 @@ begin
       AFind.FToken := nil;
     end;
 
-    if (Assigned(AFind.FRange) and (AFind.FRange.AlternativeCloseArrayCount > 0)) then
-      for LIndex := 0 to AFind.FRange.AlternativeCloseArrayCount - 1 do
+    if (Assigned(AFind.FRange) and (AFind.FRange.AlternativeCloseList.Count > 0)) then
+      for LIndex := 0 to AFind.FRange.AlternativeCloseList.Count - 1 do
       begin
-        LKeywordText := AFind.FRange.AlternativeCloseArray[LIndex];
+        LKeywordText := AFind.FRange.AlternativeCloseList[LIndex];
         if ((AFind.FLineLength - AFind.FLineChar >= Length(LKeywordText))
           and (StrLComp(@AFind.FLineText[AFind.FLineChar], PChar(LKeywordText), Length(LKeywordText)) = 0)) then
         begin
@@ -3113,58 +3222,178 @@ begin
     Result := TAttribute(FAttributes.Objects[AIndex]);
 end;
 
-procedure TBCEditorHighlighter.LoadFromFile(const AFileName: string);
+procedure TBCEditorHighlighter.LoadFromFile(const AFilename: string);
 var
   LStream: TStream;
 begin
-  FFileName := AFileName;
-  FName := TPath.GetFileNameWithoutExtension(AFileName);
-  LStream := TFileStream.Create(AFileName, fmOpenRead);
-  try
-    LoadFromStream(LStream);
-  finally
-    LStream.Free;
-  end;
+  FDirectory := IncludeTrailingPathDelimiter(TPath.GetDirectoryName(TPath.GetFullPath(AFilename)));
+  FFilename := AFilename;
+  FName := TPath.GetFileNameWithoutExtension(AFilename);
+
+  LStream := TFileStream.Create(AFilename, fmOpenRead);
+  LoadFromStream(LStream);
+  LStream.Free();
 end;
 
-procedure TBCEditorHighlighter.LoadFromResource(const ResName: string; const ResType: PChar);
+procedure TBCEditorHighlighter.LoadFromJSON(const AJSON: TJSONObject);
 var
-  Stream: TResourceStream;
+  LCodeFoldingObject: TJSONObject;
+  LCodeFoldingRangeObject: TJSONObject;
+  LCodeFoldingRangesArray: TJSONArray;
+  LCodeFoldingRegion: TBCEditorCodeFoldingRegion;
+  LIndex: Integer;
+  LSampleArray: TJSONArray;
 begin
-  Stream := TResourceStream.Create(HInstance, PChar(ResName), ResType);
-  LoadFromStream(Stream);
-  Stream.Free();
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    LSampleArray := GetJSONArray(AJSON, 'Sample');
+    if (Assigned(LSampleArray)) then
+      for LIndex := 0 to LSampleArray.Size - 1 do
+      begin
+        if (LIndex > 0) then FSample := FSample + #13#10;
+        FSample := FSample + GetJSONString(LSampleArray, LIndex);
+      end;
+
+    MainRules.LoadFromJSON(GetJSONObject(AJSON, 'MainRules'));
+
+    LCodeFoldingObject := GetJSONObject(AJSON, 'CodeFolding');
+    if (Assigned(LCodeFoldingObject)) then
+    begin
+      LCodeFoldingRangesArray := GetJSONArray(LCodeFoldingObject, 'Ranges');
+      if (Assigned(LCodeFoldingRangesArray)) then
+        for LIndex := 0 to LCodeFoldingRangesArray.Size - 1 do
+        begin
+          LCodeFoldingRangeObject := GetJSONObject(LCodeFoldingRangesArray, LIndex);
+          if (Assigned(LCodeFoldingRangeObject)) then
+          begin
+            LCodeFoldingRegion := TBCEditorCodeFoldingRegion.Create(Self, TBCEditorCodeFoldingRegionItem);
+            LCodeFoldingRegion.LoadFromJSON(LCodeFoldingRangeObject);
+            LCodeFoldingRegion.LoadSkipRegionFromJSON(LCodeFoldingRangeObject);
+            LCodeFoldingRegion.LoadFoldRegionFromJSON(LCodeFoldingRangeObject);
+            FCodeFoldingRegions.Add(LCodeFoldingRegion);
+          end;
+        end;
+    end;
+
+    LoadMatchingPairFromJSON(GetJSONObject(AJSON, 'MatchingPair'));
+    LoadCompletionProposalFromJSON(GetJSONObject(AJSON, 'CompletionProposal'));
+  end;
+
+  UpdateColors();
 end;
 
-procedure TBCEditorHighlighter.LoadFromStream(AStream: TStream);
+procedure TBCEditorHighlighter.LoadFromResource(const AResourceName: string; const AResourceType: PChar);
 var
-  ImportJSON: TImportJSON;
+  LStream: TResourceStream;
 begin
-  Clear;
-  ImportJSON := TImportJSON.Create(Self);
-  try
-    ImportJSON.ImportFromStream(AStream);
-  finally
-    ImportJSON.Free();
-  end;
-  UpdateColors;
+  LStream := TResourceStream.Create(HInstance, PChar(AResourceName), AResourceType);
+  LoadFromStream(LStream);
+  LStream.Free();
 end;
 
-procedure TBCEditorHighlighter.SetCodeFoldingRangeCount(AValue: Integer);
+procedure TBCEditorHighlighter.LoadFromStream(const AStream: TStream);
+var
+  LJSON: TJSONObject;
 begin
-  if FCodeFoldingRangeCount <> AValue then
+  LJSON := CreateJSONObjectFromStream(AStream);
+  if (Assigned(LJSON)) then
   begin
-    SetLength(FCodeFoldingRegions, AValue);
-    FCodeFoldingRangeCount := AValue;
+    LoadFromJSON(GetJSONObject(LJSON, 'Highlighter'));
+    LJSON.Free();
   end;
 end;
 
-procedure TBCEditorHighlighter.SetFileName(AValue: string);
+procedure TBCEditorHighlighter.LoadCompletionProposalFromJSON(const AJSON: TJSONObject);
+var
+  LCloseToken: string;
+  LCompletionProposalObject: TJSONObject;
+  LFilename: string;
+  LIndex: Integer;
+  LItem: TJSONObject;
+  LJSONObject: TJSONObject;
+  LOpenToken: string;
+  LSkipRegionArray: TJSONArray;
+  LSkipRegionItem: TBCEditorCodeFoldingSkipRegions.TItem;
 begin
-  if (AValue <> FFileName) then
+  if (Assigned(AJSON)) then
   begin
-    FFileName := AValue;
-    FFilePath := TPath.GetDirectoryName(AValue);
+    { Skip regions }
+    LSkipRegionArray := GetJSONArray(AJSON, 'SkipRegion');
+    for LIndex := 0 to LSkipRegionArray.Size - 1 do
+    begin
+      LItem := GetJSONObject(LSkipRegionArray, LIndex);
+
+      LOpenToken := GetJSONString(LItem, 'OpenToken');
+      LCloseToken := GetJSONString(LItem, 'CloseToken');
+
+      if (MultiHighlighter) then
+      begin
+        { Multi highlighter code folding skip region include }
+        LFilename := GetJSONString(LItem, 'File');
+        if (TFile.Exists(Directory + LFilename)) then
+        begin
+          LJSONObject := CreateJSONObjectFromFile(Directory + LFilename);
+          if (Assigned(LJSONObject)) then
+          begin
+            LCompletionProposalObject := GetJSONObject(LItem, 'CompletionProposal');
+            LoadCompletionProposalFromJSON(LCompletionProposalObject);
+            LJSONObject.Free();
+          end;
+        end;
+        { Skip duplicates }
+        if (CompletionProposalSkipRegions.Contains(LOpenToken, LCloseToken)) then
+          Continue;
+      end;
+
+      LSkipRegionItem := CompletionProposalSkipRegions.Add(LOpenToken, LCloseToken);
+      LSkipRegionItem.RegionType := StrToRegionType(GetJSONString(LItem, 'RegionType', True));
+      LSkipRegionItem.SkipEmptyChars := GetJSONBoolean(LItem, 'SkipEmptyChars', LSkipRegionItem.SkipEmptyChars);
+    end;
+  end;
+end;
+
+procedure TBCEditorHighlighter.LoadMatchingPairFromJSON(const AJSON: TJSONObject);
+var
+  LFilename: string;
+  LIndex: Integer;
+  LItem: TJSONObject;
+  LJSONObject: TJSONObject;
+  LMatchingPairObject: TJSONObject;
+  LPairsArray: TJSONArray;
+  LTokenMatch: TMatchingPairToken;
+begin
+  if (Assigned(AJSON)) then
+  begin
+    { Matching token pairs }
+    LPairsArray := GetJSONArray(AJSON, 'Pairs');
+    if (Assigned(LPairsArray)) then
+      for LIndex := 0 to LPairsArray.Size - 1 do
+      begin
+        LItem := GetJSONObject(LPairsArray, LIndex);
+
+        if (MultiHighlighter) then
+        begin
+          { Multi highlighter code folding fold region include }
+          LFilename := GetJSONString(LItem, 'File');
+          if (TFile.Exists(Directory + LFilename)) then
+          begin
+            LJSONObject := CreateJSONObjectFromFile(Directory + LFilename);
+            if (Assigned(LJSONObject)) then
+            begin
+              LMatchingPairObject := GetJSONObject(LJSONObject, 'MatchingPair');
+              LoadMatchingPairFromJSON(LMatchingPairObject);
+              LJSONObject.Free;
+            end;
+          end;
+        end;
+
+        LTokenMatch.OpenToken := GetJSONString(LItem, 'OpenToken');
+        LTokenMatch.CloseToken := GetJSONString(LItem, 'CloseToken');
+        if ((LTokenMatch.OpenToken <> '') and (LTokenMatch.CloseToken <> '')) then
+          MatchingPairs.Add(LTokenMatch)
+      end;
   end;
 end;
 
@@ -3181,20 +3410,20 @@ var
   var
     LElement: PElement;
   begin
-    LElement := FColors.GetElement(AAttribute.Element);
+    LElement := FColors[AAttribute.Element];
 
     if AAttribute.ParentBackground and Assigned(AParentRange) then
       AAttribute.Background := AParentRange.Attribute.Background
     else
     if Assigned(LElement) then
-      AAttribute.Background := LElement.Background;
+      AAttribute.Background := LElement^.Background;
     if AAttribute.ParentForeground and Assigned(AParentRange) then
       AAttribute.Foreground := AParentRange.Attribute.Foreground
     else
     if Assigned(LElement) then
-      AAttribute.Foreground := LElement.Foreground;
+      AAttribute.Foreground := LElement^.Foreground;
     if Assigned(LElement) then
-      AAttribute.FontStyles := LElement.FontStyles;
+      AAttribute.FontStyles := LElement^.FontStyles;
   end;
 
 begin

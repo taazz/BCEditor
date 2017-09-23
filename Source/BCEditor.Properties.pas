@@ -552,23 +552,6 @@ type
     property Width: Integer read FWidth write SetWidth default DefaultWidth;
   end;
 
-  TBCEditorTabs = class(TPersistent)
-  strict private const
-    DefaultWidth = 2;
-  strict private
-    FOnChange: TNotifyEvent;
-    FWidth: Integer;
-    procedure DoChange();
-    procedure SetWidth(const AValue: Integer);
-  protected
-    property OnChange: TNotifyEvent read FOnChange write FOnChange;
-  public
-    procedure Assign(ASource: TPersistent); override;
-    constructor Create();
-  published
-    property Width: Integer read FWidth write SetWidth default DefaultWidth;
-  end;
-
 implementation  {**************************************************************}
 
 uses
@@ -1842,41 +1825,6 @@ end;
 procedure TBCEditorMinimap.SetWidth(const AValue: Integer);
 begin
   if (AValue <> FWidth) then
-  begin
-    FWidth := AValue;
-    DoChange();
-  end;
-end;
-
-{ TBCEditorTabs ***************************************************************}
-
-procedure TBCEditorTabs.Assign(ASource: TPersistent);
-begin
-  Assert(ASource is TBCEditorTabs);
-
-  inherited;
-
-  FWidth := TBCEditorTabs(ASource).FWidth;
-
-  DoChange();
-end;
-
-constructor TBCEditorTabs.Create();
-begin
-  inherited;
-
-  FWidth := DefaultWidth;
-end;
-
-procedure TBCEditorTabs.DoChange();
-begin
-  if (Assigned(FOnChange)) then
-    FOnChange(Self);
-end;
-
-procedure TBCEditorTabs.SetWidth(const AValue: Integer);
-begin
-  if ((AValue <> FWidth) and (1 <= AValue) and (AValue < 256)) then
   begin
     FWidth := AValue;
     DoChange();

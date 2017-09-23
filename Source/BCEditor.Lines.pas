@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   SysUtils, Classes, Generics.Collections, RegularExpressions, SyncObjs,
   Graphics, Controls, StdCtrls, Types,
-  BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter, BCEditor.Locale;
+  BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter;
 
 type
   TBCEditorLines = class(TStrings)

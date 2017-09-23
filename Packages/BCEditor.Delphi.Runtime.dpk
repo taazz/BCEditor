@@ -28,6 +28,7 @@ package BCEditor.Delphi.Runtime;
 {$IMPLICITBUILD ON}
 
 requires
+  {$IF not Defined(VER270)} DbxCommonDriver, {$ENDIF}
   rtl,
   vcl,
   dbrtl,
@@ -42,10 +43,8 @@ contains
   BCEditor.Highlighter in '..\Source\BCEditor.Highlighter.pas',
   BCEditor.GotoLine in '..\Source\BCEditor.GotoLine.pas',
   BCEditor.Lines in '..\Source\BCEditor.Lines.pas',
-  BCEditor.Locale in '..\Source\BCEditor.Locale.pas',
   BCEditor.Properties in '..\Source\BCEditor.Properties.pas',
-  BCEditor.Types in '..\Source\BCEditor.Types.pas',
-  JsonDataObjects in '..\Source\JsonDataObjects.pas';
+  BCEditor.Types in '..\Source\BCEditor.Types.pas';
 
 end.
 

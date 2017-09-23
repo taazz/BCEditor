@@ -23,7 +23,6 @@ type
     TBCEditorLeftMargin = class(BCEditor.Properties.TBCEditorLeftMargin);
     TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
     TBCEditorMinimap = class(BCEditor.Properties.TBCEditorMinimap);
-    TBCEditorTabs = class(BCEditor.Properties.TBCEditorTabs);
 
 
     TDropData = class(TInterfacedObject, IDataObject, IEnumFORMATETC)
@@ -329,6 +328,7 @@ type
       eoHighlightActiveLine, eoHighlightMatchingPairs, eoMiddleClickScrolling];
     DefaultSelectionOptions = [soHighlightWholeLine, soTripleClickLineSelect];
     DefaultSyncEditOptions = [seoShowButton, seoCaseSensitive];
+    DefaultTabWidth = 2;
     DefaultTextOverwrite = False;
     DefaultUndoOptions = [uoGroupUndo];
     UM_FIND_ALLAREAS = WM_USER + 1;
@@ -456,7 +456,7 @@ type
     FSyncEditButtonPressedBitmap: TGPCachedBitmap;
     FSyncEditButtonRect: TRect;
     FSyncEditOptions: TBCEditorSyncEditOptions;
-    FTabs: TBCEditorTabs;
+    FTabWidth: Integer;
     FTextOverwrite: Boolean;
     FTextPos: TPoint;
     FTextRect: TRect;
@@ -579,7 +579,6 @@ type
     function GetSelLength(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function GetSelStart(): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function GetSelText(): string;
-    function GetTabs(): BCEditor.Properties.TBCEditorTabs; {$IFNDEF Debug} inline; {$ENDIF}
     function GetText(): string; {$IFNDEF Debug} inline; {$ENDIF}
     function GetTopLine(): Integer;
     function GetUndoOptions(): TBCEditorUndoOptions;
@@ -690,7 +689,7 @@ type
     procedure SetSelStart(AValue: Integer);
     procedure SetSelText(const AValue: string);
     procedure SetSyncEditOptions(AValue: TBCEditorSyncEditOptions);
-    procedure SetTabs(const AValue: BCEditor.Properties.TBCEditorTabs);
+    procedure SetTabWidth(const AValue: Integer);
     procedure SetText(const AValue: string); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextOverwrite(const AValue: Boolean);
     procedure SetTextPos(const AValue: TPoint); overload;
@@ -702,7 +701,6 @@ type
     procedure SetWordWrap(const AValue: Boolean);
     procedure SyncEditActivated(const AData: Pointer);
     procedure SyncEditChecked(const AData: Pointer);
-    procedure TabsChanged(ASender: TObject);
     function TokenColumns(const AText: PChar; const ALength, AColumn: Integer): Integer; {$IFNDEF Debug} inline; {$ENDIF}
     function TokenWidth(const APaintHelper: TPaintHelper; const ALine: Integer;
       const AText: PChar; const ALength: Integer;
@@ -860,8 +858,8 @@ type
     property SelStart: Integer read GetSelStart write SetSelStart;
     property SelText: string read GetSelText write SetSelText;
     property SyncEditOptions: TBCEditorSyncEditOptions read FSyncEditOptions write SetSyncEditOptions default DefaultSyncEditOptions;
-    property Tabs: BCEditor.Properties.TBCEditorTabs read GetTabs write SetTabs;
     property TabStop default True;
+    property TabWidth: Integer read FTabWidth write SetTabWidth default DefaultTabWidth;
     property Text: string read GetText write SetText;
     property TextOverwrite: Boolean read FTextOverwrite write SetTextOverwrite default DefaultTextOverwrite;
     property TextPos: TPoint read FTextPos write ScrollTo;
@@ -1012,8 +1010,8 @@ type
     property ShowHint;
     property SyncEditOptions;
     property TabOrder;
-    property Tabs;
     property TabStop;
+    property TabWidth;
     property Tag;
     property UndoOptions;
     property Visible;
@@ -1031,7 +1029,7 @@ uses
   ShellAPI, Imm, CommCtrl,
   Math, Types, Character, RegularExpressions, ComObj, SysConst,
   Clipbrd, Themes, ImgList,
-  BCEditor.Locale, BCEditor.ExportHTML;
+  BCEditor.ExportHTML;
 
 resourcestring
   SBCEditorLineIsNotVisible = 'Line %d is not visible';
@@ -2180,7 +2178,6 @@ begin
     begin
       Self.FCompletionProposal.Assign(FCompletionProposal);
       Self.FLeftMargin.Assign(FLeftMargin);
-      Self.FTabs.Assign(FTabs);
     end
   else
     inherited Assign(ASource);
@@ -2766,6 +2763,7 @@ begin
   FSyncEditButtonNormalBitmap := nil;
   FSyncEditButtonPressedBitmap := nil;
   FSyncEditOptions := DefaultSyncEditOptions;
+  FTabWidth := DefaultTabWidth;
   FTextOverwrite := DefaultTextOverwrite;
   FUCCVisible := False;
   FUpdateCount := 0;
@@ -2827,9 +2825,6 @@ begin
   FVertScrollBar.TabStop := False;
   FVertScrollBar.Visible := False;
   FVertScrollBar.Parent := Self;
-  { Tabs }
-  FTabs := TBCEditorTabs.Create;
-  FTabs.OnChange := TabsChanged;
   { Completion proposal }
   FCompletionProposal := TBCEditorCompletionProposal.Create(Self);
   { LeftMargin }
@@ -2838,8 +2833,6 @@ begin
   { Minimap }
   FMinimap := TBCEditorMinimap.Create();
   FMinimap.OnChange := MinimapChanged;
-  { Do update character constraints }
-  TabsChanged(nil);
   { Highlighter }
   FHighlighter := TBCEditorHighlighter.Create(Self);
   FHighlighter.OnChange := HighlighterChanged;
@@ -3057,7 +3050,6 @@ begin
     FSyncEditButtonNormalBitmap.Free();
   if (Assigned(FSyncEditButtonPressedBitmap)) then
     FSyncEditButtonPressedBitmap.Free();
-  FTabs.Free();
   FVertScrollBar.Free();
 
   inherited;
@@ -3162,9 +3154,9 @@ begin
           else
           begin
             LNewCaretPosition := LinesPosition(FLines.CaretPosition.Char - 1, FLines.CaretPosition.Line);
-            LVisualSpaceCount2 := LVisualSpaceCount1 - (LVisualSpaceCount1 mod FTabs.Width);
+            LVisualSpaceCount2 := LVisualSpaceCount1 - (LVisualSpaceCount1 mod FTabWidth);
             if (LVisualSpaceCount2 = LVisualSpaceCount1) then
-              LVisualSpaceCount2 := Max(LVisualSpaceCount2 - FTabs.Width, 0);
+              LVisualSpaceCount2 := Max(LVisualSpaceCount2 - FTabWidth, 0);
 
             LLength := GetLeadingExpandedLength(FLines.Items[FLines.CaretPosition.Line].Text, LNewCaretPosition.Char - 1);
             while (LNewCaretPosition.Char > 0) and (LLength > LVisualSpaceCount2) do
@@ -3295,7 +3287,7 @@ begin
           if ((LLinesDeleted = 2) and (LArea.EndPosition >= LArea.BeginPosition)) then
             FLines.DeleteIndent(LArea.BeginPosition,
               LinesPosition(LArea.BeginPosition.Char, LArea.EndPosition.Line),
-              IndentText(Tabs.Width, InsertTabChar(LArea.BeginPosition)));
+              IndentText(FTabWidth, InsertTabChar(LArea.BeginPosition)));
         end;
 
         Inc(LCommentIndex, 2);
@@ -3315,7 +3307,7 @@ begin
 
           FLines.InsertIndent(FLines.BOLPosition[LArea.BeginPosition.Line + 1],
             LinesPosition(LArea.BeginPosition.Char, LArea.EndPosition.Line + 1),
-            IndentText(Tabs.Width, InsertTabChar(LArea.BeginPosition)));
+            IndentText(FTabWidth, InsertTabChar(LArea.BeginPosition)));
           Inc(LArea.EndPosition.Line);
         end;
 
@@ -3348,7 +3340,7 @@ begin
       else
         LTextArea.EndPosition := FLines.EOLPosition[LTextArea.EndPosition.Line];
 
-    LIndentText := IndentText(FTabs.Width, InsertTabChar(LTextArea.BeginPosition));
+    LIndentText := IndentText(FTabWidth, InsertTabChar(LTextArea.BeginPosition));
 
     FLines.BeginUpdate();
     try
@@ -4207,11 +4199,11 @@ begin
         begin
           if (not InsertTabChar(FLines.CaretPosition)) then
           begin
-            LTabText := StringOfChar(BCEDITOR_TAB_CHAR, FTabs.Width div FTabs.Width);
-            LTabText := LTabText + StringOfChar(BCEDITOR_TAB_CHAR, FTabs.Width mod FTabs.Width);
+            LTabText := StringOfChar(BCEDITOR_TAB_CHAR, FTabWidth div FTabWidth);
+            LTabText := LTabText + StringOfChar(BCEDITOR_TAB_CHAR, FTabWidth mod FTabWidth);
           end
           else
-            LTabText := StringOfChar(BCEDITOR_SPACE_CHAR, FTabs.Width - (FRows.CaretPosition.Column - 1) mod FTabs.Width);
+            LTabText := StringOfChar(BCEDITOR_SPACE_CHAR, FTabWidth - (FRows.CaretPosition.Column - 1) mod FTabWidth);
           DoInsertText(LTabText);
         end
         else
@@ -4226,7 +4218,7 @@ begin
             if LLengthAfterLine > 1 then
               LCharCount := LLengthAfterLine
             else
-              LCharCount := FTabs.Width;
+              LCharCount := FTabWidth;
 
             if Trim(FLines.Items[LCaretPosition.Line].Text) = '' then
             begin
@@ -4243,11 +4235,11 @@ begin
 
             if (InsertTabChar(LCaretPosition)) then
             begin
-              LTabText := StringOfChar(BCEDITOR_TAB_CHAR, LCharCount div FTabs.Width);
-              LTabText := LTabText + StringOfChar(BCEDITOR_TAB_CHAR, LCharCount mod FTabs.Width);
+              LTabText := StringOfChar(BCEDITOR_TAB_CHAR, LCharCount div FTabWidth);
+              LTabText := LTabText + StringOfChar(BCEDITOR_TAB_CHAR, LCharCount mod FTabWidth);
             end
             else
-              LTabText := StringOfChar(BCEDITOR_SPACE_CHAR, LCharCount - LRowsPosition.Column mod FTabs.Width);
+              LTabText := StringOfChar(BCEDITOR_SPACE_CHAR, LCharCount - LRowsPosition.Column mod FTabWidth);
 
             if (not FTextOverwrite) then
               FLines.InsertText(LCaretPosition, LTabText);
@@ -4257,7 +4249,7 @@ begin
               if LChangeScrollPastEndOfLine then
                 FLines.Options := FLines.Options + [loCaretBeyondEOL];
               if (FTextOverwrite) then
-                LTabText := StringReplace(LTabText, BCEDITOR_TAB_CHAR, StringOfChar(BCEDITOR_SPACE_CHAR, FTabs.Width),
+                LTabText := StringReplace(LTabText, BCEDITOR_TAB_CHAR, StringOfChar(BCEDITOR_SPACE_CHAR, FTabWidth),
                   [rfReplaceAll]);
               FLines.CaretPosition := LinesPosition(LCaretPosition.Char + Length(LTabText), FLines.CaretPosition.Line);
             finally
@@ -4276,10 +4268,10 @@ begin
           if (FRows.CaretPosition.Column > 0) then
             if (FLines.Char[LinesPosition(FLines.CaretPosition.Char - 1, FLines.CaretPosition.Line)] = BCEDITOR_TAB_CHAR) then
               FLines.CaretPosition := LinesPosition(FLines.CaretPosition.Char - 1, FLines.CaretPosition.Line)
-            else if (FRows.CaretPosition.Column mod FTabs.Width = 0) then
-              FLines.CaretPosition := RowsToLines(RowsPosition(FRows.CaretPosition.Column - FTabs.Width, FRows.CaretPosition.Row))
+            else if (FRows.CaretPosition.Column mod FTabWidth = 0) then
+              FLines.CaretPosition := RowsToLines(RowsPosition(FRows.CaretPosition.Column - FTabWidth, FRows.CaretPosition.Row))
             else
-              FLines.CaretPosition := RowsToLines(RowsPosition(FRows.CaretPosition.Column - FRows.CaretPosition.Column mod FTabs.Width, FRows.CaretPosition.Row));
+              FLines.CaretPosition := RowsToLines(RowsPosition(FRows.CaretPosition.Column - FRows.CaretPosition.Column mod FTabWidth, FRows.CaretPosition.Row));
         end
         else if (LIndex >= 0) then
         begin
@@ -4294,7 +4286,7 @@ begin
         else
         begin
           if (InsertTabChar(FLines.CaretPosition)) then
-            LTabWidth := FTabs.Width
+            LTabWidth := FTabWidth
           else
             LTabWidth := 1;
           LNewCaretPosition := LinesPosition(Max(0, FLines.CaretPosition.Char - LTabWidth + 1), FLines.CaretPosition.Line);
@@ -4834,7 +4826,7 @@ begin
     AMessage.Result := LRESULT(FALSE)
   else
   begin
-    FTabs.Width := PUNIT(AMessage.LParam)^;
+    FTabWidth := PUNIT(AMessage.LParam)^;
     AMessage.Result := LRESULT(TRUE);
   end;
 end;
@@ -4990,7 +4982,7 @@ end;
 procedure TCustomBCEditor.ExportToHTML(AStream: TStream; const ACharSet: string = '';
   AEncoding: TEncoding = nil);
 begin
-  with TBCEditorExportHTML.Create(FLines, FHighlighter, Font, FTabs.Width, ACharSet) do
+  with TBCEditorExportHTML.Create(FLines, FHighlighter, Font, FTabWidth, ACharSet) do
   try
     SaveToStream(AStream, AEncoding);
   finally
@@ -5117,17 +5109,17 @@ end;
 
 function TCustomBCEditor.GetCanPaste(): Boolean;
 begin
-  Result := not FReadOnly and (IsClipboardFormatAvailable(CF_TEXT) or IsClipboardFormatAvailable(CF_UNICODETEXT));
+  Result := IsClipboardFormatAvailable(CF_TEXT) or IsClipboardFormatAvailable(CF_UNICODETEXT);
 end;
 
 function TCustomBCEditor.GetCanRedo(): Boolean;
 begin
-  Result := not FReadOnly and FLines.CanRedo;
+  Result := FLines.CanRedo;
 end;
 
 function TCustomBCEditor.GetCanUndo(): Boolean;
 begin
-  Result := (not FReadOnly or (csDesigning in ComponentState)) and FLines.CanUndo;
+  Result := FLines.CanUndo;
 end;
 
 function TCustomBCEditor.GetCaretPos(): TPoint;
@@ -5210,7 +5202,7 @@ begin
   while LLength > 0 do
   begin
     if LChar^ = BCEDITOR_TAB_CHAR then
-      Inc(Result, FTabs.Width - (Result mod FTabs.Width))
+      Inc(Result, FTabWidth - (Result mod FTabWidth))
     else
     if (CharInSet(LChar^, [BCEDITOR_NONE_CHAR, BCEDITOR_SPACE_CHAR])) then
       Inc(Result)
@@ -5243,7 +5235,7 @@ begin
       if (LLinePos^ <> BCEDITOR_TAB_CHAR) then
         Inc(Result)
       else
-        Inc(Result, FTabs.Width - Result mod FTabs.Width);
+        Inc(Result, FTabWidth - Result mod FTabWidth);
       Inc(LLinePos);
     end;
   end;
@@ -5292,11 +5284,6 @@ end;
 function TCustomBCEditor.GetSelText(): string;
 begin
   Result := FLines.TextIn[FLines.SelArea];
-end;
-
-function TCustomBCEditor.GetTabs(): BCEditor.Properties.TBCEditorTabs;
-begin
-  Result := FTabs;
 end;
 
 function TCustomBCEditor.GetText(): string;
@@ -5391,7 +5378,7 @@ procedure TCustomBCEditor.HighlighterChanged(ASender: TObject);
 var
   LElement: TBCEditorHighlighter.PElement;
 begin
-  LElement := FHighlighter.Colors.GetElement(BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR);
+  LElement := FHighlighter.Colors[BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR];
   if (Assigned(LElement) and (LElement^.Foreground <> clNone)) then
     Font.Color := LElement^.Foreground
   else
@@ -5416,8 +5403,8 @@ begin
     Result := ''
   else if (AInsertTabChar) then
   begin
-    Result := StringOfChar(BCEDITOR_TAB_CHAR, IndentCount div FTabs.Width);
-    Result := Result + StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount mod FTabs.Width);
+    Result := StringOfChar(BCEDITOR_TAB_CHAR, IndentCount div FTabWidth);
+    Result := Result + StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount mod FTabWidth);
   end
   else
     Result := StringOfChar(BCEDITOR_SPACE_CHAR, IndentCount);
@@ -5988,9 +5975,11 @@ begin
   inherited;
 
   if (Assigned(BCEditorCommandManager)
+    and (not FReadOnly or not (BCEditorCommandManager.CommandCategoryOf(LCommand) in [eccText, eccUndo]) and (LCommand <> ecPasteFromClipboard))
     and BCEditorCommandManager.TryShortCutToCommand(ShortCut(AKey, AShift), LCommand)) then
   begin
     Include(FState, esKeyHandled);
+
     if (ProcessCommand(LCommand)) then
       AKey := 0;
   end;
@@ -6002,6 +5991,7 @@ begin
 
   if (not (esKeyHandled in FState)
     and (AKey <> #0)
+    and not FReadOnly
     and ProcessCommand(ecChar, TBCEditorCommandDataChar.Create(AKey))) then
   begin
     AKey := #0;
@@ -6052,7 +6042,7 @@ begin
     while ((LTextPos <= LTextEndPos) and (LTextPos^ <= BCEDITOR_SPACE_CHAR)) do
     begin
       if ((LTextPos^ = BCEDITOR_TAB_CHAR) and AWantTabs) then
-        Inc(Result, FTabs.Width - Result mod FTabs.Width)
+        Inc(Result, FTabWidth - Result mod FTabWidth)
       else
         Inc(Result);
       Inc(LTextPos);
@@ -7859,12 +7849,7 @@ begin
       FHookedCommandHandlers.Broadcast(True, LCommand, AData, LHandled);
 
       if (not LHandled
-        and (LCommand <> ecNone)
-        and (not FReadOnly
-          or ((BCEditorCommandManager.CommandCategoryOf(LCommand) <> eccText)
-            and (LCommand <> ecPasteFromClipboard)
-            and (LCommand <> ecRedo)
-            and (LCommand <> ecUndo)))) then
+        and (LCommand <> ecNone)) then
       begin
         FRowsWanted.CriticalSection.Enter();
         try
@@ -8489,7 +8474,7 @@ begin
   if (not Assigned(AText)) then
     LRect.Right := ARect.Right
   else if (LIsTabToken) then
-    LRect.Right := LRect.Left + (FTabs.Width - ARowsPosition.Column mod FTabs.Width) * APaintHelper.TabSignWidth
+    LRect.Right := LRect.Left + (FTabWidth - ARowsPosition.Column mod FTabWidth) * APaintHelper.TabSignWidth
   else if (LLength = 0) then
     LRect.Right := LRect.Left
   else if (FFontPitchFixed
@@ -9663,7 +9648,7 @@ var
 
   function RegionItemsOpen: Boolean;
   var
-    LArrayIndex: Integer;
+    LListIndex: Integer;
     LIndex: Integer;
     LLineTempPos: PChar;
     LRange: TBCEditorCodeFoldingRanges.TRange;
@@ -9766,12 +9751,12 @@ var
                 begin
                   { Check if special rule found }
                   LSkipIfFoundAfterOpenToken := False;
-                  if (LRegionItem.SkipIfFoundAfterOpenTokenArrayCount > 0) then
+                  if (LRegionItem.SkipIfFoundAfterOpenTokenList.Count > 0) then
                     while (LLinePos <= LLineEndPos) do
                     begin
-                      for LArrayIndex := 0 to LRegionItem.SkipIfFoundAfterOpenTokenArrayCount - 1 do
+                      for LListIndex := 0 to LRegionItem.SkipIfFoundAfterOpenTokenList.Count - 1 do
                       begin
-                        LTokenText := LRegionItem.SkipIfFoundAfterOpenTokenArray[LArrayIndex];
+                        LTokenText := LRegionItem.SkipIfFoundAfterOpenTokenList[LListIndex];
                         LTokenPos := @LTokenText[1];
                         LTokenEndPos := @LTokenText[Length(LTokenText)];
                         LPBookmarkText2 := LLinePos;
@@ -9849,7 +9834,7 @@ var
       Exit;
     LChar := UpCase(LLinePos^);
     LPBookmarkText := LLinePos;
-    for LIndex := 1 to Highlighter.CodeFoldingRangeCount - 1 do { First (0) is the default range }
+    for LIndex := 1 to Highlighter.CodeFoldingRegions.Count - 1 do { First (0) is the default range }
     begin
       LCodeFoldingRegion := Highlighter.CodeFoldingRegions[LIndex];
 
@@ -9892,7 +9877,7 @@ var
     begin
       LChar := UpCase(LLinePos^);
       LPBookmarkText := LLinePos;
-      for LIndex := 1 to Highlighter.CodeFoldingRangeCount - 1 do { First (0) is the default range }
+      for LIndex := 1 to Highlighter.CodeFoldingRegions.Count - 1 do { First (0) is the default range }
       begin
         LCodeFoldingRegion := Highlighter.CodeFoldingRegions[LIndex];
 
@@ -9933,7 +9918,7 @@ var
     LIndex: Integer;
   begin
     Result := False;
-    for LIndex := 0 to Highlighter.CodeFoldingRangeCount - 1 do
+    for LIndex := 0 to Highlighter.CodeFoldingRegions.Count - 1 do
     begin
       LCodeFoldingRegion := Highlighter.CodeFoldingRegions[LIndex];
       if LCodeFoldingRegion.FoldTags then
@@ -10034,7 +10019,7 @@ begin
 
     LCodeFoldingRangeIndexList.Add(Pointer(DEFAULT_CODE_FOLDING_RANGE_INDEX));
 
-    if Highlighter.CodeFoldingRangeCount > 0 then
+    if Highlighter.CodeFoldingRegions.Count > 0 then
       LCurrentCodeFoldingRegion := Highlighter.CodeFoldingRegions[DEFAULT_CODE_FOLDING_RANGE_INDEX];
 
     for LRow := 0 to FRows.Count - 1 do
@@ -10670,9 +10655,17 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.SetTabs(const AValue: BCEditor.Properties.TBCEditorTabs);
+procedure TCustomBCEditor.SetTabWidth(const AValue: Integer);
 begin
-  FTabs.Assign(AValue);
+  if (AValue <> FTabWidth) then
+  begin
+    FTabWidth := AValue;
+
+    if (FWordWrap) then
+      InvalidateRows();
+    InvalidateText();
+    InvalidateMinimap();
+  end;
 end;
 
 procedure TCustomBCEditor.SetText(const AValue: string);
@@ -11012,13 +11005,6 @@ begin
     InvalidateSyncEditButton();
 end;
 
-procedure TCustomBCEditor.TabsChanged(ASender: TObject);
-begin
-  if (FWordWrap) then
-    InvalidateRows();
-  InvalidateText();
-end;
-
 function TCustomBCEditor.TextBetween(const ABeginPosition, AEndPosition: TBCEditorLinesPosition): string;
 var
   LSelArea: TBCEditorLinesArea;
@@ -11039,7 +11025,7 @@ function TCustomBCEditor.TokenColumns(const AText: PChar;
   const ALength, AColumn: Integer): Integer;
 begin
   if (Assigned(AText) and (AText^ = BCEDITOR_TAB_CHAR)) then
-    Result := FTabs.Width - AColumn mod FTabs.Width
+    Result := FTabWidth - AColumn mod FTabWidth
   else
     Result := ALength;
 end;
@@ -11237,7 +11223,7 @@ begin
 
   if (Result) then
     if (Action is TEditCut) then
-      TEditCut(Action).Enabled := not FReadOnly and not FLines.SelArea.IsEmpty()
+      TEditCut(Action).Enabled := not FLines.SelArea.IsEmpty()
     else if (Action is TEditCopy) then
       TEditCopy(Action).Enabled := not FLines.SelArea.IsEmpty()
     else if (Action is TEditPaste) then
@@ -11667,12 +11653,12 @@ begin
           begin
             case (LMenuItemInfo.wID) of
               WM_UNDO:
-                if (CanUndo) then
+                if (CanUndo and not FReadOnly) then
                   LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
               WM_CUT:
-                if (not FLines.SelArea.IsEmpty() and not FReadOnly) then
+                if (not FLines.SelArea.IsEmpty()) then
                   LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
@@ -11682,7 +11668,7 @@ begin
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
               WM_PASTE:
-                if (CanPaste) then
+                if (CanPaste and not FReadOnly) then
                   LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED
                 else
                   LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
@@ -11709,9 +11695,15 @@ begin
 //                else
 //                  LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED;
               WM_APP + 20: { Open IME }
-                LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED;
+//                if (not FReadOnly) then
+//                  LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED
+//                else
+                  LMenuItemInfo.fState := LMenuItemInfo.fState and not MFS_DISABLED;
               WM_APP + 21: { Reconversion }
-                LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED
+//                if (not FReadOnly) then
+//                  LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED
+//                else
+                  LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED
               else
                 LMenuItemInfo.fState := LMenuItemInfo.fState or MFS_DISABLED;
             end;

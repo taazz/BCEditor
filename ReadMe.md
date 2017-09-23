@@ -22,7 +22,7 @@ A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VC
 <h3>Build requirements</h3>
 
 * Delphi XE4 or higher
-* C++ Builder XE4 or higher
+* C++ Builder XE6 or higher
 
 <h3>Usage example</h3>
 
