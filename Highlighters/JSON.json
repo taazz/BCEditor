@@ -307,8 +307,9 @@
       }
     ]
   },
-  "FileExtensions": {
-    "Default": ".json",
+  "Detection": {
+    "FirstLinePattern": "^( |\t)*{",
+    "DefaultExtension": ".json",
     "Extensions": [
       ".json"
     ]

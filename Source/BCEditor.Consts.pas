@@ -331,7 +331,7 @@ var
 
 function BCEditorTranslation(const Id: Integer): string;
 begin
-  BCEditorTranslation(Id, []);
+  Result := BCEditorTranslation(Id, []);
 end;
 
 function BCEditorTranslation(const Id: Integer; const AArgs: array of const): string;

@@ -58,6 +58,7 @@ type
 
     PSearchResult = ^TSearchResult;
     TSearchResult = record
+      AllAreas: Boolean;
       Area: TBCEditorLinesArea;
       Backwards: Boolean;
       Count: Integer;
@@ -126,6 +127,9 @@ type
         const ABackwards: Boolean; const AFoundLength: Integer): Boolean;
       function GetRegExpr(): Boolean;
     protected
+      FAllAreas: Boolean;
+      FBackwards: Boolean;
+      FPosition: TBCEditorLinesPosition;
       function Find(var APosition: TBCEditorLinesPosition;
         const ABackwards: Boolean; out AFoundLength: Integer): Boolean;
       procedure Replace();
@@ -137,7 +141,9 @@ type
         const APattern: string;
         const AJob: TJob = sjFind; const AReplaceText: string = '';
         const APrompt: Boolean = False);
+      property AllAreas: Boolean read FAllAreas;
       property Area: TBCEditorLinesArea read FArea;
+      property Backwards: Boolean read FBackwards;
       property CaseSensitive: Boolean read FCaseSensitive;
       property ErrorMessage: string read FErrorMessage;
       property Job: TJob read FJob;
@@ -282,9 +288,6 @@ type
     FRedoList: TUndoList;
     FReplaceText: TReplaceTextParams;
     FSearch: TSearch;
-    FSearchAll: Boolean;
-    FSearchBackwards: Boolean;
-    FSearchPosition: TBCEditorLinesPosition;
     FSearchResult: TSearchResult;
     FSelArea: TBCEditorLinesArea;
     FSortOrder: TBCEditorSortOrder;
@@ -386,7 +389,7 @@ type
     procedure StartScanMatchingPair(const AHighlighter: TBCEditorHighlighter;
       const AExecuted: TJobThread.TExecutedProc);
     procedure StartSearch(const ASearch: TSearch; const APosition: TBCEditorLinesPosition;
-      const ABackwards, ASearchAll, ABlockModify: Boolean; const AExecuted: TJobThread.TExecutedProc);
+      const ABackwards, AAllAreas, ABlockModify: Boolean; const AExecuted: TJobThread.TExecutedProc);
     function SyncEditItemIndexOf(const APosition: TBCEditorLinesPosition): Integer;
     procedure TerminateJob(const AFinal: Boolean = False);
     procedure Undo(); {$IFNDEF Debug} inline; {$ENDIF}
@@ -2985,12 +2988,13 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
               LinesArea(LOpenTokenPosition, LCloseTokenPosition),
               False, False, False, AHighlighter.MatchingPairs[LIndex].CloseToken);
 
-            while (not Result and not AThread.Terminated
-              and LCloseTokenSearch.Find(LCloseTokenPosition, True, LCloseTokenFoundLength)) do
-            begin
-              Inc(LDeep);
-              LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength, LCloseTokenPosition);
-            end;
+            if (AHighlighter.MatchingPairs[LIndex].OpenToken <> AHighlighter.MatchingPairs[LIndex].CloseToken) then
+              while (not Result and not AThread.Terminated
+                and LCloseTokenSearch.Find(LCloseTokenPosition, True, LCloseTokenFoundLength)) do
+              begin
+                Inc(LDeep);
+                LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength, LCloseTokenPosition);
+              end;
 
             Result := LDeep = 0;
             if (Result) then
@@ -3037,12 +3041,13 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
               LinesArea(LOpenTokenPosition, LCloseTokenPosition),
               False, False, False, AHighlighter.MatchingPairs[LIndex].OpenToken);
 
-            while (not Result and not AThread.Terminated
-              and LOpenTokenSearch.Find(LOpenTokenPosition, False, LOpenTokenFoundLength)) do
-            begin
-              Inc(LDeep);
-              LOpenTokenPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenPosition);
-            end;
+            if (AHighlighter.MatchingPairs[LIndex].OpenToken <> AHighlighter.MatchingPairs[LIndex].CloseToken) then
+              while (not Result and not AThread.Terminated
+                and LOpenTokenSearch.Find(LOpenTokenPosition, False, LOpenTokenFoundLength)) do
+              begin
+                Inc(LDeep);
+                LOpenTokenPosition := PositionOf(LOpenTokenFoundLength, LOpenTokenPosition);
+              end;
 
             Result := LDeep = 0;
             if (Result) then
@@ -3223,33 +3228,34 @@ begin
     BeginUpdate();
 
   try
+    FSearchResult.AllAreas := FSearch.FAllAreas;
     FSearchResult.Area := InvalidLinesArea;
-    FSearchResult.Backwards := FSearchBackwards;
+    FSearchResult.Backwards := FSearch.Backwards;
     FSearchResult.Count := 0;
 
-    if (not FSearchAll) then
+    if (not FSearch.FAllAreas) then
       LFoundAreas := nil
     else
       LFoundAreas := TList<TBCEditorLinesArea>.Create();
 
-    if (not FSearchAll) then
+    if (not FSearch.FAllAreas) then
       LReplaceAction := raReplace
     else
       LReplaceAction := raReplaceAll;
 
     repeat
-      if (FSearchBackwards) then
-        FSearchPosition := PositionOf(-1, FSearchPosition);
+      if (FSearch.Backwards) then
+        FSearch.FPosition := PositionOf(-1, FSearch.FPosition);
 
-      Result := FSearch.Find(FSearchPosition, FSearchBackwards, LFoundLength);
+      Result := FSearch.Find(FSearch.FPosition, FSearch.Backwards, LFoundLength);
 
       if (Result) then
       begin
-        LFoundArea.BeginPosition := FSearchPosition;
+        LFoundArea.BeginPosition := FSearch.FPosition;
         LFoundArea.EndPosition := PositionOf(LFoundLength, LFoundArea.BeginPosition);
 
         if (Assigned(LFoundAreas)) then
-          if (FSearchBackwards) then
+          if (FSearch.Backwards) then
             LFoundAreas.Insert(0, LFoundArea)
           else
             LFoundAreas.Insert(LFoundAreas.Count, LFoundArea);
@@ -3264,7 +3270,7 @@ begin
         begin
           if (FSearch.Prompt
             and Assigned(FOnReplacePrompt) and (LReplaceAction <> raReplaceAll)) then
-            FOnReplacePrompt(FSearch, LFoundArea, FSearchBackwards, FSearch.ReplaceText, LReplaceAction);
+            FOnReplacePrompt(FSearch, LFoundArea, FSearch.Backwards, FSearch.ReplaceText, LReplaceAction);
           if (LReplaceAction in [raReplace, raReplaceAll]) then
           begin
             FSearch.Replace();
@@ -3275,9 +3281,9 @@ begin
         end;
       end;
 
-      if (Result and not FSearchBackwards) then
-        FSearchPosition := PositionOf(1, FSearchPosition);
-    until (AThread.Terminated or not Result or not FSearchAll or (LReplaceAction = raCancel));
+      if (Result and not FSearch.Backwards) then
+        FSearch.FPosition := PositionOf(1, FSearch.FPosition);
+    until (AThread.Terminated or not Result or not FSearch.FAllAreas or (LReplaceAction = raCancel));
 
     if (AThread.Terminated) then
       FSearchResult.ErrorMessage := BCEditorTranslation(15)
@@ -3288,7 +3294,7 @@ begin
 
     if (Assigned(LFoundAreas)) then
     begin
-      FFoundAreas.AddRange(LFoundAreas.ToArray);
+      FFoundAreas.AddRange(LFoundAreas.ToArray());
       LFoundAreas.Free();
     end;
   finally
@@ -3683,15 +3689,16 @@ begin
 end;
 
 procedure TBCEditorLines.StartSearch(const ASearch: TSearch;
-  const APosition: TBCEditorLinesPosition; const ABackwards, ASearchAll, ABlockModify: Boolean;
+  const APosition: TBCEditorLinesPosition; const ABackwards, AAllAreas, ABlockModify: Boolean;
   const AExecuted: TJobThread.TExecutedProc);
 begin
   TerminateJob();
   FFoundAreas.Clear();
 
   FSearch := ASearch;
-  FSearchAll := ASearchAll;
-  FSearchPosition := APosition;
+  FSearch.FBackwards := ABackwards;
+  FSearch.FAllAreas := AAllAreas;
+  FSearch.FPosition := APosition;
 
   StartJob(tjSearch, ABlockModify, AExecuted);
 end;

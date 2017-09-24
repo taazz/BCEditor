@@ -15,12 +15,15 @@ type
 type
   { Command Data }
 
+  PBCEditorCommandData = ^TBCEditorCommandData;
   TBCEditorCommandData = TBytes;
 
   PBCEditorCommandDataChar = ^TBCEditorCommandDataChar;
   TBCEditorCommandDataChar = packed record
     Char: Char;
     class function Create(const AChar: Char): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataChar): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataChar; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   PBCEditorCommandDataDropOLE = ^TBCEditorCommandDataDropOLE;
@@ -28,6 +31,8 @@ type
     Pos: TPoint;
     dataObj: IDataObject;
     class function Create(const APos: TPoint; const AdataObj: IDataObject): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataDropOLE): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataDropOLE; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   PBCEditorCommandDataFind = ^TBCEditorCommandDataFind;
@@ -40,6 +45,8 @@ type
   public
     class function Create(const APattern: string;
       const AOptions: TBCEditorFindOptions): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataFind): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataFind; {$IFNDEF Debug} inline; {$ENDIF}
     property Pattern: string read GetPattern;
   end;
 
@@ -49,6 +56,8 @@ type
     Y: Integer;
     Selection: Boolean;
     class function Create(const AX, AY: Integer; const ASelection: Boolean = False): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataMoveCaret): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataMoveCaret; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   PBCEditorCommandDataPosition = ^TBCEditorCommandDataPosition;
@@ -57,6 +66,8 @@ type
     Selection: Boolean;
     class function Create(const APosition: TBCEditorLinesPosition;
       const ASelection: Boolean = False): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataPosition): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataPosition; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   PBCEditorCommandDataReplace = ^TBCEditorCommandDataReplace;
@@ -72,6 +83,8 @@ type
     Options: TBCEditorReplaceOptions;
     class function Create(const APattern, AReplaceText: string;
       const AOptions: TBCEditorReplaceOptions): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataReplace): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataReplace; {$IFNDEF Debug} inline; {$ENDIF}
     property Pattern: string read GetPattern;
     property ReplaceText: string read GetReplaceText;
   end;
@@ -80,6 +93,8 @@ type
   TBCEditorCommandDataScrollTo = packed record
     Pos: TPoint;
     class function Create(const APos: TPoint): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataScrollTo): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataScrollTo; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   PBCEditorCommandDataSelection = ^TBCEditorCommandDataSelection;
@@ -89,6 +104,8 @@ type
     CaretToBeginPosition: Boolean;
     class function Create(const ASelArea: TBCEditorLinesArea;
       const ACaretToBeginPosition: Boolean = False): TBCEditorCommandData; static;
+    class operator Implicit(const a: TBCEditorCommandDataSelection): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataSelection; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   PBCEditorCommandDataText = ^TBCEditorCommandDataText;
@@ -103,6 +120,8 @@ type
     class function Create(const AText: string; const ADelete: Boolean = False;
       const ASelection: Boolean = False): TBCEditorCommandData; static;
     property Text: string read GetText;
+    class operator Implicit(const a: TBCEditorCommandDataText): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
+    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataText; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   TBCEditorHookedCommandProc = procedure(const AEditor: Pointer; const ABefore: LongBool;
@@ -284,6 +303,16 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
+class operator TBCEditorCommandDataChar.Implicit(const a: TBCEditorCommandDataChar): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a));
+end;
+
+class operator TBCEditorCommandDataChar.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataChar;
+begin
+  Move(a[0], Result, Length(a));
+end;
+
 { TBCEditorCommandDataDropOLE *************************************************}
 
 class function TBCEditorCommandDataDropOLE.Create(const APos: TPoint; const AdataObj: IDataObject): TBCEditorCommandData;
@@ -293,6 +322,16 @@ begin
   LData.Pos := APos;
   LData.dataObj := AdataObj;
   Result := BytesOf(@LData, SizeOf(LData));
+end;
+
+class operator TBCEditorCommandDataDropOLE.Implicit(const a: TBCEditorCommandDataDropOLE): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a));
+end;
+
+class operator TBCEditorCommandDataDropOLE.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataDropOLE;
+begin
+  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataFind ****************************************************}
@@ -317,6 +356,16 @@ begin
   SetString(Result, FPattern, FPatternLength);
 end;
 
+class operator TBCEditorCommandDataFind.Implicit(const a: TBCEditorCommandDataFind): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a) + a.FPatternLength * SizeOf(Char));
+end;
+
+class operator TBCEditorCommandDataFind.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataFind;
+begin
+  Move(a[0], Result, Length(a));
+end;
+
 { TBCEditorCommandDataMoveCaret ***********************************************}
 
 class function TBCEditorCommandDataMoveCaret.Create(const AX, AY: Integer;
@@ -330,6 +379,16 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
+class operator TBCEditorCommandDataMoveCaret.Implicit(const a: TBCEditorCommandDataMoveCaret): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a));
+end;
+
+class operator TBCEditorCommandDataMoveCaret.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataMoveCaret;
+begin
+  Move(a[0], Result, Length(a));
+end;
+
 { TBCEditorCommandDataPosition ************************************************}
 
 class function TBCEditorCommandDataPosition.Create(const APosition: TBCEditorLinesPosition;
@@ -340,6 +399,16 @@ begin
   LData.Pos := APosition;
   LData.Selection := ASelection;
   Result := BytesOf(@LData, SizeOf(LData));
+end;
+
+class operator TBCEditorCommandDataPosition.Implicit(const a: TBCEditorCommandDataPosition): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a));
+end;
+
+class operator TBCEditorCommandDataPosition.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataPosition;
+begin
+  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataReplace *************************************************}
@@ -372,6 +441,16 @@ begin
   SetString(Result, FReplaceText, FReplaceTextLength);
 end;
 
+class operator TBCEditorCommandDataReplace.Implicit(const a: TBCEditorCommandDataReplace): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a) + a.FPatternLength * SizeOf(Char) + a.FReplaceTextLength * SizeOf(Char));
+end;
+
+class operator TBCEditorCommandDataReplace.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataReplace;
+begin
+  Move(a[0], Result, Length(a));
+end;
+
 { TBCEditorCommandDataScrollTo ************************************************}
 
 class function TBCEditorCommandDataScrollTo.Create(const APos: TPoint): TBCEditorCommandData;
@@ -380,6 +459,16 @@ var
 begin
   LData.Pos := APos;
   Result := BytesOf(@LData, SizeOf(LData));
+end;
+
+class operator TBCEditorCommandDataScrollTo.Implicit(const a: TBCEditorCommandDataScrollTo): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a));
+end;
+
+class operator TBCEditorCommandDataScrollTo.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataScrollTo;
+begin
+  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataSelection ***********************************************}
@@ -393,6 +482,16 @@ begin
   LData.EndPos := ASelArea.EndPosition;
   LData.CaretToBeginPosition := ACaretToBeginPosition;
   Result := BytesOf(@LData, SizeOf(LData));
+end;
+
+class operator TBCEditorCommandDataSelection.Implicit(const a: TBCEditorCommandDataSelection): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a));
+end;
+
+class operator TBCEditorCommandDataSelection.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataSelection;
+begin
+  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataText ****************************************************}
@@ -416,6 +515,16 @@ end;
 function TBCEditorCommandDataText.GetText(): string;
 begin
   SetString(Result, FText, FTextLength);
+end;
+
+class operator TBCEditorCommandDataText.Implicit(const a: TBCEditorCommandDataText): TBCEditorCommandData;
+begin
+  Result := BytesOf(@a, SizeOf(a) + a.FTextLength * SizeOf(Char));
+end;
+
+class operator TBCEditorCommandDataText.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataText;
+begin
+  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorHookedCommandHandler ***********************************************}

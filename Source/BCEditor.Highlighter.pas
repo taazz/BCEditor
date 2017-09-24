@@ -564,16 +564,20 @@ type
       property Text: PChar read FText;
     end;
 
-    TFileExtensions = class(TStringList)
+    TDetection = class
     strict private
       FDefaultExtension: string;
-      FHighlighter: TBCEditorHighlighter;
+      FExtensions: TStringList;
+      FFirstLinePattern: string;
     protected
+      procedure Clear();
       procedure LoadFromJSON(const AJSON: TJSONObject);
     public
-      procedure Clear(); override;
-      constructor Create(const AHighlighter: TBCEditorHighlighter);
+      constructor Create();
+      destructor Destroy(); override;
       property DefaultExtension: string read FDefaultExtension;
+      property Extensions: TStringList read FExtensions;
+      property FirstLinePattern: string read FFirstLinePattern;
     end;
 
   strict private
@@ -583,9 +587,9 @@ type
     FColors: TElements;
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions;
+    FDetection: TDetection;
     FDirectory: string;
     FEditor: TCustomControl;
-    FFileExtensions: TFileExtensions;
     FFilename: string;
     FFoldCloseKeyChars: TBCEditorAnsiCharSet;
     FFoldOpenKeyChars: TBCEditorAnsiCharSet;
@@ -633,7 +637,8 @@ type
     property Colors: TElements read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
-    property FileExtensions: TFileExtensions read FFileExtensions;
+    property Detection: TDetection read FDetection;
+    property Filename: string read FFilename;
     property FoldCloseKeyChars: TBCEditorAnsiCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
     property FoldOpenKeyChars: TBCEditorAnsiCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
     property MainRules: TRange read FMainRules;
@@ -702,7 +707,7 @@ begin
         Inc(LLine);
       end;
       LChar := LPos;
-      raise Exception(BCEditorTranslation(18, [LLine + 1, LChar + 1]));
+      raise Exception.CreateFmt(SBCEditorHighlighterJSONSyntaxError, [LLine + 1, LChar + 1]);
       LStringList.Free();
       FreeAndNil(Result);
     end;
@@ -968,16 +973,14 @@ end;
 
 function StrToRegionType(const AString: string): TBCEditorRangeItemType;
 begin
-  if AString = 'SingleLine' then
+  if (AString = 'SingleLine') then
     Result := ritSingleLineComment
-  else
-  if AString = 'MultiLine' then
+  else if (AString = 'MultiLine') then
     Result := ritMultiLineComment
-  else
-  if AString = 'SingleLineString' then
+  else if (AString = 'SingleLineString') then
     Result := ritSingleLineString
   else
-    Result := ritMultiLineString
+    Result := ritMultiLineString;
 end;
 
 function StrToRangeType(const AString: string): TBCEditorRangeType;
@@ -1248,8 +1251,10 @@ begin
               Continue;
           end;
 
-          LSkipRegionType := StrToRegionType(GetJSONString(LItem, 'RegionType', True));
-          if (LSkipRegionType = ritMultiLineComment) and (cfoFoldMultilineComments in TCustomBCEditor(FHighlighter.Editor).LeftMargin.CodeFolding.Options) then
+          LSkipRegionType := StrToRegionType(GetJSONString(LItem, 'RegionType'));
+          if ((LSkipRegionType = ritMultiLineComment)
+            and Assigned(FHighlighter.Editor)
+            and (cfoFoldMultilineComments in TCustomBCEditor(FHighlighter.Editor).LeftMargin.CodeFolding.Options)) then
           begin
             LRegionItem := Add(LOpenToken, LCloseToken);
             LRegionItem.NoSubs := True;
@@ -2985,25 +2990,31 @@ begin
   Result := True;
 end;
 
-{ TBCEditorHighlighter.TFileExtensions ****************************************}
+{ TBCEditorHighlighter.TDetection *********************************************}
 
-procedure TBCEditorHighlighter.TFileExtensions.Clear();
+procedure TBCEditorHighlighter.TDetection.Clear();
 begin
-  inherited;
-
   FDefaultExtension := '';
+  FExtensions.Clear();
+  FFirstLinePattern := '';
 end;
 
-constructor TBCEditorHighlighter.TFileExtensions.Create(const AHighlighter: TBCEditorHighlighter);
+constructor TBCEditorHighlighter.TDetection.Create();
 begin
   inherited Create();
 
-  FHighlighter := AHighlighter;
-
+  FExtensions := TStringList.Create();
   Clear();
 end;
 
-procedure TBCEditorHighlighter.TFileExtensions.LoadFromJSON(const AJSON: TJSONObject);
+destructor TBCEditorHighlighter.TDetection.Destroy();
+begin
+  FExtensions.Free();
+
+  inherited;
+end;
+
+procedure TBCEditorHighlighter.TDetection.LoadFromJSON(const AJSON: TJSONObject);
 var
   LExtensionsArray: TJSONArray;
   LIndex: Integer;
@@ -3014,6 +3025,7 @@ begin
   if (Assigned(AJSON)) then
   begin
     FDefaultExtension := GetJSONString(AJSON, 'Default');
+    FFirstLinePattern := GetJSONString(AJSON, 'FirstLinePattern');
 
     LExtensionsArray := GetJSONArray(AJSON, 'Extensions');
     if (Assigned(LExtensionsArray)) then
@@ -3021,7 +3033,7 @@ begin
       begin
         LString := GetJSONString(LExtensionsArray, LIndex);
         if ((LString <> '') and (LString[1] = '.')) then
-          Add(LString);
+          FExtensions.Add(LString);
       end;
   end;
 end;
@@ -3110,7 +3122,7 @@ begin
 
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
 
-  FFileExtensions := TFileExtensions.Create(Self);
+  FDetection := TDetection.Create();
 end;
 
 procedure TBCEditorHighlighter.DoChange();
@@ -3125,7 +3137,7 @@ begin
 
   FCodeFoldingRegions.Free();
   FComments.Free();
-  FFileExtensions.Free();
+  FDetection.Free();
   FMainRules.Free();
   FAttributes.Free();
   FCompletionProposalSkipRegions.Free();
@@ -3335,7 +3347,7 @@ begin
     LoadMatchingPairFromJSON(GetJSONObject(AJSON, 'MatchingPair'));
     LoadCompletionProposalFromJSON(GetJSONObject(AJSON, 'CompletionProposal'));
 
-    FFileExtensions.LoadFromJSON(GetJSONObject(AJSON, 'FileExtensions'));
+    FDetection.LoadFromJSON(GetJSONObject(AJSON, 'Detection'));
   end;
 
   UpdateColors();
@@ -3405,7 +3417,7 @@ begin
       end;
 
       LSkipRegionItem := CompletionProposalSkipRegions.Add(LOpenToken, LCloseToken);
-      LSkipRegionItem.RegionType := StrToRegionType(GetJSONString(LItem, 'RegionType', True));
+      LSkipRegionItem.RegionType := StrToRegionType(GetJSONString(LItem, 'RegionType'));
       LSkipRegionItem.SkipEmptyChars := GetJSONBoolean(LItem, 'SkipEmptyChars', LSkipRegionItem.SkipEmptyChars);
     end;
   end;
@@ -3502,13 +3514,16 @@ var
 begin
   UpdateAttributes(MainRules, nil);
   DoChange();
-  LFontDummy := TFont.Create;
-  try
-    LFontDummy.Name := TCustomBCEditor(Editor).Font.Name;
-    LFontDummy.Size := TCustomBCEditor(Editor).Font.Size;
-    TCustomBCEditor(Editor).Font.Assign(LFontDummy);
-  finally
-    LFontDummy.Free;
+  if (Assigned(Editor)) then
+  begin
+    LFontDummy := TFont.Create;
+    try
+      LFontDummy.Name := TCustomBCEditor(Editor).Font.Name;
+      LFontDummy.Size := TCustomBCEditor(Editor).Font.Size;
+      TCustomBCEditor(Editor).Font.Assign(LFontDummy);
+    finally
+      LFontDummy.Free;
+    end;
   end;
 end;
 
