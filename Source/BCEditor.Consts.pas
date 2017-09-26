@@ -207,14 +207,15 @@ const
   aclBookmarkRingLeft = $FF929292;
   aclBookmarkRingMiddle = $FFFCFCFC;
   aclBookmarkRingRight = $FFBCBCBC;
-  clCodeFoldingBackground = $00F4F4F4;
-  clCodeFoldingForeground = $00CC9999;
-  clActiveLineBackground = $00E6FFFA;
-  clFoundTextBackground = $0078AAFF;
+  aclSyncEditPen = $FF3E78B3;
+  clCodeFoldingBackground = $F4F4F4;
+  clCodeFoldingForeground = $CC9999;
+  clActiveLineBackground = $E6FFFA;
+  clFoundTextBackground = $78AAFF;
   clFoundTextForeground = clWindowText;
-  clLineNumbersBackground = $00F4F4F4;
-  clLineNumbersForeground = $00CC9999;
-  clLineStateLoaded = $00F4F4F4;
+  clLineNumbersBackground = $F4F4F4;
+  clLineNumbersForeground = $CC9999;
+  clLineStateLoaded = $F4F4F4;
   clLineStateModified = clYellow;
   clLineStateSaved = clLime;
   clMarksBackground = clBtnFace;
@@ -222,7 +223,7 @@ const
   clSelectionBackground = clHighlight;
   clSelectionForeground = clHighlightText;
   clSpecialCharsForeground = clGrayText;
-  clSyncEditBackground = $00FCFDCD;
+  clSyncEditBackground = $FCFDCD;
   clSyncEditOverlay = clHighlight;
 
 var

@@ -15,10 +15,8 @@ type
 type
   { Command Data }
 
-  PBCEditorCommandData = ^TBCEditorCommandData;
   TBCEditorCommandData = TBytes;
 
-  PBCEditorCommandDataChar = ^TBCEditorCommandDataChar;
   TBCEditorCommandDataChar = packed record
     Char: Char;
     class function Create(const AChar: Char): TBCEditorCommandData; static;
@@ -26,7 +24,6 @@ type
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataChar; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
-  PBCEditorCommandDataDropOLE = ^TBCEditorCommandDataDropOLE;
   TBCEditorCommandDataDropOLE = packed record
     Pos: TPoint;
     dataObj: IDataObject;
@@ -35,7 +32,6 @@ type
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataDropOLE; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
-  PBCEditorCommandDataFind = ^TBCEditorCommandDataFind;
   TBCEditorCommandDataFind = packed record
     Options: TBCEditorFindOptions;
   private
@@ -45,12 +41,12 @@ type
   public
     class function Create(const APattern: string;
       const AOptions: TBCEditorFindOptions): TBCEditorCommandData; static;
+    class operator Equal(const a, b: TBCEditorCommandDataFind): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     class operator Implicit(const a: TBCEditorCommandDataFind): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataFind; {$IFNDEF Debug} inline; {$ENDIF}
     property Pattern: string read GetPattern;
   end;
 
-  PBCEditorCommandDataMoveCaret = ^TBCEditorCommandDataMoveCaret;
   TBCEditorCommandDataMoveCaret = packed record
     X: Integer;
     Y: Integer;
@@ -60,7 +56,6 @@ type
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataMoveCaret; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
-  PBCEditorCommandDataPosition = ^TBCEditorCommandDataPosition;
   TBCEditorCommandDataPosition = packed record
     Pos: TPoint;
     Selection: Boolean;
@@ -70,7 +65,6 @@ type
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataPosition; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
-  PBCEditorCommandDataReplace = ^TBCEditorCommandDataReplace;
   TBCEditorCommandDataReplace = packed record
   private
     FPattern: PChar;
@@ -89,7 +83,6 @@ type
     property ReplaceText: string read GetReplaceText;
   end;
 
-  PBCEditorCommandDataScrollTo = ^TBCEditorCommandDataScrollTo;
   TBCEditorCommandDataScrollTo = packed record
     Pos: TPoint;
     class function Create(const APos: TPoint): TBCEditorCommandData; static;
@@ -97,7 +90,6 @@ type
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataScrollTo; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
-  PBCEditorCommandDataSelection = ^TBCEditorCommandDataSelection;
   TBCEditorCommandDataSelection = packed record
     BeginPos: TPoint;
     EndPos: TPoint;
@@ -108,7 +100,6 @@ type
     class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataSelection; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
-  PBCEditorCommandDataText = ^TBCEditorCommandDataText;
   TBCEditorCommandDataText = packed record
     Delete: Boolean;
     Selection: Boolean;
@@ -288,10 +279,10 @@ uses
   Math,
   BCEditor, BCEditor.Consts;
 
-resourcestring
-  SBCEditorCannotRecord = 'Cannot record macro: Already recording or playing';
-  SBCEditorCannotPlay = 'Cannot play macro: Already recording or playing';
-  SBCEditorNotTCustomBCEditor = 'Value must be a TCustomBCEditor class object';
+const
+  SCannotRecord = 'Cannot record macro: Already recording or playing';
+  SCannotPlay = 'Cannot play macro: Already recording or playing';
+  SNotTCustomBCEditor = 'Value must be a TCustomBCEditor class object';
 
 { TBCEditorCommandDataChar ****************************************************}
 
@@ -339,7 +330,7 @@ end;
 class function TBCEditorCommandDataFind.Create(const APattern: string;
   const AOptions: TBCEditorFindOptions): TBCEditorCommandData;
 var
-  LData: PBCEditorCommandDataFind;
+  LData: ^TBCEditorCommandDataFind;
   LSize: Int64;
 begin
   LSize := SizeOf(TBCEditorCommandDataFind) + Length(APattern) * SizeOf(Char);
@@ -356,6 +347,11 @@ begin
   SetString(Result, FPattern, FPatternLength);
 end;
 
+class operator TBCEditorCommandDataFind.Equal(const a, b: TBCEditorCommandDataFind): Boolean;
+begin
+  Result := (a.Options = b.Options) and (a.FPatternLength = b.FPatternLength) and CompareMem(a.FPattern, b.FPattern, a.FPatternLength);
+end;
+
 class operator TBCEditorCommandDataFind.Implicit(const a: TBCEditorCommandDataFind): TBCEditorCommandData;
 begin
   Result := BytesOf(@a, SizeOf(a) + a.FPatternLength * SizeOf(Char));
@@ -364,6 +360,7 @@ end;
 class operator TBCEditorCommandDataFind.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataFind;
 begin
   Move(a[0], Result, Length(a));
+  Result.FPattern := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataFind)];
 end;
 
 { TBCEditorCommandDataMoveCaret ***********************************************}
@@ -416,7 +413,7 @@ end;
 class function TBCEditorCommandDataReplace.Create(const APattern, AReplaceText: string;
   const AOptions: TBCEditorReplaceOptions): TBCEditorCommandData;
 var
-  LData: PBCEditorCommandDataReplace;
+  LData: ^TBCEditorCommandDataReplace;
   LSize: Int64;
 begin
   LSize := SizeOf(TBCEditorCommandDataReplace) + Length(APattern) * SizeOf(Char) + Length(AReplaceText) * SizeOf(Char);
@@ -449,6 +446,8 @@ end;
 class operator TBCEditorCommandDataReplace.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataReplace;
 begin
   Move(a[0], Result, Length(a));
+  Result.FPattern := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataReplace)];
+  Result.FReplaceText := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataReplace) + Result.FPatternLength * SizeOf(Char)];
 end;
 
 { TBCEditorCommandDataScrollTo ************************************************}
@@ -499,7 +498,7 @@ end;
 class function TBCEditorCommandDataText.Create(const AText: string; const ADelete: Boolean = False;
   const ASelection: Boolean = False): TBCEditorCommandData;
 var
-  LData: PBCEditorCommandDataText;
+  LData: ^TBCEditorCommandDataText;
   LSize: Int64;
 begin
   LSize := SizeOf(TBCEditorCommandDataText) + Length(AText) * SizeOf(Char);
@@ -525,6 +524,7 @@ end;
 class operator TBCEditorCommandDataText.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataText;
 begin
   Move(a[0], Result, Length(a));
+  Result.FText := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataText)];
 end;
 
 { TBCEditorHookedCommandHandler ***********************************************}
@@ -1100,7 +1100,7 @@ end;
 procedure TCustomBCEditorMacroRecorder.Playback();
 begin
   if (FState in [msRecording, msPlaying]) then
-    raise ERangeError.Create(SBCEditorCannotPlay);
+    raise ERangeError.Create(SCannotPlay);
 
   SetState(msPlaying);
   try
@@ -1138,7 +1138,7 @@ end;
 procedure TCustomBCEditorMacroRecorder.SetEditor(AValue: TCustomControl);
 begin
   if (Assigned(AValue) and not (AValue is TCustomBCEditor)) then
-    raise ERangeError.Create(SBCEditorNotTCustomBCEditor);
+    raise ERangeError.Create(SNotTCustomBCEditor);
 
   if (AValue <> FEditor) then
   begin
@@ -1182,7 +1182,7 @@ end;
 procedure TCustomBCEditorMacroRecorder.StartRecord();
 begin
   if (FState in [msRecording, msPlaying]) then
-    raise ERangeError.Create(SBCEditorCannotRecord);
+    raise ERangeError.Create(SCannotRecord);
 
   Clear();
   SetState(msRecording);
@@ -1204,7 +1204,7 @@ end;
 function TCustomBCEditorMacroRecorder.PlaybackStep(const APlay: Boolean): Boolean;
 begin
   if ((FState = msRecording) or not APlay and (FState = msPlaying)) then
-    raise ERangeError.Create(SBCEditorCannotPlay);
+    raise ERangeError.Create(SCannotPlay);
 
   Result := FCurrentCommand < FItems.Count;
   if (Result) then

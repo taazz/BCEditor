@@ -1439,6 +1439,7 @@ begin
   FOptions := DefaultOptions;
   FRedoList := TUndoList.Create(Self);
   FFoundAreas := TList<TBCEditorLinesArea>.Create();
+  FSearch := nil;
   FSelArea := LinesArea(BOFPosition, BOFPosition);
   FSyncEditArea := InvalidLinesArea;
   FSyncEditItems := TList<TSyncEditItem>.Create();

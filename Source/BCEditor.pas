@@ -440,6 +440,7 @@ type
     FReplaceDialog: TReplaceDialog;
     FRows: TCustomBCEditor.TRows;
     FRowsWanted: TRowsWanted;
+    FSearchExecuted: Boolean;
     FScrollBars: UITypes.TScrollStyle;
     FScrollingBitmap: TGPCachedBitmap;
     FScrollingBitmapHeight: Integer;
@@ -1024,19 +1025,17 @@ type
 
 implementation {***************************************************************}
 
-{$R BCEditor.res}
-
 uses
   ShellAPI, Imm, CommCtrl,
   Math, Types, Character, RegularExpressions, ComObj, SysConst,
   Clipbrd, Themes, ImgList,
   BCEditor.ExportHTML;
 
-resourcestring
-  SBCEditorLineIsNotVisible = 'Line %d is not visible';
-  SBCEditorOverlayInvalidArea = 'Overlay area invalid';
-  SBCEditorOverlayOverlap = 'Overlay overlap';
-  SBCEditorProcessCommandNotAllowed = 'Command not allowed now. Use PostCommand(%s ...';
+const
+  SLineIsNotVisible = 'Line %d is not visible';
+  SOverlayInvalidArea = 'Overlay area invalid';
+  SOverlayOverlap = 'Overlay overlap';
+  SProcessCommandNotAllowed = 'Command not allowed now. Use PostCommand(%s ...';
 
 const
   InvalidRect: TRect = ( Left: -1; Top: -1; Right: -1; Bottom: -1 );
@@ -1508,9 +1507,9 @@ begin
     or (AValue.Area.BeginPosition.Char < 0)
     or (AValue.Area.EndPosition.Char < AValue.Area.BeginPosition.Char)
     or (AValue.Area.EndPosition.Char > Length(FEditor.FLines.Items[AValue.Area.EndPosition.Line].Text))) then
-    raise ERangeError.Create(SBCEditorOverlayInvalidArea);
+    raise ERangeError.Create(SOverlayInvalidArea);
   if ((LIndex > 0) and (Items[LIndex - 1].Area.EndPosition > AValue.Area.BeginPosition)) then
-    raise ERangeError.Create(SBCEditorOverlayOverlap);
+    raise ERangeError.Create(SOverlayOverlap);
 
   Insert(LIndex, AValue);
   Result := LIndex;
@@ -2327,6 +2326,8 @@ end;
 
 procedure TCustomBCEditor.CaretChanged(ASender: TObject);
 begin
+  FSearchExecuted := False;
+
   InvalidateMatchingPair();
   InvalidateCaret();
   InvalidateSyncEditOverlays();
@@ -2398,6 +2399,7 @@ var
   LChar: Integer;
   LColumn: Integer;
   LIndex: Integer;
+  LL: Integer;
   LLeft: Integer;
   LLength: Integer;
   LLine: Integer;
@@ -2464,17 +2466,17 @@ begin
         LWidths[0] := LLeft;
         LWidths[Length(LWidths) - 1] := LLeft + LTokenWidth;
 
-        LLeft := 0;
+        LL := 0;
         LRight := Length(LWidths) - 1;
-        while (LRight - LLeft >= 2) do
+        while (LRight - LL >= 2) do
         begin
-          LMiddle := (LLeft + LRight) div 2;
+          LMiddle := (LL + LRight) div 2;
 
           if (LWidths[LMiddle] < 0) then
             LWidths[LMiddle] := LLeft + TokenWidth(FPaintHelper, LLine, LToken.Text, LMiddle, LColumn, @LToken);
 
           case (Sign(LWidths[LMiddle] - LX)) of
-            -1: LLeft := LMiddle;
+            -1: LL := LMiddle;
             0:
               begin
                 Result := RowsPosition(LColumn + LMiddle, LRow);
@@ -2490,13 +2492,13 @@ begin
           end;
         end;
 
-        if (LWidths[LLeft] < 0) then
-          LWidths[LLeft] := LLeft + TokenWidth(FPaintHelper, LLine, LToken.Text, LLeft, LColumn, @LToken);
+        if (LWidths[LL] < 0) then
+          LWidths[LL] := LLeft + TokenWidth(FPaintHelper, LLine, LToken.Text, LL, LColumn, @LToken);
         if (LWidths[LRight] < 0) then
           LWidths[LRight] := LLeft + TokenWidth(FPaintHelper, LLine, LToken.Text, LRight, LColumn, @LToken);
 
-        if ((LX - LWidths[LLeft]) < (LWidths[LRight] - LX)) then
-          Result := RowsPosition(LColumn + LLeft, LRow)
+        if ((LX - LWidths[LL]) < (LWidths[LRight] - LX)) then
+          Result := RowsPosition(LColumn + LL, LRow)
         else
           Result := RowsPosition(LColumn + LRight, LRow);
 
@@ -2752,6 +2754,7 @@ begin
   FReadOnly := False;
   FReplaceAction := raReplace;
   FRowsWanted.CriticalSection := TCriticalSection.Create();
+  FSearchExecuted := False;
   FScrollBars := ssBoth;
   FScrollingBitmap := nil;
   FFindDialog := nil;
@@ -3993,7 +3996,7 @@ var
   LSearchPosition: TBCEditorLinesPosition;
 begin
   FLastSearch := lsReplace;
-  FLastSearchData := BytesOf(@AData, Length(PBCEditorCommandData(@AData)^));
+  FLastSearchData := AData;
 
   if ((roSelection in AData.Options) and not FLines.SelArea.IsEmpty()) then
     LArea := FLines.SelArea
@@ -5001,8 +5004,11 @@ end;
 
 procedure TCustomBCEditor.FindDialogFind(Sender: TObject);
 var
+  FNewSearchData: TBCEditorCommandDataFind;
   LOptions: TBCEditorFindOptions;
 begin
+  Assert(Sender is TFindDialog);
+
   LOptions := LOptions - [foRegExpr];
   if (frDown in TFindDialog(Sender).Options) then
     LOptions := LOptions - [foBackwards]
@@ -5013,7 +5019,8 @@ begin
   else
     LOptions := LOptions - [foCaseSensitive];
   LOptions := LOptions - [foEntireScope];
-  if (FLines.SelArea.IsEmpty()) then
+  if (FLines.SelArea.IsEmpty()
+    or FSearchExecuted and not (foSelection in TBCEditorCommandDataFind(FLastSearchData).Options)) then
     LOptions := LOptions - [foSelection]
   else
     LOptions := LOptions + [foSelection];
@@ -5022,7 +5029,13 @@ begin
   else
     LOptions := LOptions - [foWholeWordsOnly];
 
-  ProcessCommand(ecFindFirst, TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions));
+  FNewSearchData := TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions);
+
+  if ((FLastSearch = lsFind)
+    and (FNewSearchData = TBCEditorCommandDataFind(FLastSearchData))) then
+    ProcessCommand(ecFindNext)
+  else
+    ProcessCommand(ecFindFirst, FNewSearchData);
 end;
 
 procedure TCustomBCEditor.FindExecuted(const AData: Pointer);
@@ -5050,12 +5063,13 @@ begin
     end
     else if (LSearchResult.ErrorMessage = '') then
       LSearchResult.ErrorMessage := BCEditorTranslation(11, [TBCEditorCommandDataFind(FLastSearchData).Pattern]);
+    FSearchExecuted := LSearchResult.Area <> InvalidLinesArea;
 
     UpdateCursor();
   end;
 
   if ((LSearchResult.Area = InvalidLinesArea)
-    and not (foEntireScope in PBCEditorCommandDataFind(FLastSearchData)^.Options)
+    and not (foEntireScope in TBCEditorCommandDataFind(FLastSearchData).Options)
     and (not LSearchResult.Backwards and (FFindArea.BeginPosition > FLines.BOFPosition)
       or LSearchResult.Backwards and (FFindArea.EndPosition < FLines.EOFPosition))
     and (FFindState = fsRequested)) then
@@ -6239,7 +6253,7 @@ begin
   else if (ALinesPosition.Line >= FLines.Count) then
     Result := RowsPosition(ALinesPosition.Char, FRows.Count + ALinesPosition.Line - FLines.Count)
   else if (FLines.Items[ALinesPosition.Line].FirstRow < 0) then
-    raise ERangeError.CreateFmt(SBCEditorLineIsNotVisible, [ALinesPosition.Line])
+    raise ERangeError.CreateFmt(SLineIsNotVisible, [ALinesPosition.Line])
   else
   begin
     LRow := FLines.Items[ALinesPosition.Line].FirstRow;
@@ -6476,6 +6490,41 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
   const AOverlays: Boolean = True);
 
   procedure BuildBitmaps();
+
+    procedure DrawSyncEditPen(const AGraphics: TGPGraphics; const ABrush: TGPBrush; const AX, AY, ASize: Single);
+    var
+      Points: TPointFDynArray;
+    begin
+      if (not StyleServices.Enabled) then
+        AGraphics.SetSmoothingMode(SmoothingModeNone)
+      else
+        AGraphics.SetSmoothingMode(SmoothingModeHighQuality);
+
+      SetLength(Points, 3);
+      Points[0] := MakePoint(AX + 0, AY - 1);
+      Points[1] := MakePoint(AX + 4 * ASize, AY - ASize - 8 * ASize);
+      Points[2] := MakePoint(AX + 8 * ASize, AY - ASize - 4 * ASize);
+      AGraphics.FillPolygon(ABrush, PGPPointF(@Points[0]), Length(Points));
+
+      SetLength(Points, 4);
+      Points[0] := MakePoint(AX + 5 * ASize, AY - ASize - 9 * ASize);
+      Points[1] := MakePoint(AX + 13 * ASize, AY - ASize - 17 * ASize);
+      Points[2] := MakePoint(AX + 17 * ASize, AY - ASize - 13 * ASize);
+      Points[3] := MakePoint(AX + 9 * ASize, AY - ASize - 5 * ASize);
+      AGraphics.FillPolygon(ABrush, PGPPointF(@Points[0]), Length(Points));
+
+      SetLength(Points, 4);
+      Points[0] := MakePoint(AX + 14 * ASize, AY - ASize - 18 * ASize);
+      Points[1] := MakePoint(AX + 16 * ASize, AY - ASize - 20 * ASize);
+      Points[2] := MakePoint(AX + 20 * ASize, AY - ASize - 16 * ASize);
+      Points[3] := MakePoint(AX + 18 * ASize, AY - ASize - 14 * ASize);
+      AGraphics.FillPolygon(ABrush, PGPPointF(@Points[0]), Length(Points));
+
+      AGraphics.SetSmoothingMode(SmoothingModeNone);
+
+      AGraphics.FillRectangle(ABrush, AX, AY + 1 * ASize, 8 * ASize, 1 * ASize);
+    end;
+
   var
     LBackgroundColor: TGPColor;
     LBitmap: TGPBitmap;
@@ -6485,16 +6534,12 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
     LGraphics: TGPGraphics;
     LHDC: HDC;
     LHeight: Integer;
-    LIcon: TGPBitmap;
-    LIconId: Integer;
     LIndex: Integer;
     LPen: TGPPen;
     LPoints: array [0 .. 2] of TGPPoint;
     LRect: TRect;
     LRectF: TGPRectF;
-    LResData: HGLOBAL;
-    LResInfo: HRSRC;
-    LResource: Pointer;
+    LSize: Single;
     LStringFormat: TGPStringFormat;
     LText: string;
     LWidth: Integer;
@@ -6693,21 +6738,14 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
 
 
       // SyncEdit Button
-      LResInfo := FindResource(HInstance, BCEDITOR_SYNCEDIT, RT_GROUP_ICON);
-      LResData := LoadResource(HInstance, LResInfo);
-      LResource := LockResource(LResData);
-      LIconId := LookupIconIdFromDirectoryEx(LResource, TRUE, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
-      LResInfo := FindResource(HInstance, MAKEINTRESOURCE(LIconId), RT_ICON);
-      LResData := LoadResource(HInstance, LResInfo);
-      LIcon := TGPBitmap.Create(CreateIconFromResourceEx(
-        LockResource(LResData), SizeOfResource(HInstance, LResInfo),
-        TRUE, $00030000, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
       LWidth := GetSystemMetrics(SM_CXSMICON) + 2 * GetSystemMetrics(SM_CXEDGE);
       LHeight := GetSystemMetrics(SM_CYSMICON) + 2 * GetSystemMetrics(SM_CYEDGE);
+      LSize := GetSystemMetrics(SM_CXSMICON) / 32;
       LRect := Rect(0, 0, LWidth, LHeight);
       LBrush.SetColor(aclTransparent);
       LBitmap := TGPBitmap.Create(LWidth, LHeight);
       LGraphics := TGPGraphics.Create(LBitmap);
+
       if (Assigned(FSyncEditButtonNormalBitmap)) then FSyncEditButtonNormalBitmap.Free();
       if (not StyleServices.Enabled) then
       begin
@@ -6724,8 +6762,11 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonNormal), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LGraphics.DrawImage(LIcon, GetSystemMetrics(SM_CXEDGE), GetSystemMetrics(SM_CYEDGE));
+      LBrush.SetColor(aclSyncEditPen);
+      DrawSyncEditPen(LGraphics, LBrush, GetSystemMetrics(SM_CXEDGE) + 2 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 9 * LSize, LSize);
+      DrawSyncEditPen(LGraphics, LBrush, GetSystemMetrics(SM_CXEDGE) + 9 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonNormalBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
+
       if (Assigned(FSyncEditButtonHotBitmap)) then FSyncEditButtonHotBitmap.Free();
       if (not StyleServices.Enabled) then
       begin
@@ -6742,8 +6783,11 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonHot), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LGraphics.DrawImage(LIcon, GetSystemMetrics(SM_CXEDGE), GetSystemMetrics(SM_CYEDGE));
+      LBrush.SetColor(aclSyncEditPen);
+      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
+      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonHotBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
+
       if (Assigned(FSyncEditButtonPressedBitmap)) then FSyncEditButtonPressedBitmap.Free();
       if (not StyleServices.Enabled) then
       begin
@@ -6760,11 +6804,13 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonPressed), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LGraphics.DrawImage(LIcon, GetSystemMetrics(SM_CXEDGE), GetSystemMetrics(SM_CYEDGE));
+      LBrush.SetColor(aclSyncEditPen);
+      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
+      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonPressedBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
+
       LGraphics.Free();
       LBitmap.Free();
-      LIcon.Free();
     end;
 
     LBrush.Free();
@@ -7839,7 +7885,7 @@ begin
   Assert((ACommand <= ecLast) or (ACommand >= ecUser));
 
   if (ecProcessingCommand in FState) then
-    raise Exception.CreateFmt(SBCEditorProcessCommandNotAllowed, [BCEditorCommandManager.CommandToIdent(ACommand)]);
+    raise Exception.CreateFmt(SProcessCommandNotAllowed, [BCEditorCommandManager.CommandToIdent(ACommand)]);
 
   Result := False;
 
@@ -7959,32 +8005,25 @@ begin
           ecEOL:
             DoEOL(LCommand = ecSelEOL);
           ecFindFirst:
-            if (FLastSearch = lsReplace) then
-              DoReplace(PBCEditorCommandDataReplace(FLastSearchData)^)
-            else if (not Assigned(FLastSearchData)) then
-              DoFindFirst(AData)
-            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
-              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData)^)
-            else
-              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData)^);
+            DoFindFirst(AData);
           ecFindNext:
             if (FLastSearch = lsReplace) then
-              DoReplace(PBCEditorCommandDataReplace(FLastSearchData)^)
+              DoReplace(FLastSearchData)
             else if (not Assigned(FLastSearchData)) then
               DoShowFind(True)
-            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
-              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData)^)
+            else if (foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options) then
+              DoFindBackwards(FLastSearchData)
             else
-              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData)^);
+              DoFindForewards(FLastSearchData);
           ecFindPrevious:
             if (FLastSearch = lsReplace) then
-              DoReplace(PBCEditorCommandDataReplace(FLastSearchData)^)
+              DoReplace(FLastSearchData)
             else if (not Assigned(FLastSearchData)) then
               DoShowFind(True)
-            else if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
-              DoFindForewards(PBCEditorCommandDataFind(FLastSearchData)^)
+            else if (foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options) then
+              DoFindForewards(FLastSearchData)
             else
-              DoFindBackwards(PBCEditorCommandDataFind(FLastSearchData)^);
+              DoFindBackwards(FLastSearchData);
           ecGotoBookmark1 .. ecGotoBookmark0:
             GotoBookmark(Ord(LCommand) - Ord(ecGotoBookmark1));
           ecGotoMatchingPair:
@@ -11118,8 +11157,8 @@ begin
   begin
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      foCaseSensitive in PBCEditorCommandDataFind(FLastSearchData)^.Options, foWholeWordsOnly in PBCEditorCommandDataFind(FLastSearchData)^.Options, foRegExpr in PBCEditorCommandDataFind(FLastSearchData)^.Options,
-      PBCEditorCommandDataFind(FLastSearchData)^.Pattern);
+      foCaseSensitive in TBCEditorCommandDataFind(FLastSearchData).Options, foWholeWordsOnly in TBCEditorCommandDataFind(FLastSearchData).Options, foRegExpr in TBCEditorCommandDataFind(FLastSearchData).Options,
+      TBCEditorCommandDataFind(FLastSearchData).Pattern);
     FFindArea := InvalidLinesArea;
     FFindState := fsAllAreas;
 
@@ -11135,7 +11174,7 @@ var
 begin
   if (FFindArea <> InvalidLinesArea) then
   begin
-    if (foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options) then
+    if (foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options) then
     begin
       FFindArea.BeginPosition := FFindPosition;
       FFindPosition := FLines.EOFPosition;
@@ -11148,11 +11187,11 @@ begin
 
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      foCaseSensitive in PBCEditorCommandDataFind(FLastSearchData)^.Options, foWholeWordsOnly in PBCEditorCommandDataFind(FLastSearchData)^.Options, foRegExpr in PBCEditorCommandDataFind(FLastSearchData)^.Options,
-      PBCEditorCommandDataFind(FLastSearchData)^.Pattern);
+      foCaseSensitive in TBCEditorCommandDataFind(FLastSearchData).Options, foWholeWordsOnly in TBCEditorCommandDataFind(FLastSearchData).Options, foRegExpr in TBCEditorCommandDataFind(FLastSearchData).Options,
+      TBCEditorCommandDataFind(FLastSearchData).Pattern);
     FFindState := fsWrappedAround;
 
-    FLines.StartSearch(LSearch, FFindPosition, False, foBackwards in PBCEditorCommandDataFind(FLastSearchData)^.Options, True, FindExecuted);
+    FLines.StartSearch(LSearch, FFindPosition, False, foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options, True, FindExecuted);
 
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;
@@ -11909,7 +11948,7 @@ begin
   if (not (csDestroying in ComponentState)) then
   begin
     if (not Assigned(FCompletionProposalPopup)) then
-      UpdateCaret();
+      InvalidateCaret();
 
     if (HideSelection and not FLines.SelArea.IsEmpty()) then
       InvalidateText();
@@ -11998,8 +12037,9 @@ begin
 
   NotifyParent(EN_SETFOCUS);
 
-  if (not GetUpdateRect(WindowHandle, nil, not (csOpaque in ControlStyle))) then
-    UpdateCaret();
+  if (not GetUpdateRect(WindowHandle, nil, not (csOpaque in ControlStyle))
+    or not (esCaretInvalid in FState)) then
+    InvalidateCaret();
 
   if (HideSelection and not FLines.SelArea.IsEmpty()) then
     InvalidateText();
@@ -12238,4 +12278,3 @@ initialization
 finalization
   OleUninitialize();
 end.
-

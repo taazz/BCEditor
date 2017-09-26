@@ -660,13 +660,13 @@ uses
   BCEditor, BCEditor.Properties;
 
 resourcestring
-  SBCEditorErrorInHighlighterParse = 'JSON parse error on line %d column %d: %s';
-  SBCEditorErrorInHighlighterImport = 'Error in highlighter import: %s';
-  SBCEditorHighlighterJSONInvalidPair = 'Invalid JSON value type for pair "%s" (Expected type: %s, Found type: %s)';
-  SBCEditorHighlighterJSONInvalidValue = 'Invalid JSON value type for item #%d (Expected type: %s, Found type: %s)';
-  SBCEditorHighlighterJSONItemNotFound = 'Missing item #%d';
-  SBCEditorHighlighterJSONPairNotFound = 'Missing pair "%s" in JSON';
-  SBCEditorHighlighterJSONSyntaxError = 'Syntax Error in JSON (Line: %d, Column: %d)';
+  SInHighlighterParse = 'JSON parse error on line %d column %d: %s';
+  SErrorInHighlighterImport = 'Error in highlighter import: %s';
+  SJSONInvalidPair = 'Invalid JSON value type for pair "%s" (Expected type: %s, Found type: %s)';
+  SJSONInvalidValue = 'Invalid JSON value type for item #%d (Expected type: %s, Found type: %s)';
+  SJSONItemNotFound = 'Missing item #%d';
+  SJSONPairNotFound = 'Missing pair "%s" in JSON';
+  SJSONSyntaxError = 'Syntax Error in JSON (Line: %d, Column: %d)';
 
 type
   TCustomBCEditor = class(BCEditor.TCustomBCEditor);
@@ -689,7 +689,7 @@ var
   LStringList: TStringList;
 begin
   if (AJSON = '') then
-    raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONSyntaxError, [1, 1])
+    raise EBCEditorHighlighterJSON.CreateFmt(SJSONSyntaxError, [1, 1])
   else
   begin
     Result := TJSONObject.Create();
@@ -707,7 +707,7 @@ begin
         Inc(LLine);
       end;
       LChar := LPos;
-      raise Exception.CreateFmt(SBCEditorHighlighterJSONSyntaxError, [LLine + 1, LChar + 1]);
+      raise Exception.CreateFmt(SJSONSyntaxError, [LLine + 1, LChar + 1]);
       LStringList.Free();
       FreeAndNil(Result);
     end;
@@ -773,9 +773,9 @@ begin
   begin
     LJsonValue := AParentArray.Get(AIndex);
     if (ARequired and not Assigned(LJsonValue)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONItemNotFound, [AIndex]);
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONItemNotFound, [AIndex]);
     if (ARequired and (LJsonValue.ClassType <> AClassType)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONInvalidValue, [AIndex, JSONValueType(AClassType), JSONValueType(LJsonValue.ClassType)]);
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidValue, [AIndex, JSONValueType(AClassType), JSONValueType(LJsonValue.ClassType)]);
     Result := LJsonValue;
   end;
 end;
@@ -791,9 +791,9 @@ begin
   begin
     LPair := AParentObject.Get(AName);
     if (ARequired and not Assigned(LPair)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONPairNotFound, [AName]);
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, [AName]);
     if (ARequired and (LPair.JsonValue.ClassType <> AClassType)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONInvalidPair, [AName, JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidPair, [AName, JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
     if (not Assigned(LPair)) then
       Result := nil
     else
@@ -812,9 +812,9 @@ begin
   begin
     LPair := AParentObject.Get(AIndex);
     if (not Assigned(LPair)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONPairNotFound, ['#' + IntToStr(AIndex)]);
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, ['#' + IntToStr(AIndex)]);
     if ((AName <> '') and (LPair.JsonValue.ClassType <> AClassType)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SBCEditorHighlighterJSONInvalidPair, ['#' + IntToStr(AIndex), JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidPair, ['#' + IntToStr(AIndex), JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
     if (not Assigned(LPair) or (AName <> '') and (LPair.JsonString.Value() <> AName)) then
       Result := nil
     else
