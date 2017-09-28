@@ -829,7 +829,7 @@ begin
     Result := nil
   else if (AParent is TJSONObject) then
   begin
-    LPair := TJSONObject(AParent).Get(AName);
+    LPair := TJSONObject(AParent).Get(AIndex);
     if (not Assigned(LPair)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, ['#' + IntToStr(AIndex)]);
     if ((AName <> '') and (LPair.JsonValue.ClassType <> AClassType)) then

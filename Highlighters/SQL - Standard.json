@@ -1,10 +1,10 @@
 {
   "Info": {
-    "Name": "SQL - Standard"
+    "Name": "SQL - Standard",
     "FileExtensions": [
-      ".sql
+      ".sql"
     ]
- },
+  },
   "Highlighter": {
     "Sample": [
       "CREATE TABLE DUAL\r\n",
