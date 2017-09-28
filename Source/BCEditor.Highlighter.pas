@@ -600,7 +600,6 @@ type
     FMatchingPairHighlight: Boolean;
     FMatchingPairs: TList<TMatchingPairToken>;
     FMultiHighlighter: Boolean;
-    xFName: string;
     FOnChange: TNotifyEvent;
     FSample: string;
     FSkipCloseKeyChars: TBCEditorAnsiCharSet;
