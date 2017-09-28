@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "D"
+    "DefaultFileExtension": ".d",
+    "FileExtensions": [
+      ".d",
+      ".di"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in D\r\n",

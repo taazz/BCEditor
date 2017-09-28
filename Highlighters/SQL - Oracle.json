@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "SQL - Oracle"
+    "FileExtensions": [
+      ".sql"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "SELECT \"Hello world!\" FROM dual;"

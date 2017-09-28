@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Python"
+    "FileExtensions": [
+      ".py"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "#!/path/to/python\r\n",

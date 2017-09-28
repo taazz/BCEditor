@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Java"
+    "FileExtensions": [
+      ".java"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "/* HelloWorld.java\r\n",

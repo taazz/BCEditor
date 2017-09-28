@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "SQL - Firebird"
+    "FileExtensions": [
+      ".sql"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "select \"Hello world!\" from RDB$DATABASE;"

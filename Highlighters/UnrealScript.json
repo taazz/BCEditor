@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "UnrealScript"
+    "FileExtensions": [
+      ".us"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in UnrealScript\r\n",

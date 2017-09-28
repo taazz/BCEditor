@@ -1,4 +1,14 @@
 {
+  "Info": {
+    "Name": "Groovy"
+    "DefaultFileExtension": ".groovy",
+    "FileExtensions": [
+      ".groovy",
+      ".gvy",
+      ".gy",
+      ".gsh"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in Groovy\r\n",

@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "MIME"
+    "DefaultFileExtension": ".eml",
+    "FileExtensions": [
+      ".eml",
+      ".mht"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "MIME-Version: 1.0\r\n",

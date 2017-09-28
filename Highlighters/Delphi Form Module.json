@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Delphi Form Module"
+    "FileExtensions": [
+      ".dfm"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "object Form1: TForm1\r\n",

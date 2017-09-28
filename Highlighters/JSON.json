@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "JSON"
+    "FileExtensions": [
+      ".json"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "{\r\n",
@@ -305,13 +311,6 @@
         "CloseToken": "\"",
         "RegionType": "SingleLineString"
       }
-    ]
-  },
-  "Detection": {
-    "FirstLinePattern": "^( |\t)*{",
-    "DefaultExtension": ".json",
-    "Extensions": [
-      ".json"
     ]
   }
 }

@@ -564,19 +564,22 @@ type
       property Text: PChar read FText;
     end;
 
-    TDetection = class
+    TInfo = class
     strict private
-      FDefaultExtension: string;
-      FExtensions: TStringList;
+      FDefaultFileExtension: string;
+      FFileExtensions: TStringList;
       FFirstLinePattern: string;
+      FName: string;
+      function GetDefaultFileExtension(): string;
     protected
       procedure Clear();
       procedure LoadFromJSON(const AJSON: TJSONObject);
+      property Name: string read FName;
     public
       constructor Create();
       destructor Destroy(); override;
-      property DefaultExtension: string read FDefaultExtension;
-      property Extensions: TStringList read FExtensions;
+      property DefaultFileExtension: string read GetDefaultFileExtension;
+      property FileExtensions: TStringList read FFileExtensions;
       property FirstLinePattern: string read FFirstLinePattern;
     end;
 
@@ -587,23 +590,24 @@ type
     FColors: TElements;
     FComments: TComments;
     FCompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions;
-    FDetection: TDetection;
     FDirectory: string;
     FEditor: TCustomControl;
     FFilename: string;
     FFoldCloseKeyChars: TBCEditorAnsiCharSet;
     FFoldOpenKeyChars: TBCEditorAnsiCharSet;
+    FInfo: TInfo;
     FMainRules: TRange;
     FMatchingPairHighlight: Boolean;
     FMatchingPairs: TList<TMatchingPairToken>;
     FMultiHighlighter: Boolean;
-    FName: string;
+    xFName: string;
     FOnChange: TNotifyEvent;
     FSample: string;
     FSkipCloseKeyChars: TBCEditorAnsiCharSet;
     FSkipOpenKeyChars: TBCEditorAnsiCharSet;
     FWordBreakChars: TBCEditorAnsiCharSet;
     procedure AddAllAttributes(ARange: TRange);
+    function GetName(): string;
     procedure UpdateAttributes(ARange: TRange; AParentRange: TRange);
   strict private
     procedure DoChange();
@@ -637,15 +641,15 @@ type
     property Colors: TElements read FColors write FColors;
     property Comments: TComments read FComments write FComments;
     property CompletionProposalSkipRegions: TBCEditorCodeFoldingSkipRegions read FCompletionProposalSkipRegions write FCompletionProposalSkipRegions;
-    property Detection: TDetection read FDetection;
     property Filename: string read FFilename;
     property FoldCloseKeyChars: TBCEditorAnsiCharSet read FFoldCloseKeyChars write FFoldCloseKeyChars;
     property FoldOpenKeyChars: TBCEditorAnsiCharSet read FFoldOpenKeyChars write FFoldOpenKeyChars;
+    property Info: TInfo read FInfo;
     property MainRules: TRange read FMainRules;
     property MatchingPairHighlight: Boolean read FMatchingPairHighlight write FMatchingPairHighlight default True;
     property MatchingPairs: TList<TMatchingPairToken> read FMatchingPairs;
     property MultiHighlighter: Boolean read FMultiHighlighter write FMultiHighlighter;
-    property Name: string read FName;
+    property Name: string read GetName;
     property Sample: string read FSample write FSample;
     property SkipCloseKeyChars: TBCEditorAnsiCharSet read FSkipCloseKeyChars write FSkipCloseKeyChars;
     property SkipOpenKeyChars: TBCEditorAnsiCharSet read FSkipOpenKeyChars write FSkipOpenKeyChars;
@@ -663,6 +667,7 @@ resourcestring
   SInHighlighterParse = 'JSON parse error on line %d column %d: %s';
   SErrorInHighlighterImport = 'Error in highlighter import: %s';
   SJSONInvalidPair = 'Invalid JSON value type for pair "%s" (Expected type: %s, Found type: %s)';
+  SJSONInvalidParent = 'Invalid Parent Type: %s';
   SJSONInvalidValue = 'Invalid JSON value type for item #%d (Expected type: %s, Found type: %s)';
   SJSONItemNotFound = 'Missing item #%d';
   SJSONPairNotFound = 'Missing pair "%s" in JSON';
@@ -762,34 +767,16 @@ begin
     raise Exception.Create('Unknown TJSONValue class: ' + AJsonValue.ClassName);
 end;
 
-function GetJSONValue(const AParentArray: TJSONArray; const AIndex: Integer;
-  const AClassType: TClass; const ARequired: Boolean = False): TJSONValue; overload;
-var
-  LJsonValue: TJSONValue;
-begin
-  if (not Assigned(AParentArray)) then
-    Result := nil
-  else
-  begin
-    LJsonValue := AParentArray.Get(AIndex);
-    if (ARequired and not Assigned(LJsonValue)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SJSONItemNotFound, [AIndex]);
-    if (ARequired and (LJsonValue.ClassType <> AClassType)) then
-      raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidValue, [AIndex, JSONValueType(AClassType), JSONValueType(LJsonValue.ClassType)]);
-    Result := LJsonValue;
-  end;
-end;
-
-function GetJSONValue(const AParentObject: TJSONObject; const AName: string;
+function GetJSONValue(const AParent: TJSONObject; const AName: string;
   const AClassType: TClass; const ARequired: Boolean = False): TJSONValue; overload;
 var
   LPair: TJSONPair;
 begin
-  if (not Assigned(AParentObject)) then
+  if (not Assigned(AParent)) then
     Result := nil
-  else
+  else if (AParent is TJSONObject) then
   begin
-    LPair := AParentObject.Get(AName);
+    LPair := TJSONObject(AParent).Get(AName);
     if (ARequired and not Assigned(LPair)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, [AName]);
     if (ARequired and (LPair.JsonValue.ClassType <> AClassType)) then
@@ -798,19 +785,52 @@ begin
       Result := nil
     else
       Result := LPair.JsonValue;
-  end;
+  end
+  else
+    raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidParent, [AParent.ClassName]);
 end;
 
-function GetJSONValue(const AParentObject: TJSONObject; const AIndex: Integer;
-  const AClassType: TClass; const AName: string = ''): TJSONValue; overload;
+function GetJSONValue(const AParent: TJSONValue; const AIndex: Integer;
+  const AClassType: TClass; const ARequired: Boolean = False): TJSONValue; overload;
 var
   LPair: TJSONPair;
 begin
-  if (not Assigned(AParentObject)) then
+  if (not Assigned(AParent)) then
     Result := nil
-  else
+  else if (AParent is TJSONArray) then
   begin
-    LPair := AParentObject.Get(AIndex);
+    Result := TJSONArray(AParent).Get(AIndex);
+    if (ARequired and not Assigned(Result)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONItemNotFound, [AIndex]);
+    if (ARequired and (Result.ClassType <> AClassType)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidValue, [AIndex, JSONValueType(AClassType), JSONValueType(Result.ClassType)]);
+  end
+  else if (AParent is TJSONObject) then
+  begin
+    LPair := TJSONObject(AParent).Get(AIndex);
+    if (ARequired and not Assigned(LPair)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, ['#' + IntToStr(AIndex)]);
+    if (ARequired and (LPair.JsonValue.ClassType <> AClassType)) then
+      raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidPair, ['#' + IntToStr(AIndex), JSONValueType(AClassType), JSONValueType(LPair.JsonValue.ClassType)]);
+    if (not Assigned(LPair)) then
+      Result := nil
+    else
+      Result := LPair.JsonValue;
+  end
+  else
+    raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidParent, [AParent.ClassName]);
+end;
+
+function GetJSONValue(const AParent: TJSONValue; const AIndex: Integer;
+  const AClassType: TClass; const AName: string): TJSONValue; overload;
+var
+  LPair: TJSONPair;
+begin
+  if (not Assigned(AParent)) then
+    Result := nil
+  else if (AParent is TJSONObject) then
+  begin
+    LPair := TJSONObject(AParent).Get(AName);
     if (not Assigned(LPair)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, ['#' + IntToStr(AIndex)]);
     if ((AName <> '') and (LPair.JsonValue.ClassType <> AClassType)) then
@@ -819,27 +839,29 @@ begin
       Result := nil
     else
       Result := LPair.JsonValue;
-  end;
+  end
+  else
+    raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidParent, [AParent.ClassName]);
 end;
 
-function GetJSONArray(const AParentObject: TJSONObject; const AName: string;
+function GetJSONArray(const AParent: TJSONObject; const AName: string;
   const ARequired: Boolean = False): TJSONArray; overload; inline;
 begin
-  Result := GetJSONValue(AParentObject, AName, TJSONArray, ARequired) as TJSONArray;
+  Result := GetJSONValue(AParent, AName, TJSONArray, ARequired) as TJSONArray;
 end;
 
-function GetJSONArray(const AParentObject: TJSONObject; const AIndex: Integer;
+function GetJSONArray(const AParent: TJSONValue; const AIndex: Integer;
   const AName: string = ''): TJSONArray; overload; inline;
 begin
-  Result := GetJSONValue(AParentObject, AIndex, TJSONArray, AName) as TJSONArray;
+  Result := GetJSONValue(AParent, AIndex, TJSONArray, AName) as TJSONArray;
 end;
 
-function GetJSONBoolean(const AParentArray: TJSONArray; const AIndex: Integer;
+function GetJSONBoolean(const AParent: TJSONValue; const AIndex: Integer;
   const ADefault: Boolean = False): Boolean; overload;
 var
   LJSONValue: TJSONValue;
 begin
-  LJSONValue := GetJSONValue(AParentArray, AIndex, TJSONValue);
+  LJSONValue := GetJSONValue(AParent, AIndex, TJSONValue);
   if (LJSONValue is TJSONTrue) then
     Result := True
   else if (LJSONValue is TJSONFalse) then
@@ -848,12 +870,12 @@ begin
     Result := ADefault;
 end;
 
-function GetJSONBoolean(const AParentObject: TJSONObject; const AName: string;
+function GetJSONBoolean(const AParent: TJSONObject; const AName: string;
   const ADefault: Boolean = False): Boolean; overload;
 var
   LJSONValue: TJSONValue;
 begin
-  LJSONValue := GetJSONValue(AParentObject, AName, TJSONValue);
+  LJSONValue := GetJSONValue(AParent, AName, TJSONValue);
   if (LJSONValue is TJSONTrue) then
     Result := True
   else if (LJSONValue is TJSONFalse) then
@@ -862,61 +884,47 @@ begin
     Result := ADefault;
 end;
 
-function GetJSONString(const AParentArray: TJSONArray; const AIndex: Integer;
+function GetJSONString(const AParent: TJSONValue; const AIndex: Integer;
   const ADefault: string = ''; const ARequired: Boolean = False): string; overload;
 var
   LJSONString: TJSONString;
 begin
-  LJSONString := GetJSONValue(AParentArray, AIndex, TJSONString, ARequired) as TJSONString;
+  LJSONString := GetJSONValue(AParent, AIndex, TJSONString, ARequired) as TJSONString;
   if (not Assigned(LJSONString)) then
     Result := ADefault
   else
     Result := LJSONString.Value();
 end;
 
-function GetJSONString(const AParentArray: TJSONArray; const AIndex: Integer;
-  const ARequired: Boolean): string; overload;
-var
-  LJSONString: TJSONString;
-begin
-  LJSONString := GetJSONValue(AParentArray, AIndex, TJSONString, ARequired) as TJSONString;
-  Result := LJSONString.Value();
-end;
-
-function GetJSONString(const AParentObject: TJSONObject; const AName: string;
+function GetJSONString(const AParent: TJSONObject; const AName: string;
   const ADefault: string = ''): string; overload;
 var
   LJSONString: TJSONString;
 begin
-  LJSONString := GetJSONValue(AParentObject, AName, TJSONString) as TJSONString;
+  LJSONString := GetJSONValue(AParent, AName, TJSONString) as TJSONString;
   if (not Assigned(LJSONString)) then
     Result := ADefault
   else
     Result := LJSONString.Value();
 end;
 
-function GetJSONString(const AParentObject: TJSONObject; const AName: string;
+function GetJSONString(const AParent: TJSONObject; const AName: string;
   const ARequired: Boolean): string; overload;
 var
   LJSONString: TJSONString;
 begin
-  LJSONString := GetJSONValue(AParentObject, AName, TJSONString, ARequired) as TJSONString;
+  LJSONString := GetJSONValue(AParent, AName, TJSONString, ARequired) as TJSONString;
   Result := LJSONString.Value();
 end;
 
-function GetJSONObject(const AParentArray: TJSONArray; const AIndex: Integer): TJSONObject; overload; inline;
+function GetJSONObject(const AParent: TJSONValue; const AIndex: Integer): TJSONObject; overload; inline;
 begin
-  Result := GetJSONValue(AParentArray, AIndex, TJSONObject) as TJSONObject;
+  Result := GetJSONValue(AParent, AIndex, TJSONObject) as TJSONObject;
 end;
 
-function GetJSONObject(const AParentObject: TJSONObject; const AIndex: Integer): TJSONObject; overload; inline;
+function GetJSONObject(const AParent: TJSONObject; const AName: string): TJSONObject; overload; inline;
 begin
-  Result := GetJSONValue(AParentObject, AIndex, TJSONObject) as TJSONObject;
-end;
-
-function GetJSONObject(const AParentObject: TJSONObject; const AName: string): TJSONObject; overload; inline;
-begin
-  Result := GetJSONValue(AParentObject, AName, TJSONObject) as TJSONObject;
+  Result := GetJSONValue(AParent, AName, TJSONObject) as TJSONObject;
 end;
 
 function StringToColorDef(const AString: string; const DefaultColor: TColor): Integer;
@@ -2992,29 +3000,39 @@ end;
 
 { TBCEditorHighlighter.TDetection *********************************************}
 
-procedure TBCEditorHighlighter.TDetection.Clear();
+procedure TBCEditorHighlighter.TInfo.Clear();
 begin
-  FDefaultExtension := '';
-  FExtensions.Clear();
+  FDefaultFileExtension := '';
+  FFileExtensions.Clear();
   FFirstLinePattern := '';
 end;
 
-constructor TBCEditorHighlighter.TDetection.Create();
+constructor TBCEditorHighlighter.TInfo.Create();
 begin
   inherited Create();
 
-  FExtensions := TStringList.Create();
+  FFileExtensions := TStringList.Create();
   Clear();
 end;
 
-destructor TBCEditorHighlighter.TDetection.Destroy();
+destructor TBCEditorHighlighter.TInfo.Destroy();
 begin
-  FExtensions.Free();
+  FFileExtensions.Free();
 
   inherited;
 end;
 
-procedure TBCEditorHighlighter.TDetection.LoadFromJSON(const AJSON: TJSONObject);
+function TBCEditorHighlighter.TInfo.GetDefaultFileExtension(): string;
+begin
+  if (FDefaultFileExtension <> '') then
+    Result := FDefaultFileExtension
+  else if (FFileExtensions.Count > 0) then
+    Result := FFileExtensions[0]
+  else
+    Result := '';
+end;
+
+procedure TBCEditorHighlighter.TInfo.LoadFromJSON(const AJSON: TJSONObject);
 var
   LExtensionsArray: TJSONArray;
   LIndex: Integer;
@@ -3024,16 +3042,17 @@ begin
 
   if (Assigned(AJSON)) then
   begin
-    FDefaultExtension := GetJSONString(AJSON, 'Default');
+    FDefaultFileExtension := GetJSONString(AJSON, 'DefaultFileExtension');
     FFirstLinePattern := GetJSONString(AJSON, 'FirstLinePattern');
+    FName := GetJSONString(AJSON, 'Name');
 
-    LExtensionsArray := GetJSONArray(AJSON, 'Extensions');
+    LExtensionsArray := GetJSONArray(AJSON, 'FileExtensions');
     if (Assigned(LExtensionsArray)) then
       for LIndex := 0 to LExtensionsArray.Size - 1 do
       begin
         LString := GetJSONString(LExtensionsArray, LIndex);
         if ((LString <> '') and (LString[1] = '.')) then
-          FExtensions.Add(LString);
+          FFileExtensions.Add(LString);
       end;
   end;
 end;
@@ -3122,7 +3141,7 @@ begin
 
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
 
-  FDetection := TDetection.Create();
+  FInfo := TInfo.Create();
 end;
 
 procedure TBCEditorHighlighter.DoChange();
@@ -3137,7 +3156,7 @@ begin
 
   FCodeFoldingRegions.Free();
   FComments.Free();
-  FDetection.Free();
+  FInfo.Free();
   FMainRules.Free();
   FAttributes.Free();
   FCompletionProposalSkipRegions.Free();
@@ -3287,13 +3306,20 @@ begin
     Result := TAttribute(FAttributes.Objects[AIndex]);
 end;
 
+function TBCEditorHighlighter.GetName(): string;
+begin
+  if (Info.Name <> '') then
+    Result := Info.Name
+  else
+    Result := TPath.GetFileNameWithoutExtension(FFilename);
+end;
+
 procedure TBCEditorHighlighter.LoadFromFile(const AFilename: string);
 var
   LStream: TStream;
 begin
   FFilename := TPath.GetFullPath(AFilename);
   FDirectory := IncludeTrailingPathDelimiter(TPath.GetDirectoryName(FFilename));
-  FName := TPath.GetFileNameWithoutExtension(AFilename);
 
   LStream := TFileStream.Create(AFilename, fmOpenRead);
   LoadFromStream(LStream);
@@ -3314,6 +3340,8 @@ begin
 
   if (Assigned(AJSON)) then
   begin
+    FInfo.LoadFromJSON(GetJSONObject(AJSON, 'Info'));
+
     LSampleArray := GetJSONArray(AJSON, 'Sample');
     if (Assigned(LSampleArray)) then
       for LIndex := 0 to LSampleArray.Size - 1 do
@@ -3346,8 +3374,6 @@ begin
 
     LoadMatchingPairFromJSON(GetJSONObject(AJSON, 'MatchingPair'));
     LoadCompletionProposalFromJSON(GetJSONObject(AJSON, 'CompletionProposal'));
-
-    FDetection.LoadFromJSON(GetJSONObject(AJSON, 'Detection'));
   end;
 
   UpdateColors();

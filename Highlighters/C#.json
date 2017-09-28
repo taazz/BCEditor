@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "C#"
+    "FileExtensions": [
+      ".cs"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in C Sharp\r\n",

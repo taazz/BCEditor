@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "C++"
+    "DefaultFileExtension": ".cpp",
+    "FileExtensions": [
+      ".cpp",
+      ".hpp"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in C++\r\n",

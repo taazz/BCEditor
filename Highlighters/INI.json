@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "INI"
+    "FileExtensions": [
+      ".ini"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "; Comment\r\n",

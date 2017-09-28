@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "AWK"
+    "FileExtensions": [
+      ".awk"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "# Hello World in AWK\r\n",

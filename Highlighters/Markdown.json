@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Markdown"
+    "FileExtensions": [
+      ".md"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "## Hello World in Markdown ##\r\n",

@@ -474,7 +474,7 @@ type
     FWordWrap: Boolean;
     procedure AskReplaceText(ASender: TObject; const AArea: TBCEditorLinesArea;
       const ABackwards: Boolean; const AReplaceText: string; var AAction: TBCEditorReplaceAction);
-    function AskSearchWrapAround(const AData: TBCEditorCommandDataFind): Boolean;
+    function AskSearchWrapAround(const AData: PBCEditorCommandDataFind): Boolean;
     procedure BookmarksChanged(ASender: TObject);
     procedure BuildRows(const AThread: TBuildRowsThread; const APaintHelper: TPaintHelper);
     function ClientToLines(const X, Y: Integer; const AForCaret: Boolean = False): TBCEditorLinesPosition; {$IFNDEF Debug} inline; {$ENDIF}
@@ -492,36 +492,36 @@ type
     procedure DoBackspaceKey();
     procedure DoBlockComment;
     procedure DoBOL(const ASelectionCommand: Boolean);
-    procedure DoChar(const AData: TBCEditorCommandDataChar);
+    procedure DoChar(const AData: PBCEditorCommandDataChar);
     procedure DoCopyToClipboard();
     procedure DoCutToClipboard();
     procedure DoDeleteToEOL();
     procedure DoDeleteWord();
-    procedure DoDropOLE(const AData: TBCEditorCommandDataDropOLE);
+    procedure DoDropOLE(const AData: PBCEditorCommandDataDropOLE);
     procedure DoEOF(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
     procedure DoEOL(const ASelectionCommand: Boolean);
     procedure DoBOF(const ACommand: TBCEditorCommand); {$IFNDEF Debug} inline; {$ENDIF}
-    function DoFindBackwards(const AData: TBCEditorCommandDataFind): Boolean;
-    procedure DoFindFirst(const AData: TBCEditorCommandDataFind);
-    function DoFindForewards(const AData: TBCEditorCommandDataFind): Boolean;
+    function DoFindBackwards(const AData: PBCEditorCommandDataFind): Boolean;
+    procedure DoFindFirst(const AData: PBCEditorCommandDataFind);
+    function DoFindForewards(const AData: PBCEditorCommandDataFind): Boolean;
     procedure DoInsertText(const AText: string);
     procedure DoLeftOrRightKey(const ACommand: TBCEditorCommand);
     procedure DoLineComment();
     procedure DoPageUpOrDownKey(const ACommand: TBCEditorCommand);
     procedure DoPageTopOrBottomKey(const ACommand: TBCEditorCommand);
-    procedure DoPosition(const AData: TBCEditorCommandDataPosition);
-    procedure DoReplace(const AData: TBCEditorCommandDataReplace);
+    procedure DoPosition(const AData: PBCEditorCommandDataPosition);
+    procedure DoReplace(const AData: PBCEditorCommandDataReplace);
     procedure DoReturnKey();
     procedure DoScroll(const ACommand: TBCEditorCommand);
-    procedure DoScrollTo(const AData: TBCEditorCommandDataScrollTo);
+    procedure DoScrollTo(const AData: PBCEditorCommandDataScrollTo);
     procedure DoSelectAll();
-    procedure DoSelection(const AData: TBCEditorCommandDataSelection);
+    procedure DoSelection(const AData: PBCEditorCommandDataSelection);
     procedure DoShowFind(const First: Boolean);
     procedure DoShowGotoLine();
     procedure DoShowReplace();
     procedure DoSetBookmark(const ACommand: TBCEditorCommand);
     procedure DoTabKey(const ACommand: TBCEditorCommand);
-    procedure DoText(const AData: TBCEditorCommandDataText);
+    procedure DoText(const AData: PBCEditorCommandDataText);
     procedure DoToggleSelectedCase(const ACommand: TBCEditorCommand);
     procedure DoUnselect();
     procedure DoUpOrDown(const ARows: Integer; const ASelect: Boolean);
@@ -1029,7 +1029,7 @@ uses
   ShellAPI, Imm, CommCtrl,
   Math, Types, Character, RegularExpressions, ComObj, SysConst,
   Clipbrd, Themes, ImgList,
-  BCEditor.ExportHTML;
+  BCEditor.ExportHTML, BCEditor.Locale;
 
 const
   SLineIsNotVisible = 'Line %d is not visible';
@@ -2148,26 +2148,26 @@ begin
     end;
 end;
 
-function TCustomBCEditor.AskSearchWrapAround(const AData: TBCEditorCommandDataFind): Boolean;
+function TCustomBCEditor.AskSearchWrapAround(const AData: PBCEditorCommandDataFind): Boolean;
 var
   LHandle: THandle;
   LText: string;
 begin
-  if (foWrapAround in AData.Options) then
+  if (foWrapAround in AData^.Options) then
     Result := True
   else if (Assigned(FOnFindWrapAround)) then
-    Result := FOnFindWrapAround(Self, AData.Pattern, foBackwards in AData.Options)
+    Result := FOnFindWrapAround(Self, AData^.Pattern, foBackwards in AData^.Options)
   else
   begin
     if (Assigned(FFindDialog)) then
       LHandle := FFindDialog.Handle
     else
       LHandle := WindowHandle;
-    if (foBackwards in AData.Options) then
-      LText := BCEditorTranslation(14, [AData.Pattern])
+    if (foBackwards in AData^.Options) then
+      LText := BCEditorTranslation(14, [AData^.Pattern])
     else
-      LText := BCEditorTranslation(13, [AData.Pattern]);
-    Result := MessageBox(LHandle, PChar(LText), PChar(BCEditorTranslation(12)), MB_ICONQUESTION or MB_YESNO) = IDYES;
+      LText := BCEditorTranslation(13, [AData^.Pattern]);
+    Result := MessageBox(LHandle, PChar(LText), PChar(BCEditorTranslation(12)), MB_ICONQUESTION or MB_YESNOCANCEL) = IDYES;
   end;
 end;
 
@@ -3392,9 +3392,9 @@ begin
   SetCaretPosition(LNewCaretPosition, ASelectionCommand);
 end;
 
-procedure TCustomBCEditor.DoChar(const AData: TBCEditorCommandDataChar);
+procedure TCustomBCEditor.DoChar(const AData: PBCEditorCommandDataChar);
 begin
-  DoInsertText(AData.Char);
+  DoInsertText(AData^.Char);
 end;
 
 procedure TCustomBCEditor.DoCompletionProposal();
@@ -3535,7 +3535,7 @@ begin
     FLines.DeleteText(LArea);
 end;
 
-procedure TCustomBCEditor.DoDropOLE(const AData: TBCEditorCommandDataDropOLE);
+procedure TCustomBCEditor.DoDropOLE(const AData: PBCEditorCommandDataDropOLE);
 var
   LFilename: string;
   LFormat: FORMATETC;
@@ -3549,9 +3549,9 @@ begin
   LFormat.dwAspect := DVASPECT_CONTENT;
   LFormat.lindex := -1;
   LFormat.tymed := TYMED_HGLOBAL;
-  if (AData.dataObj.QueryGetData(LFormat) = S_OK) then
+  if (AData^.dataObj.QueryGetData(LFormat) = S_OK) then
   begin
-    OleCheck(AData.dataObj.GetData(LFormat, LMedium));
+    OleCheck(AData^.dataObj.GetData(LFormat, LMedium));
     SetString(LText, PChar(GlobalLock(LMedium.hGlobal)), GlobalSize(LMedium.hGlobal) div SizeOf(LText[1]));
     FLines.CaretPosition := FInsertPos;
     SelText := LText;
@@ -3563,7 +3563,7 @@ begin
     LFormat.dwAspect := DVASPECT_CONTENT;
     LFormat.lindex := -1;
     LFormat.tymed := TYMED_HGLOBAL;
-    OleCheck(AData.dataObj.GetData(LFormat, LMedium));
+    OleCheck(AData^.dataObj.GetData(LFormat, LMedium));
     LLen := DragQueryFile(LMedium.hGlobal, 0, nil, 0);
     SetLength(LFilename, LLen + 1);
     Assert(DragQueryFile(LMedium.hGlobal, 0, PChar(LFilename), LLen + 1) = LLen);
@@ -3610,7 +3610,7 @@ begin
   SetCaretPosition(FLines.BOFPosition, ACommand = ecSelBOF);
 end;
 
-function TCustomBCEditor.DoFindBackwards(const AData: TBCEditorCommandDataFind): Boolean;
+function TCustomBCEditor.DoFindBackwards(const AData: PBCEditorCommandDataFind): Boolean;
 var
   LFindResult: TBCEditorLines.TSearchResult;
   LIndex: Integer;
@@ -3653,7 +3653,7 @@ begin
     if (not Result) then
     begin
       LFindResult.Area := InvalidLinesArea;
-      LFindResult.ErrorMessage := BCEditorTranslation(11, [AData.Pattern]);
+      LFindResult.ErrorMessage := BCEditorTranslation(11, [AData^.Pattern]);
     end
     else
     begin
@@ -3667,52 +3667,52 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoFindFirst(const AData: TBCEditorCommandDataFind);
+procedure TCustomBCEditor.DoFindFirst(const AData: PBCEditorCommandDataFind);
 var
   LSearch: TBCEditorLines.TSearch;
   LSearchArea: TBCEditorLinesArea;
 begin
   FLastSearch := lsFind;
-  FLastSearchData := AData;
+  FLastSearchData := AData^;
 
-  if ((foSelection in AData.Options) and not FLines.SelArea.IsEmpty()) then
+  if ((foSelection in AData^.Options) and not FLines.SelArea.IsEmpty()) then
     FFindArea := FLines.SelArea
   else
     FFindArea := FLines.Area;
 
   if (FLines.Count = 0) then
     FFindPosition := FLines.BOFPosition
-  else if (not (foEntireScope in AData.Options)) then
+  else if (not (foEntireScope in AData^.Options)) then
   begin
     FFindPosition.Line := Min(FLines.CaretPosition.Line, FLines.Count - 1);
     FFindPosition.Char := Min(FLines.CaretPosition.Char, Length(FLines[FLines.CaretPosition.Line]));
   end
-  else if (foBackwards in AData.Options) then
+  else if (foBackwards in AData^.Options) then
     FFindPosition := FLines.EOFPosition
   else
     FFindPosition := FLines.BOFPosition;
 
   FFindState := fsRequested;
 
-  if (foEntireScope in AData.Options) then
+  if (foEntireScope in AData^.Options) then
     LSearchArea := FFindArea
-  else if (foBackwards in AData.Options) then
+  else if (foBackwards in AData^.Options) then
     LSearchArea := LinesArea(FFindArea.BeginPosition, FFindPosition)
   else
     LSearchArea := LinesArea(FFindPosition, FFindArea.EndPosition);
 
   LSearch := TBCEditorLines.TSearch.Create(FLines,
     LSearchArea,
-    foCaseSensitive in AData.Options, foWholeWordsOnly in AData.Options, foRegExpr in AData.Options,
-    AData.Pattern);
+    foCaseSensitive in AData^.Options, foWholeWordsOnly in AData^.Options, foRegExpr in AData^.Options,
+    AData^.Pattern);
 
-  FLines.StartSearch(LSearch, FFindPosition, False, foBackwards in AData.Options, False, FindExecuted);
+  FLines.StartSearch(LSearch, FFindPosition, False, foBackwards in AData^.Options, False, FindExecuted);
   UpdateCursor();
 
   Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
 end;
 
-function TCustomBCEditor.DoFindForewards(const AData: TBCEditorCommandDataFind): Boolean;
+function TCustomBCEditor.DoFindForewards(const AData: PBCEditorCommandDataFind): Boolean;
 var
   LFindResult: TBCEditorLines.TSearchResult;
   LIndex: Integer;
@@ -3755,7 +3755,7 @@ begin
     if (not Result) then
     begin
       LFindResult.Area := InvalidLinesArea;
-      LFindResult.ErrorMessage := BCEditorTranslation(11, [AData.Pattern]);
+      LFindResult.ErrorMessage := BCEditorTranslation(11, [AData^.Pattern]);
     end
     else
     begin
@@ -3979,9 +3979,9 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoPosition(const AData: TBCEditorCommandDataPosition);
+procedure TCustomBCEditor.DoPosition(const AData: PBCEditorCommandDataPosition);
 begin
-  SetCaretPosition(AData.Pos, AData.Selection);
+  SetCaretPosition(AData^.Pos, AData^.Selection);
 end;
 
 procedure TCustomBCEditor.DoRedo();
@@ -3989,47 +3989,47 @@ begin
   Redo();
 end;
 
-procedure TCustomBCEditor.DoReplace(const AData: TBCEditorCommandDataReplace);
+procedure TCustomBCEditor.DoReplace(const AData: PBCEditorCommandDataReplace);
 var
   LArea: TBCEditorLinesArea;
   LSearch: TBCEditorLines.TSearch;
   LSearchPosition: TBCEditorLinesPosition;
 begin
   FLastSearch := lsReplace;
-  FLastSearchData := AData;
+  FLastSearchData := AData^;
 
-  if ((roSelection in AData.Options) and not FLines.SelArea.IsEmpty()) then
+  if ((roSelection in AData^.Options) and not FLines.SelArea.IsEmpty()) then
     LArea := FLines.SelArea
   else
     LArea := FLines.Area;
-  if (not (roEntireScope in AData.Options) and not (roSelection in AData.Options)) then
-    if (roBackwards in AData.Options) then
+  if (not (roEntireScope in AData^.Options) and not (roSelection in AData^.Options)) then
+    if (roBackwards in AData^.Options) then
       LArea.EndPosition := FLines.CaretPosition
     else
       LArea.BeginPosition := FLines.CaretPosition;
 
-  if ((Length(AData.Pattern) > 0) and not (LArea.IsEmpty())) then
+  if ((Length(AData^.Pattern) > 0) and not (LArea.IsEmpty())) then
   begin
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       LArea,
-      roCaseSensitive in AData.Options, roWholeWordsOnly in AData.Options, roRegExpr in AData.Options,
-      AData.Pattern,
-      sjFindAndReplace, AData.ReplaceText, roPrompt in AData.Options);
+      roCaseSensitive in AData^.Options, roWholeWordsOnly in AData^.Options, roRegExpr in AData^.Options,
+      AData^.Pattern,
+      sjFindAndReplace, AData^.ReplaceText, roPrompt in AData^.Options);
 
     if (FLines.Count = 0) then
       LSearchPosition := FLines.BOFPosition
-    else if (not (roSelection in AData.Options)) then
+    else if (not (roSelection in AData^.Options)) then
     begin
       LSearchPosition := FLines.CaretPosition;
       LSearchPosition.Line := Min(LSearchPosition.Line, FLines.Count - 1);
       LSearchPosition.Char := Min(LSearchPosition.Char, Length(FLines[LSearchPosition.Line]));
     end
-    else if (roBackwards in AData.Options) then
+    else if (roBackwards in AData^.Options) then
       LSearchPosition := FLines.SelArea.EndPosition
     else
       LSearchPosition := FLines.SelArea.BeginPosition;
 
-    FLines.StartSearch(LSearch, LSearchPosition, roReplaceAll in AData.Options, roBackwards in AData.Options, True, ReplaceExecuted);
+    FLines.StartSearch(LSearch, LSearchPosition, roReplaceAll in AData^.Options, roBackwards in AData^.Options, True, ReplaceExecuted);
   end;
 end;
 
@@ -4071,9 +4071,9 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoScrollTo(const AData: TBCEditorCommandDataScrollTo);
+procedure TCustomBCEditor.DoScrollTo(const AData: PBCEditorCommandDataScrollTo);
 begin
-  SetTextPos(AData.Pos);
+  SetTextPos(AData^.Pos);
 end;
 
 procedure TCustomBCEditor.DoSelectAll();
@@ -4081,9 +4081,9 @@ begin
   SetSelArea(FLines.Area);
 end;
 
-procedure TCustomBCEditor.DoSelection(const AData: TBCEditorCommandDataSelection);
+procedure TCustomBCEditor.DoSelection(const AData: PBCEditorCommandDataSelection);
 begin
-  SetSelArea(LinesArea(AData.BeginPos, AData.EndPos), AData.CaretToBeginPosition);
+  SetSelArea(LinesArea(AData^.BeginPos, AData^.EndPos), AData^.CaretToBeginPosition);
 end;
 
 procedure TCustomBCEditor.DoShowFind(const First: Boolean);
@@ -4306,17 +4306,17 @@ begin
   end;
 end;
 
-procedure TCustomBCEditor.DoText(const AData: TBCEditorCommandDataText);
+procedure TCustomBCEditor.DoText(const AData: PBCEditorCommandDataText);
 var
   LOldCaretPosition: TBCEditorLinesPosition;
 begin
   FLines.BeginUpdate();
   try
-    if (AData.Delete and not FLines.SelArea.IsEmpty()) then
+    if (AData^.Delete and not FLines.SelArea.IsEmpty()) then
       FLines.DeleteText(FLines.SelArea);
     LOldCaretPosition := FLines.CaretPosition;
-    FLines.InsertText(FLines.CaretPosition, AData.Text);
-    if (AData.Selection) then
+    FLines.InsertText(FLines.CaretPosition, AData^.Text);
+    if (AData^.Selection) then
       SetSelArea(LinesArea(LOldCaretPosition, FLines.CaretPosition));
   finally
     FLines.EndUpdate();
@@ -5004,12 +5004,12 @@ end;
 
 procedure TCustomBCEditor.FindDialogFind(Sender: TObject);
 var
-  FNewSearchData: TBCEditorCommandDataFind;
+  FNewSearchData: TBCEditorCommandData;
   LOptions: TBCEditorFindOptions;
 begin
   Assert(Sender is TFindDialog);
 
-  LOptions := LOptions - [foRegExpr];
+  LOptions := [];
   if (frDown in TFindDialog(Sender).Options) then
     LOptions := LOptions - [foBackwards]
   else
@@ -5020,7 +5020,7 @@ begin
     LOptions := LOptions - [foCaseSensitive];
   LOptions := LOptions - [foEntireScope];
   if (FLines.SelArea.IsEmpty()
-    or FSearchExecuted and not (foSelection in TBCEditorCommandDataFind(FLastSearchData).Options)) then
+    or FSearchExecuted and not (foSelection in PBCEditorCommandDataFind(@FLastSearchData)^.Options)) then
     LOptions := LOptions - [foSelection]
   else
     LOptions := LOptions + [foSelection];
@@ -5032,10 +5032,14 @@ begin
   FNewSearchData := TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions);
 
   if ((FLastSearch = lsFind)
-    and (FNewSearchData = TBCEditorCommandDataFind(FLastSearchData))) then
+    and Assigned(FLastSearchData)
+    and (PBCEditorCommandDataFind(@FNewSearchData[0])^ = PBCEditorCommandDataFind(@FLastSearchData[0])^)) then
     ProcessCommand(ecFindNext)
   else
+  begin
+    FLastSearch := lsFind;
     ProcessCommand(ecFindFirst, FNewSearchData);
+  end;
 end;
 
 procedure TCustomBCEditor.FindExecuted(const AData: Pointer);
@@ -5047,7 +5051,7 @@ begin
 
   if ((LSearchResult.Area <> InvalidLinesArea)
     and (FFindState = fsWrappedAround)
-    and not AskSearchWrapAround(TBCEditorCommandDataFind(AData^))) then
+    and not AskSearchWrapAround(PBCEditorCommandDataFind(AData))) then
     LSearchResult.Area := InvalidLinesArea;
 
   if (not LSearchResult.AllAreas) then
@@ -5062,14 +5066,14 @@ begin
       end;
     end
     else if (LSearchResult.ErrorMessage = '') then
-      LSearchResult.ErrorMessage := BCEditorTranslation(11, [TBCEditorCommandDataFind(FLastSearchData).Pattern]);
+      LSearchResult.ErrorMessage := BCEditorTranslation(11, [PBCEditorCommandDataFind(@FLastSearchData[0])^.Pattern]);
     FSearchExecuted := LSearchResult.Area <> InvalidLinesArea;
 
     UpdateCursor();
   end;
 
   if ((LSearchResult.Area = InvalidLinesArea)
-    and not (foEntireScope in TBCEditorCommandDataFind(FLastSearchData).Options)
+    and not (foEntireScope in PBCEditorCommandDataFind(@FLastSearchData)^.Options)
     and (not LSearchResult.Backwards and (FFindArea.BeginPosition > FLines.BOFPosition)
       or LSearchResult.Backwards and (FFindArea.EndPosition < FLines.EOFPosition))
     and (FFindState = fsRequested)) then
@@ -5091,7 +5095,6 @@ begin
 
     if ((eoHighlightAllFoundTexts in FOptions)
       and (LSearchResult.Area <> InvalidLinesArea)) then
-    begin
       if (FFindState in [fsRequested, fsWrappedAround]) then
         PostMessage(WindowHandle, UM_FIND_ALLAREAS, 0, 0)
       else if (FFindState = fsAllAreas) then
@@ -5099,7 +5102,6 @@ begin
         Include(FState, esHighlightSearchAllAreas);
         InvalidateText();
       end;
-    end;
   end;
 end;
 
@@ -7979,7 +7981,7 @@ begin
           ecClear:
             FLines.Clear();
           ecChar:
-            DoChar(AData);
+            DoChar(PBCEditorCommandDataChar(@AData[0]));
           ecCopyToClipboard:
             DoCopyToClipboard();
           ecCutToClipboard:
@@ -7999,31 +8001,31 @@ begin
           ecDown:
             DoUpOrDown(1, LCommand = ecSelDown);
           ecDropOLE:
-            DoDropOLE(AData);
+            DoDropOLE(@AData[0]);
           ecEOF:
             DoEOF(LCommand);
           ecEOL:
             DoEOL(LCommand = ecSelEOL);
           ecFindFirst:
-            DoFindFirst(AData);
+            DoFindFirst(@AData[0]);
           ecFindNext:
             if (FLastSearch = lsReplace) then
-              DoReplace(FLastSearchData)
-            else if (not Assigned(FLastSearchData)) then
+              DoReplace(@FLastSearchData)
+            else if (not Assigned(FLastSearchData) or (FLines.FoundAreas.Count = 0)) then
               DoShowFind(True)
-            else if (foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options) then
-              DoFindBackwards(FLastSearchData)
+            else if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
+              DoFindBackwards(@FLastSearchData[0])
             else
-              DoFindForewards(FLastSearchData);
+              DoFindForewards(@FLastSearchData[0]);
           ecFindPrevious:
             if (FLastSearch = lsReplace) then
-              DoReplace(FLastSearchData)
+              DoReplace(@FLastSearchData)
             else if (not Assigned(FLastSearchData)) then
               DoShowFind(True)
-            else if (foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options) then
-              DoFindForewards(FLastSearchData)
+            else if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
+              DoFindForewards(@FLastSearchData[0])
             else
-              DoFindBackwards(FLastSearchData);
+              DoFindBackwards(@FLastSearchData[0]);
           ecGotoBookmark1 .. ecGotoBookmark0:
             GotoBookmark(Ord(LCommand) - Ord(ecGotoBookmark1));
           ecGotoMatchingPair:
@@ -8055,11 +8057,11 @@ begin
           ecPasteFromClipboard:
             PasteFromClipboard();
           ecPosition:
-            DoPosition(AData);
+            DoPosition(@AData[0]);
           ecRedo:
             FLines.Redo();
           ecReplace:
-            DoReplace(AData);
+            DoReplace(@AData[0]);
           ecReturn:
             if (FWantReturns) then DoReturnKey();
           ecRight:
@@ -8071,11 +8073,11 @@ begin
           ecScrollRight:
             DoScroll(LCommand);
           ecScrollTo:
-            DoScrollTo(AData);
+            DoScrollTo(@AData[0]);
           ecScrollUp:
             DoScroll(LCommand);
           ecSel:
-            DoSelection(AData);
+            DoSelection(@AData[0]);
           ecSelBOF:
             DoBOF(LCommand);
           ecSelBOL:
@@ -8125,7 +8127,7 @@ begin
           ecTab:
             if (FWantTabs) then DoTabKey(LCommand);
           ecText:
-            DoText(AData);
+            DoText(@AData[0]);
           ecToggleTextMode:
             if (not FTextOverwrite) then
               SetTextOverwrite(True)
@@ -9086,9 +9088,10 @@ end;
 
 procedure TCustomBCEditor.ReplaceDialogFind(ASender: TObject);
 var
+  FNewSearchData: TBCEditorCommandData;
   LOptions: TBCEditorFindOptions;
 begin
-  LOptions := LOptions - [foRegExpr];
+  LOptions := [];
   if (frDown in TReplaceDialog(ASender).Options) then
     LOptions := LOptions - [foBackwards]
   else
@@ -9103,16 +9106,24 @@ begin
   else
     LOptions := LOptions - [foWholeWordsOnly];
 
-  FLastSearch := lsFind;
-  FLastSearchData := TBCEditorCommandDataFind.Create(TReplaceDialog(ASender).FindText, LOptions);
-  ProcessCommand(ecFindFirst, FLastSearchData);
+  FNewSearchData := TBCEditorCommandDataFind.Create(TReplaceDialog(ASender).FindText, LOptions);
+
+  if ((FLastSearch = lsFind)
+    and Assigned(FLastSearchData)
+    and (PBCEditorCommandDataFind(@FNewSearchData[0])^ = PBCEditorCommandDataFind(@FLastSearchData[0])^)) then
+    ProcessCommand(ecFindNext)
+  else
+  begin
+    FLastSearch := lsFind;
+    ProcessCommand(ecFindFirst, FNewSearchData);
+  end;
 end;
 
 procedure TCustomBCEditor.ReplaceDialogReplace(ASender: TObject);
 var
   LOptions: TBCEditorReplaceOptions;
 begin
-  LOptions := LOptions - [roBackwards, roRegExpr];
+  LOptions := [];
   if (frMatchCase in TReplaceDialog(ASender).Options) then
     LOptions := LOptions + [roCaseSensitive]
   else
@@ -11157,8 +11168,8 @@ begin
   begin
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      foCaseSensitive in TBCEditorCommandDataFind(FLastSearchData).Options, foWholeWordsOnly in TBCEditorCommandDataFind(FLastSearchData).Options, foRegExpr in TBCEditorCommandDataFind(FLastSearchData).Options,
-      TBCEditorCommandDataFind(FLastSearchData).Pattern);
+      foCaseSensitive in PBCEditorCommandDataFind(@FLastSearchData[0])^.Options, foWholeWordsOnly in PBCEditorCommandDataFind(@FLastSearchData[0])^.Options, foRegExpr in PBCEditorCommandDataFind(@FLastSearchData[0])^.Options,
+      PBCEditorCommandDataFind(@FLastSearchData[0])^.Pattern);
     FFindArea := InvalidLinesArea;
     FFindState := fsAllAreas;
 
@@ -11174,7 +11185,7 @@ var
 begin
   if (FFindArea <> InvalidLinesArea) then
   begin
-    if (foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options) then
+    if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
     begin
       FFindArea.BeginPosition := FFindPosition;
       FFindPosition := FLines.EOFPosition;
@@ -11187,11 +11198,11 @@ begin
 
     LSearch := TBCEditorLines.TSearch.Create(FLines,
       FFindArea,
-      foCaseSensitive in TBCEditorCommandDataFind(FLastSearchData).Options, foWholeWordsOnly in TBCEditorCommandDataFind(FLastSearchData).Options, foRegExpr in TBCEditorCommandDataFind(FLastSearchData).Options,
-      TBCEditorCommandDataFind(FLastSearchData).Pattern);
+      foCaseSensitive in PBCEditorCommandDataFind(@FLastSearchData[0])^.Options, foWholeWordsOnly in PBCEditorCommandDataFind(@FLastSearchData[0]).Options, foRegExpr in PBCEditorCommandDataFind(@FLastSearchData[0]).Options,
+      PBCEditorCommandDataFind(@FLastSearchData[0])^.Pattern);
     FFindState := fsWrappedAround;
 
-    FLines.StartSearch(LSearch, FFindPosition, False, foBackwards in TBCEditorCommandDataFind(FLastSearchData).Options, True, FindExecuted);
+    FLines.StartSearch(LSearch, FFindPosition, False, foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options, True, FindExecuted);
 
     Sleep(GClientRefreshTime); // If search is fast enough, prevent double painting
   end;

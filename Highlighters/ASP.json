@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "ASP"
+    "FileExtensions": [
+      ".asp"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "<%\r\n",

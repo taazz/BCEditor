@@ -1,4 +1,13 @@
 {
+  "Info": {
+    "Name": "PHP"
+    "DefaultFileExtension": ".php",
+    "FileExtensions": [
+      ".php",
+      ".class",
+      ".inc"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "<?php\r\n",

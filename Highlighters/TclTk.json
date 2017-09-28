@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Tcl/Tk"
+    "FileExtensions": [
+      ".tcl"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "#!/path/to/wish\r\n",

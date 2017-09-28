@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "SQL - SQLite"
+    "FileExtensions": [
+      ".sqlite"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "CREATE TABLE DUAL\r\n",

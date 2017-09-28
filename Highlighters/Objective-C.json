@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Objective-C"
+    "FileExtensions": [
+      ".m"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "#import <Foundation/Foundation.h>\r\n",

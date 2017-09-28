@@ -15,104 +15,94 @@ type
 type
   { Command Data }
 
+  PBCEditorCommandData = ^TBCEditorCommandData;
   TBCEditorCommandData = TBytes;
 
+  PBCEditorCommandDataChar = ^TBCEditorCommandDataChar;
   TBCEditorCommandDataChar = packed record
     Char: Char;
     class function Create(const AChar: Char): TBCEditorCommandData; static;
-    class operator Implicit(const a: TBCEditorCommandDataChar): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataChar; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
+  PBCEditorCommandDataDropOLE = ^TBCEditorCommandDataDropOLE;
   TBCEditorCommandDataDropOLE = packed record
     Pos: TPoint;
     dataObj: IDataObject;
     class function Create(const APos: TPoint; const AdataObj: IDataObject): TBCEditorCommandData; static;
-    class operator Implicit(const a: TBCEditorCommandDataDropOLE): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataDropOLE; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
+  PBCEditorCommandDataFind = ^TBCEditorCommandDataFind;
   TBCEditorCommandDataFind = packed record
     Options: TBCEditorFindOptions;
   private
-    FPattern: PChar;
     FPatternLength: Int64;
-    function GetPattern(): string;
+    function GetPattern(): string; {$IFNDEF Debug} inline; {$ENDIF}
   public
     class function Create(const APattern: string;
       const AOptions: TBCEditorFindOptions): TBCEditorCommandData; static;
     class operator Equal(const a, b: TBCEditorCommandDataFind): Boolean; {$IFNDEF Debug} inline; {$ENDIF}
     class operator Implicit(const a: TBCEditorCommandDataFind): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataFind; {$IFNDEF Debug} inline; {$ENDIF}
     property Pattern: string read GetPattern;
   end;
 
+  PBCEditorCommandDataMoveCaret = ^TBCEditorCommandDataMoveCaret;
   TBCEditorCommandDataMoveCaret = packed record
     X: Integer;
     Y: Integer;
     Selection: Boolean;
     class function Create(const AX, AY: Integer; const ASelection: Boolean = False): TBCEditorCommandData; static;
-    class operator Implicit(const a: TBCEditorCommandDataMoveCaret): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataMoveCaret; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
+  PBCEditorCommandDataPosition = ^TBCEditorCommandDataPosition;
   TBCEditorCommandDataPosition = packed record
     Pos: TPoint;
     Selection: Boolean;
     class function Create(const APosition: TBCEditorLinesPosition;
       const ASelection: Boolean = False): TBCEditorCommandData; static;
-    class operator Implicit(const a: TBCEditorCommandDataPosition): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataPosition; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
+  PBCEditorCommandDataReplace = ^TBCEditorCommandDataReplace;
   TBCEditorCommandDataReplace = packed record
   private
-    FPattern: PChar;
     FPatternLength: Int64;
-    FReplaceText: PChar;
     FReplaceTextLength: Int64;
-    function GetPattern(): string;
-    function GetReplaceText(): string;
+    function GetPattern(): string; {$IFNDEF Debug} inline; {$ENDIF}
+    function GetReplaceText(): string; {$IFNDEF Debug} inline; {$ENDIF}
   public
     Options: TBCEditorReplaceOptions;
     class function Create(const APattern, AReplaceText: string;
       const AOptions: TBCEditorReplaceOptions): TBCEditorCommandData; static;
     class operator Implicit(const a: TBCEditorCommandDataReplace): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataReplace; {$IFNDEF Debug} inline; {$ENDIF}
     property Pattern: string read GetPattern;
     property ReplaceText: string read GetReplaceText;
   end;
 
+  PBCEditorCommandDataScrollTo = ^TBCEditorCommandDataScrollTo;
   TBCEditorCommandDataScrollTo = packed record
     Pos: TPoint;
     class function Create(const APos: TPoint): TBCEditorCommandData; static;
-    class operator Implicit(const a: TBCEditorCommandDataScrollTo): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataScrollTo; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
+  PBCEditorCommandDataSelection = ^TBCEditorCommandDataSelection;
   TBCEditorCommandDataSelection = packed record
     BeginPos: TPoint;
     EndPos: TPoint;
     CaretToBeginPosition: Boolean;
     class function Create(const ASelArea: TBCEditorLinesArea;
       const ACaretToBeginPosition: Boolean = False): TBCEditorCommandData; static;
-    class operator Implicit(const a: TBCEditorCommandDataSelection): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataSelection; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
+  PBCEditorCommandDataText = ^TBCEditorCommandDataText;
   TBCEditorCommandDataText = packed record
     Delete: Boolean;
     Selection: Boolean;
   private
-    FText: PChar;
     FTextLength: Int64;
-    function GetText(): string;
+    function GetText(): string; {$IFNDEF Debug} inline; {$ENDIF}
   public
     class function Create(const AText: string; const ADelete: Boolean = False;
       const ASelection: Boolean = False): TBCEditorCommandData; static;
     property Text: string read GetText;
-    class operator Implicit(const a: TBCEditorCommandDataText): TBCEditorCommandData; {$IFNDEF Debug} inline; {$ENDIF}
-    class operator Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataText; {$IFNDEF Debug} inline; {$ENDIF}
   end;
 
   TBCEditorHookedCommandProc = procedure(const AEditor: Pointer; const ABefore: LongBool;
@@ -294,16 +284,6 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-class operator TBCEditorCommandDataChar.Implicit(const a: TBCEditorCommandDataChar): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a));
-end;
-
-class operator TBCEditorCommandDataChar.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataChar;
-begin
-  Move(a[0], Result, Length(a));
-end;
-
 { TBCEditorCommandDataDropOLE *************************************************}
 
 class function TBCEditorCommandDataDropOLE.Create(const APos: TPoint; const AdataObj: IDataObject): TBCEditorCommandData;
@@ -313,16 +293,6 @@ begin
   LData.Pos := APos;
   LData.dataObj := AdataObj;
   Result := BytesOf(@LData, SizeOf(LData));
-end;
-
-class operator TBCEditorCommandDataDropOLE.Implicit(const a: TBCEditorCommandDataDropOLE): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a));
-end;
-
-class operator TBCEditorCommandDataDropOLE.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataDropOLE;
-begin
-  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataFind ****************************************************}
@@ -337,30 +307,23 @@ begin
   SetLength(Result, LSize);
   LData := @Result[0];
   LData^.Options := AOptions;
-  LData^.FPattern := @PAnsiChar(Result)[SizeOf(TBCEditorCommandDataFind)];
   LData^.FPatternLength := Length(APattern);
-  MoveMemory(LData^.FPattern, PChar(APattern), Length(APattern) * SizeOf(Char));
+  MoveMemory(@PAnsiChar(Result)[SizeOf(TBCEditorCommandDataFind)], PChar(APattern), Length(APattern) * SizeOf(Char));
 end;
 
 function TBCEditorCommandDataFind.GetPattern(): string;
 begin
-  SetString(Result, FPattern, FPatternLength);
+  SetString(Result, PChar(@PAnsiChar(Pointer(@Self))[SizeOf(TBCEditorCommandDataFind)]), FPatternLength);
 end;
 
 class operator TBCEditorCommandDataFind.Equal(const a, b: TBCEditorCommandDataFind): Boolean;
 begin
-  Result := (a.Options = b.Options) and (a.FPatternLength = b.FPatternLength) and CompareMem(a.FPattern, b.FPattern, a.FPatternLength);
+  Result := (a.Options = b.Options) and (a.FPatternLength = b.FPatternLength) and (a.Pattern = b.Pattern);
 end;
 
 class operator TBCEditorCommandDataFind.Implicit(const a: TBCEditorCommandDataFind): TBCEditorCommandData;
 begin
-  Result := BytesOf(@a, SizeOf(a) + a.FPatternLength * SizeOf(Char));
-end;
-
-class operator TBCEditorCommandDataFind.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataFind;
-begin
-  Move(a[0], Result, Length(a));
-  Result.FPattern := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataFind)];
+  Result := BytesOf(@a, SizeOf(TBCEditorCommandDataFind) + a.FPatternLength * SizeOf(Char));
 end;
 
 { TBCEditorCommandDataMoveCaret ***********************************************}
@@ -376,16 +339,6 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-class operator TBCEditorCommandDataMoveCaret.Implicit(const a: TBCEditorCommandDataMoveCaret): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a));
-end;
-
-class operator TBCEditorCommandDataMoveCaret.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataMoveCaret;
-begin
-  Move(a[0], Result, Length(a));
-end;
-
 { TBCEditorCommandDataPosition ************************************************}
 
 class function TBCEditorCommandDataPosition.Create(const APosition: TBCEditorLinesPosition;
@@ -396,16 +349,6 @@ begin
   LData.Pos := APosition;
   LData.Selection := ASelection;
   Result := BytesOf(@LData, SizeOf(LData));
-end;
-
-class operator TBCEditorCommandDataPosition.Implicit(const a: TBCEditorCommandDataPosition): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a));
-end;
-
-class operator TBCEditorCommandDataPosition.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataPosition;
-begin
-  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataReplace *************************************************}
@@ -420,34 +363,25 @@ begin
   SetLength(Result, LSize);
   LData := @Result[0];
   LData^.Options := AOptions;
-  LData^.FPattern := @PAnsiChar(LData)[SizeOf(TBCEditorCommandDataReplace)];
   LData^.FPatternLength := Length(APattern);
-  LData^.FReplaceText := @PAnsiChar(LData)[SizeOf(TBCEditorCommandDataReplace) + Length(APattern) * SizeOf(Char)];
   LData^.FReplaceTextLength := Length(AReplaceText);
-  MoveMemory(LData^.FPattern, PChar(APattern), Length(APattern) * SizeOf(Char));
-  MoveMemory(LData^.FReplaceText, PChar(AReplaceText), Length(AReplaceText) * SizeOf(Char));
+  MoveMemory(@PAnsiChar(LData)[SizeOf(TBCEditorCommandDataReplace)], PChar(APattern), Length(APattern) * SizeOf(Char));
+  MoveMemory(@PAnsiChar(LData)[SizeOf(TBCEditorCommandDataReplace) + Length(APattern) * SizeOf(Char)], PChar(AReplaceText), Length(AReplaceText) * SizeOf(Char));
 end;
 
 function TBCEditorCommandDataReplace.GetPattern(): string;
 begin
-  SetString(Result, FPattern, FPatternLength);
+  SetString(Result, PChar(@PAnsiChar(Pointer(@Self))[SizeOf(TBCEditorCommandDataReplace)]), FPatternLength);
 end;
 
 function TBCEditorCommandDataReplace.GetReplaceText(): string;
 begin
-  SetString(Result, FReplaceText, FReplaceTextLength);
+  SetString(Result, PChar(@PAnsiChar(Pointer(@Self))[SizeOf(TBCEditorCommandDataReplace) + FPatternLength * SizeOf(Char)]), FReplaceTextLength);
 end;
 
 class operator TBCEditorCommandDataReplace.Implicit(const a: TBCEditorCommandDataReplace): TBCEditorCommandData;
 begin
-  Result := BytesOf(@a, SizeOf(a) + a.FPatternLength * SizeOf(Char) + a.FReplaceTextLength * SizeOf(Char));
-end;
-
-class operator TBCEditorCommandDataReplace.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataReplace;
-begin
-  Move(a[0], Result, Length(a));
-  Result.FPattern := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataReplace)];
-  Result.FReplaceText := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataReplace) + Result.FPatternLength * SizeOf(Char)];
+  Result := BytesOf(@a, SizeOf(TBCEditorCommandDataReplace) + a.FPatternLength * SizeOf(Char) + a.FReplaceTextLength * SizeOf(Char));
 end;
 
 { TBCEditorCommandDataScrollTo ************************************************}
@@ -458,16 +392,6 @@ var
 begin
   LData.Pos := APos;
   Result := BytesOf(@LData, SizeOf(LData));
-end;
-
-class operator TBCEditorCommandDataScrollTo.Implicit(const a: TBCEditorCommandDataScrollTo): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a));
-end;
-
-class operator TBCEditorCommandDataScrollTo.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataScrollTo;
-begin
-  Move(a[0], Result, Length(a));
 end;
 
 { TBCEditorCommandDataSelection ***********************************************}
@@ -483,16 +407,6 @@ begin
   Result := BytesOf(@LData, SizeOf(LData));
 end;
 
-class operator TBCEditorCommandDataSelection.Implicit(const a: TBCEditorCommandDataSelection): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a));
-end;
-
-class operator TBCEditorCommandDataSelection.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataSelection;
-begin
-  Move(a[0], Result, Length(a));
-end;
-
 { TBCEditorCommandDataText ****************************************************}
 
 class function TBCEditorCommandDataText.Create(const AText: string; const ADelete: Boolean = False;
@@ -506,25 +420,13 @@ begin
   LData := @Result[0];
   LData^.Delete := ADelete;
   LData^.Selection := ASelection;
-  LData^.FText := @PAnsiChar(LData)[SizeOf(TBCEditorCommandDataText)];
   LData^.FTextLength := Length(AText);
-  MoveMemory(LData^.FText, PChar(AText), Length(AText) * SizeOf(Char));
+  MoveMemory(@PAnsiChar(LData)[SizeOf(TBCEditorCommandDataText)], PChar(AText), Length(AText) * SizeOf(Char));
 end;
 
 function TBCEditorCommandDataText.GetText(): string;
 begin
-  SetString(Result, FText, FTextLength);
-end;
-
-class operator TBCEditorCommandDataText.Implicit(const a: TBCEditorCommandDataText): TBCEditorCommandData;
-begin
-  Result := BytesOf(@a, SizeOf(a) + a.FTextLength * SizeOf(Char));
-end;
-
-class operator TBCEditorCommandDataText.Implicit(const a: TBCEditorCommandData): TBCEditorCommandDataText;
-begin
-  Move(a[0], Result, Length(a));
-  Result.FText := @PAnsiChar(@Result)[SizeOf(TBCEditorCommandDataText)];
+  SetString(Result, PChar(@PAnsiChar(Pointer(@Self))[SizeOf(TBCEditorCommandDataText)]), FTextLength);
 end;
 
 { TBCEditorHookedCommandHandler ***********************************************}

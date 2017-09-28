@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Inno Setup"
+    "FileExtensions": [
+      ".iss"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "; This is comment\r\n",

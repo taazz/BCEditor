@@ -1,4 +1,13 @@
 {
+  "Info": {
+    "Name": "LaTex"
+    "DefaultFileExtension": ".lat",
+    "FileExtensions": [
+      ".lat",
+      ".tex",
+      ".lex"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "\\documentclass{article}\r\n",

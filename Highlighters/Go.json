@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Go"
+    "FileExtensions": [
+      ".go"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in Go\r\n",

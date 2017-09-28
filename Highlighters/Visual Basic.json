@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "Visual Basic"
+    "DefaultFileExtension": ".vb",
+    "FileExtensions": [
+      ".vb",
+      ".bas"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "' Hello World in Visual Basic\r\n",

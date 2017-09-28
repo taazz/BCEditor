@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "XSL"
+    "DefaultFileExtension": ".xsl",
+    "FileExtensions": [
+      ".xls",
+      ".xlst"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "<?xml version=\"1.0\"?>\r\n",

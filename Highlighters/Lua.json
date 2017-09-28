@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Lua"
+    "FileExtensions": [
+      ".lua"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "-- Hello World in Lua\r\n",

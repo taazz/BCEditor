@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "68HC11 Assembler"
+    "FileExtensions": [
+      ".hc11"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "REGBS   EQU     $1000     ; location of on-board peripherals\r\n",

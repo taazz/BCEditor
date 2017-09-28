@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "MATLAB"
+    "FileExtensions": [
+      ".matlab"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "% Hello World in MATLAB\r\n",

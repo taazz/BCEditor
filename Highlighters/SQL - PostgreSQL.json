@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "SQL - PostgreSQL"
+    "FileExtensions": [
+      ".sql"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "CREATE FUNCTION concat_lower_or_upper(a text, b text, uppercase boolean DEFAULT false)\r\n",

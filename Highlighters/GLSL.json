@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "GLSL"
+    "FileExtensions": [
+      ".glsl"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// GLSL example\r\n",

@@ -1,4 +1,11 @@
 {
+  "Info": {
+    "Name": "Ruby"
+    "DefaultFileExtension": ".rb",
+    "FileExtensions": [
+      ".rbw"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "#!/usr/bin/ruby -w\r\n",

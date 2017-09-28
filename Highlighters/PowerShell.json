@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "PowerShell"
+    "FileExtensions": [
+      ".ps1"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "# Filename: Hello.ps1\r\n",

@@ -462,7 +462,8 @@ implementation {***************************************************************}
 
 uses
   Windows,
-  Math, StrUtils, SysConst;
+  Math, StrUtils, SysConst,
+  BCEditor.Locale;
 
 function HasLineBreak(const AText: string): Boolean;
 var
@@ -3348,19 +3349,21 @@ begin
 
     Exclude(FState, lsSyncEditAvailable);
 
-    if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
-    begin
-      BeginUpdate();
-      try
-        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
-          Delete(Count - 1);
-      finally
-        EndUpdate();
-      end;
-    end;
-
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
+
+    BeginUpdate();
+    try
+      if (FState * [lsUndo, lsRedo] = []) then
+        UndoList.Push(utSelection, FCaretPosition, FSelArea,
+          InvalidLinesArea);
+
+      if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
+        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
+          Delete(Count - 1);
+    finally
+      EndUpdate();
+    end;
 
     FCaretPosition := LValue;
     FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
@@ -3500,6 +3503,10 @@ begin
 
     LOldCaretPosition := FCaretPosition;
     LOldSelArea := FSelArea;
+
+    if (FState * [lsUndo, lsRedo] = []) then
+      UndoList.Push(utSelection, FCaretPosition, FSelArea,
+        InvalidLinesArea);
 
     FCaretPosition := LValue.EndPosition;
     FSelArea := LValue;

@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Scala"
+    "FileExtensions": [
+      ".scala"
+    ]
+ },
   "Highlighter": {
     "Sample": [
       "// Hello World in Scala\r\n",

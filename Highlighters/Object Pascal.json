@@ -1,4 +1,13 @@
 {
+  "Info": {
+    "Name": "Pascal"
+    "DefaultFileExtension": ".pas",
+    "FileExtensions": [
+      ".pas",
+      ".dpr",
+      ".dpk"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in Pascal\r\n",

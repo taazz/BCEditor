@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "C"
+    "DefaultFileExtension": ".c",
+    "FileExtensions": [
+      ".c",
+      ".h"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in C\r\n",

@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Cascading Stylesheet"
+    "FileExtensions": [
+      ".css"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "/* Hello World in CSS */\r\n",

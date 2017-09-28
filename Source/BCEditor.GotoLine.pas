@@ -29,7 +29,7 @@ implementation {***************************************************************}
 uses
   Windows,
   SysUtils, Types, Math,
-  BCEditor.Consts;
+  BCEditor.Consts, BCEditor.Locale;
 
 {$R *.dfm}
 

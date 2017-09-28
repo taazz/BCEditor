@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "SQL - Sybase"
+    "FileExtensions": [
+      ".sql"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "declare @val varbinary (16)\r\n",

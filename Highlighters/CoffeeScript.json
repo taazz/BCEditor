@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "CoffeeScript"
+    "FileExtensions": [
+      ".coffee"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "# hello world example\r\n",

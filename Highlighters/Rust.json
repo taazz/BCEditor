@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Rust"
+    "FileExtensions": [
+      ".rc"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in Rust\r\n",

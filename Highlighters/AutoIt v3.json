@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "AutoIt"
+    "FileExtensions": [
+      ".au3"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "MsgBox(64, \"Tutorial\", \"Hello World!\")"

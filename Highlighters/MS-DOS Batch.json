@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "MS-DOS Batch"
+    "DefaultFileExtension": ".bat",
+    "FileExtensions": [
+      ".bat",
+      ".cmd"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "REM Hello World in Batch\r\n",

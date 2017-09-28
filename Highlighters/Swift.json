@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "Swift"
+    "FileExtensions": [
+      ".swift"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in Swift\r\n",

@@ -1,4 +1,13 @@
 {
+  "Info": {
+    "Name": "Perl"
+    "DefaultFileExtension": ".pl",
+    "FileExtensions": [
+      ".pl",
+      ".pm",
+      ".cgi"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "#!/usr/bin/perl -w\r\n",

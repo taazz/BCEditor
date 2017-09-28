@@ -1,4 +1,15 @@
 {
+  "Info": {
+    "Name": "XML"
+    "DefaultFileExtension": ".xml",
+    "FileExtensions": [
+      ".xml",
+      ".xsd",
+      ".dtd",
+      ".dproj",
+      ".groupproj"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "<!-- Hello World in XML -->\r\n",

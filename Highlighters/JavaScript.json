@@ -1,4 +1,10 @@
 {
+  "Info": {
+    "Name": "JavaScript"
+    "FileExtensions": [
+      ".js"
+    ]
+  },
   "Highlighter": {
     "Sample": [
       "// Hello World in JavaScript\r\n",

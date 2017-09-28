@@ -1,4 +1,12 @@
 {
+  "Info": {
+    "Name": "HTML"
+    "DefaultFileExtension": ".html",
+    "FileExtensions": [
+      ".html",
+      ".htm"
+    ]
+  },
   "Highlighter": {
     "MultiHighlighter": true,
     "Sample": [
