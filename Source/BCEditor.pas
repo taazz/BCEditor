@@ -3814,8 +3814,6 @@ begin
       LLineTextLength := Length(FLines.Items[FLines.CaretPosition.Line].Text);
 
       LNewCaretPosition := LinesPosition(Max(0, FLines.CaretPosition.Char + LColumns), FLines.CaretPosition.Line);
-      if (not (eoBeyondEndOfLine in FOptions) or FWordWrap) then
-        LNewCaretPosition.Char := Min(LNewCaretPosition.Char, LLineTextLength);
 
       { Skip combined and non-spacing marks }
       if ((0 < LLineTextLength) and (LNewCaretPosition.Char < LLineTextLength)) then
@@ -9289,7 +9287,7 @@ begin
     or (ARowsPosition.Row >= FRows.Count)
     or (FRows.Items[ARowsPosition.Row].Length = 0)) then
     Result := Point(ARowsPosition.Column * FPaintHelper.SpaceWidth, ARowsPosition.Row * FPaintHelper.RowHeight)
-  else if (ARowsPosition.Row = FRows.Items[ARowsPosition.Row].Length) then
+  else if (ARowsPosition.Column = FRows.Items[ARowsPosition.Row].Length) then
     Result := Point(FRows.Items[ARowsPosition.Row].Width, ARowsPosition.Row * FPaintHelper.RowHeight)
   else
   begin
