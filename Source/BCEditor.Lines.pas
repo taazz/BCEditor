@@ -7,6 +7,9 @@ uses
   Graphics, Controls, StdCtrls, Types,
   BCEditor.Consts, BCEditor.Types, BCEditor.Highlighter;
 
+var
+  JobThreadHandle: THandle;
+
 type
   TBCEditorLines = class(TStrings)
   private type
@@ -691,7 +694,7 @@ begin
   FWholeWords := AWholeWords;
 
   if (FPattern = '') then
-    FErrorMessage := BCEditorTranslation(8);
+    FErrorMessage := BCEditorStr(8);
 
   if (FEngine = eNormal) then
   begin
@@ -699,7 +702,7 @@ begin
       for LIndex := 1 to Length(FPattern) do
         if (FLines.IsWordBreakChar(FPattern[LIndex])) then
         begin
-          FErrorMessage := BCEditorTranslation(9);
+          FErrorMessage := BCEditorStr(9);
           FPattern := '';
           break;
         end;
@@ -732,13 +735,6 @@ begin
       eTextRegExpr: Result := FindTextRegEx(APosition, ABackwards, AFoundLength);
       else raise ERangeError.Create('FEngine: ' + IntToStr(Ord(FEngine)));
     end;
-
-    if (Result) then
-      // if this fails, there is a bug in the FindXxx routine
-      if (ABackwards) then
-        Assert(FFoundPosition >= FArea.BeginPosition)
-      else
-        Assert(FFoundPosition <= FArea.EndPosition);
 
     if (Result) then
     begin
@@ -864,7 +860,7 @@ begin
         else
         begin
           LLineBeginPos := @LLineText[1 + FFoundPosition.Char];
-          LLineEndPos := @LLineText[1 + LLineLength - LPatternLength];
+          LLineEndPos := @LLineText[LLineLength];
         end;
 
         if (ABackwards) then
@@ -877,7 +873,9 @@ begin
             or not ABackwards and (LLinePos <= LLineEndPos))) do
         begin
           if ((LLinePos^ = LPatternBeginPos^)
-            and (not FWholeWords or not FLines.IsWordBreakChar(LLinePos^))) then
+            and (not FWholeWords
+              or ((LLinePos = LLineBeginPos) or FLines.IsWordBreakChar(LLinePos[-1]))
+                and not FLines.IsWordBreakChar(LLinePos^))) then
           begin
             LPatternPos := LPatternBeginPos;
             LLineCompPos := LLinePos;
@@ -887,7 +885,10 @@ begin
               Inc(LPatternPos);
               Inc(LLineCompPos);
             end;
-            Result := LPatternPos > LPatternEndPos;
+            Result := (LPatternPos > LPatternEndPos)
+              and (not FWholeWords
+                or (LLineCompPos > LLineEndPos)
+                or FLines.IsWordBreakChar(LLineCompPos^));
           end;
 
           if (not Result) then
@@ -2930,12 +2931,19 @@ end;
 
 procedure TBCEditorLines.SaveToStream(AStream: TStream; AEncoding: TEncoding);
 begin
-  inherited;
-
-  if (not (loUndoAfterSave in FOptions)) then
+  if (not Assigned(AEncoding)) then
+    inherited SaveToStream(AStream)
+  else
   begin
-    UndoList.Clear();
-    RedoList.Clear();
+    inherited;
+
+    if (not (loUndoAfterSave in FOptions)) then
+    begin
+      UndoList.Clear();
+      RedoList.Clear();
+    end;
+
+    Modified := False;
   end;
 end;
 
@@ -3288,7 +3296,7 @@ begin
     until (AThread.Terminated or not Result or not FSearch.FAllAreas or (LReplaceAction = raCancel));
 
     if (AThread.Terminated) then
-      FSearchResult.ErrorMessage := BCEditorTranslation(15)
+      FSearchResult.ErrorMessage := BCEditorStr(15)
     else
       FSearchResult.ErrorMessage := FSearch.ErrorMessage;
     if (FSearchResult.ErrorMessage <> '') then
@@ -3751,8 +3759,11 @@ begin
 
   if (Assigned(FJobThread) and (AFinal or FJobThread.IsRunning())) then
   begin
+    OutputDebugString(PChar('JobThread.Terminate(' + FJobThread.Handle.ToString() +')'));
     FJobThread.Terminate();
+    OutputDebugString(PChar('JobThread.WaitFor(' + FJobThread.Handle.ToString() +')'));
     FJobThread.WaitFor();
+    OutputDebugString(PChar('JobThread.Free(' + FJobThread.Handle.ToString() +')'));
     FJobThread.Free();
     FJobThread := nil;
 

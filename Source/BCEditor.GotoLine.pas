@@ -55,11 +55,11 @@ end;
 
 procedure TGotoLineDialog.FormCreate(Sender: TObject);
 begin
-  Caption := BCEditorTranslation(16);
+  Caption := BCEditorStr(16);
   FGroupBox.Caption := '';
-  FLLine.Caption := BCEditorTranslation(17) + ':';
-  FBOk.Caption := BCEditorTranslation(4);
-  FBCancel.Caption := BCEditorTranslation(5);
+  FLLine.Caption := BCEditorStr(17) + ':';
+  FBOk.Caption := BCEditorStr(4);
+  FBCancel.Caption := BCEditorStr(5);
 end;
 
 procedure TGotoLineDialog.FormHide(Sender: TObject);

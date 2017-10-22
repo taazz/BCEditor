@@ -2,8 +2,8 @@
 
 interface {********************************************************************}
 
-function BCEditorTranslation(const Id: Integer): string; overload;
-function BCEditorTranslation(const Id: Integer; const AArgs: array of const): string; overload;
+function BCEditorStr(const Id: Integer): string; overload;
+function BCEditorStr(const Id: Integer; const AArgs: array of const): string; overload;
 
 implementation {***************************************************************}
 
@@ -103,12 +103,12 @@ var
   GEnglish: Integer;
   GTranslation: Integer;
 
-function BCEditorTranslation(const Id: Integer): string;
+function BCEditorStr(const Id: Integer): string;
 begin
-  Result := BCEditorTranslation(Id, []);
+  Result := BCEditorStr(Id, []);
 end;
 
-function BCEditorTranslation(const Id: Integer; const AArgs: array of const): string;
+function BCEditorStr(const Id: Integer; const AArgs: array of const): string;
 begin
   if (Translations[GTranslation].Strings[Id] = '') then
     Result := Format(StrPas(Translations[GEnglish].Strings[Id]), AArgs)

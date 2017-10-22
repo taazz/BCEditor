@@ -45,7 +45,7 @@ type
     procedure SetPopupParent(Value: TCustomForm);
     procedure SetTopLine(const AValue: Integer);
     procedure UpdateScrollBar();
-    procedure WMActivate(var Msg: TWMActivate); message WM_ACTIVATE;
+    procedure WMActivate(var AMessage: TWMActivate); message WM_ACTIVATE;
     procedure WMEraseBkgnd(var AMessage: TMessage); message WM_ERASEBKGND;
     procedure WMVScroll(var AMessage: TWMScroll); message WM_VSCROLL;
   protected
@@ -840,14 +840,14 @@ begin
     SendMessage(Handle, WM_SETREDRAW, -1, 0);
 end;
 
-procedure TBCEditorCompletionProposalPopup.WMActivate(var Msg: TWMActivate);
+procedure TBCEditorCompletionProposalPopup.WMActivate(var AMessage: TWMActivate);
 begin
-  if ((Msg.Active <> WA_INACTIVE) and Assigned(PopupParent)) then
+  if ((AMessage.Active <> WA_INACTIVE) and Assigned(PopupParent)) then
     SendMessage(PopupParent.Handle, WM_NCACTIVATE, WPARAM(TRUE), 0);
 
   inherited;
 
-  if Msg.Active = WA_INACTIVE then
+  if AMessage.Active = WA_INACTIVE then
     Hide();
 end;
 
