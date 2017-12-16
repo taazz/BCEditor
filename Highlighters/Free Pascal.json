@@ -538,7 +538,6 @@
             "CloseToken": "$ENDREGION",
             "Properties": {
               "OpenTokenEnd": "}",
-              "ShowGuideLine": false,
               "BeginWithBreakChar": true
             }
           }

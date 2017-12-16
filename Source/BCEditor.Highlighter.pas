@@ -30,7 +30,6 @@ type
       FOpenTokenLength: Integer;
       FParentRegionItem: TBCEditorCodeFoldingRegionItem;
       FSharedClose: Boolean;
-      FShowGuideLine: Boolean;
       FSkipIfFoundAfterOpenTokenList: TStringList;
       FTokenEndIsPreviousLine: Boolean;
     protected
@@ -56,7 +55,6 @@ type
       property OpenTokenLength: Integer read FOpenTokenLength write FOpenTokenLength;
       property ParentRegionItem: TBCEditorCodeFoldingRegionItem read FParentRegionItem write FParentRegionItem;
       property SharedClose: Boolean read FSharedClose write FSharedClose default False;
-      property ShowGuideLine: Boolean read FShowGuideLine write FShowGuideLine default True;
       property SkipIfFoundAfterOpenTokenList: TStringList read FSkipIfFoundAfterOpenTokenList write FSkipIfFoundAfterOpenTokenList;
       property TokenEndIsPreviousLine: Boolean read FTokenEndIsPreviousLine write FTokenEndIsPreviousLine default False;
     end;
@@ -1053,7 +1051,6 @@ begin
     FOpenTokenCanBeFollowedBy := GetJSONString(AJSON, 'OpenTokenCanBeFollowedBy', FOpenTokenCanBeFollowedBy);
     FOpenTokenEnd := GetJSONString(AJSON, 'OpenTokenEnd', FOpenTokenEnd);
     FSharedClose := GetJSONBoolean(AJSON, 'SharedClose', FSharedClose);
-    FShowGuideLine := GetJSONBoolean(AJSON, 'ShowGuideLine', FShowGuideLine);
     LJSONArray := GetJSONArray(AJSON, 'SkipIfFoundAfterOpenToken');
     if (Assigned(LJSONArray)) then
       for LIndex := 0 to LJSONArray.Size - 1 do
