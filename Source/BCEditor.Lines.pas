@@ -106,7 +106,7 @@ type
 
     TSearch = class
     public type
-      TJob = (sjFind, sjFindAndReplace);
+      TJob = (sjFind, sjReplace);
     strict private
       FArea: TBCEditorLinesArea;
       FCaseSensitive: Boolean;
@@ -135,7 +135,7 @@ type
       FPosition: TBCEditorLinesPosition;
       function Find(var APosition: TBCEditorLinesPosition;
         const ABackwards: Boolean; out AFoundLength: Integer): Boolean;
-      procedure Replace();
+      procedure Replace(const AArea: TBCEditorLinesArea);
       property Lines: TBCEditorLines read FLines;
     public
       constructor Create(const ALines: TBCEditorLines;
@@ -976,24 +976,20 @@ begin
   Result := FEngine in [eLinesRegExpr, eTextRegExpr];
 end;
 
-procedure TBCEditorLines.TSearch.Replace();
-var
-  LEndPosition: TBCEditorLinesPosition;
+procedure TBCEditorLines.TSearch.Replace(const AArea: TBCEditorLinesArea);
 begin
   Assert((BOFPosition <= FFoundPosition) and (FFoundPosition <= FLines.EOFPosition));
 
-  LEndPosition := FLines.PositionOf(FFoundLength, FFoundPosition);
-
   if (FEngine = eNormal) then
-    FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition), FReplaceText, True)
+    FLines.ReplaceText(AArea, FReplaceText, True)
   else
-    FLines.ReplaceText(LinesArea(FFoundPosition, LEndPosition),
-      FRegEx.Replace(FLines.TextIn[LinesArea(FFoundPosition, LEndPosition)], FPattern, FReplaceText, FRegExOptions), True);
+    FLines.ReplaceText(AArea,
+      FRegEx.Replace(FLines.TextIn[AArea], FPattern, FReplaceText, FRegExOptions), True);
 
-  if (LEndPosition.Line > FFoundPosition.Line) then
-    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char, FArea.EndPosition.Line - (LEndPosition.Line - FFoundPosition.Line))
-  else if (LEndPosition.Line = FArea.EndPosition.Line) then
-    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char - (LEndPosition.Char - FFoundPosition.Char), FArea.EndPosition.Char);
+  if (AArea.EndPosition.Line > FFoundPosition.Line) then
+    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char, FArea.EndPosition.Line - (AArea.EndPosition.Line - FFoundPosition.Line))
+  else if (AArea.EndPosition.Line = FArea.EndPosition.Line) then
+    FArea.EndPosition := LinesPosition(FArea.EndPosition.Char - (AArea.EndPosition.Char - FFoundPosition.Char), FArea.EndPosition.Char);
 
   if (FLines.CaretPosition.Line > FFoundPosition.Line) then
     FArea.EndPosition := LinesPosition(FArea.EndPosition.Char, FArea.EndPosition.Line + (FLines.CaretPosition.Line - FFoundPosition.Line))
@@ -3234,7 +3230,7 @@ var
   LFoundLength: Integer;
   LReplaceAction: TBCEditorReplaceAction;
 begin
-  if (FSearch.Job = sjFindAndReplace) then
+  if (FSearch.Job = sjReplace) then
     BeginUpdate();
 
   try
@@ -3243,15 +3239,22 @@ begin
     FSearchResult.Backwards := FSearch.Backwards;
     FSearchResult.Count := 0;
 
-    if (not FSearch.FAllAreas) then
-      LFoundAreas := nil
+    if (FSearch.Job = sjFind) then
+    begin
+      if (not FSearch.FAllAreas) then
+        LFoundAreas := nil
+      else
+        LFoundAreas := TList<TBCEditorLinesArea>.Create();
+      LReplaceAction := raReplace;
+    end
     else
-      LFoundAreas := TList<TBCEditorLinesArea>.Create();
-
-    if (not FSearch.FAllAreas) then
-      LReplaceAction := raReplace
-    else
-      LReplaceAction := raReplaceAll;
+    begin
+      LFoundAreas := nil;
+      if (not FSearch.FAllAreas) then
+        LReplaceAction := raReplace
+      else
+        LReplaceAction := raReplaceAll;
+    end;
 
     repeat
       if (FSearch.Backwards) then
@@ -3283,7 +3286,7 @@ begin
             FOnReplacePrompt(FSearch, LFoundArea, FSearch.Backwards, FSearch.ReplaceText, LReplaceAction);
           if (LReplaceAction in [raReplace, raReplaceAll]) then
           begin
-            FSearch.Replace();
+            FSearch.Replace(LFoundArea);
             if (FSearchResult.Area = InvalidLinesArea) then
               FSearchResult.Area := LFoundArea;
             Inc(FSearchResult.Count);
@@ -3293,7 +3296,10 @@ begin
 
       if (Result and not FSearch.Backwards) then
         FSearch.FPosition := PositionOf(1, FSearch.FPosition);
-    until (AThread.Terminated or not Result or not FSearch.FAllAreas or (LReplaceAction = raCancel));
+    until (AThread.Terminated
+      or not Result
+      or not FSearch.FAllAreas
+      or (LReplaceAction = raCancel));
 
     if (AThread.Terminated) then
       FSearchResult.ErrorMessage := BCEditorStr(15)
@@ -3308,7 +3314,7 @@ begin
       LFoundAreas.Free();
     end;
   finally
-    if (FSearch.Job = sjFindAndReplace) then
+    if (FSearch.Job = sjReplace) then
       EndUpdate();
   end;
 

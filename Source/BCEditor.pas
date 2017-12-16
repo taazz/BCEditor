@@ -4026,7 +4026,7 @@ begin
       LArea,
       roCaseSensitive in AData^.Options, roWholeWordsOnly in AData^.Options, roRegExpr in AData^.Options,
       AData^.Pattern,
-      sjFindAndReplace, AData^.ReplaceText, roPrompt in AData^.Options);
+      sjReplace, AData^.ReplaceText, roPrompt in AData^.Options);
 
     if (FLines.Count = 0) then
       LSearchPosition := FLines.BOFPosition
@@ -4041,7 +4041,7 @@ begin
     else
       LSearchPosition := FLines.SelArea.BeginPosition;
 
-    FLines.StartSearch(LSearch, LSearchPosition, roReplaceAll in AData^.Options, roBackwards in AData^.Options, True, ReplaceExecuted);
+    FLines.StartSearch(LSearch, LSearchPosition, roBackwards in AData^.Options, roReplaceAll in AData^.Options, True, ReplaceExecuted);
   end;
 end;
 
@@ -5012,7 +5012,7 @@ end;
 
 procedure TCustomBCEditor.FindDialogFind(Sender: TObject);
 var
-  FNewSearchData: TBCEditorCommandData;
+  LNewFindData: TBCEditorCommandData;
   LOptions: TBCEditorFindOptions;
 begin
   Assert(Sender is TFindDialog);
@@ -5028,7 +5028,7 @@ begin
     LOptions := LOptions - [foCaseSensitive];
   LOptions := LOptions - [foEntireScope];
   if (FLines.SelArea.IsEmpty()
-    or FSearchExecuted and not (foSelection in PBCEditorCommandDataFind(@FLastSearchData)^.Options)) then
+    or FSearchExecuted and not (foSelection in PBCEditorCommandDataFind(@FLastSearchData[0])^.Options)) then
     LOptions := LOptions - [foSelection]
   else
     LOptions := LOptions + [foSelection];
@@ -5037,17 +5037,14 @@ begin
   else
     LOptions := LOptions - [foWholeWordsOnly];
 
-  FNewSearchData := TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions);
+  LNewFindData := TBCEditorCommandDataFind.Create(TFindDialog(Sender).FindText, LOptions);
 
   if ((FLastSearch = lsFind)
     and Assigned(FLastSearchData)
-    and (PBCEditorCommandDataFind(@FNewSearchData[0])^ = PBCEditorCommandDataFind(@FLastSearchData[0])^)) then
+    and (PBCEditorCommandDataFind(@LNewFindData[0])^ = PBCEditorCommandDataFind(@FLastSearchData[0])^)) then
     ProcessCommand(ecFindNext)
   else
-  begin
-    FLastSearch := lsFind;
-    ProcessCommand(ecFindFirst, FNewSearchData);
-  end;
+    ProcessCommand(ecFindFirst, LNewFindData);
 end;
 
 procedure TCustomBCEditor.FindExecuted(const AData: Pointer);
@@ -6615,9 +6612,9 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
     if (not (csOpaque in ControlStyle)) then
       LBackgroundColor := aclTransparent
     else if (FColors.CodeFolding.Background <> clNone) then
-      LBackgroundColor :=ColorRefToARGB(ColorToRGB(FColors.CodeFolding.Background))
+      LBackgroundColor := ColorRefToARGB(ColorToRGB(FColors.CodeFolding.Background))
     else
-      LBackgroundColor :=ColorRefToARGB(ColorToRGB(Color));
+      LBackgroundColor := ColorRefToARGB(ColorToRGB(Color));
     if (FColors.CodeFolding.Foreground <> clNone) then
       LColor := ColorRefToARGB(ColorToRGB(FColors.CodeFolding.Foreground))
     else
@@ -9076,10 +9073,7 @@ begin
     and (PBCEditorCommandDataFind(@FNewSearchData[0])^ = PBCEditorCommandDataFind(@FLastSearchData[0])^)) then
     ProcessCommand(ecFindNext)
   else
-  begin
-    FLastSearch := lsFind;
     ProcessCommand(ecFindFirst, FNewSearchData);
-  end;
 end;
 
 procedure TCustomBCEditor.ReplaceDialogReplace(ASender: TObject);
@@ -9106,9 +9100,7 @@ begin
   else
     LOptions := LOptions - [roWholeWordsOnly];
 
-  FLastSearch := lsReplace;
-  FLastSearchData := TBCEditorCommandDataReplace.Create(TReplaceDialog(ASender).FindText, TReplaceDialog(ASender).ReplaceText, LOptions);
-  ProcessCommand(ecReplace, FLastSearchData);
+  ProcessCommand(ecReplace, TBCEditorCommandDataReplace.Create(TReplaceDialog(ASender).FindText, TReplaceDialog(ASender).ReplaceText, LOptions));
 end;
 
 procedure TCustomBCEditor.ReplaceExecuted(const AData: Pointer);
@@ -9252,9 +9244,6 @@ begin
     or (ARowsPosition.Row >= FRows.Count)
     or (FRows.Items[ARowsPosition.Row].Length = 0)) then
     Result := Point(ARowsPosition.Column * FPaintHelper.SpaceWidth, ARowsPosition.Row * FPaintHelper.RowHeight)
-  else if (not (rfHasTabs in FRows.Items[ARowsPosition.Row].Flags)
-    and (ARowsPosition.Column = FRows.Items[ARowsPosition.Row].Length)) then
-    Result := Point(FRows.Items[ARowsPosition.Row].Width, ARowsPosition.Row * FPaintHelper.RowHeight)
   else
   begin
     FPaintHelper.BeginPaint(Canvas.Handle);
@@ -12021,9 +12010,8 @@ begin
 
   NotifyParent(EN_SETFOCUS);
 
-  if ((AMessage.FocusedWnd = WindowHandle)
-    and (not GetUpdateRect(WindowHandle, nil, not (csOpaque in ControlStyle))
-      or not (esCaretInvalid in FState))) then
+  if (not GetUpdateRect(WindowHandle, nil, not (csOpaque in ControlStyle))
+    or not (esCaretInvalid in FState)) then
     InvalidateCaret();
 
   if (HideSelection and not FLines.SelArea.IsEmpty()) then
