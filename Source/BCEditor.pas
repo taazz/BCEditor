@@ -6580,24 +6580,24 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         GPadding + GLineWidth,
         LWidth - 2 * GPadding - 3 * GLineWidth,
         LHeight - 2 * GPadding - 3 * GLineWidth);
-      LBrush.SetColor(aclBookmarkCover);
+      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.Bookmark.Cover)));
       LGraphics.FillRectangle(LBrush, LRectF);
       LRectF := MakeRect(GPadding + 2 * GLineWidth + 0.0,
         GPadding + GLineWidth - 2,
         LWidth - 2 * GPadding - 3 * GLineWidth,
         LHeight - 2 * GPadding - GLineWidth);
-      LBrush.SetColor(aclBookmarkNumber);
+      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.Bookmark.Number)));
       LGraphics.DrawString(LText, -1, LFont, LRectF, LStringFormat, LBrush);
-      LPen.SetColor(aclBookmarkBorder);
+      LPen.SetColor(ColorRefToARGB(ColorToRGB(Colors.Bookmark.Border)));
       LGraphics.DrawRectangle(LPen, GPadding + GLineWidth, GPadding, APaintHelper.RowHeight - 2 * GPadding - 2 * GLineWidth, APaintHelper.RowHeight - 3 * GPadding - GLineWidth);
 
       LY := GPadding + 2 * GLineWidth;
       repeat
-        LBrush.SetColor(aclBookmarkRingLeft);
+        LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.Bookmark.RingLeft)));
         LGraphics.FillRectangle(LBrush, GPadding, LY, GLineWidth, GLineWidth);
-        LBrush.SetColor(aclBookmarkRingMiddle);
+        LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.Bookmark.RingMiddle)));
         LGraphics.FillRectangle(LBrush, GPadding + GLineWidth, LY, GLineWidth, GLineWidth);
-        LBrush.SetColor(aclBookmarkRingRight);
+        LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.Bookmark.RingRight)));
         LGraphics.FillRectangle(LBrush, GPadding + 2 * GLineWidth, LY, GLineWidth, GLineWidth);
         Inc(LY, 2 * GLineWidth);
       until (LY >= APaintHelper.RowHeight - 2 * GPadding - 2 * GLineWidth);
@@ -6773,7 +6773,7 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonNormal), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LBrush.SetColor(aclSyncEditPen);
+      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)));
       DrawSyncEditPen(LGraphics, LBrush, GetSystemMetrics(SM_CXEDGE) + 2 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 9 * LSize, LSize);
       DrawSyncEditPen(LGraphics, LBrush, GetSystemMetrics(SM_CXEDGE) + 9 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonNormalBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
@@ -6794,7 +6794,7 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonHot), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LBrush.SetColor(aclSyncEditPen);
+      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)));
       DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
       DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonHotBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
@@ -6815,7 +6815,7 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonPressed), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LBrush.SetColor(aclSyncEditPen);
+      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)));
       DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
       DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonPressedBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);

@@ -204,6 +204,35 @@ type
       property Background: TColor read FBackground write SetBackground default clActiveLineBackground;
     end;
 
+    TBookmark = class(TPersistent)
+    private
+      FBorder: TColor;
+      FColors: TBCEditorColors;
+      FCover: TColor;
+      FNumber: TColor;
+      FRingLeft: TColor;
+      FRingMiddle: TColor;
+      FRingRight: TColor;
+      procedure SetBorder(AValue: TColor);
+      procedure SetCover(AValue: TColor);
+      procedure SetNumber(AValue: TColor);
+      procedure SetRingLeft(AValue: TColor);
+      procedure SetRingMiddle(AValue: TColor);
+      procedure SetRingRight(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Border: TColor read FBorder write SetBorder default clBookmarkBorder;
+      property Cover: TColor read FCover write SetCover default clBookmarkCover;
+      property Number: TColor read FNumber write SetNumber default clBookmarkNumber;
+      property RingLeft: TColor read FRingLeft write SetRingLeft default clBookmarkRingLeft;
+      property RingMiddle: TColor read FRingMiddle write SetRingMiddle default clBookmarkRingMiddle;
+      property RingRight: TColor read FRingRight write SetRingRight default clBookmarkRingRight;
+    end;
+
     TCodeFolding = class(TPersistent)
     private
       FBackground: TColor;
@@ -350,7 +379,22 @@ type
       property Background: TColor read FBackground write SetBackground default clSyncEditBackground;
       property Overlay: TColor read FOverlay write SetOverlays default clSyncEditOverlay;
     end;
+
+    TSyncEditButton = class(TPersistent)
+    private
+      FColors: TBCEditorColors;
+      FPen: TColor;
+      procedure SetPen(AValue: TColor);
+    protected
+      function IsStored(): Boolean;
+    public
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create(const AColors: TBCEditorColors);
+    published
+      property Pen: TColor read FPen write SetPen default clSyncEditButtonPen;
+    end;
   private
+    FBookmark: TBookmark;
     FCodeFolding: TCodeFolding;
     FActiveLine: TActiveLine;
     FFoundText: TFoundText;
@@ -362,9 +406,11 @@ type
     FSelection: TSelection;
     FSpecialChars: TSpecialChars;
     FSyncEdit: TSyncEdit;
+    FSyncEditButton: TSyncEditButton;
     procedure DoChange();
-    procedure SetCodeFolding(AValue: TCodeFolding);
     procedure SetActiveLine(AValue: TActiveLine);
+    procedure SetBookmark(AValue: TBookmark);
+    procedure SetCodeFolding(AValue: TCodeFolding);
     procedure SetFoundText(AValue: TFoundText);
     procedure SetLineNumbers(AValue: TLineNumbers);
     procedure SetLineState(AValue: TLineState);
@@ -373,6 +419,7 @@ type
     procedure SetSelection(AValue: TSelection);
     procedure SetSpecialChars(AValue: TSpecialChars);
     procedure SetSyncEdit(AValue: TSyncEdit);
+    procedure SetSyncEditButton(AValue: TSyncEditButton);
   protected
     function IsStored(): Boolean;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -381,8 +428,9 @@ type
     constructor Create();
     destructor Destroy(); override;
   published
-    property CodeFolding: TCodeFolding read FCodeFolding write SetCodeFolding;
     property ActiveLine: TActiveLine read FActiveLine write SetActiveLine;
+    property Bookmark: TBookmark read FBookmark write SetBookmark;
+    property CodeFolding: TCodeFolding read FCodeFolding write SetCodeFolding;
     property FoundText: TFoundText read FFoundText write SetFoundText;
     property LineNumbers: TLineNumbers read FLineNumbers write SetLineNumbers;
     property LineState: TLineState read FLineState write SetLineState;
@@ -391,6 +439,7 @@ type
     property Selection: TSelection read FSelection write SetSelection;
     property SpecialChars: TSpecialChars read FSpecialChars write SetSpecialChars;
     property SyncEdit: TSyncEdit read FSyncEdit write SetSyncEdit;
+    property SyncEditButton: TSyncEditButton read FSyncEditButton write SetSyncEditButton;
   end;
 
   TBCEditorLeftMargin = class(TPersistent)
@@ -923,6 +972,102 @@ begin
   end;
 end;
 
+{ TBCEditorColors.TBookmark ***************************************************}
+
+procedure TBCEditorColors.TBookmark.Assign(ASource: TPersistent);
+begin
+  Assert(ASource is TBCEditorColors.TBookmark);
+
+  inherited;
+
+  FBorder := TBCEditorColors.TBookmark(ASource).FBorder;
+  FCover := TBCEditorColors.TBookmark(ASource).FCover;
+  FNumber := TBCEditorColors.TBookmark(ASource).FNumber;
+  FRingLeft := TBCEditorColors.TBookmark(ASource).FRingLeft;
+  FRingMiddle := TBCEditorColors.TBookmark(ASource).FRingMiddle;
+  FRingRight := TBCEditorColors.TBookmark(ASource).FRingRight;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TBookmark.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FBorder := clBookmarkBorder;
+  FCover := clBookmarkCover;
+  FNumber := clBookmarkNumber;
+  FRingLeft := clBookmarkRingLeft;
+  FRingMiddle := clBookmarkRingMiddle;
+  FRingRight := clBookmarkRingRight;
+end;
+
+function TBCEditorColors.TBookmark.IsStored(): Boolean;
+begin
+  Result := (FBorder <> clBookmarkBorder)
+    or (FCover <> clBookmarkCover)
+    or (FNumber <> clBookmarkNumber)
+    or (FRingLeft <> clBookmarkRingLeft)
+    or (FRingMiddle <> clBookmarkRingMiddle)
+    or (FRingRight <> clBookmarkRingRight);
+end;
+
+procedure TBCEditorColors.TBookmark.SetBorder(AValue: TColor);
+begin
+  if (AValue <> FBorder) then
+  begin
+    FBorder := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TBookmark.SetCover(AValue: TColor);
+begin
+  if (AValue <> FCover) then
+  begin
+    FCover := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TBookmark.SetNumber(AValue: TColor);
+begin
+  if (AValue <> FNumber) then
+  begin
+    FNumber := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TBookmark.SetRingLeft(AValue: TColor);
+begin
+  if (AValue <> FRingLeft) then
+  begin
+    FRingLeft := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TBookmark.SetRingMiddle(AValue: TColor);
+begin
+  if (AValue <> FRingMiddle) then
+  begin
+    FRingMiddle := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TBookmark.SetRingRight(AValue: TColor);
+begin
+  if (AValue <> FRingRight) then
+  begin
+    FRingRight := AValue;
+    FColors.DoChange();
+  end;
+end;
+
 { TBCEditorColors.TCodeFolding ************************************************}
 
 procedure TBCEditorColors.TCodeFolding.Assign(ASource: TPersistent);
@@ -1331,6 +1476,42 @@ begin
   end;
 end;
 
+{ TBCEditorColors.TSyncEditButton ***************************************************}
+
+procedure TBCEditorColors.TSyncEditButton.Assign(ASource: TPersistent);
+begin
+  Assert(ASource is TBCEditorColors.TSyncEditButton);
+
+  inherited;
+
+  FPen := TBCEditorColors.TSyncEditButton(ASource).FPen;
+
+  FColors.DoChange();
+end;
+
+constructor TBCEditorColors.TSyncEditButton.Create(const AColors: TBCEditorColors);
+begin
+  inherited Create();
+
+  FColors := AColors;
+
+  FPen := clSyncEditButtonPen;
+end;
+
+function TBCEditorColors.TSyncEditButton.IsStored(): Boolean;
+begin
+  Result := (FPen <> clSyncEditButtonPen);
+end;
+
+procedure TBCEditorColors.TSyncEditButton.SetPen(AValue: TColor);
+begin
+  if (AValue <> FPen) then
+  begin
+    FPen := AValue;
+    FColors.DoChange();
+  end;
+end;
+
 { TBCEditorColors *************************************************************}
 
 procedure TBCEditorColors.Assign(ASource: TPersistent);
@@ -1339,8 +1520,9 @@ begin
 
   inherited;
 
-  FCodeFolding.Assign(TBCEditorColors(ASource).FCodeFolding);
   FActiveLine.Assign(TBCEditorColors(ASource).FActiveLine);
+  FBookmark.Assign(TBCEditorColors(ASource).FBookmark);
+  FCodeFolding.Assign(TBCEditorColors(ASource).FCodeFolding);
   FFoundText.Assign(TBCEditorColors(ASource).FFoundText);
   FLineNumbers.Assign(TBCEditorColors(ASource).FLineNumbers);
   FLineState.Assign(TBCEditorColors(ASource).FLineState);
@@ -1349,14 +1531,16 @@ begin
   FMatchingPairs.Assign(TBCEditorColors(ASource).FMatchingPairs);
   FSpecialChars.Assign(TBCEditorColors(ASource).FSpecialChars);
   FSyncEdit.Assign(TBCEditorColors(ASource).FSyncEdit);
+  FSyncEditButton.Assign(TBCEditorColors(ASource).FSyncEditButton);
 end;
 
 constructor TBCEditorColors.Create();
 begin
   inherited;
 
-  FCodeFolding := TCodeFolding.Create(Self);
   FActiveLine := TActiveLine.Create(Self);
+  FBookmark := TBookmark.Create(Self);
+  FCodeFolding := TCodeFolding.Create(Self);
   FFoundText := TFoundText.Create(Self);
   FLineNumbers := TLineNumbers.Create(Self);
   FLineState := TLineState.Create(Self);
@@ -1365,12 +1549,14 @@ begin
   FSelection := TSelection.Create(Self);
   FSpecialChars := TSpecialChars.Create(Self);
   FSyncEdit := TSyncEdit.Create(Self);
+  FSyncEditButton := TSyncEditButton.Create(Self);
 end;
 
 destructor TBCEditorColors.Destroy();
 begin
-  FCodeFolding.Free();
   FActiveLine.Free();
+  FBookmark.Free();
+  FCodeFolding.Free();
   FFoundText.Free();
   FLineNumbers.Free();
   FLineState.Free();
@@ -1379,6 +1565,7 @@ begin
   FMatchingPairs.Free();
   FSpecialChars.Free();
   FSyncEdit.Free();
+  FSyncEditButton.Free();
 
   inherited;
 end;
@@ -1403,14 +1590,19 @@ begin
     or FSyncEdit.IsStored();
 end;
 
-procedure TBCEditorColors.SetCodeFolding(AValue: TCodeFolding);
-begin
-  FCodeFolding.Assign(AValue);
-end;
-
 procedure TBCEditorColors.SetActiveLine(AValue: TActiveLine);
 begin
   FActiveLine.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetBookmark(AValue: TBookmark);
+begin
+  FBookmark.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetCodeFolding(AValue: TCodeFolding);
+begin
+  FCodeFolding.Assign(AValue);
 end;
 
 procedure TBCEditorColors.SetFoundText(AValue: TFoundText);
@@ -1451,6 +1643,11 @@ end;
 procedure TBCEditorColors.SetSyncEdit(AValue: TSyncEdit);
 begin
   FSyncEdit.Assign(AValue);
+end;
+
+procedure TBCEditorColors.SetSyncEditButton(AValue: TSyncEditButton);
+begin
+  FSyncEditButton.Assign(AValue);
 end;
 
 { TBCEditorLeftMargin.TBookmarks **********************************************}

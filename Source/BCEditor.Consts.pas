@@ -201,13 +201,12 @@ const
 
   { Colors ********************************************************************}
 
-  aclBookmarkBorder = $FF977302;
-  aclBookmarkCover = $FFFAE6B2;
-  aclBookmarkNumber = $FF977302;
-  aclBookmarkRingLeft = $FF929292;
-  aclBookmarkRingMiddle = $FFFCFCFC;
-  aclBookmarkRingRight = $FFBCBCBC;
-  aclSyncEditPen = $FF3E78B3;
+  clBookmarkBorder = $027397;
+  clBookmarkCover = $B2E6FA;
+  clBookmarkNumber = $027397;
+  clBookmarkRingLeft = $929292;
+  clBookmarkRingMiddle = $FCFCFC;
+  clBookmarkRingRight = $BCBCBC;
   clCodeFoldingBackground = $F4F4F4;
   clCodeFoldingForeground = $CC9999;
   clActiveLineBackground = $E6FFFA;
@@ -224,6 +223,7 @@ const
   clSelectionForeground = clHighlightText;
   clSpecialCharsForeground = clGrayText;
   clSyncEditBackground = $FCFDCD;
+  clSyncEditButtonPen = $B3783E;
   clSyncEditOverlay = clHighlight;
 
 var

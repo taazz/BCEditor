@@ -1738,6 +1738,12 @@ begin
         LEditorColorsObject := GetJSONObject(LEditorObject, 'Colors');
         Color := StringToColor(GetJSONString(LEditorColorsObject, 'Background', ColorToString(Color)));
         Colors.ActiveLine.Background := StringToColor(GetJSONString(LEditorColorsObject, 'ActiveLineBackground', ColorToString(Colors.ActiveLine.Background)));
+        Colors.Bookmark.Border := StringToColor(GetJSONString(LEditorColorsObject, 'BookmarkBorder', ColorToString(Colors.Bookmark.Border)));
+        Colors.Bookmark.Cover := StringToColor(GetJSONString(LEditorColorsObject, 'BookmarkCover', ColorToString(Colors.Bookmark.Cover)));
+        Colors.Bookmark.Number := StringToColor(GetJSONString(LEditorColorsObject, 'BookmarkNumber', ColorToString(Colors.Bookmark.Number)));
+        Colors.Bookmark.RingLeft := StringToColor(GetJSONString(LEditorColorsObject, 'BookmarkRingLeft', ColorToString(Colors.Bookmark.RingLeft)));
+        Colors.Bookmark.RingMiddle := StringToColor(GetJSONString(LEditorColorsObject, 'BookmarkRingMiddle', ColorToString(Colors.Bookmark.RingMiddle)));
+        Colors.Bookmark.RingRight := StringToColor(GetJSONString(LEditorColorsObject, 'BookmarkRingRight', ColorToString(Colors.Bookmark.RingRight)));
         Colors.CodeFolding.Background := StringToColor(GetJSONString(LEditorColorsObject, 'CodeFoldingBackground', ColorToString(Colors.CodeFolding.Background)));
         Colors.CodeFolding.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'CodeFoldingFoldingLine', ColorToString(Colors.CodeFolding.Foreground)));
         Colors.Marks.Background := StringToColor(GetJSONString(LEditorColorsObject, 'LeftMarginBookmarkPanel', ColorToString(Colors.Marks.Background)));
@@ -1754,6 +1760,7 @@ begin
         Colors.SpecialChars.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'SpecialCharForeground', ColorToString(Colors.SpecialChars.Foreground)));
         Colors.SyncEdit.Background := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditBackground', ColorToString(Colors.SyncEdit.Background)));
         Colors.SyncEdit.Overlay := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditWordBorder', ColorToString(Colors.SyncEdit.Overlay)));
+        Colors.SyncEditButton.Pen := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditButtonPen', ColorToString(Colors.SyncEditButton.Pen)));
 
         LFontObject := GetJSONObject(LEditorObject, 'Fonts');
         if (Assigned(LFontObject)) then
