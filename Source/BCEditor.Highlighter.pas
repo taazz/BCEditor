@@ -1760,7 +1760,9 @@ begin
         Colors.SpecialChars.Foreground := StringToColor(GetJSONString(LEditorColorsObject, 'SpecialCharForeground', ColorToString(Colors.SpecialChars.Foreground)));
         Colors.SyncEdit.Background := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditBackground', ColorToString(Colors.SyncEdit.Background)));
         Colors.SyncEdit.Overlay := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditWordBorder', ColorToString(Colors.SyncEdit.Overlay)));
+        Colors.SyncEditButton.Background := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditButtonBackground', ColorToString(Colors.SyncEditButton.Background)));
         Colors.SyncEditButton.Pen := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditButtonPen', ColorToString(Colors.SyncEditButton.Pen)));
+        Colors.SyncEditButton.Text := StringToColor(GetJSONString(LEditorColorsObject, 'SyncEditButtonText', ColorToString(Colors.SyncEditButton.Text)));
 
         LFontObject := GetJSONObject(LEditorObject, 'Fonts');
         if (Assigned(LFontObject)) then

@@ -6502,7 +6502,9 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
 
   procedure BuildBitmaps();
 
-    procedure DrawSyncEditPen(const AGraphics: TGPGraphics; const ABrush: TGPBrush; const AX, AY, ASize: Single);
+    procedure DrawSyncEditPen(const AGraphics: TGPGraphics;
+      const ABrush: TGPSolidBrush; const APenColor, ATextColor: TGPColor;
+      const AX, AY, ASize: Single);
     var
       Points: TPointFDynArray;
     begin
@@ -6510,6 +6512,7 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
         AGraphics.SetSmoothingMode(SmoothingModeNone)
       else
         AGraphics.SetSmoothingMode(SmoothingModeHighQuality);
+      ABrush.SetColor(APenColor);
 
       SetLength(Points, 3);
       Points[0] := MakePoint(AX + 0, AY - 1);
@@ -6532,6 +6535,7 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
       AGraphics.FillPolygon(ABrush, PGPPointF(@Points[0]), Length(Points));
 
       AGraphics.SetSmoothingMode(SmoothingModeNone);
+      ABrush.SetColor(ATextColor);
 
       AGraphics.FillRectangle(ABrush, AX, AY + 1 * ASize, 8 * ASize, 1 * ASize);
     end;
@@ -6753,71 +6757,75 @@ procedure TCustomBCEditor.PaintTo(const APaintHelper: TPaintHelper; const ARect:
       LHeight := GetSystemMetrics(SM_CYSMICON) + 2 * GetSystemMetrics(SM_CYEDGE);
       LSize := GetSystemMetrics(SM_CXSMICON) / 32;
       LRect := Rect(0, 0, LWidth, LHeight);
-      LBrush.SetColor(aclTransparent);
+      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Background)));
       LBitmap := TGPBitmap.Create(LWidth, LHeight);
       LGraphics := TGPGraphics.Create(LBitmap);
 
       if (Assigned(FSyncEditButtonNormalBitmap)) then FSyncEditButtonNormalBitmap.Free();
+      LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
       if (not StyleServices.Enabled) then
       begin
-        LBrush.SetColor(ColorRefToARGB(ColorToRGB(clBtnFace)));
-        LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
         LHDC := LGraphics.GetHDC();
         DrawEdge(LHDC, LRect, BDR_RAISEDINNER, BF_RECT);
         LGraphics.ReleaseHDC(LHDC);
       end
       else
       begin
-        LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
         LHDC := LGraphics.GetHDC();
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonNormal), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)));
-      DrawSyncEditPen(LGraphics, LBrush, GetSystemMetrics(SM_CXEDGE) + 2 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 9 * LSize, LSize);
-      DrawSyncEditPen(LGraphics, LBrush, GetSystemMetrics(SM_CXEDGE) + 9 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 3 * LSize, LSize);
+      DrawSyncEditPen(LGraphics,
+        LBrush, ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)), ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Text)),
+        GetSystemMetrics(SM_CXEDGE) + 2 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 9 * LSize, LSize);
+      DrawSyncEditPen(LGraphics,
+        LBrush, ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)), ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Text)),
+        GetSystemMetrics(SM_CXEDGE) + 9 * LSize, GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CYSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonNormalBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
 
       if (Assigned(FSyncEditButtonHotBitmap)) then FSyncEditButtonHotBitmap.Free();
+      LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
       if (not StyleServices.Enabled) then
       begin
-        LBrush.SetColor(ColorRefToARGB(ColorToRGB(clBtnFace)));
-        LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
         LHDC := LGraphics.GetHDC();
         DrawEdge(LHDC, LRect, BDR_RAISED, BF_RECT);
         LGraphics.ReleaseHDC(LHDC);
       end
       else
       begin
-        LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
         LHDC := LGraphics.GetHDC();
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonHot), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
-      LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)));
-      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
-      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
+      DrawSyncEditPen(LGraphics,
+        LBrush, ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)), ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Text)),
+        2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
+      DrawSyncEditPen(LGraphics,
+        LBrush, ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)), ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Text)),
+        2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonHotBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
 
       if (Assigned(FSyncEditButtonPressedBitmap)) then FSyncEditButtonPressedBitmap.Free();
+      LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
       if (not StyleServices.Enabled) then
       begin
-        LBrush.SetColor(ColorRefToARGB(ColorToRGB(clBtnFace)));
-        LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
         LHDC := LGraphics.GetHDC();
         DrawEdge(LHDC, LRect, BDR_SUNKENOUTER, BF_RECT);
         LGraphics.ReleaseHDC(LHDC);
       end
       else
       begin
-        LGraphics.FillRectangle(LBrush, 0, 0, LWidth, LHeight);
         LHDC := LGraphics.GetHDC();
         StyleServices.DrawElement(LHDC, StyleServices.GetElementDetails(tbPushButtonPressed), LRect);
         LGraphics.ReleaseHDC(LHDC);
       end;
       LBrush.SetColor(ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)));
-      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
-      DrawSyncEditPen(LGraphics, LBrush, 2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
+      DrawSyncEditPen(LGraphics,
+        LBrush, ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)), ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Text)),
+        2 * GetSystemMetrics(SM_CXEDGE) + 2 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 9 * LSize, LSize);
+      DrawSyncEditPen(LGraphics,
+        LBrush, ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Pen)), ColorRefToARGB(ColorToRGB(Colors.SyncEditButton.Text)),
+        2 * GetSystemMetrics(SM_CXEDGE) + 9 * LSize, 2 * GetSystemMetrics(SM_CYEDGE) + GetSystemMetrics(SM_CXSMICON) - 1 - 3 * LSize, LSize);
       FSyncEditButtonPressedBitmap := TGPCachedBitmap.Create(LBitmap, APaintHelper.Graphics);
 
       LGraphics.Free();

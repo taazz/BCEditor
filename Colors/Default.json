@@ -24,7 +24,9 @@
         "SelectionForeground": "clWindow",
         "SpecialCharForeground": "clGrayText",
         "SyncEditBackground": "$00FAFFE6",
+        "SyncEditButtonBackground": "clWindow",
         "SyncEditButtonPen": "$00B3783E",
+        "SyncEditButtonText": "clWindowText",
         "SyncEditWordBorder": "$00A56D53"
       },
       "Fonts": {

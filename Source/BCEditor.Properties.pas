@@ -383,15 +383,21 @@ type
     TSyncEditButton = class(TPersistent)
     private
       FColors: TBCEditorColors;
+      FBackground: TColor;
       FPen: TColor;
+      FText: TColor;
+      procedure SetBackground(AValue: TColor);
       procedure SetPen(AValue: TColor);
+      procedure SetText(AValue: TColor);
     protected
       function IsStored(): Boolean;
     public
       procedure Assign(ASource: TPersistent); override;
       constructor Create(const AColors: TBCEditorColors);
     published
+      property Background: TColor read FBackground write SetBackground default clSyncEditButtonBackground;
       property Pen: TColor read FPen write SetPen default clSyncEditButtonPen;
+      property Text: TColor read FText write SetText default clSyncEditButtonText;
     end;
   private
     FBookmark: TBookmark;
@@ -1484,7 +1490,9 @@ begin
 
   inherited;
 
+  FBackground := TBCEditorColors.TSyncEditButton(ASource).FBackground;
   FPen := TBCEditorColors.TSyncEditButton(ASource).FPen;
+  FText := TBCEditorColors.TSyncEditButton(ASource).FText;
 
   FColors.DoChange();
 end;
@@ -1495,12 +1503,24 @@ begin
 
   FColors := AColors;
 
+  FBackground := clSyncEditButtonBackground;
   FPen := clSyncEditButtonPen;
+  FText := clSyncEditButtonText;
 end;
 
 function TBCEditorColors.TSyncEditButton.IsStored(): Boolean;
 begin
-  Result := (FPen <> clSyncEditButtonPen);
+  Result := (FPen <> clSyncEditButtonPen)
+    or (FText <> clSyncEditButtonText);
+end;
+
+procedure TBCEditorColors.TSyncEditButton.SetBackground(AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    FColors.DoChange();
+  end;
 end;
 
 procedure TBCEditorColors.TSyncEditButton.SetPen(AValue: TColor);
@@ -1508,6 +1528,15 @@ begin
   if (AValue <> FPen) then
   begin
     FPen := AValue;
+    FColors.DoChange();
+  end;
+end;
+
+procedure TBCEditorColors.TSyncEditButton.SetText(AValue: TColor);
+begin
+  if (AValue <> FText) then
+  begin
+    FText := AValue;
     FColors.DoChange();
   end;
 end;

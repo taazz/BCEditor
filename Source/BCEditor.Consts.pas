@@ -223,7 +223,9 @@ const
   clSelectionForeground = clHighlightText;
   clSpecialCharsForeground = clGrayText;
   clSyncEditBackground = $FCFDCD;
+  clSyncEditButtonBackground = clWindow;
   clSyncEditButtonPen = $B3783E;
+  clSyncEditButtonText = clWindowText;
   clSyncEditOverlay = clHighlight;
 
 var
