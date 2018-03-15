@@ -2205,13 +2205,13 @@ procedure TCustomBCEditor.BuildRows(const AThread: TBuildRowsThread;
 var
   LCodeFolding: Integer;
   LCollapsedLines: TList<Integer>;
-  LLastUpdateScrollBars: Integer;
+  LLastUpdateScrollBars: Cardinal;
   LLine: Integer;
   LLineItem: TBCEditorLines.TLine;
   LRange: TBCEditorCodeFoldingRanges.TRange;
   LRow: Integer;
   LSynchronizeRowsWantedValid: Boolean;
-  LTickCount: Integer;
+  LTickCount: Cardinal;
 begin
   LCollapsedLines := TList<Integer>.Create();
 
