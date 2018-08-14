@@ -75,7 +75,7 @@ type
 
     TState = set of (lsLoading, lsSaving, lsInserting, lsSearching,
       lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair,
-      lsUpdating,
+      lsUpdating, lsUpdatingCaretPosition,
       lsDontTrim, lsUndo, lsRedo, lsBlockModify,
       lsCaretChanged, lsSelChanged,
       lsSyncEditAvailable, lsSyncEdit);
@@ -1656,7 +1656,7 @@ end;
 
 procedure TBCEditorLines.DoDeleteText(const AArea: TBCEditorLinesArea);
 var
-  Line: Integer;
+  LLine: Integer;
 begin
   Assert((BOFPosition <= AArea.BeginPosition) and (AArea.EndPosition <= EOFPosition));
   Assert(AArea.BeginPosition <= AArea.EndPosition);
@@ -1673,8 +1673,8 @@ begin
       DoPut(AArea.BeginPosition.Line, LeftStr(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char)
         + Copy(Items[AArea.EndPosition.Line].Text, 1 + AArea.EndPosition.Char, MaxInt));
 
-      for Line := AArea.EndPosition.Line downto AArea.BeginPosition.Line + 1 do
-        DoDelete(Line);
+      for LLine := Min(AArea.EndPosition.Line, Count - 1) downto AArea.BeginPosition.Line + 1 do
+        DoDelete(LLine);
     finally
       EndUpdate();
     end;
@@ -1877,16 +1877,10 @@ var
   LEndPos: PChar;
   LModified: Boolean;
   LPos: PChar;
-  LText: string;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (not (loTrimEOL in FOptions) or (lsLoading in FState)) then
-    LText := AText
-  else
-    LText := TrimRight(AText);
-
-  LModified := (LText <> Items[ALine].Text) or (lsInserting in FState);
+  LModified := (AText <> Items[ALine].Text) or (lsInserting in FState);
   if (LModified) then
   begin
     FFoundAreas.Clear();
@@ -1897,12 +1891,12 @@ begin
 
     Items.List[ALine].Flags := [];
     Items.List[ALine].State := lsModified;
-    Items.List[ALine].Text := LText;
+    Items.List[ALine].Text := AText;
 
-    if (LText <> '') then
+    if (AText <> '') then
     begin
-      LPos := @LText[1];
-      LEndPos := @LText[Length(LText)];
+      LPos := @AText[1];
+      LEndPos := @AText[Length(AText)];
       while (LPos <= LEndPos) do
       begin
         if (LPos^ = BCEDITOR_TAB_CHAR) then
@@ -1926,7 +1920,7 @@ begin
   SetCaretPosition(EOLPosition[ALine]);
 
   if (LModified
-    and not (lsInserting in State)
+    and not (lsInserting in FState)
     and Assigned(FOnUpdate)) then
     FOnUpdate(Self, ALine);
 end;
@@ -3342,57 +3336,75 @@ var
   LOldSelArea: TBCEditorLinesArea;
   LValue: TBCEditorLinesPosition;
 begin
-  Assert(BOFPosition <= AValue);
-
-  LValue := AValue;
-  if (not (loCaretBeyondEOL in FOptions)) then
-    if (LValue.Line < Count) then
-      LValue.Char := Min(LValue.Char, Length(Items[LValue.Line].Text))
-    else
-      LValue.Char := 0;
-  if (not (loCaretBeyondEOL in FOptions)) then
-    LValue.Line := Max(0, Min(LValue.Line, Count - 1));
-
-  if (LValue <> FCaretPosition) then
+  if (not (lsUpdatingCaretPosition in FState)) then
   begin
-    FMatchedPairOpenArea := InvalidLinesArea;
-    FMatchedPairCloseArea := InvalidLinesArea;
+    Include(FState, lsUpdatingCaretPosition);
 
-    Exclude(FState, lsSyncEditAvailable);
+    Assert(BOFPosition <= AValue);
 
-    LOldCaretPosition := FCaretPosition;
-    LOldSelArea := FSelArea;
+    LValue := AValue;
+    if (not (loCaretBeyondEOL in FOptions)) then
+      if (LValue.Line < Count) then
+        LValue.Char := Min(LValue.Char, Length(Items[LValue.Line].Text))
+      else
+        LValue.Char := 0;
+    if (not (loCaretBeyondEOL in FOptions)) then
+      LValue.Line := Max(0, Min(LValue.Line, Count - 1));
 
-    BeginUpdate();
-    try
-      if (FState * [lsUndo, lsRedo] = []) then
-        UndoList.Push(utSelection, FCaretPosition, FSelArea,
-          InvalidLinesArea);
+    if (LValue <> FCaretPosition) then
+    begin
+      FMatchedPairOpenArea := InvalidLinesArea;
+      FMatchedPairCloseArea := InvalidLinesArea;
 
-      if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
-        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
-          Delete(Count - 1);
-    finally
-      EndUpdate();
+      Exclude(FState, lsSyncEditAvailable);
+
+      LOldCaretPosition := FCaretPosition;
+      LOldSelArea := FSelArea;
+
+      BeginUpdate();
+      try
+        if (FState * [lsUndo, lsRedo] = []) then
+          UndoList.Push(utSelection, FCaretPosition, FSelArea,
+            InvalidLinesArea);
+
+        if ((loTrimEOL in FOptions) and not (lsLoading in FState)
+          and (LValue.Line <> LOldCaretPosition.Line)
+          and (0 <= LOldCaretPosition.Line) and (LOldCaretPosition.Line < Count)
+          and (Items[LOldCaretPosition.Line].Text <> '')
+          and (Items[LOldCaretPosition.Line].Text[Length(Items[LOldCaretPosition.Line].Text)] <= ' ')) then
+        begin
+          Put(LOldCaretPosition.Line, TrimRight(Items[LOldCaretPosition.Line].Text));
+          if (Assigned(FOnUpdate)) then
+            FOnUpdate(Self, LOldCaretPosition.Line);
+        end;
+
+        if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
+          while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
+            Delete(Count - 1);
+      finally
+        EndUpdate();
+      end;
+
+      FCaretPosition := LValue;
+      FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
+
+      if (UpdateCount > 0) then
+      begin
+        if (FSelArea <> LOldSelArea) then
+          Include(FState, lsSelChanged);
+        if (FCaretPosition <> LOldCaretPosition) then
+          Include(FState, lsCaretChanged);
+      end
+      else
+      begin
+        if ((FSelArea <> LOldSelArea) and Assigned(FOnSelChange)) then
+          FOnSelChange(Self);
+        if ((FCaretPosition <> LOldCaretPosition) and Assigned(FOnCaretChange)) then
+          FOnCaretChange(Self);
+      end;
     end;
 
-    FCaretPosition := LValue;
-    FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
-
-    if (UpdateCount > 0) then
-    begin
-      if (FSelArea <> LOldSelArea) then
-        Include(FState, lsSelChanged);
-      if (FCaretPosition <> LOldCaretPosition) then
-        Include(FState, lsCaretChanged);
-    end
-    else
-    begin
-      if ((FSelArea <> LOldSelArea) and Assigned(FOnSelChange)) then
-        FOnSelChange(Self);
-      if ((FCaretPosition <> LOldCaretPosition) and Assigned(FOnCaretChange)) then
-        FOnCaretChange(Self);
-    end;
+    Exclude(FState, lsUpdatingCaretPosition);
   end;
 end;
 

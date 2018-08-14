@@ -3304,51 +3304,47 @@ begin
   Inc(LPoint.Y, FPaintHelper.RowHeight);
 
   FCompletionProposalPopup := TBCEditorCompletionProposalPopup.Create(Self);
-  with FCompletionProposalPopup do
+  LControl := Self;
+  while Assigned(LControl) and not (LControl is TCustomForm) do
+    LControl := LControl.Parent;
+  if (LControl is TCustomForm) then
+    FCompletionProposalPopup.PopupParent := TCustomForm(LControl);
+  FCompletionProposalPopup.OnClose := FOnCompletionProposalClose;
+  FCompletionProposalPopup.OnValidate := FOnCompletionProposalValidate;
+  FCompletionProposalPopup.Assign(FCompletionProposal);
+
+  LItems := TStringList.Create;
+  try
+    if (cpoParseItemsFromText in FCompletionProposal.Options) then
+      SplitTextIntoWords(LItems, False);
+    if (cpoAddHighlighterKeywords in FCompletionProposal.Options) then
+      AddHighlighterKeywords(LItems);
+    if ((LItems.Count > 0) or not Assigned(FOnCompletionProposalShow)) then
+      FCompletionProposalPopup.Items.Clear();
+    for LIndex := 0 to LItems.Count - 1 do
+    begin
+      FCompletionProposalPopup.Items.Add().Value := LItems[LIndex];
+      { Add empty items for columns }
+      for LColumnIndex := 1 to FCompletionProposal.Columns.Count - 1 do
+        FCompletionProposal.Columns[LColumnIndex].Items.Add();
+    end;
+  finally
+    LItems.Free();
+  end;
+
+  LCurrentInput := FCompletionProposalPopup.GetCurrentInput();
+  LCanExecute := True;
+  if (Assigned(FOnCompletionProposalShow)) then
+    FOnCompletionProposalShow(Self, FCompletionProposal.Columns, LCurrentInput, LCanExecute);
+  if (LCanExecute) then
   begin
-    LControl := Self;
-    while Assigned(LControl) and not (LControl is TCustomForm) do
-      LControl := LControl.Parent;
-    if LControl is TCustomForm then
-      PopupParent := TCustomForm(LControl);
-    OnClose := FOnCompletionProposalClose;
-    OnValidate := FOnCompletionProposalValidate;
-    Assign(FCompletionProposal);
-
-    LItems := TStringList.Create;
-    try
-      if cpoParseItemsFromText in FCompletionProposal.Options then
-        SplitTextIntoWords(LItems, False);
-      if cpoAddHighlighterKeywords in FCompletionProposal.Options then
-        AddHighlighterKeywords(LItems);
-      if ((LItems.Count > 0) or not Assigned(FOnCompletionProposalShow)) then
-        Items.Clear;
-      for LIndex := 0 to LItems.Count - 1 do
-      begin
-        Items.Add().Value := LItems[LIndex];
-        { Add empty items for columns }
-        for LColumnIndex := 1 to FCompletionProposal.Columns.Count - 1 do
-          FCompletionProposal.Columns[LColumnIndex].Items.Add();
-      end;
-    finally
-      LItems.Free;
-    end;
-
-    LCurrentInput := GetCurrentInput();
-    LCanExecute := True;
-    if Assigned(FOnCompletionProposalShow) then
-      FOnCompletionProposalShow(Self, FCompletionProposal.Columns,
-        LCurrentInput, LCanExecute);
-    if LCanExecute then
-    begin
-      DoUnselect();
-      Execute(LCurrentInput, LPoint);
-    end
-    else
-    begin
-      FCompletionProposalPopup.Free;
-      FCompletionProposalPopup := nil;
-    end;
+    DoUnselect();
+    FCompletionProposalPopup.Execute(LCurrentInput, LPoint);
+  end
+  else
+  begin
+    FCompletionProposalPopup.Free();
+    FCompletionProposalPopup := nil;
   end;
 end;
 
@@ -8059,7 +8055,6 @@ begin
                 end;
 
                 repeat
-
                   Result := Result or ProcessToken(AJob, ATextRect,
                     APaintHelper, LClipRect,
                     AButton, AShift, ACursorPos, LRect,
