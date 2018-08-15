@@ -12,7 +12,6 @@ type
   TBCEditorCompletionProposalPopup = class(TCustomControl)
   strict private
     FAdjustCompletionStart: Boolean;
-    FDoubleBufferBitmap: Graphics.TBitmap;
     FCaseSensitive: Boolean;
     FCompletionProposal: TBCEditorCompletionProposal;
     FCompletionStartChar: Integer;
@@ -28,13 +27,10 @@ type
     FPopupParent: TCustomForm;
     FSelectedLine: Integer;
     FSendToEditor: Boolean;
-    FTitleHeight: Integer;
-    FTitleVisible: Boolean;
     FTopLine: Integer;
     FValueSet: Boolean;
     function GetItemHeight(): Integer;
     function GetItems(): TBCEditorCompletionProposalItems;
-    function GetTitleHeight(): Integer;
     function GetVisibleLines(): Integer;
     procedure HandleDblClick(ASender: TObject);
     procedure HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
@@ -118,7 +114,6 @@ begin
   Visible := False;
 
   FItems := TStringList.Create;
-  FDoubleBufferBitmap := Graphics.TBitmap.Create();
 
   FOnValidate := nil;
   OnDblClick := HandleDblClick;
@@ -132,6 +127,8 @@ begin
   if cpoResizeable in FCompletionProposal.Options then
     Params.Style := Params.Style or WS_SIZEBOX;
   Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW;
+  if (TCustomBCEditor(FEditor).DoubleBuffered and not (csDesigning in ComponentState)) then
+    Params.ExStyle := Params.ExStyle or WS_EX_COMPOSITED;
 
   if (Assigned(PopupParent)) then
     Params.WndParent := PopupParent.Handle;
@@ -151,7 +148,6 @@ begin
     FOnClose(FEditor, LSelectedItem);
   end;
 
-  FDoubleBufferBitmap.Free();
   FVisibleItems.Free();
   FItems.Free();
 
@@ -162,26 +158,19 @@ procedure TBCEditorCompletionProposalPopup.Execute(const ACurrentString: string;
 var
   LPoint: TPoint;
 
-  procedure CalculateFormPlacement;
+  procedure CalculateFormPlacement();
   begin
-    LPoint.X := APoint.X - FDoubleBufferBitmap.Canvas.TextWidth(ACurrentString);
+    Canvas.Font.Assign(TCustomBCEditor(FEditor).Font);
+    LPoint.X := APoint.X - Canvas.TextWidth(ACurrentString);
     LPoint.Y := APoint.Y;
 
-    ClientHeight := FItemHeight * FCompletionProposal.VisibleLines + FTitleHeight + 2;
+    ClientHeight := FItemHeight * FCompletionProposal.VisibleLines + 2;
 
-    if LPoint.X + ClientWidth > Screen.DesktopWidth then
-    begin
-      LPoint.X := Screen.DesktopWidth - ClientWidth - 5;
-      if LPoint.X < 0 then
-        LPoint.X := 0;
-    end;
+    if (LPoint.X + ClientWidth > Screen.DesktopWidth) then
+      LPoint.X := Max(0, Screen.DesktopWidth - ClientWidth - 5);
 
-    if LPoint.Y + ClientHeight > Screen.DesktopHeight then
-    begin
-      LPoint.Y := LPoint.Y - ClientHeight - TCustomBCEditor(FEditor).RowHeight - 2;
-      if LPoint.Y < 0 then
-        LPoint.Y := 0;
-    end;
+    if (LPoint.Y + ClientHeight > Screen.DesktopHeight) then
+      LPoint.Y := Max(0, LPoint.Y - ClientHeight - TCustomBCEditor(FEditor).RowHeight - 2);
   end;
 
   procedure CalculateColumnWidths();
@@ -198,10 +187,10 @@ var
   begin
     LVisibleColumnCount := 0;
     for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-      if FCompletionProposal.Columns[LColumnIndex].Visible then
+      if (FCompletionProposal.Columns[LColumnIndex].Visible) then
         Inc(LVisibleColumnCount);
 
-    if LVisibleColumnCount = 1 then
+    if (LVisibleColumnCount = 1) then
     begin
       LProposalColumn := nil; // Hide compiler warning only.
       for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
@@ -217,14 +206,15 @@ var
     for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
     begin
       LProposalColumn := FCompletionProposal.Columns[LColumnIndex];
-      if LProposalColumn.Visible and LProposalColumn.AutoWidth then
+      Canvas.Font.Assign(LProposalColumn.Font);
+      if (LProposalColumn.Visible and LProposalColumn.AutoWidth) then
       begin
         LItems := LProposalColumn.Items;
         LMaxWidth := 0;
         for LIndex := 0 to LItems.Count - 1 do
         begin
-          LTempWidth := FDoubleBufferBitmap.Canvas.TextWidth(LItems[LIndex].Value);
-          if LTempWidth > LMaxWidth then
+          LTempWidth := Canvas.TextWidth(LItems[LIndex].Value);
+          if (LTempWidth > LMaxWidth) then
             LMaxWidth := LTempWidth;
         end;
         LProposalColumn.Width := LMaxWidth;
@@ -234,27 +224,13 @@ var
     end;
 
     LMaxWidth := (Width - LWidthSum - GetSystemMetrics(SM_CYHSCROLL)) div LAutoWidthCount;
-    if LMaxWidth > 0 then
-    for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-    begin
-      LProposalColumn := FCompletionProposal.Columns[LColumnIndex];
-      if LProposalColumn.Visible and LProposalColumn.AutoWidth then
-        LProposalColumn.Width := LProposalColumn.Width + LMaxWidth;
-    end;
-  end;
-
-  function GetTitleVisible(): Boolean;
-  var
-    LColumn: TBCEditorCompletionProposalColumn;
-    LColumnIndex: Integer;
-  begin
-    Result := False;
-    for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-    begin
-      LColumn := FCompletionProposal.Columns[LColumnIndex];
-      if LColumn.Visible and LColumn.Title.Visible then
-        Exit(True);
-    end;
+    if (LMaxWidth > 0) then
+      for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
+      begin
+        LProposalColumn := FCompletionProposal.Columns[LColumnIndex];
+        if LProposalColumn.Visible and LProposalColumn.AutoWidth then
+          LProposalColumn.Width := LProposalColumn.Width + LMaxWidth;
+      end;
   end;
 
   procedure SetAutoConstraints();
@@ -279,9 +255,7 @@ begin
 
   if (FVisibleItems.Count > 0) then
   begin
-    FTitleVisible := GetTitleVisible();
     FItemHeight := GetItemHeight();
-    FTitleHeight := GetTitleHeight();
     CalculateFormPlacement();
     CalculateColumnWidths();
     SetAutoConstraints();
@@ -327,18 +301,13 @@ end;
 
 function TBCEditorCompletionProposalPopup.GetItemHeight(): Integer;
 var
-  LColumn: TBCEditorCompletionProposalColumn;
-  LColumnIndex: Integer;
-  LHeight: Integer;
+  LIndex: Integer;
 begin
   Result := 0;
-  for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
+  for LIndex := 0 to FCompletionProposal.Columns.Count - 1 do
   begin
-    LColumn := FCompletionProposal.Columns[LColumnIndex];
-    FDoubleBufferBitmap.Canvas.Font.Assign(LColumn.Font);
-    LHeight := FDoubleBufferBitmap.Canvas.TextHeight('X');
-    if (LHeight > Result) then
-      Result := LHeight;
+    Canvas.Font.Assign(FCompletionProposal.Columns[LIndex].Font);
+    Result := Max(Result, Canvas.TextHeight('X'));
   end;
 end;
 
@@ -349,27 +318,9 @@ begin
     Result := FCompletionProposal.Columns[FCompletionProposal.CompletionColumnIndex].Items;
 end;
 
-function TBCEditorCompletionProposalPopup.GetTitleHeight(): Integer;
-var
-  LColumn: TBCEditorCompletionProposalColumn;
-  LColumnIndex: Integer;
-  LHeight: Integer;
-begin
-  Result := 0;
-  if (FTitleVisible) then
-  for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-  begin
-    LColumn := FCompletionProposal.Columns[LColumnIndex];
-    FDoubleBufferBitmap.Canvas.Font.Assign(LColumn.Title.Font);
-    LHeight := FDoubleBufferBitmap.Canvas.TextHeight('X');
-    if (LHeight > Result) then
-      Result := LHeight;
-  end;
-end;
-
 function TBCEditorCompletionProposalPopup.GetVisibleLines(): Integer;
 begin
-  Result := (ClientHeight - FTitleHeight) div FItemHeight;
+  Result := ClientHeight div FItemHeight;
 end;
 
 procedure TBCEditorCompletionProposalPopup.HandleDblClick(ASender: TObject);
@@ -543,7 +494,7 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
 begin
-  FSelectedLine := Max(0, FTopLine + ((Y - FTitleHeight) div FItemHeight));
+  FSelectedLine := Max(0, FTopLine + Y div FItemHeight);
 
   inherited;
 
@@ -569,87 +520,49 @@ var
   LLeft: Integer;
   LRect: TRect;
 begin
-  with FDoubleBufferBitmap do
+  LRect := ClientRect;
+  LRect.Height := FItemHeight;
+  for LIndex := 0 to Min(GetVisibleLines() - 1, FVisibleItems.Count - 1) do
   begin
-    Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
-    Height := 0;
-    Width := ClientWidth;
-    Height := ClientHeight;
-    { Title }
-    LRect := ClientRect;
-    LRect.Height := FItemHeight;
+    if (LIndex + FTopLine = FSelectedLine) then
+      Canvas.Brush.Color := TCustomBCEditor(FEditor).Colors.Selection.Background
+    else
+      Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
+    Canvas.FillRect(LRect);
+
     LColumnWidth := 0;
-    if (FTitleVisible) then
+    for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
     begin
-      LRect.Height := FTitleHeight;
-      for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
+      LItemIndex := FVisibleItems[FTopLine + LIndex];
+      LColumn := FCompletionProposal.Columns[LColumnIndex];
+      if (LColumn.Visible) then
       begin
-        LColumn := FCompletionProposal.Columns[LColumnIndex];
-        if (LColumn.Visible) then
-        begin
-          LColumn := FCompletionProposal.Columns[LColumnIndex];
-          Canvas.Brush.Color := LColumn.Title.Colors.Background;
-          LRect.Left := LColumnWidth;
-          LRect.Right := LColumnWidth + LColumn.Width;
-          ExtTextOut(Canvas.Handle, 0, 0, ETO_OPAQUE, LRect, '', 0, nil);
-          Canvas.Font.Assign(LColumn.Title.Font);
-          if LColumn.Title.Visible then
-            Canvas.TextOut(FMargin + LColumnWidth, 0, LColumn.Title.Caption);
-          Canvas.Pen.Color := LColumn.Title.Colors.BottomBorder;
-          Canvas.MoveTo(LRect.Left, LRect.Bottom - 1);
-          Canvas.LineTo(LRect.Right, LRect.Bottom - 1);
-          Canvas.Pen.Color := LColumn.Title.Colors.RightBorder;
-          Canvas.MoveTo(LRect.Right - 1, LRect.Top - 1);
-          Canvas.LineTo(LRect.Right - 1, LRect.Bottom - 1);
-          LColumnWidth := LColumnWidth + LColumn.Width;
-        end;
-        LRect.Right := ClientRect.Right;
-        LRect.Left := 0;
-        LRect.Top := LRect.Bottom;
-        LRect.Bottom := LRect.Top + FItemHeight;
-      end;
-    end;
-    { Items }
-    for LIndex := 0 to Min(GetVisibleLines() - 1, FVisibleItems.Count - 1) do
-    begin
-      if (LIndex + FTopLine = FSelectedLine) then
-        Canvas.Brush.Color := TCustomBCEditor(FEditor).Colors.Selection.Background
-      else
-        Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
-      Canvas.FillRect(LRect);
+        Canvas.Font.Assign(LColumn.Font);
+        if (FTopLine + LIndex = FSelectedLine) then
+          Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
+        else
+          Canvas.Font.Color := TCustomBCEditor(FEditor).Font.Color;
 
-      LColumnWidth := 0;
-      for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-      begin
-        LItemIndex := FVisibleItems[FTopLine + LIndex];
-        LColumn := FCompletionProposal.Columns[LColumnIndex];
-        if (LColumn.Visible) then
+        if (LItemIndex < LColumn.Items.Count) then
         begin
-          Canvas.Font.Assign(LColumn.Font);
-          if LIndex + FTopLine = FSelectedLine then
-            Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
-          else
-            Canvas.Font.Color := TCustomBCEditor(FEditor).Font.Color;
-
-          if (LItemIndex < LColumn.Items.Count) then
+          LLeft := 0;
+          if LColumn.Items[LItemIndex].ImageIndex <> -1 then
           begin
-            LLeft := 0;
-            if LColumn.Items[LItemIndex].ImageIndex <> -1 then
-            begin
-              FCompletionProposal.Images.Draw(Canvas, FMargin + LColumnWidth, LRect.Top, LColumn.Items[LItemIndex].ImageIndex);
-              Inc(LLeft, FCompletionProposal.Images.Width + FMargin);
-            end;
-            Canvas.TextOut(FMargin + LColumnWidth + LLeft, LRect.Top, LColumn.Items[LItemIndex].Value);
+            FCompletionProposal.Images.Draw(Canvas, FMargin + LColumnWidth, LRect.Top, LColumn.Items[LItemIndex].ImageIndex);
+            Inc(LLeft, FCompletionProposal.Images.Width + FMargin);
           end;
-
-          LColumnWidth := LColumnWidth + LColumn.Width;
+          Canvas.TextOut(FMargin + LColumnWidth + LLeft, LRect.Top, LColumn.Items[LItemIndex].Value);
         end;
+
+        LColumnWidth := LColumnWidth + LColumn.Width;
       end;
-      Inc(LRect.Top, FItemHeight);
-      Inc(LRect.Bottom, FItemHeight);
     end;
+    Inc(LRect.Top, FItemHeight);
+    Inc(LRect.Bottom, FItemHeight);
   end;
-  Canvas.Draw(0, 0, FDoubleBufferBitmap);
+  LRect.Bottom := Height;
+  Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
+  Canvas.FillRect(LRect);
 end;
 
 procedure TBCEditorCompletionProposalPopup.SetCurrentString(const AValue: string);

@@ -31,47 +31,10 @@ type
   end;
 
   TBCEditorCompletionProposalColumn = class(TPersistent)
-  type
-
-    TTitle = class(TPersistent)
-    type
-
-      TColors = class(TPersistent)
-      strict private
-        FBackground: TColor;
-        FBottomBorder: TColor;
-        FRightBorder: TColor;
-      public
-        procedure Assign(ASource: TPersistent); override;
-        constructor Create();
-      published
-        property Background: TColor read FBackground write FBackground default clWindow;
-        property BottomBorder: TColor read FBottomBorder write FBottomBorder default clBtnFace;
-        property RightBorder: TColor read FRightBorder write FRightBorder default clBtnFace;
-      end;
-
-    strict private
-      FCaption: string;
-      FColors: TTitle.TColors;
-      FFont: TFont;
-      FVisible: Boolean;
-      procedure SetFont(const AValue: TFont);
-    public
-      procedure Assign(ASource: TPersistent); override;
-      constructor Create();
-      destructor Destroy(); override;
-    published
-      property Caption: string read FCaption write FCaption;
-      property Colors: TTitle.TColors read FColors write FColors;
-      property Font: TFont read FFont write SetFont;
-      property Visible: Boolean read FVisible write FVisible default False;
-    end;
-
   strict private
     FAutoWidth: Boolean;
     FFont: TFont;
     FItems: TBCEditorCompletionProposalItems;
-    FTitle: TTitle;
     FVisible: Boolean;
     FWidth: Integer;
     procedure SetFont(const AValue: TFont);
@@ -83,7 +46,6 @@ type
   published
     property AutoWidth: Boolean read FAutoWidth write FAutoWidth default True;
     property Font: TFont read FFont write SetFont;
-    property Title: TTitle read FTitle write FTitle;
     property Visible: Boolean read FVisible write FVisible default True;
     property Width: Integer read FWidth write FWidth default 0;
   end;
@@ -637,66 +599,6 @@ begin
   inherited Insert(AIndex, Result);
 end;
 
-{ TBCEditorCompletionProposalColumn.TTitle.TColors ****************************}
-
-procedure TBCEditorCompletionProposalColumn.TTitle.TColors.Assign(ASource: TPersistent);
-begin
-  Assert(ASource is TBCEditorCompletionProposalColumn.TTitle.TColors);
-
-  inherited;
-
-  FBackground := TBCEditorCompletionProposalColumn.TTitle.TColors(ASource).FBackground;
-  FBottomBorder := TBCEditorCompletionProposalColumn.TTitle.TColors(ASource).FBottomBorder;
-  FRightBorder := TBCEditorCompletionProposalColumn.TTitle.TColors(ASource).FRightBorder;
-end;
-
-constructor TBCEditorCompletionProposalColumn.TTitle.TColors.Create();
-begin
-  inherited Create();
-
-  FBackground := clWindow;
-  FBottomBorder := clBtnFace;
-  FRightBorder := clBtnFace;
-end;
-
-{ TBCEditorCompletionProposalColumn.TTitle ************************************}
-
-procedure TBCEditorCompletionProposalColumn.TTitle.Assign(ASource: TPersistent);
-begin
-  Assert(ASource is TBCEditorCompletionProposalColumn.TTitle);
-
-  inherited;
-
-  FCaption := TBCEditorCompletionProposalColumn.TTitle(ASource).FCaption;
-  FColors.Assign(TBCEditorCompletionProposalColumn.TTitle(ASource).FColors);
-  FFont.Assign(TBCEditorCompletionProposalColumn.TTitle(ASource).FFont);
-  FVisible := TBCEditorCompletionProposalColumn.TTitle(ASource).FVisible;
-end;
-
-constructor TBCEditorCompletionProposalColumn.TTitle.Create();
-begin
-  inherited Create();
-
-  FColors := TColors.Create;
-  FFont := TFont.Create;
-  FFont.Name := 'Courier New';
-  FFont.Size := 8;
-  FVisible := False;
-end;
-
-destructor TBCEditorCompletionProposalColumn.TTitle.Destroy();
-begin
-  FColors.Free();
-  FFont.Free();
-
-  inherited;
-end;
-
-procedure TBCEditorCompletionProposalColumn.TTitle.SetFont(const AValue: TFont);
-begin
-  FFont.Assign(AValue);
-end;
-
 { TBCEditorCompletionProposalColumn ********************************}
 
 procedure TBCEditorCompletionProposalColumn.Assign(ASource: TPersistent);
@@ -708,7 +610,6 @@ begin
   FAutoWidth := TBCEditorCompletionProposalColumn(ASource).FAutoWidth;
   FFont.Assign(TBCEditorCompletionProposalColumn(ASource).FFont);
   FItems.Assign(TBCEditorCompletionProposalColumn(ASource).FItems);
-  FTitle.Assign(TBCEditorCompletionProposalColumn(ASource).FTitle);
   FWidth := TBCEditorCompletionProposalColumn(ASource).FWidth;
 end;
 
@@ -721,7 +622,6 @@ begin
   FFont.Name := 'Courier New';
   FFont.Size := 8;
   FItems := TBCEditorCompletionProposalItems.Create();
-  FTitle := TTitle.Create;
   FVisible := True;
   FWidth := 0;
 end;
@@ -730,7 +630,6 @@ destructor TBCEditorCompletionProposalColumn.Destroy();
 begin
   FFont.Free();
   FItems.Free();
-  FTitle.Free();
 
   inherited;
 end;
