@@ -383,6 +383,7 @@ type
     procedure SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
     procedure SetForeground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
+    procedure SetState(const ALine: Integer; const AValue: TLine.TState);
     procedure SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
@@ -3469,6 +3470,15 @@ begin
     if (Assigned(FOnModifiedChange)) then
       FOnModifiedChange(Self);
   end;
+end;
+
+procedure TBCEditorLines.SetState(const ALine: Integer; const AValue: TLine.TState);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  FCriticalSection.Enter();
+  Items.List[ALine].State := AValue;
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer);

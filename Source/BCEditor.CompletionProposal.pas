@@ -24,12 +24,14 @@ type
     FSendKeyToEditor: Boolean;
     FTopLine: Integer;
     FVisibleItems: TList<Integer>;
+    procedure ApplySelection();
     function GetItems(): TBCEditorCompletionProposal.TColumn.TItems;
     function GetVisibleLines(): Integer;
     procedure HandleDblClick(ASender: TObject);
     procedure MoveSelectedLine(ALineCount: Integer);
     procedure SetCurrentString(const AValue: string);
     procedure SetPopupParent(const AValue: TCustomForm);
+    procedure SetSelectedLine(const AValue: Integer);
     procedure SetTopLine(const AValue: Integer);
     procedure UpdateScrollBar();
     procedure WMActivate(var AMessage: TWMActivate); message WM_ACTIVATE;
@@ -65,6 +67,30 @@ type
   TCustomBCEditor = class(BCEditor.TCustomBCEditor);
 
 { TBCEditorCompletionProposalPopup ********************************************}
+
+procedure TBCEditorCompletionProposalPopup.ApplySelection();
+begin
+  if (FSelectedLine < FVisibleItems.Count) then
+  begin
+    TCustomBCEditor(FEditor).Lines.BeginUpdate();
+    try
+      if (FCompletionStartChar < TCustomBCEditor(FEditor).CaretPos.X) then
+      begin
+        TCustomBCEditor(FEditor).ProcessCommand(ecWordLeft);
+        TCustomBCEditor(FEditor).ProcessCommand(ecDeleteWord);
+      end
+      else if (TCustomBCEditor(FEditor).WordAt[TCustomBCEditor(FEditor).CaretPos] <> '') then
+      begin
+        TCustomBCEditor(FEditor).ProcessCommand(ecSelWordRight);
+        TCustomBCEditor(FEditor).ProcessCommand(ecDelete);
+      end;
+      if (FVisibleItems[FSelectedLine] < GetItems().Count) then
+        TCustomBCEditor(FEditor).ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems()[FVisibleItems[FSelectedLine]].Value));
+    finally
+      TCustomBCEditor(FEditor).Lines.EndUpdate();
+    end;
+  end;
+end;
 
 constructor TBCEditorCompletionProposalPopup.Create(const AEditor: TCustomControl);
 begin
@@ -288,26 +314,8 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.HandleDblClick(ASender: TObject);
 begin
-  if (FSelectedLine < FVisibleItems.Count) then
-  begin
-    TCustomBCEditor(FEditor).Lines.BeginUpdate();
-    try
-      if (FCompletionStartChar < TCustomBCEditor(FEditor).CaretPos.X) then
-      begin
-        TCustomBCEditor(FEditor).ProcessCommand(ecWordLeft);
-        TCustomBCEditor(FEditor).ProcessCommand(ecDeleteWord);
-      end
-      else if (TCustomBCEditor(FEditor).WordAt[TCustomBCEditor(FEditor).CaretPos] <> '') then
-      begin
-        TCustomBCEditor(FEditor).ProcessCommand(ecSelWordRight);
-        TCustomBCEditor(FEditor).ProcessCommand(ecDeleteChar);
-      end;
-      if (FVisibleItems[FSelectedLine] < GetItems().Count) then
-        TCustomBCEditor(FEditor).ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems()[FVisibleItems[FSelectedLine]].Value));
-    finally
-      TCustomBCEditor(FEditor).Lines.EndUpdate();
-    end;
-  end;
+  ApplySelection();
+  TCustomBCEditor(FEditor).SetFocus();
 end;
 
 procedure TBCEditorCompletionProposalPopup.Hide();
@@ -328,11 +336,11 @@ begin
   case (Key) of
     VK_TAB,
     VK_RETURN:
-      HandleDblClick(Self);
+      ApplySelection();
     VK_ESCAPE:
       FEditor.SetFocus();
     VK_LEFT:
-      if Length(FCurrentString) > 0 then
+      if (Length(FCurrentString) > 0) then
       begin
         SetCurrentString(Copy(FCurrentString, 1, Length(FCurrentString) - 1));
         TCustomBCEditor(FEditor).ProcessCommand(ecLeft);
@@ -345,7 +353,7 @@ begin
     VK_RIGHT:
       begin
         LTextCaretPosition := TCustomBCEditor(FEditor).CaretPos;
-        if LTextCaretPosition.Char < Length(TCustomBCEditor(FEditor).Lines[LTextCaretPosition.Line]) then
+        if (LTextCaretPosition.Char < Length(TCustomBCEditor(FEditor).Lines[LTextCaretPosition.Line])) then
           LChar := TCustomBCEditor(FEditor).Lines[LTextCaretPosition.Line][1 + LTextCaretPosition.Char]
         else
           LChar := BCEDITOR_SPACE_CHAR;
@@ -367,12 +375,12 @@ begin
       SetTopLine(0);
     VK_UP:
       if (ssCtrl in Shift) then
-        FSelectedLine := 0
+        SetSelectedLine(0)
       else
         MoveSelectedLine(-1);
     VK_DOWN:
       if (ssCtrl in Shift) then
-        FSelectedLine := FVisibleItems.Count - 1
+        SetSelectedLine(FVisibleItems.Count - 1)
       else
         MoveSelectedLine(1);
     VK_BACK:
@@ -380,7 +388,6 @@ begin
         if (Length(FCurrentString) > 0) then
         begin
           SetCurrentString(Copy(FCurrentString, 1, Length(FCurrentString) - 1));
-
           TCustomBCEditor(FEditor).ProcessCommand(ecBackspace);
         end
         else
@@ -389,12 +396,11 @@ begin
           FEditor.SetFocus();
         end;
     VK_DELETE:
-      TCustomBCEditor(FEditor).ProcessCommand(ecDeleteChar);
+      TCustomBCEditor(FEditor).ProcessCommand(ecDelete);
     else
       FSendKeyToEditor := True;
   end;
   Key := 0;
-  Invalidate();
 end;
 
 procedure TBCEditorCompletionProposalPopup.KeyPress(var Key: Char);
@@ -419,16 +425,14 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
 begin
-  FSelectedLine := Max(0, FTopLine + Y div FLineHeight);
+  SetSelectedLine(Max(0, FTopLine + Y div FLineHeight));
 
   inherited;
-
-  Invalidate();
 end;
 
 procedure TBCEditorCompletionProposalPopup.MoveSelectedLine(ALineCount: Integer);
 begin
-  FSelectedLine := Min(Max(FSelectedLine + ALineCount, 0), FVisibleItems.Count - 1);
+  SetSelectedLine(Min(Max(FSelectedLine + ALineCount, 0), FVisibleItems.Count - 1));
   if (FSelectedLine >= FTopLine + GetVisibleLines()) then
     SetTopLine(FSelectedLine - GetVisibleLines() + 1);
   if (FSelectedLine < FTopLine) then
@@ -554,6 +558,16 @@ begin
       AValue.FreeNotification(Self);
     if (HandleAllocated and not (csDesigning in ComponentState)) then
       RecreateWnd();
+  end;
+end;
+
+procedure TBCEditorCompletionProposalPopup.SetSelectedLine(const AValue: Integer);
+begin
+  if (AValue <> FSelectedLine) then
+  begin
+    FSelectedLine := AValue;
+    UpdateScrollBar();
+    Invalidate();
   end;
 end;
 

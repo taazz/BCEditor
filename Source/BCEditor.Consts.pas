@@ -159,7 +159,7 @@ const
   ecChar = 74;
   ecClear = 75;
   ecDeleteToBOL = 76;
-  ecDeleteChar = 77;
+  ecDelete = 77;
   ecDeleteToEOL = 78;
   ecDeleteLastWord = 79;
   ecDeleteLine = 80;

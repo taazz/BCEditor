@@ -755,7 +755,7 @@ begin
   RegisterCommand(ecChar, eccText, 'ecChar');
   RegisterCommand(ecClear, eccText, 'ecClear');
   RegisterCommand(ecDeleteToBOL, eccText, 'ecDeleteToBOL');
-  RegisterCommand(ecDeleteChar, eccText, 'ecDeleteChar', ShortCut(VK_DELETE, []));
+  RegisterCommand(ecDelete, eccText, 'ecDeleteChar', ShortCut(VK_DELETE, []));
   RegisterCommand(ecDeleteToEOL, eccText, 'ecDeleteToEOL', ShortCut(Ord('Y'), [ssCtrl, ssShift]));
   RegisterCommand(ecDeleteLastWord, eccText, 'ecDeleteLastWord', ShortCut(VK_BACK, [ssCtrl]));
   RegisterCommand(ecDeleteLine, eccText, 'ecDeleteLine', ShortCut(Ord('Y'), [ssCtrl]));

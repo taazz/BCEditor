@@ -54,7 +54,7 @@ type
     end;
 
     TClientJob = (cjTokenWidth, cjPaint, cjPaintOverlays,
-      cjMouseDown, cjMouseDblClk, THideEvent, cjMouseMove, cjMouseUp,
+      cjMouseDown, cjMouseDblClk, cjMouseTrplClk, cjMouseMove, cjMouseUp,
       cjSetCursor, cjHint, cjScrolling);
 
     TMouseCapture = (mcNone, mcSyncEditButton, mcMarks,
@@ -2744,9 +2744,7 @@ begin
       ExStyle := ExStyle or WS_EX_COMPOSITED;
 
     if (NewStyleControls and Ctl3D and (FBorderStyle = bsSingle)) then
-    begin
       ExStyle := ExStyle or WS_EX_CLIENTEDGE;
-    end;
   end;
 end;
 
@@ -5591,11 +5589,14 @@ procedure TCustomBCEditor.InvalidateLineNumber(const ALine: Integer);
 var
   LRect: TRect;
 begin
-  LRect.Left := FLineNumbersRect.Left;
-  LRect.Top := FLineNumbersRect.Top + (FLines.Items[ALine].FirstRow - FPaintHelper.TopRow) * FPaintHelper.RowHeight;
-  LRect.Right := FLineNumbersRect.Right;
-  LRect.Bottom := LRect.Top + FPaintHelper.RowHeight;
-  InvalidateRect(LRect);
+  if ((0 <= ALine) and (ALine < FLines.Items.Count)) then
+  begin
+    LRect.Left := FLineNumbersRect.Left;
+    LRect.Top := FLineNumbersRect.Top + (FLines.Items[ALine].FirstRow - FPaintHelper.TopRow) * FPaintHelper.RowHeight;
+    LRect.Right := FLineNumbersRect.Right;
+    LRect.Bottom := LRect.Top + FPaintHelper.RowHeight;
+    InvalidateRect(LRect);
+  end;
 end;
 
 procedure TCustomBCEditor.InvalidateMarks();
@@ -6212,7 +6213,7 @@ begin
 
   if (GetTickCount() < FLastDoubleClickTime + FDoubleClickTime) then
   begin
-    LAction := THideEvent;
+    LAction := cjMouseTrplClk;
     FLastDoubleClickTime := 0;
     Include(FState, esMouseDblClk);
   end
@@ -7302,7 +7303,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
             end;
           cjMouseDown,
           cjMouseDblClk,
-          THideEvent,
+          cjMouseTrplClk,
           cjMouseUp,
           cjHint:
             if (LRect.Contains(ACursorPos)) then
@@ -7700,7 +7701,7 @@ begin
 
         if (FCodeFoldingVisible) then
           case (LCommand) of
-            ecBackspace, ecDeleteChar, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
+            ecBackspace, ecDelete, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
             ecClear, ecReturn, ecChar, ecText, ecCutToClipboard, ecPasteFromClipboard,
             ecBlockIndent, ecBlockUnindent, ecTab:
               if (not FLines.SelArea.IsEmpty()) then
@@ -7761,7 +7762,7 @@ begin
             DoCopyToClipboard();
           ecCutToClipboard:
             DoCutToClipboard();
-          ecDeleteChar:
+          ecDelete:
             DeleteChar();
           ecDeleteLastWord:
             DeleteLastWordOrBOL(LCommand);
@@ -8003,7 +8004,7 @@ begin
         else
           LLine := -1;
 
-        if (AJob = THideEvent) then
+        if (AJob = cjMouseTrplClk) then
         begin
           if ((AButton = mbLeft)
             and (soTripleClickLineSelect in FSelectionOptions)
@@ -8820,8 +8821,13 @@ begin
 end;
 
 procedure TCustomBCEditor.ReadState(Reader: TReader);
+var
+  LLine: Integer;
 begin
   inherited;
+
+  for LLine := 0 to FLines.Count - 1 do
+    FLines.SetState(LLine, lsLoaded);
 
   if (eoTrimEndOfFile in Options) then
     FLines.Options := FLines.Options + [loTrimEOF]
@@ -9954,7 +9960,8 @@ var
   LTextPos: TPoint;
   LNewTextPos: TPoint;
 begin
-  if (GetWindowLong(WindowHandle, GWL_STYLE) and (ES_AUTOVSCROLL or ES_AUTOHSCROLL) <> 0) then
+  if ((GetWindowLong(WindowHandle, GWL_STYLE) and (ES_AUTOVSCROLL or ES_AUTOHSCROLL) <> 0)
+    and (FPaintHelper.UsableRows > 0)) then
   begin
     FRowsWanted.CriticalSection.Enter();
     try
@@ -10746,7 +10753,7 @@ begin
   try
     case (FRowsWanted.What) of
       rwPaintText:
-        InvalidateText();
+        Invalidate();
       rwScrollToPosition:
         begin
           if (FRowsWanted.CenterCaret) then
@@ -10757,7 +10764,7 @@ begin
             if (FRowsWanted.CenterCaret) then
               Exclude(FState, esCenterCaret);
           end;
-          InvalidateText();
+          Invalidate();
         end;
       rwDown:
         DoUpOrDown(FRowsWanted.Row - FRows.CaretPosition.Row, FRowsWanted.Select);
@@ -10851,8 +10858,7 @@ begin
     begin
       if (FCaretVisible) then
       begin
-        if (not DestroyCaret()) then
-          RaiseLastOSError();
+        DestroyCaret();
         FCaretVisible := False;
       end;
     end
