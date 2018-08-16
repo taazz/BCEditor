@@ -54,7 +54,7 @@ type
     end;
 
     TClientJob = (cjTokenWidth, cjPaint, cjPaintOverlays,
-      cjMouseDown, cjMouseDblClk, cjMouseTrplClk, cjMouseMove, cjMouseUp,
+      cjMouseDown, cjMouseDblClk, THideEvent, cjMouseMove, cjMouseUp,
       cjSetCursor, cjHint, cjScrolling);
 
     TMouseCapture = (mcNone, mcSyncEditButton, mcMarks,
@@ -421,9 +421,8 @@ type
     FOldVertScrollBarVisible: Boolean;
     FOnCaretChange: TBCEditorCaretChangedEvent;
     FOnChange: TNotifyEvent;
-    FOnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent;
-    FOnCompletionProposalShow: TBCEditorCompletionProposalShowEvent;
-    FOnCompletionProposalValidate: TBCEditorCompletionProposalValidateEvent;
+    FOnCompletionProposalHide: TBCEditorCompletionProposal.THideEvent;
+    FOnCompletionProposalShow: TBCEditorCompletionProposal.TShowEvent;
     FOnFindExecuted: TBCEditorFindExecutedEvent;
     FOnFindWrapAround: TBCEditorFindWrapAroundEvent;
     FOnHint: TBCEditorHintEvent;
@@ -709,7 +708,6 @@ type
     procedure SetWantReturns(const AValue: Boolean);
     procedure SetWordBlock(const ALinesPosition: TBCEditorLinesPosition);
     procedure SetWordWrap(const AValue: Boolean);
-    function SplitTextIntoWords(AStringList: TStrings; const ACaseSensitive: Boolean): string;
     procedure SyncEditActivated(const AData: Pointer);
     procedure SyncEditChecked(const AData: Pointer);
     function TokenColumns(const AText: PChar; const ALength, AColumn: Integer): Integer; {$IFNDEF Debug} inline; {$ENDIF}
@@ -834,9 +832,8 @@ type
     property MouseCapture: TMouseCapture read FMouseCapture write SetMouseCapture;
     property OnCaretChange: TBCEditorCaretChangedEvent read FOnCaretChange write FOnCaretChange;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
-    property OnCompletionProposalClose: TBCEditorCompletionProposalCloseEvent read FOnCompletionProposalClose write FOnCompletionProposalClose;
-    property OnCompletionProposalShow: TBCEditorCompletionProposalShowEvent read FOnCompletionProposalShow write FOnCompletionProposalShow;
-    property OnCompletionProposalValidate: TBCEditorCompletionProposalValidateEvent read FOnCompletionProposalValidate write FOnCompletionProposalValidate;
+    property OnCompletionProposalHide: TBCEditorCompletionProposal.THideEvent read FOnCompletionProposalHide write FOnCompletionProposalHide;
+    property OnCompletionProposalShow: TBCEditorCompletionProposal.TShowEvent read FOnCompletionProposalShow write FOnCompletionProposalShow;
     property OnFindExecuted: TBCEditorFindExecutedEvent read FOnFindExecuted write FOnFindExecuted;
     property OnFindWrapAround: TBCEditorFindWrapAroundEvent read FOnFindWrapAround write FOnFindWrapAround;
     property OnHint: TBCEditorHintEvent read FOnHint write FOnHint;
@@ -956,7 +953,7 @@ type
     property OnCaretChange;
     property OnChange;
     property OnClick;
-    property OnCompletionProposalClose;
+    property OnCompletionProposalHide;
     property OnCompletionProposalShow;
     property OnContextPopup;
     property OnDblClick;
@@ -2614,7 +2611,7 @@ begin
   FOldSelArea := InvalidLinesArea;
   FOldVertScrollBarVisible := False;
   FOnChange := nil;
-  FOnCompletionProposalClose := nil;
+  FOnCompletionProposalHide := nil;
   FOnCompletionProposalShow := nil;
   FOnFindExecuted := nil;
   FOnFindWrapAround := nil;
@@ -3309,14 +3306,10 @@ begin
     LControl := LControl.Parent;
   if (LControl is TCustomForm) then
     FCompletionProposalPopup.PopupParent := TCustomForm(LControl);
-  FCompletionProposalPopup.OnClose := FOnCompletionProposalClose;
-  FCompletionProposalPopup.OnValidate := FOnCompletionProposalValidate;
-  FCompletionProposalPopup.Assign(FCompletionProposal);
+  FCompletionProposalPopup.OnClose := FOnCompletionProposalHide;
 
-  LItems := TStringList.Create;
+  LItems := TStringList.Create();
   try
-    if (cpoParseItemsFromText in FCompletionProposal.Options) then
-      SplitTextIntoWords(LItems, False);
     if (cpoAddHighlighterKeywords in FCompletionProposal.Options) then
       AddHighlighterKeywords(LItems);
     if ((LItems.Count > 0) or not Assigned(FOnCompletionProposalShow)) then
@@ -6219,7 +6212,7 @@ begin
 
   if (GetTickCount() < FLastDoubleClickTime + FDoubleClickTime) then
   begin
-    LAction := cjMouseTrplClk;
+    LAction := THideEvent;
     FLastDoubleClickTime := 0;
     Include(FState, esMouseDblClk);
   end
@@ -7309,7 +7302,7 @@ function TCustomBCEditor.ProcessClient(const AJob: TClientJob;
             end;
           cjMouseDown,
           cjMouseDblClk,
-          cjMouseTrplClk,
+          THideEvent,
           cjMouseUp,
           cjHint:
             if (LRect.Contains(ACursorPos)) then
@@ -8010,7 +8003,7 @@ begin
         else
           LLine := -1;
 
-        if (AJob = cjMouseTrplClk) then
+        if (AJob = THideEvent) then
         begin
           if ((AButton = mbLeft)
             and (soTripleClickLineSelect in FSelectionOptions)
@@ -10636,171 +10629,6 @@ begin
 
   InvalidateRows();
   InvalidateCodeFolding();
-end;
-
-function TCustomBCEditor.SplitTextIntoWords(AStringList: TStrings; const ACaseSensitive: Boolean): string;
-var
-  LSkipCloseKeyChars: TBCEditorAnsiCharSet;
-  LSkipOpenKeyChars: TBCEditorAnsiCharSet;
-  LSkipRegionItem: TBCEditorCodeFoldingSkipRegion;
-
-  procedure AddKeyChars();
-  var
-    LIndex: Integer;
-    LTokenEndPos: PChar;
-    LTokenPos: PChar;
-    LTokenText: string;
-  begin
-    LSkipOpenKeyChars := [];
-    LSkipCloseKeyChars := [];
-
-    for LIndex := 0 to FHighlighter.CompletionProposalSkipRegions.Count - 1 do
-    begin
-      LSkipRegionItem := FHighlighter.CompletionProposalSkipRegions[LIndex];
-
-      LTokenText := LSkipRegionItem.OpenToken;
-      if (LTokenText <> '') then
-      begin
-        LTokenPos := @LTokenText[1];
-        LTokenEndPos := @LTokenText[Length(LTokenText)];
-        while (LTokenPos <= LTokenEndPos) do
-        begin
-          LSkipOpenKeyChars := LSkipOpenKeyChars + [LTokenPos^];
-          Inc(LTokenPos);
-        end;
-
-        LTokenText := LSkipRegionItem.CloseToken;
-        if (LTokenText <> '') then
-        begin
-          LTokenPos := @LTokenText[1];
-          LTokenEndPos := @LTokenText[Length(LTokenText)];
-          while (LTokenPos <= LTokenEndPos) do
-          begin
-            LSkipCloseKeyChars := LSkipCloseKeyChars + [LTokenPos^];
-            Inc(LTokenPos);
-          end;
-        end;
-      end;
-    end;
-  end;
-
-var
-  LIndex: Integer;
-  LLine: Integer;
-  LLineEndPos: PChar;
-  LLinePos: PChar;
-  LOpenTokenSkipFoldRangeList: TList<TBCEditorCodeFoldingSkipRegion>;
-  LPBookmarkText: PChar;
-  LStringList: TStringList;
-  LTokenEndPos: PChar;
-  LTokenPos: PChar;
-  LTokenText: string;
-  LWord: string;
-  LWordList: string;
-begin
-  Result := '';
-  AddKeyChars;
-  AStringList.Clear;
-  LOpenTokenSkipFoldRangeList := TList<TBCEditorCodeFoldingSkipRegion>.Create;
-  try
-    for LLine := 0 to FLines.Count - 1 do
-      if (FLines.Items[LLine].Text <> '') then
-      begin
-        { Add document words }
-        LLinePos := @FLines.Items[LLine].Text[1];
-        LLineEndPos := @FLines.Items[LLine].Text[Length(FLines.Items[LLine].Text)];
-        LWord := '';
-        while (LLinePos <= LLineEndPos) do
-        begin
-          { Skip regions - Close }
-          if (LOpenTokenSkipFoldRangeList.Count > 0) and CharInSet(LLinePos^, LSkipCloseKeyChars) then
-          begin
-            LTokenText := LOpenTokenSkipFoldRangeList[LOpenTokenSkipFoldRangeList.Count - 1].CloseToken;
-            if (LTokenText <> '') then
-            begin
-              LTokenPos := @LTokenText[1];
-              LTokenEndPos := @LTokenText[Length(LTokenText)];
-              LPBookmarkText := LLinePos;
-              { Check if the close keyword found }
-              while ((LLinePos <= LLineEndPos) and (LTokenPos <= LTokenEndPos)
-                and (LLinePos^ = LTokenPos^)) do
-              begin
-                Inc(LLinePos);
-                Inc(LTokenPos);
-              end;
-              if (LTokenPos > LTokenEndPos) then { If found, pop skip region from the list }
-              begin
-                LOpenTokenSkipFoldRangeList.Delete(LOpenTokenSkipFoldRangeList.Count - 1);
-                Continue;
-              end
-              else
-                LLinePos := LPBookmarkText;
-                { Skip region close not found, return pointer back }
-            end;
-          end;
-
-          { Skip regions - Open }
-          if (CharInSet(LLinePos^, LSkipOpenKeyChars)) then
-            for LIndex := 0 to FHighlighter.CompletionProposalSkipRegions.Count - 1 do
-            begin
-              LSkipRegionItem := FHighlighter.CompletionProposalSkipRegions[LIndex];
-              LTokenText := LSkipRegionItem.OpenToken;
-              if ((LTokenText <> '') and (LLinePos^ = LTokenText[1])) then { If the first character is a match }
-              begin
-                LTokenPos := @LTokenText[1];
-                LTokenEndPos := @LTokenText[Length(LTokenText)];
-                LPBookmarkText := LLinePos;
-                { Check if the open keyword found }
-                while ((LLinePos <= LLineEndPos) and (LTokenPos <= LTokenEndPos)
-                  and (LLinePos^ = LTokenPos^)) do
-                begin
-                  Inc(LLinePos);
-                  Inc(LTokenPos);
-                end;
-                if (LTokenPos > LTokenEndPos) then { If found, skip single line comment or push skip region into stack }
-                begin
-                  if LSkipRegionItem.RegionType = ritSingleLineComment then
-                    { Single line comment skip until next line }
-                    LLinePos := LLineEndPos
-                  else
-                    LOpenTokenSkipFoldRangeList.Add(LSkipRegionItem);
-                  Dec(LLinePos); { The end of the while loop will increase }
-                  Break;
-                end
-                else
-                  LLinePos := LPBookmarkText;
-                { Skip region open not found, return pointer back }
-              end;
-            end;
-
-          if LOpenTokenSkipFoldRangeList.Count = 0 then
-          begin
-            if ((LWord = '') and (LLinePos^.IsLower or LLinePos^.IsUpper or (LLinePos^ = BCEDITOR_UNDERSCORE))
-              or (LWord <> '') and (LLinePos^.IsLower or LLinePos^.IsUpper or LLinePos^.IsNumber or (LLinePos^ = BCEDITOR_UNDERSCORE))) then
-              LWord := LWord + LLinePos^
-            else
-            begin
-              if (LWord <> '') and (Length(LWord) > 1) then
-                if Pos(LWord + FLines.LineBreak, LWordList) = 0 then { No duplicates }
-                  LWordList := LWordList + LWord + FLines.LineBreak;
-              LWord := ''
-            end;
-          end;
-          LLinePos := LLineEndPos + 1;
-        end;
-        if (Length(LWord) > 1) then
-          if Pos(LWord + FLines.LineBreak, LWordList) = 0 then { No duplicates }
-            LWordList := LWordList + LWord + FLines.LineBreak;
-      end;
-    LStringList := TStringList.Create();
-    LStringList.LineBreak := FLines.LineBreak;
-    LStringList.Text := LWordList;
-    LStringList.Sort();
-    AStringList.Assign(LStringList);
-    LStringList.Free();
-  finally
-    LOpenTokenSkipFoldRangeList.Free;
-  end;
 end;
 
 procedure TCustomBCEditor.SyncEditActivated(const AData: Pointer);

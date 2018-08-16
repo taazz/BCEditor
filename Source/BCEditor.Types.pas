@@ -4,8 +4,7 @@ interface {********************************************************************}
 
 uses
   SysUtils, Types,
-  Graphics, Controls,
-  BCEditor.Consts;
+  Graphics, Controls;
 
 type
   TBCEditorArrayOfString = array of string;
@@ -30,9 +29,7 @@ type
     cpoAddHighlighterKeywords,
     cpoCaseSensitive,
     cpoFiltered,
-    cpoParseItemsFromText,
     cpoResizeable,
-    cpoShowShadow,
     cpoUseHighlighterColumnFont
   );
   TBCEditorCompletionProposalOptions = set of TBCEditorCompletionProposalOption;
@@ -118,15 +115,15 @@ type
   TBCEditorReplaceOptions = set of TBCEditorReplaceOption;
 
   TBCEditorSelectionOption = (
-    soDoubleClickRealNumbers,
-    soHighlightWholeLine,
-    soTripleClickLineSelect
+    soDoubleClickRealNumbers, { Double-click selects whole real numbers }
+    soHighlightWholeLine, { select whole lines instead of the cursor selected character }
+    soTripleClickLineSelect { triple click selects the whole line }
   );
   TBCEditorSelectionOptions = set of TBCEditorSelectionOption;
 
   TBCEditorSyncEditOption = (
-    seoShowButton,
-    seoCaseSensitive
+    seoShowButton, { Show SyncEdit button on the left side of the editor if SyncEdit is available }
+    seoCaseSensitive { SyncEdit works with case sensitive words detection }
   );
   TBCEditorSyncEditOptions = set of TBCEditorSyncEditOption;
 

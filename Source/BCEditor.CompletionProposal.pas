@@ -11,29 +11,22 @@ uses
 type
   TBCEditorCompletionProposalPopup = class(TCustomControl)
   strict private
-    FAdjustCompletionStart: Boolean;
     FCaseSensitive: Boolean;
-    FCompletionProposal: TBCEditorCompletionProposal;
     FCompletionStartChar: Integer;
     FCurrentString: string;
     FEditor: TCustomControl;
     FFiltered: Boolean;
-    FItemHeight: Integer;
-    FVisibleItems: TList<Integer>;
-    FItems: TStrings;
     FMargin: Integer;
-    FOnClose: TBCEditorCompletionProposalCloseEvent;
-    FOnValidate: TBCEditorCompletionProposalValidateEvent;
+    FLineHeight: Integer;
+    FOnHide: TBCEditorCompletionProposal.THideEvent;
     FPopupParent: TCustomForm;
     FSelectedLine: Integer;
-    FSendToEditor: Boolean;
+    FSendKeyToEditor: Boolean;
     FTopLine: Integer;
-    FValueSet: Boolean;
-    function GetItemHeight(): Integer;
-    function GetItems(): TBCEditorCompletionProposalItems;
+    FVisibleItems: TList<Integer>;
+    function GetItems(): TBCEditorCompletionProposal.TColumn.TItems;
     function GetVisibleLines(): Integer;
     procedure HandleDblClick(ASender: TObject);
-    procedure HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
     procedure MoveSelectedLine(ALineCount: Integer);
     procedure SetCurrentString(const AValue: string);
     procedure SetPopupParent(const AValue: TCustomForm);
@@ -51,14 +44,12 @@ type
     procedure MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer); override;
     procedure Paint(); override;
     procedure Show(Origin: TPoint);
-    property OnClose: TBCEditorCompletionProposalCloseEvent read FOnClose write FOnClose;
-    property OnValidate: TBCEditorCompletionProposalValidateEvent read FOnValidate write FOnValidate;
-    property Items: TBCEditorCompletionProposalItems read GetItems;
+    property OnClose: TBCEditorCompletionProposal.THideEvent read FOnHide write FOnHide;
+    property Items: TBCEditorCompletionProposal.TColumn.TItems read GetItems;
     property PopupParent: TCustomForm read FPopupParent write SetPopupParent;
   public
     constructor Create(const AEditor: TCustomControl); reintroduce;
     destructor Destroy(); override;
-    procedure Assign(ASource: TPersistent); override;
     procedure Execute(const ACurrentString: string; const APoint: TPoint);
   end;
 
@@ -67,31 +58,13 @@ implementation {***************************************************************}
 uses
   Windows,
   SysUtils, UITypes, Math,
-  Themes, Dialogs,
-  BCEditor, BCEditor.Consts, BCEditor.Commands, BCEditor.Lines;
+  Themes,
+  BCEditor, BCEditor.Consts, BCEditor.Commands;
 
 type
   TCustomBCEditor = class(BCEditor.TCustomBCEditor);
-  TBCEditorLines = class(BCEditor.Lines.TBCEditorLines);
 
-{ TBCEditorCompletionProposalPopupWindow **************************************}
-
-procedure TBCEditorCompletionProposalPopup.Assign(ASource: TPersistent);
-begin
-  if ASource is TBCEditorCompletionProposal then
-  begin
-    FCompletionProposal := ASource as TBCEditorCompletionProposal;
-    with FCompletionProposal do
-    begin
-      Self.FCaseSensitive := cpoCaseSensitive in Options;
-      Self.FFiltered := cpoFiltered in Options;
-      Self.Width := Width;
-      Self.Constraints.Assign(Constraints);
-    end
-  end
-  else
-    inherited Assign(ASource);
-end;
+{ TBCEditorCompletionProposalPopup ********************************************}
 
 constructor TBCEditorCompletionProposalPopup.Create(const AEditor: TCustomControl);
 begin
@@ -100,22 +73,18 @@ begin
   ControlStyle := ControlStyle + [csNoDesignVisible, csReplicatable];
 
   FEditor := AEditor;
+  Width := TCustomBCEditor(FEditor).CompletionProposal.Width;
 
   Ctl3D := False;
   FCaseSensitive := False;
   FFiltered := False;
-  FItemHeight := 0;
+  FLineHeight := 0;
   FVisibleItems := TList<Integer>.Create();
-  FMargin := 2;
-  FOnClose := nil;
+  FMargin := GetSystemMetrics(SM_CXSIZEFRAME) div 2;
+  FOnHide := nil;
   FPopupParent := nil;
-  FValueSet := False;
-  ParentCtl3D := False;
   Visible := False;
 
-  FItems := TStringList.Create;
-
-  FOnValidate := nil;
   OnDblClick := HandleDblClick;
 end;
 
@@ -124,7 +93,7 @@ begin
   inherited;
 
   Params.Style := WS_POPUP or WS_BORDER;
-  if cpoResizeable in FCompletionProposal.Options then
+  if (cpoResizeable in TCustomBCEditor(FEditor).CompletionProposal.Options) then
     Params.Style := Params.Style or WS_SIZEBOX;
   Params.WindowClass.Style := Params.WindowClass.Style or CS_DROPSHADOW;
   if (TCustomBCEditor(FEditor).DoubleBuffered and not (csDesigning in ComponentState)) then
@@ -135,23 +104,16 @@ begin
 end;
 
 destructor TBCEditorCompletionProposalPopup.Destroy();
-var
-  LSelectedItem: string;
 begin
-  if FItemHeight <> 0 then
-    FCompletionProposal.VisibleLines := ClientHeight div FItemHeight;
-  FCompletionProposal.Width := Width;
-
-  if not FValueSet and Assigned(FOnClose) then
+  if (FLineHeight <> 0) then
   begin
-    LSelectedItem := '';
-    FOnClose(FEditor, LSelectedItem);
+    TCustomBCEditor(FEditor).CompletionProposal.Lines := ClientHeight div FLineHeight;
+    TCustomBCEditor(FEditor).CompletionProposal.Width := Width;
   end;
 
   FVisibleItems.Free();
-  FItems.Free();
 
-  inherited Destroy;
+  inherited;
 end;
 
 procedure TBCEditorCompletionProposalPopup.Execute(const ACurrentString: string; const APoint: TPoint);
@@ -164,7 +126,7 @@ var
     LPoint.X := APoint.X - Canvas.TextWidth(ACurrentString);
     LPoint.Y := APoint.Y;
 
-    ClientHeight := FItemHeight * FCompletionProposal.VisibleLines + 2;
+    ClientHeight := FLineHeight * TCustomBCEditor(FEditor).CompletionProposal.Lines + 2;
 
     if (LPoint.X + ClientWidth > Screen.DesktopWidth) then
       LPoint.X := Max(0, Screen.DesktopWidth - ClientWidth - 5);
@@ -178,34 +140,34 @@ var
     LAutoWidthCount: Integer;
     LColumnIndex: Integer;
     LIndex: Integer;
-    LItems: TBCEditorCompletionProposalItems;
+    LItems: TBCEditorCompletionProposal.TColumn.TItems;
     LMaxWidth: Integer;
-    LProposalColumn: TBCEditorCompletionProposalColumn;
+    LProposalColumn: TBCEditorCompletionProposal.TColumn;
     LTempWidth: Integer;
     LVisibleColumnCount: Integer;
     LWidthSum: Integer;
   begin
     LVisibleColumnCount := 0;
-    for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-      if (FCompletionProposal.Columns[LColumnIndex].Visible) then
+    for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
+      if (TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex].Visible) then
         Inc(LVisibleColumnCount);
 
     if (LVisibleColumnCount = 1) then
     begin
       LProposalColumn := nil; // Hide compiler warning only.
-      for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-        if FCompletionProposal.Columns[LColumnIndex].Visible then
-          LProposalColumn := FCompletionProposal.Columns[LColumnIndex];
-      if LProposalColumn.AutoWidth then
+      for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
+        if (TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex].Visible) then
+          LProposalColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
+      if (LProposalColumn.AutoWidth) then
         LProposalColumn.Width := Width;
       Exit;
     end;
 
     LAutoWidthCount := 0;
     LWidthSum := 0;
-    for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
+    for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
     begin
-      LProposalColumn := FCompletionProposal.Columns[LColumnIndex];
+      LProposalColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
       Canvas.Font.Assign(LProposalColumn.Font);
       if (LProposalColumn.Visible and LProposalColumn.AutoWidth) then
       begin
@@ -225,21 +187,33 @@ var
 
     LMaxWidth := (Width - LWidthSum - GetSystemMetrics(SM_CYHSCROLL)) div LAutoWidthCount;
     if (LMaxWidth > 0) then
-      for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
+      for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
       begin
-        LProposalColumn := FCompletionProposal.Columns[LColumnIndex];
-        if LProposalColumn.Visible and LProposalColumn.AutoWidth then
+        LProposalColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
+        if (LProposalColumn.Visible and LProposalColumn.AutoWidth) then
           LProposalColumn.Width := LProposalColumn.Width + LMaxWidth;
       end;
   end;
 
+  function CalculateLineHeight(): Integer;
+  var
+    LIndex: Integer;
+  begin
+    Result := 0;
+    for LIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
+    begin
+      Canvas.Font.Assign(TCustomBCEditor(FEditor).CompletionProposal.Columns[LIndex].Font);
+      Result := Max(Result, Canvas.TextHeight('X'));
+    end;
+  end;
+
   procedure SetAutoConstraints();
   begin
-    if cpoAutoConstraints in FCompletionProposal.Options then
+    if cpoAutoConstraints in TCustomBCEditor(FEditor).CompletionProposal.Options then
     begin
-      FCompletionProposal.Constraints.MinHeight := Height;
-      FCompletionProposal.Constraints.MinWidth := Width;
-      Constraints.Assign(FCompletionProposal.Constraints);
+      TCustomBCEditor(FEditor).CompletionProposal.Constraints.MinHeight := Height;
+      TCustomBCEditor(FEditor).CompletionProposal.Constraints.MinWidth := Width;
+      Constraints.Assign(TCustomBCEditor(FEditor).CompletionProposal.Constraints);
     end;
   end;
 
@@ -247,6 +221,9 @@ var
   LCount: Integer;
   LIndex: Integer;
 begin
+  FCaseSensitive := cpoCaseSensitive in TCustomBCEditor(FEditor).CompletionProposal.Options;
+  FFiltered := cpoFiltered in TCustomBCEditor(FEditor).CompletionProposal.Options;
+
   LCount := GetItems().Count;
   FVisibleItems.Clear();
   for LIndex := 0 to LCount - 1 do
@@ -255,7 +232,7 @@ begin
 
   if (FVisibleItems.Count > 0) then
   begin
-    FItemHeight := GetItemHeight();
+    FLineHeight := CalculateLineHeight();
     CalculateFormPlacement();
     CalculateColumnWidths();
     SetAutoConstraints();
@@ -284,7 +261,6 @@ begin
     LChar := LTextCaretPosition.Char;
     if (LChar <= Length(LLineText)) then
     begin
-      FAdjustCompletionStart := False;
       while ((LChar > 0) and not TCustomBCEditor(FEditor).IsWordBreakChar(LLineText[1 + LChar - 1])) do
         Dec(LChar);
 
@@ -293,44 +269,24 @@ begin
     end
     else
     begin
-      FAdjustCompletionStart := True;
       FCompletionStartChar := LTextCaretPosition.Char;
     end;
   end;
 end;
 
-function TBCEditorCompletionProposalPopup.GetItemHeight(): Integer;
-var
-  LIndex: Integer;
-begin
-  Result := 0;
-  for LIndex := 0 to FCompletionProposal.Columns.Count - 1 do
-  begin
-    Canvas.Font.Assign(FCompletionProposal.Columns[LIndex].Font);
-    Result := Max(Result, Canvas.TextHeight('X'));
-  end;
-end;
-
-function TBCEditorCompletionProposalPopup.GetItems(): TBCEditorCompletionProposalItems;
+function TBCEditorCompletionProposalPopup.GetItems(): TBCEditorCompletionProposal.TColumn.TItems;
 begin
   Result := nil;
-  if (FCompletionProposal.CompletionColumnIndex < FCompletionProposal.Columns.Count) then
-    Result := FCompletionProposal.Columns[FCompletionProposal.CompletionColumnIndex].Items;
+  if (TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex < TCustomBCEditor(FEditor).CompletionProposal.Columns.Count) then
+    Result := TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex].Items;
 end;
 
 function TBCEditorCompletionProposalPopup.GetVisibleLines(): Integer;
 begin
-  Result := ClientHeight div FItemHeight;
+  Result := ClientHeight div FLineHeight;
 end;
 
 procedure TBCEditorCompletionProposalPopup.HandleDblClick(ASender: TObject);
-begin
-  if Assigned(FOnValidate) then
-    FOnValidate(Self, [], BCEDITOR_NONE_CHAR);
-  Hide();
-end;
-
-procedure TBCEditorCompletionProposalPopup.HandleOnValidate(ASender: TObject; AShift: TShiftState; AEndToken: Char);
 begin
   if (FSelectedLine < FVisibleItems.Count) then
   begin
@@ -338,10 +294,16 @@ begin
     try
       if (FCompletionStartChar < TCustomBCEditor(FEditor).CaretPos.X) then
       begin
-        TCustomBCEditor(FEditor).ProcessCommand(ecSelWordLeft);
+        TCustomBCEditor(FEditor).ProcessCommand(ecWordLeft);
         TCustomBCEditor(FEditor).ProcessCommand(ecDeleteWord);
+      end
+      else if (TCustomBCEditor(FEditor).WordAt[TCustomBCEditor(FEditor).CaretPos] <> '') then
+      begin
+        TCustomBCEditor(FEditor).ProcessCommand(ecSelWordRight);
+        TCustomBCEditor(FEditor).ProcessCommand(ecDeleteChar);
       end;
-      TCustomBCEditor(FEditor).ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems[FVisibleItems[FSelectedLine]].Value));
+      if (FVisibleItems[FSelectedLine] < GetItems().Count) then
+        TCustomBCEditor(FEditor).ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems()[FVisibleItems[FSelectedLine]].Value));
     finally
       TCustomBCEditor(FEditor).Lines.EndUpdate();
     end;
@@ -350,6 +312,9 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.Hide();
 begin
+  if (Assigned(FOnHide)) then
+    FOnHide(FEditor);
+
   SetWindowPos(Handle, 0, 0, 0, 0, 0, SWP_HIDEWINDOW or SWP_NOSIZE or SWP_NOMOVE or SWP_NOZORDER);
   Visible := False;
 end;
@@ -359,35 +324,23 @@ var
   LChar: Char;
   LTextCaretPosition: TBCEditorLinesPosition;
 begin
-  FSendToEditor := True;
-  case Key of
+  FSendKeyToEditor := False;
+  case (Key) of
     VK_TAB,
     VK_RETURN:
-      begin
-        if (Assigned(FOnValidate)) then
-          FOnValidate(Self, Shift, BCEDITOR_NONE_CHAR)
-        else
-          HandleOnValidate(Self, Shift, BCEDITOR_NONE_CHAR);
-        FSendToEditor := False;
-      end;
+      HandleDblClick(Self);
     VK_ESCAPE:
-      begin
-        FEditor.SetFocus;
-        FSendToEditor := False;
-      end;
+      FEditor.SetFocus();
     VK_LEFT:
+      if Length(FCurrentString) > 0 then
       begin
-        if Length(FCurrentString) > 0 then
-        begin
-          SetCurrentString(Copy(FCurrentString, 1, Length(FCurrentString) - 1));
-          TCustomBCEditor(FEditor).ProcessCommand(ecLeft);
-        end
-        else
-        begin
-          TCustomBCEditor(FEditor).ProcessCommand(ecLeft);
-          FEditor.SetFocus();
-        end;
-        FSendToEditor := False;
+        SetCurrentString(Copy(FCurrentString, 1, Length(FCurrentString) - 1));
+        TCustomBCEditor(FEditor).ProcessCommand(ecLeft);
+      end
+      else
+      begin
+        TCustomBCEditor(FEditor).ProcessCommand(ecLeft);
+        FEditor.SetFocus();
       end;
     VK_RIGHT:
       begin
@@ -403,48 +356,28 @@ begin
           FEditor.SetFocus();
 
         TCustomBCEditor(FEditor).ProcessCommand(ecRight);
-        FSendToEditor := False;
       end;
     VK_PRIOR:
-      begin
-        MoveSelectedLine(-GetVisibleLines());
-        FSendToEditor := False;
-      end;
+      MoveSelectedLine(-GetVisibleLines());
     VK_NEXT:
-      begin
-        MoveSelectedLine(GetVisibleLines());
-        FSendToEditor := False;
-      end;
+      MoveSelectedLine(GetVisibleLines());
     VK_END:
-      begin
-        SetTopLine(FVisibleItems.Count - 1);
-        FSendToEditor := False;
-      end;
+      SetTopLine(FVisibleItems.Count - 1);
     VK_HOME:
-      begin
-        SetTopLine(0);
-        FSendToEditor := False;
-      end;
+      SetTopLine(0);
     VK_UP:
-      begin
-        if (ssCtrl in Shift) then
-          FSelectedLine := 0
-        else
-          MoveSelectedLine(-1);
-        FSendToEditor := False;
-      end;
+      if (ssCtrl in Shift) then
+        FSelectedLine := 0
+      else
+        MoveSelectedLine(-1);
     VK_DOWN:
-      begin
-        if (ssCtrl in Shift) then
-          FSelectedLine := FVisibleItems.Count - 1
-        else
-          MoveSelectedLine(1);
-        FSendToEditor := False;
-      end;
+      if (ssCtrl in Shift) then
+        FSelectedLine := FVisibleItems.Count - 1
+      else
+        MoveSelectedLine(1);
     VK_BACK:
       if (Shift = []) then
-      begin
-        if Length(FCurrentString) > 0 then
+        if (Length(FCurrentString) > 0) then
         begin
           SetCurrentString(Copy(FCurrentString, 1, Length(FCurrentString) - 1));
 
@@ -453,15 +386,12 @@ begin
         else
         begin
           TCustomBCEditor(FEditor).ProcessCommand(ecBackspace);
-          FEditor.SetFocus;
+          FEditor.SetFocus();
         end;
-        FSendToEditor := False;
-      end;
     VK_DELETE:
-      begin
-        TCustomBCEditor(FEditor).ProcessCommand(ecDeleteChar);
-        FSendToEditor := False;
-      end;
+      TCustomBCEditor(FEditor).ProcessCommand(ecDeleteChar);
+    else
+      FSendKeyToEditor := True;
   end;
   Key := 0;
   Invalidate();
@@ -469,32 +399,27 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.KeyPress(var Key: Char);
 begin
-  case Key of
+  case (Key) of
     BCEDITOR_CARRIAGE_RETURN:
-      begin
-        FEditor.SetFocus();
-      end;
+      FEditor.SetFocus();
     BCEDITOR_SPACE_CHAR .. High(Char):
       begin
-        if not (cpoAutoInvoke in FCompletionProposal.Options) then
-          if (TCustomBCEditor(FEditor).IsWordBreakChar(Key) and Assigned(FOnValidate) and (Key = BCEDITOR_SPACE_CHAR)) then
-            FOnValidate(Self, [], BCEDITOR_NONE_CHAR);
         SetCurrentString(FCurrentString + Key);
-        if ((cpoAutoInvoke in FCompletionProposal.Options) and (FVisibleItems.Count = 0)
-          or (Pos(Key, FCompletionProposal.CloseChars) <> 0)) then
+        if ((cpoAutoInvoke in TCustomBCEditor(FEditor).CompletionProposal.Options) and (FVisibleItems.Count = 0)
+          or (Pos(Key, TCustomBCEditor(FEditor).CompletionProposal.CloseChars) <> 0)) then
           FEditor.SetFocus()
         else if (Assigned(OnKeyPress)) then
           OnKeyPress(Self, Key);
       end;
   end;
-  if (FSendToEditor) then
-    PostMessage(TCustomBCEditor(FEditor).Handle, WM_CHAR, WParam(Key), 0);
+  if (FSendKeyToEditor) then
+    TCustomBCEditor(FEditor).ProcessCommand(ecChar, TBCEditorCommandDataChar.Create(Key));
   Invalidate();
 end;
 
 procedure TBCEditorCompletionProposalPopup.MouseDown(AButton: TMouseButton; AShift: TShiftState; X, Y: Integer);
 begin
-  FSelectedLine := Max(0, FTopLine + Y div FItemHeight);
+  FSelectedLine := Max(0, FTopLine + Y div FLineHeight);
 
   inherited;
 
@@ -512,57 +437,60 @@ end;
 
 procedure TBCEditorCompletionProposalPopup.Paint();
 var
-  LColumn: TBCEditorCompletionProposalColumn;
+  LColumn: TBCEditorCompletionProposal.TColumn;
   LColumnIndex: Integer;
   LColumnWidth: Integer;
-  LIndex: Integer;
   LItemIndex: Integer;
   LLeft: Integer;
+  LLineIndex: Integer;
   LRect: TRect;
 begin
   LRect := ClientRect;
-  LRect.Height := FItemHeight;
-  for LIndex := 0 to Min(GetVisibleLines() - 1, FVisibleItems.Count - 1) do
+  LRect.Height := FLineHeight;
+  for LLineIndex := 0 to Min(GetVisibleLines() - 1, FVisibleItems.Count - 1) do
   begin
-    if (LIndex + FTopLine = FSelectedLine) then
+    if (FTopLine + LLineIndex = FSelectedLine) then
       Canvas.Brush.Color := TCustomBCEditor(FEditor).Colors.Selection.Background
     else
       Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
     Canvas.FillRect(LRect);
 
     LColumnWidth := 0;
-    for LColumnIndex := 0 to FCompletionProposal.Columns.Count - 1 do
+    for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
     begin
-      LItemIndex := FVisibleItems[FTopLine + LIndex];
-      LColumn := FCompletionProposal.Columns[LColumnIndex];
+      LColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
+      LItemIndex := FVisibleItems[FTopLine + LLineIndex];
       if (LColumn.Visible) then
       begin
-        Canvas.Font.Assign(LColumn.Font);
-        if (FTopLine + LIndex = FSelectedLine) then
-          Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
-        else
-          Canvas.Font.Color := TCustomBCEditor(FEditor).Font.Color;
-
         if (LItemIndex < LColumn.Items.Count) then
         begin
+          Canvas.Font.Assign(LColumn.Font);
+          if (FTopLine + LLineIndex = FSelectedLine) then
+            Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
+          else
+            Canvas.Font.Color := TCustomBCEditor(FEditor).Font.Color;
+
           LLeft := 0;
-          if LColumn.Items[LItemIndex].ImageIndex <> -1 then
+          if (LColumn.Items[LItemIndex].ImageIndex >= 0) then
           begin
-            FCompletionProposal.Images.Draw(Canvas, FMargin + LColumnWidth, LRect.Top, LColumn.Items[LItemIndex].ImageIndex);
-            Inc(LLeft, FCompletionProposal.Images.Width + FMargin);
+            TCustomBCEditor(FEditor).CompletionProposal.Images.Draw(Canvas, FMargin + LColumnWidth, LRect.Top, LColumn.Items[LItemIndex].ImageIndex);
+            Inc(LLeft, TCustomBCEditor(FEditor).CompletionProposal.Images.Width + FMargin);
           end;
           Canvas.TextOut(FMargin + LColumnWidth + LLeft, LRect.Top, LColumn.Items[LItemIndex].Value);
         end;
 
-        LColumnWidth := LColumnWidth + LColumn.Width;
+        Inc(LColumnWidth, LColumn.Width);
       end;
     end;
-    Inc(LRect.Top, FItemHeight);
-    Inc(LRect.Bottom, FItemHeight);
+    Inc(LRect.Top, FLineHeight);
+    Inc(LRect.Bottom, FLineHeight);
   end;
   LRect.Bottom := Height;
-  Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
-  Canvas.FillRect(LRect);
+  if (LRect.Height > 0) then
+  begin
+    Canvas.Brush.Color := TCustomBCEditor(FEditor).Color;
+    Canvas.FillRect(LRect);
+  end;
 end;
 
 procedure TBCEditorCompletionProposalPopup.SetCurrentString(const AValue: string);
@@ -608,7 +536,7 @@ begin
     while (LIndex < Items.Count) and (not MatchItem(LIndex)) do
       Inc(LIndex);
 
-    if LIndex < Items.Count then
+    if (LIndex < Items.Count) then
       SetTopLine(LIndex)
     else
       SetTopLine(0);
@@ -655,7 +583,7 @@ procedure TBCEditorCompletionProposalPopup.UpdateScrollBar();
 var
   LScrollInfo: SCROLLINFO;
 begin
-  if (FItemHeight > 0) then
+  if (FLineHeight > 0) then
   begin
     if (Visible) then
       SendMessage(Handle, WM_SETREDRAW, 0, 0);
