@@ -191,6 +191,7 @@ type
   TBCEditorHighlighter = class
   type
     TAttribute = class;
+    TElements = class;
     TRule = class;
     TToken = class;
     TRange = class;
@@ -248,27 +249,42 @@ type
       property ParentForeground: Boolean read FParentForeground write FParentForeground;
     end;
 
-    PElement = ^TElement;
-    TElement = record
-      Background: TColor;
-      Foreground: TColor;
-      Name: string;
-      FontStyles: TFontStyles;
+    TElement = class
+    strict private
+      FBackground: TColor;
+      FElements: TElements;
+      FForeground: TColor;
+      FName: string;
+      FStyle: TFontStyles;
+      procedure Clear();
+      procedure SetBackground(const AValue: TColor);
+      procedure SetFontStyles(const AValue: TFontStyles);
+      procedure SetForeground(const AValue: TColor);
+    protected
+      procedure LoadFromJSON(const AJSON: TJSONObject);
+    public
+      constructor Create(const AElements: TElements; const AName: string); reintroduce;
+      property Background: TColor read FBackground write SetBackground;
+      property Foreground: TColor read FForeground write SetForeground;
+      property Name: string read FName;
+      property Style: TFontStyles read FStyle write SetFontStyles;
     end;
 
-    TElements = class(TList<TElement>)
+    TElements = class(TObjectList<TElement>)
     strict private
       FHighlighter: TBCEditorHighlighter;
       FName: string;
-      function GetElement(AName: string): PElement;
+      function GetElement(AName: string): TElement;
       procedure LoadFromJSON(const AJSON: TJSONObject);
+    protected
+      procedure DoChange();
     public
       constructor Create(const AHighlighter: TBCEditorHighlighter);
       function IndexOf(const AName: string): Integer;
       procedure LoadFromFile(const AFileName: string);
       procedure LoadFromResource(const ResName: string; const ResType: PChar);
       procedure LoadFromStream(const AStream: TStream);
-      property Element[Name: string]: PElement read GetElement; default;
+      property Element[Name: string]: TElement read GetElement; default;
       property Name: string read FName;
     end;
 
@@ -610,6 +626,7 @@ type
   protected
     procedure LoadCompletionProposalFromJSON(const AJSON: TJSONObject);
     procedure LoadMatchingPairFromJSON(const AJSON: TJSONObject);
+    procedure UpdateColors();
     property Directory: string read FDirectory;
     property Editor: TCustomControl read FEditor;
     property OnChange: TNotifyEvent read FOnChange write FOnChange;
@@ -626,7 +643,6 @@ type
     procedure LoadFromFile(const AFilename: string);
     procedure LoadFromResource(const AResourceName: string; const AResourceType: PChar);
     procedure LoadFromStream(const AStream: TStream);
-    procedure UpdateColors();
     property Attribute[AIndex: Integer]: TAttribute read GetAttribute;
     property Attributes: TStringList read FAttributes;
     property CodeFoldingRegions: TBCEditorCodeFoldingRegions read FCodeFoldingRegions;
@@ -656,12 +672,10 @@ uses
   BCEditor, BCEditor.Properties;
 
 resourcestring
-  SInHighlighterParse = 'JSON parse error on line %d column %d: %s';
   SErrorInHighlighterImport = 'Error in highlighter import: %s';
   SJSONInvalidPair = 'Invalid JSON value type for pair "%s" (Expected type: %s, Found type: %s)';
-  SJSONInvalidParent = 'Invalid Parent Type: %s';
   SJSONInvalidValue = 'Invalid JSON value type for item #%d (Expected type: %s, Found type: %s)';
-  SJSONItemNotFound = 'Missing item #%d';
+  SJSONItemNotFound = 'Missing JSON item #%d';
   SJSONPairNotFound = 'Missing pair "%s" in JSON';
   SJSONSyntaxError = 'Syntax Error in JSON (Line: %d, Column: %d)';
 
@@ -766,7 +780,7 @@ var
 begin
   if (not Assigned(AParent)) then
     Result := nil
-  else if (AParent is TJSONObject) then
+  else
   begin
     LPair := TJSONObject(AParent).Get(AName);
     if (ARequired and not Assigned(LPair)) then
@@ -777,9 +791,7 @@ begin
       Result := nil
     else
       Result := LPair.JsonValue;
-  end
-  else
-    raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidParent, [AParent.ClassName]);
+  end;
 end;
 
 function GetJSONValue(const AParent: TJSONValue; const AIndex: Integer;
@@ -797,7 +809,7 @@ begin
     if (ARequired and (Result.ClassType <> AClassType)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidValue, [AIndex, JSONValueType(AClassType), JSONValueType(Result.ClassType)]);
   end
-  else if (AParent is TJSONObject) then
+  else
   begin
     LPair := TJSONObject(AParent).Get(AIndex);
     if (ARequired and not Assigned(LPair)) then
@@ -808,9 +820,7 @@ begin
       Result := nil
     else
       Result := LPair.JsonValue;
-  end
-  else
-    raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidParent, [AParent.ClassName]);
+  end;
 end;
 
 function GetJSONValue(const AParent: TJSONValue; const AIndex: Integer;
@@ -820,7 +830,7 @@ var
 begin
   if (not Assigned(AParent)) then
     Result := nil
-  else if (AParent is TJSONObject) then
+  else
   begin
     LPair := TJSONObject(AParent).Get(AIndex);
     if (not Assigned(LPair)) then
@@ -831,9 +841,7 @@ begin
       Result := nil
     else
       Result := LPair.JsonValue;
-  end
-  else
-    raise EBCEditorHighlighterJSON.CreateFmt(SJSONInvalidParent, [AParent.ClassName]);
+  end;
 end;
 
 function GetJSONArray(const AParent: TJSONObject; const AName: string;
@@ -1663,16 +1671,84 @@ begin
   end;
 end;
 
-{ TBCEditorHighlighter.TColors ************************************************}
+{ TBCEditorHighlighter.TElement ***********************************************}
+
+procedure TBCEditorHighlighter.TElement.Clear();
+begin
+  FBackground := clNone;
+  FForeground := clNone;
+  FStyle := [];
+end;
+
+constructor TBCEditorHighlighter.TElement.Create(const AElements: TElements; const AName: string);
+begin
+  inherited Create();
+
+  FElements := AElements;
+  FName := AName;
+
+  Clear();
+end;
+
+procedure TBCEditorHighlighter.TElement.LoadFromJSON(const AJSON: TJSONObject);
+begin
+  Clear();
+
+  if (Assigned(AJSON)) then
+  begin
+    FBackground := StringToColor(GetJSONString(AJSON, 'Background', 'clNone'));
+    FForeground := StringToColor(GetJSONString(AJSON, 'Foreground', 'clNone'));
+    FStyle := StrToFontStyle(GetJSONString(AJSON, 'Style'));
+  end;
+end;
+
+procedure TBCEditorHighlighter.TElement.SetBackground(const AValue: TColor);
+begin
+  if (AValue <> FBackground) then
+  begin
+    FBackground := AValue;
+    if (Assigned(FElements)) then
+      FElements.DoChange();
+  end;
+end;
+
+procedure TBCEditorHighlighter.TElement.SetFontStyles(const AValue: TFontStyles);
+begin
+  if (AValue <> FStyle) then
+  begin
+    FStyle := AValue;
+    if (Assigned(FElements)) then
+      FElements.DoChange();
+  end;
+end;
+
+procedure TBCEditorHighlighter.TElement.SetForeground(const AValue: TColor);
+begin
+  if (AValue <> FForeground) then
+  begin
+    FForeground := AValue;
+    if (Assigned(FElements)) then
+      FElements.DoChange();
+  end;
+end;
+
+
+{ TBCEditorHighlighter.TElements **********************************************}
 
 constructor TBCEditorHighlighter.TElements.Create(const AHighlighter: TBCEditorHighlighter);
 begin
-  inherited Create;
+  inherited Create();
 
   FHighlighter := AHighlighter;
 end;
 
-function TBCEditorHighlighter.TElements.GetElement(AName: string): PElement;
+procedure TBCEditorHighlighter.TElements.DoChange();
+begin
+  if (Assigned(FHighlighter)) then
+    FHighlighter.UpdateColors();
+end;
+
+function TBCEditorHighlighter.TElements.GetElement(AName: string): TElement;
 var
   LIndex: Integer;
 begin
@@ -1680,7 +1756,7 @@ begin
   if (LIndex < 0) then
     Result := nil
   else
-    Result := @List[LIndex];
+    Result := Items[LIndex];
 end;
 
 function TBCEditorHighlighter.TElements.IndexOf(const AName: string): Integer;
@@ -1712,6 +1788,7 @@ var
   LFontObject: TJSONObject;
   LIndex: Integer;
   LItem: TJSONObject;
+  LName: string;
   LSizeObject: TJSONObject;
   LSize: Integer;
 begin
@@ -1777,12 +1854,13 @@ begin
       LItem := GetJSONObject(LElementsArray, LIndex);
       if (Assigned(LItem)) then
       begin
-        LElement.Background := StringToColor(GetJSONString(LItem, 'Background', 'clNone'));
-        LElement.Foreground := StringToColor(GetJSONString(LItem, 'Foreground', 'clNone'));
-        LElement.Name := GetJSONString(LItem, 'Name');
-        LElement.FontStyles := StrToFontStyle(GetJSONString(LItem, 'Style'));
-        if ((LElement.Name <> '') and (IndexOf(LElement.Name) < 0)) then
+        LName := GetJSONString(LItem, 'Name');
+        if ((LName <> '') and (IndexOf(LName) < 0)) then
+        begin
+          LElement := TElement.Create(Self, LName);
+          LElement.LoadFromJSON(LItem);
           Add(LElement);
+        end;
       end;
     end;
   end;
@@ -3138,6 +3216,8 @@ begin
   FAllDelimiters := BCEDITOR_DEFAULT_DELIMITERS + BCEDITOR_ABSOLUTE_DELIMITERS;
 
   FInfo := TInfo.Create();
+
+  FOnChange := nil;
 end;
 
 procedure TBCEditorHighlighter.DoChange();
@@ -3371,8 +3451,6 @@ begin
     LoadMatchingPairFromJSON(GetJSONObject(AJSON, 'MatchingPair'));
     LoadCompletionProposalFromJSON(GetJSONObject(AJSON, 'CompletionProposal'));
   end;
-
-  UpdateColors();
 end;
 
 procedure TBCEditorHighlighter.LoadFromResource(const AResourceName: string; const AResourceType: PChar);
@@ -3499,7 +3577,7 @@ var
 
   procedure SetAttributes(AAttribute: TAttribute; AParentRange: TRange);
   var
-    LElement: PElement;
+    LElement: TElement;
   begin
     LElement := FColors[AAttribute.Element];
 
@@ -3507,14 +3585,14 @@ var
       AAttribute.Background := AParentRange.Attribute.Background
     else
     if Assigned(LElement) then
-      AAttribute.Background := LElement^.Background;
+      AAttribute.Background := LElement.Background;
     if AAttribute.ParentForeground and Assigned(AParentRange) then
       AAttribute.Foreground := AParentRange.Attribute.Foreground
     else
     if Assigned(LElement) then
-      AAttribute.Foreground := LElement^.Foreground;
+      AAttribute.Foreground := LElement.Foreground;
     if Assigned(LElement) then
-      AAttribute.FontStyles := LElement^.FontStyles;
+      AAttribute.FontStyles := LElement.Style;
   end;
 
 begin
@@ -3526,27 +3604,14 @@ begin
     SetAttributes(ARange.Sets[LIndex].Attribute, ARange);
 
   if ARange.RangeCount > 0 then
-  for LIndex := 0 to ARange.RangeCount - 1 do
-    UpdateAttributes(ARange.Ranges[LIndex], ARange);
+    for LIndex := 0 to ARange.RangeCount - 1 do
+      UpdateAttributes(ARange.Ranges[LIndex], ARange);
 end;
 
 procedure TBCEditorHighlighter.UpdateColors();
-var
-  LFontDummy: TFont;
 begin
   UpdateAttributes(MainRules, nil);
   DoChange();
-  if (Assigned(Editor)) then
-  begin
-    LFontDummy := TFont.Create;
-    try
-      LFontDummy.Name := TCustomBCEditor(Editor).Font.Name;
-      LFontDummy.Size := TCustomBCEditor(Editor).Font.Size;
-      TCustomBCEditor(Editor).Font.Assign(LFontDummy);
-    finally
-      LFontDummy.Free;
-    end;
-  end;
 end;
 
 end.

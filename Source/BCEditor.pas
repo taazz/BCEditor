@@ -3330,7 +3330,7 @@ begin
   if (LCanExecute) then
   begin
     DoUnselect();
-    FCompletionProposalPopup.Execute(LCurrentInput, LPoint);
+    FCompletionProposalPopup.Popup(LCurrentInput, LPoint);
   end
   else
   begin
@@ -5218,19 +5218,19 @@ end;
 
 procedure TCustomBCEditor.HighlighterChanged(ASender: TObject);
 var
-  LElement: TBCEditorHighlighter.PElement;
+  LElement: TBCEditorHighlighter.TElement;
 begin
   ExpandCodeFoldingLines();
 
   FCodeFoldingVisible := FLeftMargin.CodeFolding.Visible and (FHighlighter.CodeFoldingRegions.Count > 0);
 
   LElement := FHighlighter.Colors[BCEDITOR_ATTRIBUTE_ELEMENT_EDITOR];
-  if (Assigned(LElement) and (LElement^.Foreground <> clNone)) then
-    Font.Color := LElement^.Foreground
+  if (Assigned(LElement) and (LElement.Foreground <> clNone)) then
+    Font.Color := LElement.Foreground
   else
     Font.Color := clWindowText;
-  if (Assigned(LElement) and (LElement^.Background <> clNone)) then
-    Color := LElement^.Background
+  if (Assigned(LElement) and (LElement.Background <> clNone)) then
+    Color := LElement.Background
   else
     Color := clWindow;
 
@@ -8828,6 +8828,7 @@ begin
 
   for LLine := 0 to FLines.Count - 1 do
     FLines.SetState(LLine, lsLoaded);
+  FLines.CaretPosition := FLines.BOFPosition;
 
   if (eoTrimEndOfFile in Options) then
     FLines.Options := FLines.Options + [loTrimEOF]
