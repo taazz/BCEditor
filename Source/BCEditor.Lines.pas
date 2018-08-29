@@ -1755,7 +1755,7 @@ var
   LEOL: Boolean;
   LLine: Integer;
   LLineBeginPos: PChar;
-  LLineBreak: array [0..2] of System.Char;
+  LLineBreak: array [0..1] of System.Char;
   LLineEnd: string;
   LPos: PChar;
 begin
@@ -1781,7 +1781,7 @@ begin
   end
   else
   begin
-    LLineBreak[0] := #0; LLineBreak[1] := #0; LLineBreak[2] := #0;
+    LLineBreak[0] := #0; LLineBreak[1] := #0;
 
 
     BeginUpdate();

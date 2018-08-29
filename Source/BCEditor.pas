@@ -940,7 +940,6 @@ type
     property Constraints;
     property Ctl3D;
     property DoubleBuffered;
-    property DragMode;
     property Enabled;
     property Font;
     property Height;

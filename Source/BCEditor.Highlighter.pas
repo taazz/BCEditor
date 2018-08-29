@@ -3424,7 +3424,7 @@ begin
     if (Assigned(LSampleArray)) then
       for LIndex := 0 to LSampleArray.Size - 1 do
       begin
-        if (LIndex > 0) then FSample := FSample + #13#10;
+        if (LIndex > 0) then FSample := FSample;
         FSample := FSample + GetJSONString(LSampleArray, LIndex);
       end;
 
