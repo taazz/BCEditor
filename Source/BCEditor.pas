@@ -940,6 +940,7 @@ type
     property Constraints;
     property Ctl3D;
     property DoubleBuffered;
+    property DragMode;
     property Enabled;
     property Font;
     property Height;
@@ -2902,6 +2903,9 @@ begin
 
   FLines.TerminateJob(True);
 
+  if Assigned(FCompletionProposalPopup) then
+    FCompletionProposalPopup.Free();
+
   // ToDo: FHighlighter sends a OnChange event on destroying
   FHighlighter.OnChange := nil;
 
@@ -2909,8 +2913,6 @@ begin
   FBuildMinimapCriticalSection.Free();
   FBuildRowsCriticalSection.Free();
   FCompletionProposal.Free();
-  if Assigned(FCompletionProposalPopup) then
-    FCompletionProposalPopup.Free();
   FColors.Free();
   FCommands.Free();
   FHighlighter.Free();
@@ -3410,6 +3412,7 @@ end;
 
 procedure TCustomBCEditor.DoDropOLE(const AData: PBCEditorCommandDataDropOLE);
 var
+  LData: TBytes;
   LFilename: string;
   LFormat: FORMATETC;
   LLen: UINT;
@@ -3425,9 +3428,10 @@ begin
   if (AData^.dataObj.QueryGetData(LFormat) = S_OK) then
   begin
     OleCheck(AData^.dataObj.GetData(LFormat, LMedium));
-    SetString(LText, PChar(GlobalLock(LMedium.hGlobal)), GlobalSize(LMedium.hGlobal) div SizeOf(LText[1]));
+    SetString(LText, PChar(GlobalLock(LMedium.hGlobal)), (GlobalSize(LMedium.hGlobal) div SizeOf(LText[1])) - 1);
     FLines.CaretPosition := FInsertPos;
-    SelText := LText;
+    LData := TBCEditorCommandDataText.Create(LText, True, True);
+    DoText(@LData[0]);
   end
   else
   begin
@@ -4378,18 +4382,18 @@ end;
 
 function TCustomBCEditor.DragOver(grfKeyState: Longint; pt: TPoint; var dwEffect: Longint): HResult;
 var
+  LClient: TPoint;
   LPosition: TBCEditorLinesPosition;
-  LScreen: TPoint;
 begin
-  if (not FTextRect.Contains(pt)) then
+  LClient := ScreenToClient(pt);
+  if (not FTextRect.Contains(LClient)) then
   begin
     SetInsertPos(InvalidPos);
     dwEffect := DROPEFFECT_NONE;
   end
   else
   begin
-    LScreen := ScreenToClient(pt);
-    LPosition := ClientToLines(LScreen.X, LScreen.Y);
+    LPosition := ClientToLines(LClient.X, LClient.Y);
     if (FLines.SelArea.Contains(LPosition)
       or not ProcessCommand(ecAcceptDrop, TBCEditorCommandDataPosition.Create(LPosition))) then
     begin
@@ -7552,7 +7556,8 @@ begin
     if (LPaintHelper.RowHeight > 0) then
     begin
       if ((AJob in [cjPaint, cjPaintOverlays])
-        or not (seoShowButton in FSyncEditOptions)) then
+        or not (seoShowButton in FSyncEditOptions)
+        or ReadOnly) then
         FSyncEditButtonRect := InvalidRect
       else
         Result := Result or ProcessSyncEditButton(LPaintHelper);
@@ -7671,283 +7676,285 @@ begin
   begin
     Include(FState, ecProcessingCommand);
 
-    LCommand := ACommand;
-    LOriginalCommand := True;
+    try
+      LCommand := ACommand;
+      LOriginalCommand := True;
 
-    repeat
-      LHandled := False;
+      repeat
+        LHandled := False;
 
-      if ((LCommand = ecRecordMacro) and FLines.SyncEdit) then
-        LHandled := not ProcessCommand(ecSyncEdit);
+        if ((LCommand = ecRecordMacro) and FLines.SyncEdit) then
+          LHandled := not ProcessCommand(ecSyncEdit);
 
-      if (Assigned(FBeforeProcessCommand)) then
-        FBeforeProcessCommand(Self, LCommand, AData, LHandled);
+        if (Assigned(FBeforeProcessCommand)) then
+          FBeforeProcessCommand(Self, LCommand, AData, LHandled);
 
-      FHookedCommandHandlers.Broadcast(True, LCommand, AData, LHandled);
+        FHookedCommandHandlers.Broadcast(True, LCommand, AData, LHandled);
 
-      if (not LHandled
-        and (LCommand <> ecNone)) then
-      begin
-        FRowsWanted.CriticalSection.Enter();
-        try
-          if (FRowsWanted.What <> rwNothing) then
-          begin
-            FRowsWanted.What := rwNothing;
-            UpdateCursor();
-          end;
-        finally
-          FRowsWanted.CriticalSection.Leave();
-        end;
-
-        if (FCodeFoldingVisible) then
-          case (LCommand) of
-            ecBackspace, ecDelete, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
-            ecClear, ecReturn, ecChar, ecText, ecCutToClipboard, ecPasteFromClipboard,
-            ecBlockIndent, ecBlockUnindent, ecTab:
-              if (not FLines.SelArea.IsEmpty()) then
-              begin
-                LNewSelArea := FLines.SelArea;
-                LCollapsedCount := 0;
-                for LLine := LNewSelArea.BeginPosition.Line to LNewSelArea.EndPosition.Line do
-                  LCollapsedCount := ExpandCodeFoldingLines(LLine + 1);
-                if LCollapsedCount <> 0 then
-                begin
-                  Inc(LNewSelArea.EndPosition.Line, LCollapsedCount);
-                  LNewSelArea.EndPosition.Char := Length(FLines.Items[LNewSelArea.EndPosition.Line].Text);
-                end;
-                FLines.BeginUpdate();
-                try
-                  FLines.SelArea := LNewSelArea;
-                finally
-                  FLines.EndUpdate();
-                end;
-              end
-              else
-                ExpandCodeFoldingLines(FLines.CaretPosition.Line + 1);
-          end;
-
-        LHandled := True;
-        case (LCommand) of
-          ecAcceptDrop:
-            ; // Do nothing, but LHandled should be True
-          ecBackspace:
-            DoBackspaceKey();
-          ecBlockComment:
-            DoBlockComment();
-          ecBlockIndent:
-            DoBlockIndent(LCommand);
-          ecBlockUnindent:
-            DoBlockIndent(LCommand);
-          ecBOF:
-            DoBOF(LCommand);
-          ecBOL:
-            DoBOL(LCommand = ecSelBOL);
-          ecCancel:
-            if (FLines.SyncEdit) then
-              DoSyncEdit()
-            else if (esScrolling in FState) then
-              ProcessClient(cjMouseDown, nil, FClientRect, mbMiddle, [], FScrollingPoint)
-            else if (not FLines.CanModify) then
-              FLines.TerminateJob()
-            else if (esHighlightSearchAllAreas in FState) then
+        if (not LHandled
+          and (LCommand <> ecNone)) then
+        begin
+          FRowsWanted.CriticalSection.Enter();
+          try
+            if (FRowsWanted.What <> rwNothing) then
             begin
-              Exclude(FState, esHighlightSearchAllAreas);
-              InvalidateText();
+              FRowsWanted.What := rwNothing;
+              UpdateCursor();
             end;
-          ecClear:
-            FLines.Clear();
-          ecChar:
-            DoChar(PBCEditorCommandDataChar(@AData[0]));
-          ecCopyToClipboard:
-            DoCopyToClipboard();
-          ecCutToClipboard:
-            DoCutToClipboard();
-          ecDelete:
-            DeleteChar();
-          ecDeleteLastWord:
-            DeleteLastWordOrBOL(LCommand);
-          ecDeleteLine:
-            DeleteLine();
-          ecDeleteToBOL:
-            DeleteLastWordOrBOL(LCommand);
-          ecDeleteToEOL:
-            DoDeleteToEOL();
-          ecDeleteWord:
-            DoDeleteWord();
-          ecDown:
-            DoUpOrDown(1, LCommand = ecSelDown);
-          ecDropOLE:
-            DoDropOLE(@AData[0]);
-          ecEOF:
-            DoEOF(LCommand);
-          ecEOL:
-            DoEOL(LCommand = ecSelEOL);
-          ecFindFirst:
-            DoFindFirst(@AData[0]);
-          ecFindNext:
-            if (FLastSearch = lsReplace) then
-              DoReplace(@FLastSearchData)
-            else if (not Assigned(FLastSearchData)) then
-              DoShowFind(True)
-            else if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
-              DoFindBackwards(@FLastSearchData[0])
-            else
-              DoFindForewards(@FLastSearchData[0]);
-          ecFindPrevious:
-            if (FLastSearch = lsReplace) then
-              DoReplace(@FLastSearchData)
-            else if (not Assigned(FLastSearchData)) then
-              DoShowFind(True)
-            else if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
-              DoFindForewards(@FLastSearchData[0])
-            else
-              DoFindBackwards(@FLastSearchData[0]);
-          ecGotoBookmark1 .. ecGotoBookmark0:
-            GotoBookmark(Ord(LCommand) - Ord(ecGotoBookmark1));
-          ecGotoMatchingPair:
-            DoGotoMatchingPair();
-          ecGotoNextBookmark:
-            GotoNextBookmark();
-          ecGotoPreviousBookmark:
-            GotoPreviousBookmark();
-          ecInsertLine:
-            InsertLine();
-          ecInsertTextMode:
-            SetTextOverwrite(False);
-          ecLeft:
-            DoLeftOrRightKey(LCommand);
-          ecLineComment:
-            DoLineComment();
-          ecLowerCase:
-            DoToggleSelectedCase(LCommand);
-          ecOverwriteTextMode:
-            SetTextOverwrite(True);
-          ecPageBottom:
-            DoPageTopOrBottomKey(LCommand);
-          ecPageDown:
-            DoPageUpOrDownKey(LCommand);
-          ecPageTop:
-            DoPageTopOrBottomKey(LCommand);
-          ecPageUp:
-            DoPageUpOrDownKey(LCommand);
-          ecPasteFromClipboard:
-            PasteFromClipboard();
-          ecPosition:
-            DoPosition(@AData[0]);
-          ecRedo:
-            FLines.Redo();
-          ecReplace:
-            DoReplace(@AData[0]);
-          ecReturn:
-            if (FWantReturns) then DoReturnKey();
-          ecRight:
-            DoLeftOrRightKey(LCommand);
-          ecScrollDown:
-            DoScroll(LCommand);
-          ecScrollLeft:
-            DoScroll(LCommand);
-          ecScrollRight:
-            DoScroll(LCommand);
-          ecScrollTo:
-            DoScrollTo(@AData[0]);
-          ecScrollUp:
-            DoScroll(LCommand);
-          ecSel:
-            DoSelection(@AData[0]);
-          ecSelBOF:
-            DoBOF(LCommand);
-          ecSelBOL:
-            DoBOL(LCommand = ecSelBOL);
-          ecSelBOP:
-            DoPageTopOrBottomKey(LCommand);
-          ecSelDown:
-            DoUpOrDown(1, LCommand = ecSelDown);
-          ecSelectAll:
-            DoSelectAll();
-          ecSelEOF:
-            DoEOF(LCommand);
-          ecSelEOL:
-            DoEOL(LCommand = ecSelEOL);
-          ecSelEOP:
-            DoPageTopOrBottomKey(LCommand);
-          ecSelLeft:
-            DoLeftOrRightKey(LCommand);
-          ecSelPageDown:
-            DoPageUpOrDownKey(LCommand);
-          ecSelPageUp:
-            DoPageUpOrDownKey(LCommand);
-          ecSelRight:
-            DoLeftOrRightKey(LCommand);
-          ecSelUp:
-            DoUpOrDown(-1, LCommand = ecSelUp);
-          ecSelWord:
-            SetSelectedWord;
-          ecSelWordLeft:
-            DoWordLeft(LCommand);
-          ecSelWordRight:
-            DoWordRight(LCommand);
-          ecSetBookmark1 ..
-            ecSetBookmark0: DoSetBookmark(LCommand);
-          ecShiftTab:
-            if (FWantTabs) then DoTabKey(LCommand);
-          ecShowCompletionProposal:
-            DoCompletionProposal();
-          ecShowFind:
-            DoShowFind(True);
-          ecShowGotoLine:
-            DoShowGotoLine();
-          ecShowReplace:
-            DoShowReplace();
-          ecSyncEdit:
-            DoSyncEdit();
-          ecTab:
-            if (FWantTabs) then DoTabKey(LCommand);
-          ecText:
-            DoText(@AData[0]);
-          ecToggleTextMode:
-            if (not FTextOverwrite) then
-              SetTextOverwrite(True)
-            else
+          finally
+            FRowsWanted.CriticalSection.Leave();
+          end;
+
+          if (FCodeFoldingVisible) then
+            case (LCommand) of
+              ecBackspace, ecDelete, ecDeleteWord, ecDeleteLastWord, ecDeleteLine,
+              ecClear, ecReturn, ecChar, ecText, ecCutToClipboard, ecPasteFromClipboard,
+              ecBlockIndent, ecBlockUnindent, ecTab:
+                if (not FLines.SelArea.IsEmpty()) then
+                begin
+                  LNewSelArea := FLines.SelArea;
+                  LCollapsedCount := 0;
+                  for LLine := LNewSelArea.BeginPosition.Line to LNewSelArea.EndPosition.Line do
+                    LCollapsedCount := ExpandCodeFoldingLines(LLine + 1);
+                  if LCollapsedCount <> 0 then
+                  begin
+                    Inc(LNewSelArea.EndPosition.Line, LCollapsedCount);
+                    LNewSelArea.EndPosition.Char := Length(FLines.Items[LNewSelArea.EndPosition.Line].Text);
+                  end;
+                  FLines.BeginUpdate();
+                  try
+                    FLines.SelArea := LNewSelArea;
+                  finally
+                    FLines.EndUpdate();
+                  end;
+                end
+                else
+                  ExpandCodeFoldingLines(FLines.CaretPosition.Line + 1);
+            end;
+
+          LHandled := True;
+          case (LCommand) of
+            ecAcceptDrop:
+              ; // Do nothing, but LHandled should be True
+            ecBackspace:
+              DoBackspaceKey();
+            ecBlockComment:
+              DoBlockComment();
+            ecBlockIndent:
+              DoBlockIndent(LCommand);
+            ecBlockUnindent:
+              DoBlockIndent(LCommand);
+            ecBOF:
+              DoBOF(LCommand);
+            ecBOL:
+              DoBOL(LCommand = ecSelBOL);
+            ecCancel:
+              if (FLines.SyncEdit) then
+                DoSyncEdit()
+              else if (esScrolling in FState) then
+                ProcessClient(cjMouseDown, nil, FClientRect, mbMiddle, [], FScrollingPoint)
+              else if (not FLines.CanModify) then
+                FLines.TerminateJob()
+              else if (esHighlightSearchAllAreas in FState) then
+              begin
+                Exclude(FState, esHighlightSearchAllAreas);
+                InvalidateText();
+              end;
+            ecClear:
+              FLines.Clear();
+            ecChar:
+              DoChar(PBCEditorCommandDataChar(@AData[0]));
+            ecCopyToClipboard:
+              DoCopyToClipboard();
+            ecCutToClipboard:
+              DoCutToClipboard();
+            ecDelete:
+              DeleteChar();
+            ecDeleteLastWord:
+              DeleteLastWordOrBOL(LCommand);
+            ecDeleteLine:
+              DeleteLine();
+            ecDeleteToBOL:
+              DeleteLastWordOrBOL(LCommand);
+            ecDeleteToEOL:
+              DoDeleteToEOL();
+            ecDeleteWord:
+              DoDeleteWord();
+            ecDown:
+              DoUpOrDown(1, LCommand = ecSelDown);
+            ecDropOLE:
+              DoDropOLE(@AData[0]);
+            ecEOF:
+              DoEOF(LCommand);
+            ecEOL:
+              DoEOL(LCommand = ecSelEOL);
+            ecFindFirst:
+              DoFindFirst(@AData[0]);
+            ecFindNext:
+              if (FLastSearch = lsReplace) then
+                DoReplace(@FLastSearchData)
+              else if (not Assigned(FLastSearchData)) then
+                DoShowFind(True)
+              else if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
+                DoFindBackwards(@FLastSearchData[0])
+              else
+                DoFindForewards(@FLastSearchData[0]);
+            ecFindPrevious:
+              if (FLastSearch = lsReplace) then
+                DoReplace(@FLastSearchData)
+              else if (not Assigned(FLastSearchData)) then
+                DoShowFind(True)
+              else if (foBackwards in PBCEditorCommandDataFind(@FLastSearchData)^.Options) then
+                DoFindForewards(@FLastSearchData[0])
+              else
+                DoFindBackwards(@FLastSearchData[0]);
+            ecGotoBookmark1 .. ecGotoBookmark0:
+              GotoBookmark(Ord(LCommand) - Ord(ecGotoBookmark1));
+            ecGotoMatchingPair:
+              DoGotoMatchingPair();
+            ecGotoNextBookmark:
+              GotoNextBookmark();
+            ecGotoPreviousBookmark:
+              GotoPreviousBookmark();
+            ecInsertLine:
+              InsertLine();
+            ecInsertTextMode:
               SetTextOverwrite(False);
-          ecUndo:
-            FLines.Undo();
-          ecUnselect:
-            DoUnselect();
-          ecUp:
-            DoUpOrDown(-1, LCommand = ecSelUp);
-          ecUpperCase:
-            DoToggleSelectedCase(LCommand);
-          ecWordLeft:
-            DoWordLeft(LCommand);
-          ecWordRight:
-            DoWordRight(LCommand);
-          else
-            LHandled := False;
+            ecLeft:
+              DoLeftOrRightKey(LCommand);
+            ecLineComment:
+              DoLineComment();
+            ecLowerCase:
+              DoToggleSelectedCase(LCommand);
+            ecOverwriteTextMode:
+              SetTextOverwrite(True);
+            ecPageBottom:
+              DoPageTopOrBottomKey(LCommand);
+            ecPageDown:
+              DoPageUpOrDownKey(LCommand);
+            ecPageTop:
+              DoPageTopOrBottomKey(LCommand);
+            ecPageUp:
+              DoPageUpOrDownKey(LCommand);
+            ecPasteFromClipboard:
+              PasteFromClipboard();
+            ecPosition:
+              DoPosition(@AData[0]);
+            ecRedo:
+              FLines.Redo();
+            ecReplace:
+              DoReplace(@AData[0]);
+            ecReturn:
+              if (FWantReturns) then DoReturnKey();
+            ecRight:
+              DoLeftOrRightKey(LCommand);
+            ecScrollDown:
+              DoScroll(LCommand);
+            ecScrollLeft:
+              DoScroll(LCommand);
+            ecScrollRight:
+              DoScroll(LCommand);
+            ecScrollTo:
+              DoScrollTo(@AData[0]);
+            ecScrollUp:
+              DoScroll(LCommand);
+            ecSel:
+              DoSelection(@AData[0]);
+            ecSelBOF:
+              DoBOF(LCommand);
+            ecSelBOL:
+              DoBOL(LCommand = ecSelBOL);
+            ecSelBOP:
+              DoPageTopOrBottomKey(LCommand);
+            ecSelDown:
+              DoUpOrDown(1, LCommand = ecSelDown);
+            ecSelectAll:
+              DoSelectAll();
+            ecSelEOF:
+              DoEOF(LCommand);
+            ecSelEOL:
+              DoEOL(LCommand = ecSelEOL);
+            ecSelEOP:
+              DoPageTopOrBottomKey(LCommand);
+            ecSelLeft:
+              DoLeftOrRightKey(LCommand);
+            ecSelPageDown:
+              DoPageUpOrDownKey(LCommand);
+            ecSelPageUp:
+              DoPageUpOrDownKey(LCommand);
+            ecSelRight:
+              DoLeftOrRightKey(LCommand);
+            ecSelUp:
+              DoUpOrDown(-1, LCommand = ecSelUp);
+            ecSelWord:
+              SetSelectedWord;
+            ecSelWordLeft:
+              DoWordLeft(LCommand);
+            ecSelWordRight:
+              DoWordRight(LCommand);
+            ecSetBookmark1 ..
+              ecSetBookmark0: DoSetBookmark(LCommand);
+            ecShiftTab:
+              if (FWantTabs) then DoTabKey(LCommand);
+            ecShowCompletionProposal:
+              DoCompletionProposal();
+            ecShowFind:
+              DoShowFind(True);
+            ecShowGotoLine:
+              DoShowGotoLine();
+            ecShowReplace:
+              DoShowReplace();
+            ecSyncEdit:
+              DoSyncEdit();
+            ecTab:
+              if (FWantTabs) then DoTabKey(LCommand);
+            ecText:
+              DoText(@AData[0]);
+            ecToggleTextMode:
+              if (not FTextOverwrite) then
+                SetTextOverwrite(True)
+              else
+                SetTextOverwrite(False);
+            ecUndo:
+              FLines.Undo();
+            ecUnselect:
+              DoUnselect();
+            ecUp:
+              DoUpOrDown(-1, LCommand = ecSelUp);
+            ecUpperCase:
+              DoToggleSelectedCase(LCommand);
+            ecWordLeft:
+              DoWordLeft(LCommand);
+            ecWordRight:
+              DoWordRight(LCommand);
+            else
+              LHandled := False;
+          end;
+
+          FHookedCommandHandlers.Broadcast(False, LCommand, AData, LHandled);
         end;
 
-        FHookedCommandHandlers.Broadcast(False, LCommand, AData, LHandled);
-      end;
+        if (Assigned(FAfterProcessCommand)) then
+          FAfterProcessCommand(Self, LCommand, AData, LHandled);
 
-      if (Assigned(FAfterProcessCommand)) then
-        FAfterProcessCommand(Self, LCommand, AData, LHandled);
+        if (LOriginalCommand) then
+        begin
+          Result := LHandled;
+          LOriginalCommand := False;
+        end;
 
-      if (LOriginalCommand) then
-      begin
-        Result := LHandled;
-        LOriginalCommand := False;
-      end;
-
-      if (FCommands.Count = 0) then
-        LCommand := ecNone
-      else
-      begin
-        LQueueValue := FCommands.Dequeue();
-        LCommand := LQueueValue.Command;
-        LData:= LQueueValue.Data;
-      end;
-    until (LCommand = ecNone);
-
-    Exclude(FState, ecProcessingCommand);
+        if (FCommands.Count = 0) then
+          LCommand := ecNone
+        else
+        begin
+          LQueueValue := FCommands.Dequeue();
+          LCommand := LQueueValue.Command;
+          LData:= LQueueValue.Data;
+        end;
+      until (LCommand = ecNone);
+    finally
+      Exclude(FState, ecProcessingCommand);
+    end;
   end;
 end;
 

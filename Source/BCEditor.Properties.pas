@@ -33,6 +33,12 @@ type
         function Insert(const AIndex: Integer): TItem; reintroduce;
       end;
 
+    strict private const
+      DefaultAutoWidth = True;
+      DefaultFontName = 'Courier New';
+      DefaultFontSize = 8;
+      DefaultVisible = True;
+      DefaultWidth = 50;
     strict private
       FAutoWidth: Boolean;
       FFont: TFont;
@@ -46,10 +52,10 @@ type
       destructor Destroy(); override;
       property Items: TItems read FItems write FItems;
     published
-      property AutoWidth: Boolean read FAutoWidth write FAutoWidth default True;
+      property AutoWidth: Boolean read FAutoWidth write FAutoWidth default DefaultAutoWidth;
       property Font: TFont read FFont write SetFont;
-      property Visible: Boolean read FVisible write FVisible default True;
-      property Width: Integer read FWidth write FWidth default 0;
+      property Visible: Boolean read FVisible write FVisible default DefaultVisible;
+      property Width: Integer read FWidth write FWidth default DefaultWidth;
     end;
 
     TColumns = class(TObjectList<TColumn>)
@@ -90,6 +96,7 @@ type
     DefaultCloseChars = '()[]. ';
     DefaultEnabled = True;
     DefaultCompletionColumnIndex = 0;
+    DefaultInputColumnIndex = -1;
     DefaultLines = 8;
     DefaultOptions = [cpoAutoConstraints, cpoAddHighlighterKeywords, cpoFiltered,
       cpoUseHighlighterColumnFont];
@@ -101,6 +108,7 @@ type
     FConstraints: TSizeConstraints;
     FEnabled: Boolean;
     FImages: TCustomImageList;
+    FInputColumnIndex: Integer;
     FLines: Integer;
     FOptions: TBCEditorCompletionProposalOptions;
     FOwner: TComponent;
@@ -125,6 +133,7 @@ type
     property Constraints: TSizeConstraints read FConstraints write FConstraints;
     property Enabled: Boolean read FEnabled write FEnabled default DefaultEnabled;
     property Images: TCustomImageList read FImages write SetImages;
+    property InputColumnIndex: Integer read FInputColumnIndex write FInputColumnIndex default DefaultInputColumnIndex;
     property Lines: Integer read FLines write FLines default DefaultLines;
     property Options: TBCEditorCompletionProposalOptions read FOptions write FOptions default DefaultOptions;
     property Trigger: TBCEditorCompletionProposal.TTrigger read FTrigger write FTrigger stored IsTriggersStored;
@@ -617,13 +626,13 @@ constructor TBCEditorCompletionProposal.TColumn.Create();
 begin
   inherited;
 
-  FAutoWidth := True;
-  FFont := TFont.Create;
-  FFont.Name := 'Courier New';
-  FFont.Size := 8;
+  FAutoWidth := DefaultAutoWidth;
+  FFont := TFont.Create();
+  FFont.Name := DefaultFontName;
+  FFont.Size := DefaultFontSize;
   FItems := TItems.Create();
-  FVisible := True;
-  FWidth := 0;
+  FVisible := DefaultVisible;
+  FWidth := DefaultWidth;
 end;
 
 destructor TBCEditorCompletionProposal.TColumn.Destroy();
@@ -723,7 +732,7 @@ end;
 
 constructor TBCEditorCompletionProposal.Create(AOwner: TComponent);
 begin
-  inherited Create;
+  inherited Create();
 
   FOwner := AOwner;
   FCloseChars := DefaultCloseChars;
@@ -732,6 +741,7 @@ begin
   FCompletionColumnIndex := DefaultCompletionColumnIndex;
   FConstraints := TSizeConstraints.Create(nil);
   FEnabled := DefaultEnabled;
+  FInputColumnIndex := DefaultInputColumnIndex;
   FOptions := DefaultOptions;
   FTrigger := TTrigger.Create(Self);
   FLines := DefaultLines;

@@ -1309,7 +1309,7 @@ begin
   end
   else
   begin
-    Result := Length(Items[ARelativePosition.Line].Text) - APosition.Char + LLineBreakLength;
+    Result := Length(Items[ARelativePosition.Line].Text) - ARelativePosition.Char + LLineBreakLength;
     for LLine := ARelativePosition.Line + 1 to APosition.Line - 1 do
     begin
       Inc(Result, Length(Items[LLine].Text));
@@ -2991,7 +2991,7 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
                 and LCloseTokenSearch.Find(LCloseTokenPosition, True, LCloseTokenFoundLength)) do
               begin
                 Inc(LDeep);
-                LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength, LCloseTokenPosition);
+                LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength + 1, LCloseTokenPosition);
               end;
 
             Result := LDeep = 0;

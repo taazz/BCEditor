@@ -149,7 +149,9 @@ end;
 function TBCEditorCompletionProposalPopup.GetItems(): TBCEditorCompletionProposal.TColumn.TItems;
 begin
   Result := nil;
-  if (TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex < TCustomBCEditor(FEditor).CompletionProposal.Columns.Count) then
+  if ((0 <= TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex) and (TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex < TCustomBCEditor(FEditor).CompletionProposal.Columns.Count)) then
+    Result := TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex].Items
+  else if ((0 <= TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex) and (TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex < TCustomBCEditor(FEditor).CompletionProposal.Columns.Count)) then
     Result := TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex].Items;
 end;
 
@@ -159,6 +161,8 @@ begin
 end;
 
 procedure TBCEditorCompletionProposalPopup.HandleDblClick(ASender: TObject);
+var
+  LItems: TBCEditorCompletionProposal.TColumn.TItems;
 begin
   if (FSelectedLine < FVisibleItems.Count) then
   begin
@@ -174,8 +178,16 @@ begin
         TCustomBCEditor(FEditor).ProcessCommand(ecSelWordRight);
         TCustomBCEditor(FEditor).ProcessCommand(ecDelete);
       end;
-      if (FVisibleItems[FSelectedLine] < GetItems().Count) then
-        TCustomBCEditor(FEditor).ProcessCommand(ecText, TBCEditorCommandDataText.Create(GetItems()[FVisibleItems[FSelectedLine]].Value));
+      if ((0 <= TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex) and (TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex < TCustomBCEditor(FEditor).CompletionProposal.Columns.Count)
+        and (FVisibleItems[FSelectedLine] < TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex].Items.Count)) then
+        LItems := TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.CompletionColumnIndex].Items
+      else if ((0 <= TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex) and (TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex < TCustomBCEditor(FEditor).CompletionProposal.Columns.Count)
+        and (FVisibleItems[FSelectedLine] < TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex].Items.Count)) then
+        LItems := TCustomBCEditor(FEditor).CompletionProposal.Columns[TCustomBCEditor(FEditor).CompletionProposal.InputColumnIndex].Items
+      else
+        LItems := nil;
+      if (Assigned(LItems)) then
+        TCustomBCEditor(FEditor).ProcessCommand(ecText, TBCEditorCommandDataText.Create(LItems[FVisibleItems[FSelectedLine]].Value));
     finally
       TCustomBCEditor(FEditor).Lines.EndUpdate();
     end;
@@ -336,7 +348,7 @@ begin
           if (FTopLine + LLineIndex = FSelectedLine) then
             Canvas.Font.Color := TCustomBCEditor(FEditor).Colors.Selection.Foreground
           else
-            Canvas.Font.Color := TCustomBCEditor(FEditor).Font.Color;
+            Canvas.Font.Color := LColumn.Font.Color;
 
           LLeft := 0;
           if (LColumn.Items[LItemIndex].ImageIndex >= 0) then
@@ -347,7 +359,7 @@ begin
           Canvas.TextOut(FMargin + LColumnWidth + LLeft, LRect.Top, LColumn.Items[LItemIndex].Value);
         end;
 
-        Inc(LColumnWidth, LColumn.Width);
+        Inc(LColumnWidth, LColumn.Width + 2 * FMargin);
       end;
     end;
     Inc(LRect.Top, FLineHeight);
@@ -382,15 +394,10 @@ var
 
   procedure CalculateColumnWidths();
   var
-    LAutoWidthCount: Integer;
+    LColumn: TBCEditorCompletionProposal.TColumn;
     LColumnIndex: Integer;
     LIndex: Integer;
-    LItems: TBCEditorCompletionProposal.TColumn.TItems;
-    LMaxWidth: Integer;
-    LProposalColumn: TBCEditorCompletionProposal.TColumn;
-    LTempWidth: Integer;
     LVisibleColumnCount: Integer;
-    LWidthSum: Integer;
   begin
     LVisibleColumnCount := 0;
     for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
@@ -399,45 +406,26 @@ var
 
     if (LVisibleColumnCount = 1) then
     begin
-      LProposalColumn := nil; // Hide compiler warning only.
+      LColumn := nil; // Hide compiler warning only.
       for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
         if (TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex].Visible) then
-          LProposalColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
-      if (LProposalColumn.AutoWidth) then
-        LProposalColumn.Width := Width;
+          LColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
+      if (LColumn.AutoWidth) then
+        LColumn.Width := Width;
       Exit;
     end;
 
-    LAutoWidthCount := 0;
-    LWidthSum := 0;
     for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
     begin
-      LProposalColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
-      Canvas.Font.Assign(LProposalColumn.Font);
-      if (LProposalColumn.Visible and LProposalColumn.AutoWidth) then
+      LColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
+      Canvas.Font.Assign(LColumn.Font);
+      if (LColumn.Visible and LColumn.AutoWidth) then
       begin
-        LItems := LProposalColumn.Items;
-        LMaxWidth := 0;
-        for LIndex := 0 to LItems.Count - 1 do
-        begin
-          LTempWidth := Canvas.TextWidth(LItems[LIndex].Value);
-          if (LTempWidth > LMaxWidth) then
-            LMaxWidth := LTempWidth;
-        end;
-        LProposalColumn.Width := LMaxWidth;
-        LWidthSum := LWidthSum + LMaxWidth;
-        Inc(LAutoWidthCount);
+        LColumn.Width := 0;
+        for LIndex := 0 to LColumn.Items.Count - 1 do
+          LColumn.Width := Max(LColumn.Width, Canvas.TextWidth(LColumn.Items[LIndex].Value));
       end;
     end;
-
-    LMaxWidth := (Width - LWidthSum - GetSystemMetrics(SM_CYHSCROLL)) div LAutoWidthCount;
-    if (LMaxWidth > 0) then
-      for LColumnIndex := 0 to TCustomBCEditor(FEditor).CompletionProposal.Columns.Count - 1 do
-      begin
-        LProposalColumn := TCustomBCEditor(FEditor).CompletionProposal.Columns[LColumnIndex];
-        if (LProposalColumn.Visible and LProposalColumn.AutoWidth) then
-          LProposalColumn.Width := LProposalColumn.Width + LMaxWidth;
-      end;
   end;
 
   function CalculateLineHeight(): Integer;
@@ -570,8 +558,8 @@ begin
   begin
     FTopLine := AValue;
     UpdateScrollBar();
-    Invalidate();
   end;
+  Invalidate();
 end;
 
 procedure TBCEditorCompletionProposalPopup.Show(Origin: TPoint);
