@@ -3418,7 +3418,9 @@ begin
   begin
     FInfo.LoadFromJSON(GetJSONObject(AJSON, 'Info'));
 
-    LSampleArray := GetJSONArray(AJSON, 'Sample');
+    LHighlighterObject := GetJSONObject(AJSON, 'Highlighter');
+
+    LSampleArray := GetJSONArray(LHighlighterObject, 'Sample');
     if (Assigned(LSampleArray)) then
       for LIndex := 0 to LSampleArray.Size - 1 do
       begin
@@ -3426,7 +3428,6 @@ begin
         FSample := FSample + GetJSONString(LSampleArray, LIndex);
       end;
 
-    LHighlighterObject := GetJSONObject(AJSON, 'Highlighter');
     FMainRules.LoadFromJSON(GetJSONObject(LHighlighterObject, 'MainRules'));
 
     LCodeFoldingObject := GetJSONObject(AJSON, 'CodeFolding');
