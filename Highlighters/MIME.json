@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "MIME"
+    "Name": "MIME",
     "DefaultFileExtension": ".eml",
     "FileExtensions": [
       ".eml",

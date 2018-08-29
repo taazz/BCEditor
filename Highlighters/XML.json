@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "XML"
+    "Name": "XML",
     "DefaultFileExtension": ".xml",
     "FileExtensions": [
       ".xml",

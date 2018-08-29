@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "SQL - SQLite"
+    "Name": "SQL - SQLite",
     "FileExtensions": [
       ".sqlite"
     ]

@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "Perl"
+    "Name": "Perl",
     "DefaultFileExtension": ".pl",
     "FileExtensions": [
       ".pl",

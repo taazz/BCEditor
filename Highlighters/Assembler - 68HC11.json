@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "68HC11 Assembler"
+    "Name": "68HC11 Assembler",
     "FileExtensions": [
       ".hc11"
     ]

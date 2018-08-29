@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "MS-DOS Batch"
+    "Name": "MS-DOS Batch",
     "DefaultFileExtension": ".bat",
     "FileExtensions": [
       ".bat",

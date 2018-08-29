@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "Visual Basic"
+    "Name": "Visual Basic",
     "DefaultFileExtension": ".vb",
     "FileExtensions": [
       ".vb",

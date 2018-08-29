@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "Ruby"
+    "Name": "Ruby",
     "DefaultFileExtension": ".rb",
     "FileExtensions": [
       ".rbw"

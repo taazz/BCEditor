@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "Pascal"
+    "Name": "Pascal",
     "DefaultFileExtension": ".pas",
     "FileExtensions": [
       ".pas",
