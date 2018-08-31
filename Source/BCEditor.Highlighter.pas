@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Classes, SysUtils, Generics.Collections,
   Controls, Graphics, StdCtrls,
-  {$IF Defined(VER270)} JSON, {$ELSE} DBXJSON, {$ENDIF}
+  {$IF RTLVersion >= 27} JSON, {$ELSE} DBXJSON, {$ENDIF}
   BCEditor.Consts, BCEditor.Types;
 
 type

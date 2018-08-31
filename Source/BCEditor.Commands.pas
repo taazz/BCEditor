@@ -610,13 +610,11 @@ end;
 function TBCEditorCommandManager.IndexOf(const AShortCut: TShortCut): Integer;
 var
   LIndex: Integer;
-  LShortCutIndex: Integer;
 begin
   Result := -1;
   for LIndex := 0 to FItems.Count - 1 do
-    for LShortCutIndex := 0 to FItems[LIndex].ShortCuts.Count - 1 do
-      if (FItems[LIndex].ShortCuts[LShortCutIndex] = AShortCut) then
-        Result := LIndex;
+    if (FItems[LIndex].ShortCuts.IndexOf(AShortCut) >= 0) then
+      Result := LIndex;
 end;
 
 function TBCEditorCommandManager.InsertIndex(const ACommand: TBCEditorCommand; out AIndex: Integer): Boolean;
