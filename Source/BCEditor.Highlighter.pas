@@ -5,7 +5,7 @@ interface {********************************************************************}
 uses
   Classes, SysUtils, Generics.Collections,
   Controls, Graphics, StdCtrls,
-  {$IF RTLVersion >= 27} JSON, {$ELSE} DBXJSON, {$ENDIF}
+  {$IFDEF VER250} DBXJSON, {$ELSE} JSON, {$ENDIF}
   BCEditor.Consts, BCEditor.Types;
 
 type
@@ -803,7 +803,7 @@ begin
     Result := nil
   else if (AParent is TJSONArray) then
   begin
-    Result := TJSONArray(AParent).Get(AIndex);
+    Result := TJSONArray(AParent).{$IFDEF VER250} Get(AIndex); {$ELSE} Items[AIndex]; {$ENDIF}
     if (ARequired and not Assigned(Result)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONItemNotFound, [AIndex]);
     if (ARequired and (Result.ClassType <> AClassType)) then
@@ -811,7 +811,7 @@ begin
   end
   else
   begin
-    LPair := TJSONObject(AParent).Get(AIndex);
+    LPair := TJSONObject(AParent).{$IFDEF VER250} Get(AIndex); {$ELSE} Pairs[AIndex]; {$ENDIF}
     if (ARequired and not Assigned(LPair)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, ['#' + IntToStr(AIndex)]);
     if (ARequired and (LPair.JsonValue.ClassType <> AClassType)) then
@@ -832,7 +832,7 @@ begin
     Result := nil
   else
   begin
-    LPair := TJSONObject(AParent).Get(AIndex);
+    LPair := TJSONObject(AParent).{$IFDEF VER250} Get(AIndex); {$ELSE} Pairs[AIndex]; {$ENDIF}
     if (not Assigned(LPair)) then
       raise EBCEditorHighlighterJSON.CreateFmt(SJSONPairNotFound, ['#' + IntToStr(AIndex)]);
     if ((AName <> '') and (LPair.JsonValue.ClassType <> AClassType)) then
@@ -1056,7 +1056,7 @@ begin
     FSharedClose := GetJSONBoolean(AJSON, 'SharedClose', FSharedClose);
     LJSONArray := GetJSONArray(AJSON, 'SkipIfFoundAfterOpenToken');
     if (Assigned(LJSONArray)) then
-      for LIndex := 0 to LJSONArray.Size - 1 do
+      for LIndex := 0 to LJSONArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
       begin
         LSkip := GetJSONString(LJSONArray, LIndex);
         if (LSkip <> '') then
@@ -1162,7 +1162,7 @@ begin
   begin
     LFoldRegionArray := GetJSONArray(AJSON, 'FoldRegion');
     if (Assigned(LFoldRegionArray)) then
-      for LIndex := 0 to LFoldRegionArray.Size - 1 do
+      for LIndex := 0 to LFoldRegionArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
       begin
         LJSONItem := GetJSONObject(LFoldRegionArray, LIndex);
 
@@ -1225,7 +1225,7 @@ begin
     LSkipRegionArray := GetJSONArray(AJSON, 'SkipRegion');
     if (Assigned(LSkipRegionArray)) then
     begin
-      for LIndex := 0 to LSkipRegionArray.Size - 1 do
+      for LIndex := 0 to LSkipRegionArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
       begin
         LItem := GetJSONObject(LSkipRegionArray, LIndex);
         if (Assigned(LItem)) then
@@ -1849,7 +1849,7 @@ begin
       end;
 
     LElementsArray := GetJSONArray(LColorsObject, 'Elements');
-    for LIndex := 0 to LElementsArray.Size - 1 do
+    for LIndex := 0 to LElementsArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
     begin
       LItem := GetJSONObject(LElementsArray, LIndex);
       if (Assigned(LItem)) then
@@ -2143,7 +2143,7 @@ begin
   begin
     TokenType := StrToRangeType(GetJSONString(AJSON, 'Type', True));
     LWordArray := GetJSONArray(AJSON, 'Words', True);
-    for LIndex := 0 to LWordArray.Size - 1 do
+    for LIndex := 0 to LWordArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
     begin
       LString := GetJSONString(LWordArray, LIndex);
       if (LString <> '') then
@@ -2433,11 +2433,11 @@ begin
         begin
           LSubRulesObject := GetJSONObject(LMainRulesObject, 'SubRules');
           if (Assigned(LSubRulesObject)) then
-            for LIndex := 0 to LSubRulesObject.Size - 1 do
+            for LIndex := 0 to LSubRulesObject.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
             begin
               LSubRuleArray := GetJSONArray(LSubRulesObject, LIndex, 'Range');
               if (Assigned(LSubRuleArray)) then
-                for LIndex2 := 0 to LSubRuleArray.Size - 1 do
+                for LIndex2 := 0 to LSubRuleArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
                 begin
                   LSubRuleObject := GetJSONObject(LSubRuleArray, LIndex2);
                   if (Assigned(LSubRuleObject)) then
@@ -2482,7 +2482,7 @@ begin
           if (Assigned(LAlternativeCloseArray)) then
           begin
             AlternativeCloseList.Clear();
-            for LIndex := 0 to LAlternativeCloseArray.Size - 1 do
+            for LIndex := 0 to LAlternativeCloseArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
             begin
               LString := GetJSONString(LAlternativeCloseArray, LIndex);
               if (LString <> '') then
@@ -2517,14 +2517,14 @@ begin
 
       if (Assigned(LSubRulesObject)) then
       begin
-        for LIndex := 0 to LSubRulesObject.Size - 1 do
+        for LIndex := 0 to LSubRulesObject.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
         begin
-          LPair := LSubRulesObject.Get(LIndex);
+          LPair := LSubRulesObject.{$IFDEF VER250} Get(LIndex); {$ELSE} Pairs[LIndex]; {$ENDIF}
           if (LPair.JsonString.Value() = 'Range') then
           begin
             LRangeArray := GetJSONArray(LSubRulesObject, LIndex, 'Range');
             if (Assigned(LRangeArray)) then
-              for LIndex2 := 0 to LRangeArray.Size - 1 do
+              for LIndex2 := 0 to LRangeArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
               begin
                 LRangeObject := GetJSONObject(LRangeArray, LIndex2);
                 if (Assigned(LRangeObject)) then
@@ -2540,7 +2540,7 @@ begin
             LKeyListArray := GetJSONArray(LSubRulesObject, LIndex, 'KeyList');
             if (Assigned(LKeyListArray)) then
             begin
-              for LIndex2 := 0 to LKeyListArray.Size - 1 do
+              for LIndex2 := 0 to LKeyListArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
               begin
                 LKeyListObject := GetJSONObject(LKeyListArray, LIndex2);
                 if (Assigned(LKeyListObject)) then
@@ -2557,7 +2557,7 @@ begin
             LSetArray := GetJSONArray(LSubRulesObject, LIndex);
             if (Assigned(LSetArray)) then
             begin
-              for LIndex2 := 0 to LSetArray.Size - 1 do
+              for LIndex2 := 0 to LSetArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
               begin
                 LSetObject := GetJSONObject(LSetArray, LIndex2);
                 if (Assigned(LSetObject)) then
@@ -3122,7 +3122,7 @@ begin
 
     LExtensionsArray := GetJSONArray(AJSON, 'FileExtensions');
     if (Assigned(LExtensionsArray)) then
-      for LIndex := 0 to LExtensionsArray.Size - 1 do
+      for LIndex := 0 to LExtensionsArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
       begin
         LString := GetJSONString(LExtensionsArray, LIndex);
         if ((LString <> '') and (LString[1] = '.')) then
@@ -3422,7 +3422,7 @@ begin
 
     LSampleArray := GetJSONArray(LHighlighterObject, 'Sample');
     if (Assigned(LSampleArray)) then
-      for LIndex := 0 to LSampleArray.Size - 1 do
+      for LIndex := 0 to LSampleArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
       begin
         if (LIndex > 0) then FSample := FSample;
         FSample := FSample + GetJSONString(LSampleArray, LIndex);
@@ -3435,7 +3435,7 @@ begin
     begin
       LCodeFoldingRangesArray := GetJSONArray(LCodeFoldingObject, 'Ranges');
       if (Assigned(LCodeFoldingRangesArray)) then
-        for LIndex := 0 to LCodeFoldingRangesArray.Size - 1 do
+        for LIndex := 0 to LCodeFoldingRangesArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
         begin
           LCodeFoldingRangeObject := GetJSONObject(LCodeFoldingRangesArray, LIndex);
           if (Assigned(LCodeFoldingRangeObject)) then
@@ -3491,7 +3491,7 @@ begin
   begin
     { Skip regions }
     LSkipRegionArray := GetJSONArray(AJSON, 'SkipRegion');
-    for LIndex := 0 to LSkipRegionArray.Size - 1 do
+    for LIndex := 0 to LSkipRegionArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
     begin
       LItem := GetJSONObject(LSkipRegionArray, LIndex);
 
@@ -3502,7 +3502,7 @@ begin
       begin
         { Multi highlighter code folding skip region include }
         LFilename := GetJSONString(LItem, 'File');
-        if (TFile.Exists(Directory + LFilename)) then
+        if (TFile.Exists(FDirectory + LFilename)) then
         begin
           LJSONObject := CreateJSONObjectFromFile(Directory + LFilename);
           if (Assigned(LJSONObject)) then
@@ -3539,7 +3539,7 @@ begin
     { Matching token pairs }
     LPairsArray := GetJSONArray(AJSON, 'Pairs');
     if (Assigned(LPairsArray)) then
-      for LIndex := 0 to LPairsArray.Size - 1 do
+      for LIndex := 0 to LPairsArray.{$IFDEF VER250} Size {$ELSE} Count {$ENDIF} - 1 do
       begin
         LItem := GetJSONObject(LPairsArray, LIndex);
 
