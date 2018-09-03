@@ -275,14 +275,13 @@ type
       FHighlighter: TBCEditorHighlighter;
       FName: string;
       function GetElement(AName: string): TElement;
-      procedure LoadFromJSON(const AJSON: TJSONObject); overload;
+      procedure LoadFromJSON(const AJSON: TJSONObject);
     protected
       procedure DoChange();
     public
       constructor Create(const AHighlighter: TBCEditorHighlighter);
       function IndexOf(const AName: string): Integer;
       procedure LoadFromFile(const AFileName: string);
-      procedure LoadFromJSON(const AJSON: string); overload;
       procedure LoadFromResource(const ResName: string; const ResType: PChar);
       procedure LoadFromStream(const AStream: TStream);
       property Element[Name: string]: TElement read GetElement; default;
@@ -622,7 +621,7 @@ type
     procedure DoChange();
     function GetAttribute(AIndex: Integer): TAttribute;
     procedure AddAttribute(AHighlighterAttribute: TAttribute);
-    procedure LoadFromJSON(const AJSON: TJSONObject); overload;
+    procedure LoadFromJSON(const AJSON: TJSONObject);
     procedure SetWordBreakChars(AChars: TBCEditorAnsiCharSet);
   protected
     procedure LoadCompletionProposalFromJSON(const AJSON: TJSONObject);
@@ -642,7 +641,6 @@ type
     procedure AddKeywords(var AStringList: TStringList);
     procedure Clear();
     procedure LoadFromFile(const AFilename: string);
-    procedure LoadFromJSON(const AJSON: string); overload;
     procedure LoadFromResource(const AResourceName: string; const AResourceType: PChar);
     procedure LoadFromStream(const AStream: TStream);
     property Attribute[AIndex: Integer]: TAttribute read GetAttribute;
@@ -1778,20 +1776,6 @@ begin
   LStream := TFileStream.Create(AFileName, fmOpenRead);
   LoadFromStream(LStream);
   LStream.Free();
-end;
-
-procedure TBCEditorHighlighter.TElements.LoadFromJSON(const AJSON: string);
-var
-  LStream: TStringStream;
-begin
-  LStream := TStringStream.Create();
-  LStream.WriteString(AJSON);
-  LStream.Position := 0;
-  try
-    LoadFromStream(LStream);
-  finally
-    LStream.Free();
-  end;
 end;
 
 procedure TBCEditorHighlighter.TElements.LoadFromJSON(const AJSON: TJSONObject);
@@ -3416,20 +3400,6 @@ begin
   LStream := TFileStream.Create(AFilename, fmOpenRead);
   LoadFromStream(LStream);
   LStream.Free();
-end;
-
-procedure TBCEditorHighlighter.LoadFromJSON(const AJSON: string);
-var
-  LStream: TStringStream;
-begin
-  LStream := TStringStream.Create();
-  LStream.WriteString(AJSON);
-  LStream.Position := 0;
-  try
-    LoadFromStream(LStream);
-  finally
-    LStream.Free();
-  end;
 end;
 
 procedure TBCEditorHighlighter.LoadFromJSON(const AJSON: TJSONObject);
