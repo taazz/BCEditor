@@ -1760,7 +1760,12 @@ var
   LPos: PChar;
 begin
   Assert(BOFPosition <= APosition);
-  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Items[APosition.Line].Text)));
+  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Items[APosition.Line].Text)),
+    'Line: ' + IntToStr(APosition.Line) + #13#10
+    + 'Count: ' + IntToStr(Count) + #13#10
+    + 'Char: ' + IntToStr(APosition.Char) + #13#10
+    + 'Length: ' + IntToStr(Length(Items[APosition.Line].Text)));
+  // Debug 2018-09-04
 
   if (AText = '') then
     Result := APosition
@@ -1999,7 +2004,15 @@ begin
                and ((LUndoItem.UndoType in [utReplace])
                  or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List = UndoList)))) then
               begin
+try
                 LText := TextIn[LUndoItem.Area];
+except
+  // Debug 2018-09-03
+        on E: Exception do
+          E.RaiseOuterException(Exception(E.ClassType).Create(E.Message + #13#10
+            + 'Area: ' + IntToStr(Ord(LUndoItem.UndoType)) + #13#10
+            + 'Area: ' + LUndoItem.Area.ToString()));
+end;
                 DoDeleteText(LUndoItem.Area);
                 if (not (LUndoItem.UndoType in [utReplace])) then
                   LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
@@ -2188,7 +2201,9 @@ begin
   end
   else
   begin
-    Assert(AArea.BeginPosition.Char <= Length(Items[AArea.BeginPosition.Line].Text));
+    Assert(AArea.BeginPosition.Char <= Length(Items[AArea.BeginPosition.Line].Text),
+      'Char: ' + IntToStr(AArea.BeginPosition.Char) + #13#10
+      + 'Length: ' + IntToStr(Length(Items[AArea.BeginPosition.Line].Text)));
     Assert(AArea.EndPosition.Char <= Length(Items[AArea.EndPosition.Line].Text));
 
     LEndLine := AArea.EndPosition.Line;

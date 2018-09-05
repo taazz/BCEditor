@@ -2320,7 +2320,7 @@ procedure TCustomBCEditor.Change();
 begin
   NotifyParent(EN_CHANGE);
 
-  if (Assigned(FOnChange)) then
+  if (Assigned(FOnChange) and not (csDestroying in ComponentState)) then
     FOnChange(Self);
 
   Include(FState, esTextUpdated);
@@ -11065,7 +11065,16 @@ begin
     FVertScrollBar.Visible := (FScrollBars in [ssVertical, ssBoth]) and (FVertScrollBar.Enabled or not FHideScrollBars);
     if (FVertScrollBar.Enabled) then
     begin
-      FVertScrollBar.SetParams(LPos, LMin, LMax);
+      try
+        FVertScrollBar.SetParams(LPos, LMin, LMax);
+      except
+        on E: Exception do
+          E.RaiseOuterException(EAssertionFailed.Create(
+            'LPos: ' + IntToStr(LPos) + #13#10
+            + 'LMin: ' + IntToStr(LMin) + #13#10
+            + 'LMax: ' + IntToStr(LMax) + #13#10
+            + 'PageSize: ' + IntToStr(FVertScrollBar.PageSize)));
+      end;
       FVertScrollBar.PageSize := LPage;
     end;
   end;

@@ -1,3 +1,8 @@
+<h1>Note</h1>
+<b>This component is very buggy and should not be used. Please use "SynEdit"
+instead of it.</b> If there is somebody who wants to overtake this project,
+please write an issue and ask about it.
+
 <h3>Description</h3>
 
 A syntax highlighting edit control for the RAD Studio (Delphi and C++ Builder VCL):
