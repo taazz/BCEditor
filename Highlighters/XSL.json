@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "XSL"
+    "Name": "XSL",
     "DefaultFileExtension": ".xsl",
     "FileExtensions": [
       ".xls",

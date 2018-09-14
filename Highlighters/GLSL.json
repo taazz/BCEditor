@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "GLSL"
+    "Name": "GLSL",
     "FileExtensions": [
       ".glsl"
     ]

@@ -123,16 +123,16 @@ begin
     FStringList.Add('      color: #' + ColorToHex(LElement.Foreground) + ';');
     FStringList.Add('      background-color: #' + ColorToHex(LElement.Background) + ';');
 
-    if TFontStyle.fsBold in LElement.FontStyles then
+    if TFontStyle.fsBold in LElement.Style then
       FStringList.Add('      font-weight: bold;');
 
-    if TFontStyle.fsItalic in LElement.FontStyles then
+    if TFontStyle.fsItalic in LElement.Style then
       FStringList.Add('      font-style: italic;');
 
-    if TFontStyle.fsUnderline in LElement.FontStyles then
+    if TFontStyle.fsUnderline in LElement.Style then
       FStringList.Add('      text-decoration: underline;');
 
-    if TFontStyle.fsStrikeOut in LElement.FontStyles then
+    if TFontStyle.fsStrikeOut in LElement.Style then
       FStringList.Add('      text-decoration: line-through;');
 
     FStringList.Add('    }');

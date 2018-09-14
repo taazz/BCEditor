@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "Groovy"
+    "Name": "Groovy",
     "DefaultFileExtension": ".groovy",
     "FileExtensions": [
       ".groovy",

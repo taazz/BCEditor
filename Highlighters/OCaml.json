@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "OCaml"
+    "Name": "OCaml",
     "FileExtensions": [
       ".ml"
     ]

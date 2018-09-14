@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "ActionScript"
+    "Name": "ActionScript",
     "FirstLinePattern": "^( |\t)*{",
     "DefaultFileExtension": ".as",
     "FileExtensions": [

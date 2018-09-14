@@ -23,7 +23,6 @@ begin
 
   UnlistPublishedProperty(TBCEditor, 'Cursor');
   UnlistPublishedProperty(TBCEditor, 'CustomHint');
-  UnlistPublishedProperty(TBCEditor, 'DoubleBuffered');
   UnlistPublishedProperty(TBCEditor, 'Hint');
   UnlistPublishedProperty(TBCEditor, 'ParentCustomHint');
   UnlistPublishedProperty(TBCEditor, 'ParentColor');

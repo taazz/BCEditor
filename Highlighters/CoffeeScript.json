@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "CoffeeScript"
+    "Name": "CoffeeScript",
     "FileExtensions": [
       ".coffee"
     ]

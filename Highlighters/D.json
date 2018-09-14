@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "D"
+    "Name": "D",
     "DefaultFileExtension": ".d",
     "FileExtensions": [
       ".d",

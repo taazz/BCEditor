@@ -133,16 +133,24 @@ type
 
   TBCEditorCommandManager = class
   type
-    TItem = record
+
+    TItem = class(TPersistent)
+    private
+      FShortCuts: TList<TShortCut>;
+    public
       EnabledWhileRecording: Boolean;
       Command: TBCEditorCommand;
       CommandCategory: TBCEditorCommandCategory;
       Ident: string;
       Recordable: Boolean;
-      ShortCuts: array of TShortCut;
+      procedure Assign(ASource: TPersistent); override;
+      constructor Create();
+      destructor Destroy(); override;
+      property ShortCuts: TList<TShortCut> read FShortCuts;
     end;
+
   private
-    FItems: TList<TItem>;
+    FItems: TObjectList<TItem>;
     function EnabledWhileRecording(const ACommand: TBCEditorCommand): Boolean;
     function GetCount(): Integer;
     function GetItem(AIndex: Integer): TItem;
@@ -479,6 +487,38 @@ begin
   FEditor := AEditor;
 end;
 
+{ TBCEditorCommandManager.TItem ***********************************************}
+
+procedure TBCEditorCommandManager.TItem.Assign(ASource: TPersistent);
+var
+  LIndex: Integer;
+begin
+  Assert(ASource is TItem);
+
+  EnabledWhileRecording := TItem(ASource).EnabledWhileRecording;
+  Command := TItem(ASource).Command;
+  CommandCategory := TItem(ASource).CommandCategory;
+  Ident := TItem(ASource).Ident;
+  Recordable := TItem(ASource).Recordable;
+  ShortCuts.Clear();
+  for LIndex := 0 to TItem(ASource).ShortCuts.Count - 1 do
+    ShortCuts.Add(TItem(ASource).ShortCuts[LIndex]);
+end;
+
+constructor TBCEditorCommandManager.TItem.Create();
+begin
+  inherited Create();
+
+  FShortCuts := TList<TShortCut>.Create();
+end;
+
+destructor TBCEditorCommandManager.TItem.Destroy();
+begin
+  FShortCuts.Free();
+
+  inherited;
+end;
+
 { TBCEditorCommandManager *****************************************************}
 
 procedure TBCEditorCommandManager.AddShortCut(const ACommand: TBCEditorCommand; const AShortCut: TShortCut);
@@ -491,10 +531,7 @@ begin
 
     LIndex := IndexOf(ACommand);
     if (LIndex >= 0) then
-    begin
-      SetLength(FItems.List[LIndex].ShortCuts, Length(FItems.List[LIndex].ShortCuts) + 1);
-      FItems.List[LIndex].ShortCuts[Length(FItems.List[LIndex].ShortCuts) - 1] := AShortCut;
-    end;
+      FItems[LIndex].ShortCuts.Add(AShortCut);
   end;
 end;
 
@@ -520,7 +557,7 @@ begin
   Result := IntToStr(Ord(ACommand));
 
   LIndex := IndexOf(ACommand);
-  if ((LIndex >= 0) and (Length(FItems[LIndex].ShortCuts) > 0)) then
+  if ((LIndex >= 0) and (FItems[LIndex].ShortCuts.Count > 0)) then
   begin
     Result := FItems[LIndex].Ident;
     if (Result = '') then
@@ -532,7 +569,7 @@ constructor TBCEditorCommandManager.Create();
 begin
   inherited;
 
-  FItems := TList<TItem>.Create();
+  FItems := TObjectList<TItem>.Create();
   Reset();
 end;
 
@@ -573,18 +610,14 @@ end;
 function TBCEditorCommandManager.IndexOf(const AShortCut: TShortCut): Integer;
 var
   LIndex: Integer;
-  LShortCutIndex: Integer;
 begin
-  for LIndex := 0 to FItems.Count - 1 do
-    for LShortCutIndex := 0 to Length(FItems[LIndex].ShortCuts) - 1 do
-      if (FItems[LIndex].ShortCuts[LShortCutIndex] = AShortCut) then
-        Exit(LIndex);
   Result := -1;
+  for LIndex := 0 to FItems.Count - 1 do
+    if (FItems[LIndex].ShortCuts.IndexOf(AShortCut) >= 0) then
+      Result := LIndex;
 end;
 
 function TBCEditorCommandManager.InsertIndex(const ACommand: TBCEditorCommand; out AIndex: Integer): Boolean;
-type
-  Tstrcmp = function(lpString1, lpString2: PWideChar): Integer; stdcall;
 var
   LLeft: Integer;
   LMid: Integer;
@@ -626,45 +659,42 @@ procedure TBCEditorCommandManager.RegisterCommand(const ACommand: TBCEditorComma
   const AShortCut: TShortCut = 0; const AEnabledWhileRecording: Boolean = True;
   const ARecordable: Boolean = True);
 var
-  LCommand: TItem;
   LIndex: Integer;
+  LItem: TItem;
 begin
   Assert((ACommand <= ecLast) or (ACommand >= ecUser));
   Assert((ACommandCategory <= eccLast) or (ACommandCategory >= eccUser));
 
-  LCommand.Command := ACommand;
-  LCommand.CommandCategory := ACommandCategory;
-  LCommand.Ident := AIdent;
-  LCommand.EnabledWhileRecording := AEnabledWhileRecording;
-  LCommand.Recordable := ARecordable;
+  LItem := TItem.Create();
+  LItem.Command := ACommand;
+  LItem.CommandCategory := ACommandCategory;
+  LItem.Ident := AIdent;
+  LItem.EnabledWhileRecording := AEnabledWhileRecording;
+  LItem.Recordable := ARecordable;
 
   if (InsertIndex(ACommand, LIndex)) then
-    FItems.Insert(LIndex, LCommand)
+    FItems.Insert(LIndex, LItem)
   else
-    FItems.List[LIndex] := LCommand;
+  begin
+    FItems[LIndex].Assign(LItem);
+    LItem.Free();
+  end;
 
   AddShortCut(ACommand, AShortCut);
 end;
 
 procedure TBCEditorCommandManager.RemoveShortCut(const AShortCut: TShortCut);
 var
-  LCommandIndex: Integer;
   LIndex: Integer;
+  LShortCutIndex: Integer;
 begin
   if (AShortCut > 0) then
   begin
-    LCommandIndex := IndexOf(AShortCut);
-    if (LCommandIndex >= 0) then
-      for LIndex := 0 to Length(FItems.List[LCommandIndex].ShortCuts) - 1 do
-        if (FItems.List[LCommandIndex].ShortCuts[LIndex] = AShortCut) then
-        begin
-          if (LIndex > 0) then
-            Move(FItems.List[LCommandIndex].ShortCuts[LIndex],
-              FItems.List[LCommandIndex].ShortCuts[LIndex - 1],
-              SizeOf(FItems.List[LCommandIndex].ShortCuts[0]) * (Length(FItems.List[LCommandIndex].ShortCuts) - LIndex + 1));
-          SetLength(FItems.List[LCommandIndex].ShortCuts, Length(FItems.List[LCommandIndex].ShortCuts) - 1);
-          break;
-        end;
+    LIndex := IndexOf(AShortCut);
+    if (LIndex >= 0) then
+      for LShortCutIndex := FItems.List[LIndex].ShortCuts.Count - 1 downto 0 do
+        if (FItems[LIndex].ShortCuts[LShortCutIndex] = AShortCut) then
+          FItems[LIndex].ShortCuts.Delete(LShortCutIndex);
   end;
 end;
 
@@ -703,7 +733,6 @@ begin
   RegisterCommand(ecScrollDown, eccScroll, 'ecScrollDown', ShortCut(VK_DOWN, [ssCtrl]), True, False);
   RegisterCommand(ecScrollLeft, eccScroll, 'ecScrollLeft', 0, True, False);
   RegisterCommand(ecScrollRight, eccScroll, 'ecScrollRight', 0, True, False);
-  RegisterCommand(ecScrollTo, eccScroll, 'ecScrollUp', 0, True, False);
   RegisterCommand(ecScrollUp, eccScroll, 'ecScrollUp', ShortCut(VK_UP, [ssCtrl]), True, False);
 
   RegisterCommand(ecBOL, eccMoveCaret, 'ecBOL', ShortCut(VK_HOME, []));
@@ -755,7 +784,7 @@ begin
   RegisterCommand(ecChar, eccText, 'ecChar');
   RegisterCommand(ecClear, eccText, 'ecClear');
   RegisterCommand(ecDeleteToBOL, eccText, 'ecDeleteToBOL');
-  RegisterCommand(ecDeleteChar, eccText, 'ecDeleteChar', ShortCut(VK_DELETE, []));
+  RegisterCommand(ecDelete, eccText, 'ecDeleteChar', ShortCut(VK_DELETE, []));
   RegisterCommand(ecDeleteToEOL, eccText, 'ecDeleteToEOL', ShortCut(Ord('Y'), [ssCtrl, ssShift]));
   RegisterCommand(ecDeleteLastWord, eccText, 'ecDeleteLastWord', ShortCut(VK_BACK, [ssCtrl]));
   RegisterCommand(ecDeleteLine, eccText, 'ecDeleteLine', ShortCut(Ord('Y'), [ssCtrl]));
@@ -802,7 +831,7 @@ var
   LIndex: Integer;
 begin
   LIndex := IndexOf(ACommand);
-  Result := (LIndex >= 0) and (Length(FItems[LIndex].ShortCuts) > 0);
+  Result := (LIndex >= 0) and (FItems[LIndex].ShortCuts.Count > 0);
   if (Result) then
     AShortCut := FItems[LIndex].ShortCuts[0];
 end;

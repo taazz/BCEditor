@@ -75,7 +75,7 @@ type
 
     TState = set of (lsLoading, lsSaving, lsInserting, lsSearching,
       lsCheckingSyncEdit, lsScanningSyncEdit, lsScanningMatchingPair,
-      lsUpdating,
+      lsUpdating, lsUpdatingCaretPosition,
       lsDontTrim, lsUndo, lsRedo, lsBlockModify,
       lsCaretChanged, lsSelChanged,
       lsSyncEditAvailable, lsSyncEdit);
@@ -213,7 +213,7 @@ type
       FMarkList: TMarkList;
       FImageIndex: Integer;
       FIndex: Integer;
-      FPos: TPoint;
+      FPosition: TBCEditorLinesPosition;
       FVisible: Boolean;
     public
       constructor Create(const AMarkList: TMarkList);
@@ -221,11 +221,11 @@ type
       property ImageIndex: Integer read FImageIndex write FImageIndex;
       property Index: Integer read FIndex write FIndex;
       property MarkList: TMarkList read FMarkList;
-      property Pos: TPoint read FPos write FPos;
+      property Position: TBCEditorLinesPosition read FPosition write FPosition;
       property Visible: Boolean read FVisible write FVisible;
     end;
 
-    TMarkList = class(TList<TMark>)
+    TMarkList = class(TObjectList<TMark>)
     private
       FLines: TBCEditorLines;
       FOnChange: TNotifyEvent;
@@ -233,10 +233,8 @@ type
       procedure Notify(const Item: TMark; Action: TCollectionNotification); override;
       property OnChange: TNotifyEvent read FOnChange write FOnChange;
     public
-      procedure Clear();
       procedure ClearLine(const ALine: Integer);
       constructor Create(const ALines: TBCEditorLines);
-      procedure Delete(AIndex: Integer);
       destructor Destroy(); override;
       function IndexOfIndex(const AIndex: Integer): Integer;
       function Remove(AValue: TMark): Integer;
@@ -385,6 +383,7 @@ type
     procedure SetCodeFoldingEndRange(const ALine: Integer; const AValue: Pointer);
     procedure SetCodeFoldingTreeLine(const ALine: Integer; const AValue: Boolean);
     procedure SetForeground(const ALine: Integer; const AValue: TColor); {$IFNDEF Debug} inline; {$ENDIF}
+    procedure SetState(const ALine: Integer; const AValue: TLine.TState);
     procedure SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer); {$IFNDEF Debug} inline; {$ENDIF}
     procedure SetTextStr(const AValue: string); override;
     procedure SetUpdateState(AUpdating: Boolean); override;
@@ -582,28 +581,18 @@ begin
   FData := nil;
   FImageIndex := -1;
   FIndex := -1;
-  FPos := InvalidLinesPosition;
+  FPosition := InvalidLinesPosition;
   FVisible := True;
 end;
 
 { TBCEditorLines.TMarkList ****************************************************}
-
-procedure TBCEditorLines.TMarkList.Clear();
-var
-  LIndex: Integer;
-begin
-  for LIndex := 0 to Count - 1 do
-    Items[LIndex].Free();
-
-  inherited;
-end;
 
 procedure TBCEditorLines.TMarkList.ClearLine(const ALine: Integer);
 var
   LIndex: Integer;
 begin
   for LIndex := Count - 1 downto 0 do
-    if (Items[LIndex].Pos.Y = ALine) then
+    if (Items[LIndex].Position.Line = ALine) then
       Delete(LIndex);
 end;
 
@@ -612,13 +601,6 @@ begin
   inherited Create();
 
   FLines := ALines;
-end;
-
-procedure TBCEditorLines.TMarkList.Delete(AIndex: Integer);
-begin
-  Items[AIndex].Free();
-
-  inherited;
 end;
 
 destructor TBCEditorLines.TMarkList.Destroy();
@@ -1327,7 +1309,7 @@ begin
   end
   else
   begin
-    Result := Length(Items[ARelativePosition.Line].Text) - APosition.Char + LLineBreakLength;
+    Result := Length(Items[ARelativePosition.Line].Text) - ARelativePosition.Char + LLineBreakLength;
     for LLine := ARelativePosition.Line + 1 to APosition.Line - 1 do
     begin
       Inc(Result, Length(Items[LLine].Text));
@@ -1502,19 +1484,19 @@ begin
     try
       DoDelete(ALine);
 
-      for LIndex := FBookmarks.Count - 1 downto 0 do
-        if (FBookmarks[LIndex].Pos.Y = ALine) then
-          FBookmarks.Delete(LIndex)
-        else if (FBookmarks[LIndex].Pos.Y > ALine) then
-          FBookmarks[LIndex].Pos := Point(FBookmarks[LIndex].Pos.X, FBookmarks[LIndex].Pos.Y - 1);
-      for LIndex := FBookmarks.Count - 1 downto 0 do
-        if (FMarks[LIndex].Pos.Y = ALine) then
-          FMarks.Delete(LIndex)
-        else if (FMarks[LIndex].Pos.Y > ALine) then
-          FMarks[LIndex].Pos := Point(FMarks[LIndex].Pos.X, FMarks[LIndex].Pos.Y - 1);
-
       UndoList.Push(LUndoType, LCaretPosition, LSelArea,
         LinesArea(LBeginPosition, InvalidLinesPosition), LText);
+
+      for LIndex := FBookmarks.Count - 1 downto 0 do
+        if (FBookmarks[LIndex].Position.Line = ALine) then
+          FBookmarks.Delete(LIndex)
+        else if (FBookmarks[LIndex].Position.Line > ALine) then
+          FBookmarks.List[LIndex].Position := LinesPosition(FBookmarks[LIndex].Position.Char, FBookmarks[LIndex].Position.Line - 1);
+      for LIndex := FMarks.Count - 1 downto 0 do
+        if (FMarks[LIndex].Position.Line = ALine) then
+          FMarks.Delete(LIndex)
+        else if (FMarks[LIndex].Position.Line > ALine) then
+          FMarks[LIndex].Position := LinesPosition(FMarks[LIndex].Position.Char, FMarks[LIndex].Position.Line - 1);
     finally
       EndUpdate();
     end;
@@ -1675,7 +1657,7 @@ end;
 
 procedure TBCEditorLines.DoDeleteText(const AArea: TBCEditorLinesArea);
 var
-  Line: Integer;
+  LLine: Integer;
 begin
   Assert((BOFPosition <= AArea.BeginPosition) and (AArea.EndPosition <= EOFPosition));
   Assert(AArea.BeginPosition <= AArea.EndPosition);
@@ -1692,8 +1674,8 @@ begin
       DoPut(AArea.BeginPosition.Line, LeftStr(Items[AArea.BeginPosition.Line].Text, AArea.BeginPosition.Char)
         + Copy(Items[AArea.EndPosition.Line].Text, 1 + AArea.EndPosition.Char, MaxInt));
 
-      for Line := AArea.EndPosition.Line downto AArea.BeginPosition.Line + 1 do
-        DoDelete(Line);
+      for LLine := Min(AArea.EndPosition.Line, Count - 1) downto AArea.BeginPosition.Line + 1 do
+        DoDelete(LLine);
     finally
       EndUpdate();
     end;
@@ -1773,12 +1755,17 @@ var
   LEOL: Boolean;
   LLine: Integer;
   LLineBeginPos: PChar;
-  LLineBreak: array [0..2] of System.Char;
+  LLineBreak: array [0..1] of System.Char;
   LLineEnd: string;
   LPos: PChar;
 begin
   Assert(BOFPosition <= APosition);
-  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Items[APosition.Line].Text)));
+  Assert((APosition.Line = 0) and (Count = 0) or (APosition.Line < Count) and (APosition.Char <= Length(Items[APosition.Line].Text)),
+    'Line: ' + IntToStr(APosition.Line) + #13#10
+    + 'Count: ' + IntToStr(Count) + #13#10
+    + 'Char: ' + IntToStr(APosition.Char) + #13#10
+    + 'Length: ' + IntToStr(Length(Items[APosition.Line].Text)));
+  // Debug 2018-09-04
 
   if (AText = '') then
     Result := APosition
@@ -1799,7 +1786,7 @@ begin
   end
   else
   begin
-    LLineBreak[0] := #0; LLineBreak[1] := #0; LLineBreak[2] := #0;
+    LLineBreak[0] := #0; LLineBreak[1] := #0;
 
 
     BeginUpdate();
@@ -1896,16 +1883,10 @@ var
   LEndPos: PChar;
   LModified: Boolean;
   LPos: PChar;
-  LText: string;
 begin
   Assert((0 <= ALine) and (ALine < Count));
 
-  if (not (loTrimEOL in FOptions) or (lsLoading in FState)) then
-    LText := AText
-  else
-    LText := TrimRight(AText);
-
-  LModified := (LText <> Items[ALine].Text) or (lsInserting in FState);
+  LModified := (AText <> Items[ALine].Text) or (lsInserting in FState);
   if (LModified) then
   begin
     FFoundAreas.Clear();
@@ -1916,12 +1897,12 @@ begin
 
     Items.List[ALine].Flags := [];
     Items.List[ALine].State := lsModified;
-    Items.List[ALine].Text := LText;
+    Items.List[ALine].Text := AText;
 
-    if (LText <> '') then
+    if (AText <> '') then
     begin
-      LPos := @LText[1];
-      LEndPos := @LText[Length(LText)];
+      LPos := @AText[1];
+      LEndPos := @AText[Length(AText)];
       while (LPos <= LEndPos) do
       begin
         if (LPos^ = BCEDITOR_TAB_CHAR) then
@@ -1945,7 +1926,7 @@ begin
   SetCaretPosition(EOLPosition[ALine]);
 
   if (LModified
-    and not (lsInserting in State)
+    and not (lsInserting in FState)
     and Assigned(FOnUpdate)) then
     FOnUpdate(Self, ALine);
 end;
@@ -2023,7 +2004,15 @@ begin
                and ((LUndoItem.UndoType in [utReplace])
                  or ((LUndoItem.UndoType in [utBackspace, utDelete]) xor (List = UndoList)))) then
               begin
+try
                 LText := TextIn[LUndoItem.Area];
+except
+  // Debug 2018-09-03
+        on E: Exception do
+          E.RaiseOuterException(Exception(E.ClassType).Create(E.Message + #13#10
+            + 'Area: ' + IntToStr(Ord(LUndoItem.UndoType)) + #13#10
+            + 'Area: ' + LUndoItem.Area.ToString()));
+end;
                 DoDeleteText(LUndoItem.Area);
                 if (not (LUndoItem.UndoType in [utReplace])) then
                   LDestinationList.Push(LUndoItem.UndoType, LCaretPosition, LSelArea,
@@ -2212,7 +2201,9 @@ begin
   end
   else
   begin
-    Assert(AArea.BeginPosition.Char <= Length(Items[AArea.BeginPosition.Line].Text));
+    Assert(AArea.BeginPosition.Char <= Length(Items[AArea.BeginPosition.Line].Text),
+      'Char: ' + IntToStr(AArea.BeginPosition.Char) + #13#10
+      + 'Length: ' + IntToStr(Length(Items[AArea.BeginPosition.Line].Text)));
     Assert(AArea.EndPosition.Char <= Length(Items[AArea.EndPosition.Line].Text));
 
     LEndLine := AArea.EndPosition.Line;
@@ -2326,11 +2317,11 @@ begin
     DoInsert(ALine, AText);
 
     for LIndex := FBookmarks.Count - 1 downto 0 do
-      if (FBookmarks[LIndex].Pos.Y > ALine) then
-        FBookmarks[LIndex].Pos := Point(FBookmarks[LIndex].Pos.X, FBookmarks[LIndex].Pos.Y + 1);
-    for LIndex := FBookmarks.Count - 1 downto 0 do
-      if (FMarks[LIndex].Pos.Y > ALine) then
-        FMarks[LIndex].Pos := Point(FMarks[LIndex].Pos.X, FMarks[LIndex].Pos.Y + 1);
+      if (FBookmarks[LIndex].Position.Line > ALine) then
+        FBookmarks[LIndex].Position := LinesPosition(FBookmarks[LIndex].Position.Char, FBookmarks[LIndex].Position.Line + 1);
+    for LIndex := FMarks.Count - 1 downto 0 do
+      if (FMarks[LIndex].Position.Line > ALine) then
+        FMarks[LIndex].Position := LinesPosition(FMarks[LIndex].Position.Char, FMarks[LIndex].Position.Line + 1);
 
     if (not (lsLoading in State)) then
     begin
@@ -2632,42 +2623,54 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
 
     procedure UpdateMarkDelete(const AMark: TMark);
     begin
-      if (AMark.Pos.Y = AArea.EndPosition.Line) then
-        if (AArea.BeginPosition.Line = AArea.EndPosition.Line) then
-          AMark.Pos :=
+      if (AArea.Contains(AMark.Position)) then
+        AMark.Position := AArea.BeginPosition
+      else if (AMark.Position.Line = AArea.EndPosition.Line) then
+        if (AMark.Position.Line = AArea.EndPosition.Line) then
+          AMark.Position :=
+            LinesPosition(
+              AArea.BeginPosition.Char + AMark.Position.Char,
+              AArea.BeginPosition.Line)
+        else if (AArea.BeginPosition.Line = AArea.EndPosition.Line) then
+          AMark.Position :=
             Point(
-              AMark.Pos.X - (AArea.EndPosition.Char - AArea.BeginPosition.Char),
-              AMark.Pos.Y)
+              AMark.Position.Char - (AArea.EndPosition.Char - AArea.BeginPosition.Char),
+              AMark.Position.Line)
         else
-          AMark.Pos :=
+          AMark.Position :=
             Point(
-              AMark.Pos.X - AArea.EndPosition.Char,
-              AMark.Pos.Y - (AArea.EndPosition.Line - AArea.BeginPosition.Line))
+              AMark.Position.Char - AArea.EndPosition.Char,
+              AMark.Position.Line - (AArea.EndPosition.Line - AArea.BeginPosition.Line))
       else if (AArea.EndPosition.Line > AArea.BeginPosition.Line) then
-        AMark.Pos :=
+        AMark.Position :=
           Point(
-            AMark.Pos.X,
-            AMark.Pos.Y - (AArea.EndPosition.Line - AArea.BeginPosition.Line));
+            AMark.Position.Char,
+            AMark.Position.Line - (AArea.EndPosition.Line - AArea.BeginPosition.Line));
     end;
 
     procedure UpdateMarkInsert(const AMark: TMark);
     begin
-      if (AMark.Pos.Y = AArea.BeginPosition.Line) then
-        if (AArea.BeginPosition.Line = Result.Line) then
-          AMark.Pos :=
+      if (AMark.Position.Line = AArea.BeginPosition.Line) then
+        if ((AMark.Position.Line = AArea.BeginPosition.Line) and (AMark.Position.Char >= AArea.BeginPosition.Char)) then
+          AMark.Position :=
             LinesPosition(
-              AMark.Pos.X + (Result.Char - AArea.BeginPosition.Char),
-              AMark.Pos.Y)
+              AMark.Position.Char - AArea.BeginPosition.Char,
+              Result.Line)
+        else if (AArea.BeginPosition.Line = Result.Line) then
+          AMark.Position :=
+            LinesPosition(
+              AMark.Position.Char + (Result.Char - AArea.BeginPosition.Char),
+              AMark.Position.Line)
         else
           FSyncEditArea.EndPosition :=
             LinesPosition(
-              AMark.Pos.X + Result.Char,
-              AMark.Pos.Y + Result.Line - AArea.BeginPosition.Line)
+              AMark.Position.Char + Result.Char,
+              AMark.Position.Line + Result.Line - AArea.BeginPosition.Line)
       else if (Result.Line > AArea.BeginPosition.Line) then
-        AMark.Pos :=
-          Point(
-            AMark.Pos.X,
-            AMark.Pos.Y + Result.Line - AArea.BeginPosition.Line);
+        AMark.Position :=
+          LinesPosition(
+            AMark.Position.Char,
+            AMark.Position.Line + Result.Line - AArea.BeginPosition.Line);
     end;
 
   var
@@ -2687,9 +2690,11 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
       LText := TextIn[AArea];
       DoDeleteText(AArea);
       for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkDelete(FBookmarks[LIndex]);
-      for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkDelete(FMarks[LIndex]);
+        if (FBookmarks[LIndex].Position >= AArea.EndPosition) then
+          UpdateMarkDelete(FBookmarks[LIndex]);
+      for LIndex := 0 to FMarks.Count - 1 do
+        if (FMarks[LIndex].Position >= AArea.EndPosition) then
+          UpdateMarkDelete(FMarks[LIndex]);
     end;
 
     if ((AUndoType in [utBackspace, utDelete]) or (AText = '')) then
@@ -2698,9 +2703,11 @@ procedure TBCEditorLines.ReplaceText(const AArea: TBCEditorLinesArea; const ATex
     begin
       Result := DoInsertText(AArea.BeginPosition, AText);
       for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkInsert(FBookmarks[LIndex]);
-      for LIndex := 0 to FBookmarks.Count - 1 do
-        UpdateMarkInsert(FMarks[LIndex]);
+        if (FBookmarks[LIndex].Position >= AArea.BeginPosition) then
+          UpdateMarkInsert(FBookmarks[LIndex]);
+      for LIndex := 0 to FMarks.Count - 1 do
+        if (FMarks[LIndex].Position >= AArea.BeginPosition) then
+          UpdateMarkInsert(FMarks[LIndex]);
     end;
 
     case (AUndoType) of
@@ -2999,7 +3006,7 @@ procedure TBCEditorLines.ScanMatchingPair(const AThread: TJobThread);
                 and LCloseTokenSearch.Find(LCloseTokenPosition, True, LCloseTokenFoundLength)) do
               begin
                 Inc(LDeep);
-                LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength, LCloseTokenPosition);
+                LCloseTokenPosition := PositionOf(-LCloseTokenFoundLength + 1, LCloseTokenPosition);
               end;
 
             Result := LDeep = 0;
@@ -3345,57 +3352,75 @@ var
   LOldSelArea: TBCEditorLinesArea;
   LValue: TBCEditorLinesPosition;
 begin
-  Assert(BOFPosition <= AValue);
-
-  LValue := AValue;
-  if (not (loCaretBeyondEOL in FOptions)) then
-    if (LValue.Line < Count) then
-      LValue.Char := Min(LValue.Char, Length(Items[LValue.Line].Text))
-    else
-      LValue.Char := 0;
-  if (not (loCaretBeyondEOL in FOptions)) then
-    LValue.Line := Max(0, Min(LValue.Line, Count - 1));
-
-  if (LValue <> FCaretPosition) then
+  if (not (lsUpdatingCaretPosition in FState)) then
   begin
-    FMatchedPairOpenArea := InvalidLinesArea;
-    FMatchedPairCloseArea := InvalidLinesArea;
+    Include(FState, lsUpdatingCaretPosition);
 
-    Exclude(FState, lsSyncEditAvailable);
+    Assert(BOFPosition <= AValue);
 
-    LOldCaretPosition := FCaretPosition;
-    LOldSelArea := FSelArea;
+    LValue := AValue;
+    if (not (loCaretBeyondEOL in FOptions)) then
+      if (LValue.Line < Count) then
+        LValue.Char := Min(LValue.Char, Length(Items[LValue.Line].Text))
+      else
+        LValue.Char := 0;
+    if (not (loCaretBeyondEOL in FOptions)) then
+      LValue.Line := Max(0, Min(LValue.Line, Count - 1));
 
-    BeginUpdate();
-    try
-      if (FState * [lsUndo, lsRedo] = []) then
-        UndoList.Push(utSelection, FCaretPosition, FSelArea,
-          InvalidLinesArea);
+    if (LValue <> FCaretPosition) then
+    begin
+      FMatchedPairOpenArea := InvalidLinesArea;
+      FMatchedPairCloseArea := InvalidLinesArea;
 
-      if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
-        while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
-          Delete(Count - 1);
-    finally
-      EndUpdate();
+      Exclude(FState, lsSyncEditAvailable);
+
+      LOldCaretPosition := FCaretPosition;
+      LOldSelArea := FSelArea;
+
+      BeginUpdate();
+      try
+        if (FState * [lsUndo, lsRedo] = []) then
+          UndoList.Push(utSelection, FCaretPosition, FSelArea,
+            InvalidLinesArea);
+
+        if ((loTrimEOL in FOptions) and not (lsLoading in FState)
+          and (LValue.Line <> LOldCaretPosition.Line)
+          and (0 <= LOldCaretPosition.Line) and (LOldCaretPosition.Line < Count)
+          and (Items[LOldCaretPosition.Line].Text <> '')
+          and (Items[LOldCaretPosition.Line].Text[Length(Items[LOldCaretPosition.Line].Text)] <= ' ')) then
+        begin
+          Put(LOldCaretPosition.Line, TrimRight(Items[LOldCaretPosition.Line].Text));
+          if (Assigned(FOnUpdate)) then
+            FOnUpdate(Self, LOldCaretPosition.Line);
+        end;
+
+        if ((loTrimEOF in FOptions) and not (lsLoading in FState)) then
+          while ((LValue < EOFPosition) and (LValue.Line < Count - 1) and (Length(Items[Count - 1].Text) = 0)) do
+            Delete(Count - 1);
+      finally
+        EndUpdate();
+      end;
+
+      FCaretPosition := LValue;
+      FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
+
+      if (UpdateCount > 0) then
+      begin
+        if (FSelArea <> LOldSelArea) then
+          Include(FState, lsSelChanged);
+        if (FCaretPosition <> LOldCaretPosition) then
+          Include(FState, lsCaretChanged);
+      end
+      else
+      begin
+        if ((FSelArea <> LOldSelArea) and Assigned(FOnSelChange)) then
+          FOnSelChange(Self);
+        if ((FCaretPosition <> LOldCaretPosition) and Assigned(FOnCaretChange)) then
+          FOnCaretChange(Self);
+      end;
     end;
 
-    FCaretPosition := LValue;
-    FSelArea := LinesArea(Min(AValue, EOFPosition), Min(AValue, EOFPosition));
-
-    if (UpdateCount > 0) then
-    begin
-      if (FSelArea <> LOldSelArea) then
-        Include(FState, lsSelChanged);
-      if (FCaretPosition <> LOldCaretPosition) then
-        Include(FState, lsCaretChanged);
-    end
-    else
-    begin
-      if ((FSelArea <> LOldSelArea) and Assigned(FOnSelChange)) then
-        FOnSelChange(Self);
-      if ((FCaretPosition <> LOldCaretPosition) and Assigned(FOnCaretChange)) then
-        FOnCaretChange(Self);
-    end;
+    Exclude(FState, lsUpdatingCaretPosition);
   end;
 end;
 
@@ -3460,6 +3485,15 @@ begin
     if (Assigned(FOnModifiedChange)) then
       FOnModifiedChange(Self);
   end;
+end;
+
+procedure TBCEditorLines.SetState(const ALine: Integer; const AValue: TLine.TState);
+begin
+  Assert((0 <= ALine) and (ALine < Count));
+
+  FCriticalSection.Enter();
+  Items.List[ALine].State := AValue;
+  FCriticalSection.Leave();
 end;
 
 procedure TBCEditorLines.SetRow(const ALine: Integer; const AFirstRow, ARowCount: Integer);

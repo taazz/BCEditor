@@ -1,6 +1,6 @@
 {
   "Info": {
-    "Name": "Inno Setup"
+    "Name": "Inno Setup",
     "FileExtensions": [
       ".iss"
     ]

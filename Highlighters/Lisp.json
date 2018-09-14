@@ -1,6 +1,6 @@
-{
+﻿{
   "Info": {
-    "Name": "Lisp"
+    "Name": "Lisp",
     "FileExtensions": [
       ".lisp"
     ]
